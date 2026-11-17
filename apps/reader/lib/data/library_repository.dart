@@ -170,6 +170,7 @@ final class LibraryRepository {
     required List<String> categoryIds,
     required int expectedCatalogRevision,
     required int expectedMangaRevision,
+    void Function()? onAcknowledged,
   }) async {
     validateBusinessCategoryIds(categoryIds);
     validateBusinessRevision(expectedCatalogRevision);
@@ -184,6 +185,7 @@ final class LibraryRepository {
       ),
       basedOnRevision: expectedMangaRevision,
       requireExactRevision: true,
+      onAcknowledged: onAcknowledged,
     );
   }
 
@@ -191,6 +193,7 @@ final class LibraryRepository {
   Future<void> removeFavorite({
     required String mangaKey,
     required int expectedMangaRevision,
+    void Function()? onAcknowledged,
   }) async {
     validateBusinessRevision(expectedMangaRevision);
     await client.mutate(
@@ -200,6 +203,7 @@ final class LibraryRepository {
       ),
       basedOnRevision: expectedMangaRevision,
       requireExactRevision: true,
+      onAcknowledged: onAcknowledged,
     );
   }
 

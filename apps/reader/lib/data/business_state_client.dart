@@ -76,6 +76,7 @@ final class _PendingMutation {
   bool rejected = false;
   bool sent = false;
   BusinessStateException? failure;
+  wire.StateMutationResponse? confirmation;
 }
 
 final class BusinessLibrarySnapshot {
@@ -175,6 +176,11 @@ final class BusinessStateClient {
       !_closed &&
       _pendingCategory?.confirmation != null &&
       _pendingCategory?.rejection == null;
+
+  bool mutationNeedsRead(String mangaKey) =>
+      !_closed &&
+      _pending[mangaKey]?.confirmation != null &&
+      _pending[mangaKey]?.rejected == false;
 
   bool hasOnlyLocalChangesSince(
     String key, {
@@ -692,8 +698,9 @@ final class BusinessStateClient {
     return bytes;
   }
 
-  /// Operation objects contain no transport identity or revision. A failed
-  /// attempt retains its exact request and UUID, including after a lost reply.
+  /// Operation objects contain no transport identity or revision. An unknown
+  /// result retains its exact request and UUID. A validated ACK is retained
+  /// while read-back is unfinished, so its retry only repeats the reads.
   Future<wire.StateMutationResponse> mutate(
     wire.StateMutation operation, {
     int? basedOnRevision,
@@ -702,6 +709,7 @@ final class BusinessStateClient {
     Uint8List? coverBytes,
     bool Function(bool explicitRetry)? canSendProgress,
     bool explicitProgressRetry = false,
+    void Function()? onAcknowledged,
   }) {
     final command = operation.deepCopy();
     if (command.hasMigrateFrom()) {
@@ -793,6 +801,9 @@ final class BusinessStateClient {
           previous,
           explicitProgressRetry:
               explicitProgressRetry && canSendProgress != null,
+          onAcknowledged: previous.fingerprint == fingerprint
+              ? onAcknowledged
+              : null,
         );
         if (previous.fingerprint == fingerprint) return result;
       }
@@ -840,7 +851,11 @@ final class BusinessStateClient {
         canSendProgress: canSendProgress,
       );
       _pending[command.mangaKey] = pending;
-      return _send(pending, explicitProgressRetry: explicitProgressRetry);
+      return _send(
+        pending,
+        explicitProgressRetry: explicitProgressRetry,
+        onAcknowledged: onAcknowledged,
+      );
     });
   }
 
@@ -857,6 +872,7 @@ final class BusinessStateClient {
   Future<wire.StateMutationResponse> _send(
     _PendingMutation pending, {
     bool explicitProgressRetry = false,
+    void Function()? onAcknowledged,
   }) async {
     _ensureOpen();
     _checkProgressWrite(
@@ -870,157 +886,168 @@ final class BusinessStateClient {
     }
     final retry = pending.sent;
     pending.sent = true;
-    final upload = pending.coverBytes;
-    final ApiReply reply;
-    if (upload != null) {
-      final transport = _covers;
-      if (transport == null) throw StateError('Cover transport is unavailable');
-      reply = await transport.uploadCover(
-        mangaKey: pending.request.mangaKey,
-        mutation: pending.body,
-        subject: identity.subject,
-        bytes: upload,
-        contentType: pending.request.setCustomCover.cover.contentType,
-      );
-    } else {
-      reply = await api.fetchApi(
-        '/api/state/mutations',
-        method: 'POST',
-        headers: {..._headers, 'Content-Type': 'application/json'},
-        body: pending.body,
-      );
-    }
-    _ensureOpen();
-    _budget(reply);
-    final value = wire.decodeProtoJson(
-      wire.StateMutationResponse(),
-      jsonDecode(reply.body),
-      maxBytes: _responseLimit,
-    );
-    _version(value.schemaVersion);
-    validateBusinessRevision(value.accountRevision);
-    if (value.mutationId != pending.request.mutationId ||
-        (value.hasManga() &&
-            value.manga.mangaKey != pending.request.mangaKey)) {
-      throw const FormatException(
-        'Business mutation response identity mismatch',
-      );
-    }
-    if (value.hasBookmark()) {
-      validateBusinessBookmark(
-        value.bookmark,
-        chapterKey: _mutationChapter(pending.request),
-      );
-    }
-    if (value.hasError()) {
-      validateBusinessError(value.error);
-      if (value.hasCategoryCatalog()) {
-        _validateCatalog(true, value.categoryCatalog, value.accountRevision);
-      }
-      if (value.hasManga()) {
-        validateBusinessManga(value.manga);
-        _validateCatalog(
-          value.hasCategoryCatalog(),
-          value.categoryCatalog,
-          value.accountRevision,
-        );
-        validateBusinessMangaCategories(value.manga, value.categoryCatalog);
-      }
-      if (value.hasProgress()) {
-        validateBusinessProgress(
-          value.progress,
-          chapterKey: _operationChapter(pending.request),
-        );
-      }
-      pending.rejected = !value.error.retryable;
-      final failure = BusinessStateException(
-        value.error,
-        manga: value.hasManga() ? value.manga : null,
-        progress: value.hasProgress() ? value.progress : null,
-        bookmark: value.hasBookmark() ? value.bookmark : null,
-        conflictedChapterKey: _mutationChapter(pending.request),
-      );
-      pending.failure = failure;
-      throw failure;
-    }
-    _success(reply);
-    if (!value.hasManga() ||
-        (pending.requireExactRevision
-            ? value.manga.revision != pending.request.expectedRevision + 1
-            : value.manga.revision <= pending.request.expectedRevision) ||
-        value.accountRevision < value.manga.revision ||
-        value.accountRevision < pending.accountRevision) {
-      throw const FormatException('Mutation did not confirm a new revision');
-    }
-    if (pending.request.hasMigrateFrom()) {
-      _validateMigrationAck(pending.request.migrateFrom, value);
-    }
-    validateBusinessManga(value.manga);
-    _validateCatalog(
-      value.hasCategoryCatalog(),
-      value.categoryCatalog,
-      value.accountRevision,
-    );
-    validateBusinessMangaCategories(value.manga, value.categoryCatalog);
-    if (pending.requireExactRevision) {
-      final request = pending.request;
-      if (request.hasSetFavorite() &&
-          value.manga.favorite != request.setFavorite.favorite) {
-        throw const FormatException('Mutation response favorite mismatch');
-      }
-      if (request.hasSetCategories()) {
-        final expected = request.setCategories.categoryIds.toSet();
-        final actual = value.manga.categoryIds.toSet();
-        if (expected.length != actual.length || !actual.containsAll(expected)) {
-          throw const FormatException('Mutation response categories mismatch');
-        }
-      }
-    }
-    if (!_coverMatches(pending.request, value.manga)) {
-      throw const FormatException('Mutation response custom cover mismatch');
-    }
-    final expectedChapter = _operationChapter(pending.request);
-    final chapterRead = pending.request.hasSetChapterRead()
-        ? pending.request.setChapterRead
-        : null;
-    if (chapterRead != null &&
-        (!value.hasProgress() ||
-            value.progress.completed != chapterRead.read ||
-            value.progress.epoch == 0 ||
-            (!chapterRead.read &&
-                (value.progress.hasCurrent() ||
-                    value.progress.hasFurthest())))) {
-      throw const FormatException(
-        'Mutation response chapter read state mismatch',
-      );
-    }
     final bookmark = pending.request.hasSetBookmark()
         ? pending.request.setBookmark
         : null;
-    if (bookmark != null &&
-        (!value.hasBookmark() ||
-            value.bookmark.chapterKey != bookmark.chapterKey ||
-            value.bookmark.bookmarked != bookmark.bookmarked)) {
-      throw const FormatException('Mutation response bookmark mismatch');
-    }
-    if (bookmark == null && value.hasBookmark()) {
-      throw const FormatException('Unexpected mutation bookmark');
-    }
-    if (expectedChapter != null &&
-        (!value.hasProgress() ||
-            value.progress.chapterKey != expectedChapter ||
-            (chapterRead == null && !value.progress.hasCurrent()) ||
-            (value.progress.hasCurrent() &&
-                value.progress.current.chapterKey != expectedChapter) ||
-            (value.progress.hasFurthest() &&
-                value.progress.furthest.chapterKey != expectedChapter))) {
-      throw const FormatException(
-        'Mutation response progress identity mismatch',
+    var value = pending.confirmation;
+    if (value == null) {
+      final upload = pending.coverBytes;
+      final ApiReply reply;
+      if (upload != null) {
+        final transport = _covers;
+        if (transport == null) {
+          throw StateError('Cover transport is unavailable');
+        }
+        reply = await transport.uploadCover(
+          mangaKey: pending.request.mangaKey,
+          mutation: pending.body,
+          subject: identity.subject,
+          bytes: upload,
+          contentType: pending.request.setCustomCover.cover.contentType,
+        );
+      } else {
+        reply = await api.fetchApi(
+          '/api/state/mutations',
+          method: 'POST',
+          headers: {..._headers, 'Content-Type': 'application/json'},
+          body: pending.body,
+        );
+      }
+      _ensureOpen();
+      _budget(reply);
+      value = wire.decodeProtoJson(
+        wire.StateMutationResponse(),
+        jsonDecode(reply.body),
+        maxBytes: _responseLimit,
       );
+      _version(value.schemaVersion);
+      validateBusinessRevision(value.accountRevision);
+      if (value.mutationId != pending.request.mutationId ||
+          (value.hasManga() &&
+              value.manga.mangaKey != pending.request.mangaKey)) {
+        throw const FormatException(
+          'Business mutation response identity mismatch',
+        );
+      }
+      if (value.hasBookmark()) {
+        validateBusinessBookmark(
+          value.bookmark,
+          chapterKey: _mutationChapter(pending.request),
+        );
+      }
+      if (value.hasError()) {
+        validateBusinessError(value.error);
+        if (value.hasCategoryCatalog()) {
+          _validateCatalog(true, value.categoryCatalog, value.accountRevision);
+        }
+        if (value.hasManga()) {
+          validateBusinessManga(value.manga);
+          _validateCatalog(
+            value.hasCategoryCatalog(),
+            value.categoryCatalog,
+            value.accountRevision,
+          );
+          validateBusinessMangaCategories(value.manga, value.categoryCatalog);
+        }
+        if (value.hasProgress()) {
+          validateBusinessProgress(
+            value.progress,
+            chapterKey: _operationChapter(pending.request),
+          );
+        }
+        pending.rejected = !value.error.retryable;
+        final failure = BusinessStateException(
+          value.error,
+          manga: value.hasManga() ? value.manga : null,
+          progress: value.hasProgress() ? value.progress : null,
+          bookmark: value.hasBookmark() ? value.bookmark : null,
+          conflictedChapterKey: _mutationChapter(pending.request),
+        );
+        pending.failure = failure;
+        throw failure;
+      }
+      _success(reply);
+      if (!value.hasManga() ||
+          (pending.requireExactRevision
+              ? value.manga.revision != pending.request.expectedRevision + 1
+              : value.manga.revision <= pending.request.expectedRevision) ||
+          value.accountRevision < value.manga.revision ||
+          value.accountRevision < pending.accountRevision) {
+        throw const FormatException('Mutation did not confirm a new revision');
+      }
+      if (pending.request.hasMigrateFrom()) {
+        _validateMigrationAck(pending.request.migrateFrom, value);
+      }
+      validateBusinessManga(value.manga);
+      _validateCatalog(
+        value.hasCategoryCatalog(),
+        value.categoryCatalog,
+        value.accountRevision,
+      );
+      validateBusinessMangaCategories(value.manga, value.categoryCatalog);
+      if (pending.requireExactRevision) {
+        final request = pending.request;
+        if (request.hasSetFavorite() &&
+            value.manga.favorite != request.setFavorite.favorite) {
+          throw const FormatException('Mutation response favorite mismatch');
+        }
+        if (request.hasSetCategories()) {
+          final expected = request.setCategories.categoryIds.toSet();
+          final actual = value.manga.categoryIds.toSet();
+          if (expected.length != actual.length ||
+              !actual.containsAll(expected)) {
+            throw const FormatException(
+              'Mutation response categories mismatch',
+            );
+          }
+        }
+      }
+      if (!_coverMatches(pending.request, value.manga)) {
+        throw const FormatException('Mutation response custom cover mismatch');
+      }
+      final expectedChapter = _operationChapter(pending.request);
+      final chapterRead = pending.request.hasSetChapterRead()
+          ? pending.request.setChapterRead
+          : null;
+      if (chapterRead != null &&
+          (!value.hasProgress() ||
+              value.progress.completed != chapterRead.read ||
+              value.progress.epoch == 0 ||
+              (!chapterRead.read &&
+                  (value.progress.hasCurrent() ||
+                      value.progress.hasFurthest())))) {
+        throw const FormatException(
+          'Mutation response chapter read state mismatch',
+        );
+      }
+      if (bookmark != null &&
+          (!value.hasBookmark() ||
+              value.bookmark.chapterKey != bookmark.chapterKey ||
+              value.bookmark.bookmarked != bookmark.bookmarked)) {
+        throw const FormatException('Mutation response bookmark mismatch');
+      }
+      if (bookmark == null && value.hasBookmark()) {
+        throw const FormatException('Unexpected mutation bookmark');
+      }
+      if (expectedChapter != null &&
+          (!value.hasProgress() ||
+              value.progress.chapterKey != expectedChapter ||
+              (chapterRead == null && !value.progress.hasCurrent()) ||
+              (value.progress.hasCurrent() &&
+                  value.progress.current.chapterKey != expectedChapter) ||
+              (value.progress.hasFurthest() &&
+                  value.progress.furthest.chapterKey != expectedChapter))) {
+        throw const FormatException(
+          'Mutation response progress identity mismatch',
+        );
+      }
+      if (value.hasProgress()) {
+        validateBusinessProgress(value.progress, chapterKey: expectedChapter);
+      }
+      value.freeze();
+      pending.confirmation = value;
     }
-    if (value.hasProgress()) {
-      validateBusinessProgress(value.progress, chapterKey: expectedChapter);
-    }
+    onAcknowledged?.call();
     // Idempotency confirms that the original write happened, not that its
     // result is still current. Refresh ambiguous retries and known old replies
     // before acknowledging a draft, even if a shelf refresh evicted this key.

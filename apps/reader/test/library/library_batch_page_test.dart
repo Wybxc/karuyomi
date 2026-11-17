@@ -376,6 +376,65 @@ void main() {
     },
   );
 
+  for (final brightness in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'a batch ACK read failure remains readable in $brightness at $textScale and retries reads only',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          await createCategory(tester, _first, '想读');
+          final alpha = await favorite(tester, 'Alpha');
+          await show(tester, brightness: brightness, textScale: textScale);
+          server.requests.clear();
+          await selectAll(tester);
+          await tap(
+            tester,
+            find.byKey(const ValueKey('library-batch-add-categories')),
+          );
+          await tap(tester, category(_first));
+          server.loseNextResponse = true;
+          await tap(tester, find.text('开始'));
+          final original = mutations().single.body;
+          var failRead = true;
+          platform.afterBusinessReply = (request, reply) =>
+              failRead &&
+                  request.method == 'GET' &&
+                  request.uri.path == '/api/state/manga/${alpha.mangaKey}'
+              ? const ApiReply(
+                  status: 503,
+                  headers: {'content-type': 'text/plain'},
+                  body: 'Confirmed batch read unavailable',
+                  redirected: false,
+                )
+              : reply;
+          await tap(tester, find.text('重试'));
+          expect(mutations(), hasLength(2));
+          expect(mutations().last.body, original);
+          final applied = server.appliedMutations;
+          expect(find.text('已确认 1 / 1 部 · 未开始 0 部'), findsOneWidget);
+          expect(find.text('全部修改已由服务端确认。'), findsNothing);
+          expect(find.text('修改已确认，需重试读取'), findsOneWidget);
+          expect(find.text('尚未确认，需重试原操作'), findsNothing);
+          expect(find.text('重试读取').hitTestable(), findsOneWidget);
+          await tap(tester, find.text('稍后'));
+          await tap(tester, find.byKey(const ValueKey('library-resume-batch')));
+          expect(find.text('重试读取'), findsOneWidget);
+          failRead = false;
+          await tap(tester, find.text('重试读取'));
+          expect(mutations(), hasLength(2));
+          expect(server.appliedMutations, applied);
+          expect(find.text('全部修改已由服务端确认。'), findsOneWidget);
+          expect(server.manga(alpha.mangaKey)!.categoryIds, [_first]);
+          expect(tester.takeException(), isNull);
+          await hide(tester);
+        },
+      );
+    }
+  }
+
   testWidgets(
     'a partial batch resumes its exact uncertain command before explicitly continuing the remainder',
     (tester) async {

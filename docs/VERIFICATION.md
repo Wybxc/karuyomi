@@ -1,5 +1,7 @@
 # 实施验证记录
 
+2026-11-18，[单作品与批量读取恢复](verification/mihon-cupertino-fidelity.md#单作品与批量确认后的读取恢复)先复现有效ACK后补读失败仍重复POST及误报未确认，再改为保留已校验确认、仅重读。批量读取未完成不自动发送后续项；相关十三文件159项组件/仓库回归通过，无效ACK与较新远端修改继续拦截。新提交完整CI见[PR #8检查](https://github.com/Wybxc/karuyomi/pull/8/checks)，正式Web待验，没有新主图，仍116/169（68.6%）。
+
 2026-11-18，用户确认当前聊天浏览器面板已打开后，显式iab选择和完整库存两次调用仍超时，累计六次。最新[归属记录](verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-准备受阻)确认桌面`ownerRoutePath`已指向本聊天，但浏览器`conversationId`仍是`client-new-thread`临时身份，控制请求继续因“属于另一个任务”被拒绝；普通打开面板未恢复绑定，官方打开入口仍queued。更深桌面状态原因尚未确定，待重建桌面连接后再验证；没有新产品画面，仍116/169（68.6%）。
 
 2026-11-18，同轮[浏览器归属诊断](verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-准备受阻)在ChatGPT 26.1111.21308的本地日志定位到当前聊天/当前turn的直接拒绝：`IAB browser belongs to another task.`，发生于IAB `getInfo / prepareSessionRoute`。在本聊天打开内置浏览器面板的官方入口返回queued，尚不能算控制恢复；已请求用户显示本聊天的浏览器后继续。为什么桌面归属不一致仍未确定，不能把同时出现的其它WebSocket警告当作因果证据。CI与API准备证据保持，主图仍116/169；没有绕过归属检查或改用其它浏览器。

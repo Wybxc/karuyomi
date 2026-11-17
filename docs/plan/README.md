@@ -79,6 +79,8 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 用户确认面板已打开后，两次新控制仍超时。最新记录显示页面路由已是本聊天、浏览器归属却仍为`client-new-thread`临时会话；普通打开面板没有刷新绑定，待重建桌面连接后再核对控制，当前仍无新主图。
 
+浏览器恢复期间已复现并修复[单作品与批量确认后的读取恢复](../verification/mihon-cupertino-fidelity.md#单作品与批量确认后的读取恢复)：有效ACK后读回失败只重读，界面区分已确认读取与未知结果，批量暂停后续项。十三文件159项相关回归通过，新提交完整CI见PR #8检查，正式Web仍待；主图继续116/169，不以组件通过替代实际双主题画面。
+
 **当前 UI 交付**：[统一 Cupertino 已恢复并生产上线](cupertino-ui.md#恢复-cupertino)。PR #7 合入后主线 CI、742 项 Dart 回归、46 条公开资源和 Access 门禁通过；内置浏览器重新确认导航、真实图片、设置保存和独立新文档续读，独立 D1 核对状态一致，见[恢复验证](../verification/cupertino-ui.md#恢复-cupertino-后的生产复验)。Web / iOS / Android 保持一套 Cupertino 共享实现，沿用 generator、Hooks 与现有权威读写/生命周期。[Liquid Glass](liquid-glass.md)已终止，玻璃库、专用材质设置及资源已移除；[评估](../design/liquid-glass-evaluation.md)与[执行证据](../verification/liquid-glass.md)保留历史及未完成性能门，不宣称能耗结论。[代码削减](ui-code-consolidation.md)仍独立规划，原生现场验证继续停止。
 
 2026-11-12：[扩展与浏览 UI 流程实施](browse-ui-flow.md)已完成本轮客户端改动、完整 Flutter 回归、Web 分项验收和[生产上线](../verification/browse-ui-flow.md#生产发布)。已覆盖源目录、扩展维护、真实 xkcd 阅读、退出阅读后跨源搜索及新标签续读；生产另通过登录、Komiic 目录及扩展页最小检查。用户选择[主线 CI 通过后自动上线](../DEPLOYMENT.md)，复用构建和现网扩展，不让 UI 等待 AOT 全量。账户权威与精确构建门禁沿用现有合同，普通 Source 缩略图仍为占位，原生验证保持停止。

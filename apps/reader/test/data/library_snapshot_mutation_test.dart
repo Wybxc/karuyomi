@@ -430,7 +430,7 @@ void main() {
   });
 
   test(
-    'an ACK followed by a failed catalog shelf read retains the original UUID',
+    'an ACK followed by a failed catalog shelf read retries only the reads',
     () async {
       await _favorite(library);
       await _createCategory(library);
@@ -454,15 +454,96 @@ void main() {
       );
       await expectLater(remove(), throwsStateError);
       final original = _posts(server).last.body;
+      final postCount = _posts(server).length;
       expect(server.manga(_mangaKey)!.favorite, false);
       final applied = server.appliedMutations;
       server.beforeRequest = null;
       await remove();
+      expect(_posts(server), hasLength(postCount));
       expect(_posts(server).last.body, original);
       expect(server.appliedMutations, applied);
       expect(await library.watchEntries().first, isEmpty);
     },
   );
+
+  test('an association retry retains its validated ACK when the current manga read fails', () async {
+    await _favorite(library);
+    await _createCategory(library);
+    final entry = await _entry(library);
+    Future<void> save() => library.setCategories(
+      mangaKey: _mangaKey,
+      categoryIds: [_categoryId],
+      expectedCatalogRevision: 1,
+      expectedMangaRevision: entry.revision,
+    );
+    server.loseNextResponse = true;
+    await expectLater(save(), throwsStateError);
+    expect(client.mutationNeedsRead(_mangaKey), false);
+    final original = _posts(server).last.body;
+    final applied = server.appliedMutations;
+    server.beforeRequest = (request) =>
+        request.method == 'GET' &&
+            request.uri.path == '/api/state/manga/$_mangaKey'
+        ? const ApiReply(
+            status: 503,
+            headers: {'content-type': 'text/plain'},
+            body: 'Confirmed association read unavailable',
+            redirected: false,
+          )
+        : null;
+    await expectLater(save(), throwsA(isA<BusinessStateTransportException>()));
+    expect(client.mutationNeedsRead(_mangaKey), true);
+    expect(_posts(server).last.body, original);
+    final postCount = _posts(server).length;
+    server.beforeRequest = null;
+    await save();
+    expect(client.mutationNeedsRead(_mangaKey), false);
+    expect(_posts(server), hasLength(postCount));
+    expect(server.appliedMutations, applied);
+    expect((await _entry(library)).categoryIds, [_categoryId]);
+  });
+
+  test('a cached association ACK cannot replace a newer remote edit on a read-only retry', () async {
+    await _favorite(library);
+    await _createCategory(library);
+    final entry = await _entry(library);
+    Future<void> save() => library.setCategories(
+      mangaKey: _mangaKey,
+      categoryIds: [_categoryId],
+      expectedCatalogRevision: 1,
+      expectedMangaRevision: entry.revision,
+    );
+    server.loseNextResponse = true;
+    await expectLater(save(), throwsStateError);
+    server.beforeRequest = (request) {
+      if (request.method == 'GET' &&
+          request.uri.path == '/api/state/manga/$_mangaKey') {
+        throw StateError('Injected confirmed association read failure');
+      }
+      return null;
+    };
+    await expectLater(save(), throwsStateError);
+    expect(client.mutationNeedsRead(_mangaKey), true);
+    server.beforeRequest = null;
+    final remote = _client(server);
+    addTearDown(remote.dispose);
+    await LibraryRepository(remote).setCategories(
+      mangaKey: _mangaKey,
+      categoryIds: [],
+      expectedCatalogRevision: 1,
+      expectedMangaRevision: server.manga(_mangaKey)!.revision,
+    );
+    final postCount = _posts(server).length;
+    final applied = server.appliedMutations;
+    await expectLater(save(), throwsA(_conflict));
+    expect(client.mutationNeedsRead(_mangaKey), false);
+    expect(_posts(server), hasLength(postCount));
+    expect(server.appliedMutations, applied);
+    expect(server.manga(_mangaKey)!.categoryIds, isEmpty);
+    final requests = server.requests.length;
+    await expectLater(save(), throwsA(_conflict));
+    expect(server.requests, hasLength(requests));
+  });
 
   for (final fault in _AckFault.values) {
     test(
@@ -475,22 +556,29 @@ void main() {
         await _favorite(library);
         await _createCategory(library);
         final entry = await _entry(library);
+        var acknowledgements = 0;
+        void onAcknowledged() => acknowledgements++;
         Future<void> save() => fault == _AckFault.categories
             ? library.setCategories(
                 mangaKey: _mangaKey,
                 categoryIds: [_categoryId],
                 expectedCatalogRevision: 1,
                 expectedMangaRevision: entry.revision,
+                onAcknowledged: onAcknowledged,
               )
             : library.removeFavorite(
                 mangaKey: _mangaKey,
                 expectedMangaRevision: entry.revision,
+                onAcknowledged: onAcknowledged,
               );
         api.enabled = true;
         await expectLater(save(), throwsFormatException);
+        expect(acknowledgements, 0);
+        expect(client.mutationNeedsRead(_mangaKey), false);
         final original = _posts(server).last.body;
         final applied = server.appliedMutations;
         await save();
+        expect(acknowledgements, 1);
         expect(_posts(server).last.body, original);
         expect(server.appliedMutations, applied);
       },

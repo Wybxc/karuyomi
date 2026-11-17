@@ -242,6 +242,105 @@ void main() {
     expect(pendingLibraryBatch(LibraryRepository(nextClient)), isNull);
   });
 
+  for (final action in [
+    LibraryBatchAction.removeFavorites,
+    LibraryBatchAction.addCategories,
+  ]) {
+    test(
+      'a batch $action ACK read failure pauses the remainder and retries reads only',
+      () async {
+        final view = await _seed(repository);
+        final draft = batch(
+          view,
+          action: action,
+          categoryIds: action == LibraryBatchAction.addCategories
+              ? {_firstCategory}
+              : {},
+        );
+        server.loseNextResponse = true;
+        await draft.start(isCurrent: () => true);
+        final stages = <LibraryBatchItemStatus>[];
+        draft.addListener(() => stages.add(draft.items.first.status));
+        final original = _posts(server).last.body;
+        final applied = server.appliedMutations;
+        final key = view.entries.first.mangaKey;
+        server.beforeRequest = (request) =>
+            request.method == 'GET' &&
+                request.uri.path == '/api/state/manga/$key'
+            ? const ApiReply(
+                status: 503,
+                headers: {'content-type': 'text/plain'},
+                body: 'Confirmed batch read unavailable',
+                redirected: false,
+              )
+            : null;
+        await draft.retry(isCurrent: () => true);
+        expect(stages, contains(LibraryBatchItemStatus.reading));
+        expect(draft.items.first.status, LibraryBatchItemStatus.readFailed);
+        expect(_posts(server).last.body, original);
+        final postCount = _posts(server).length;
+        expect(draft.error, '该项修改已确认，但未能读取最新书架。请重试读取；后续项目尚未发送。');
+        expect(draft.confirmedCount, 1);
+        expect(draft.notStartedCount, 2);
+        expect(draft.completed, false);
+        expect(draft.canContinue, false);
+        expect(draft.canRetry, true);
+        await draft.retry(isCurrent: () => true);
+        expect(_posts(server), hasLength(postCount));
+        server.beforeRequest = null;
+        await draft.retry(isCurrent: () => true);
+        expect(_posts(server), hasLength(postCount));
+        expect(server.appliedMutations, applied);
+        expect(draft.completed, false);
+        expect(draft.canContinue, true);
+        expect(draft.notStartedCount, 2);
+        await draft.continueRemaining(isCurrent: () => true);
+        expect(_posts(server), hasLength(postCount + 2));
+        expect(draft.completed, true);
+      },
+    );
+  }
+
+  test('a batch read rejection after a valid ACK does not reject the confirmed write', () async {
+    final view = await _seed(repository);
+    final draft = batch(view);
+    server.loseNextResponse = true;
+    await draft.start(isCurrent: () => true);
+    server.beforeRequest = (request) =>
+        request.method == 'GET' &&
+            request.uri.path ==
+                '/api/state/manga/${view.entries.first.mangaKey}'
+        ? ApiReply(
+            status: 200,
+            headers: const {'content-type': 'application/json'},
+            body: jsonEncode(
+              wire.encodeProtoJson(
+                wire.MangaStateResponse(
+                  schemaVersion: 1,
+                  accountRevision: server.accountRevision,
+                  error: wire.BusinessStateError(
+                    code: wire
+                        .BusinessStateErrorCode
+                        .BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+                    message: 'Current read rejected',
+                  ),
+                ),
+              ),
+            ),
+            redirected: false,
+          )
+        : null;
+    await draft.retry(isCurrent: () => true);
+    expect(draft.items.first.status, LibraryBatchItemStatus.readFailed);
+    expect(draft.error, '该项修改已确认，但未能读取最新书架。请重试读取；后续项目尚未发送。');
+    expect(draft.canReloadAndFinish, false);
+    final postCount = _posts(server).length;
+    server.beforeRequest = null;
+    await draft.retry(isCurrent: () => true);
+    expect(_posts(server), hasLength(postCount));
+    expect(draft.canContinue, true);
+  });
+
   for (final change in ['catalog', 'manga']) {
     test(
       'a remote $change change after the first write blocks the frozen remainder without rebasing',

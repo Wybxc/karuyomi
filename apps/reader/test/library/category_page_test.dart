@@ -905,6 +905,82 @@ void main() {
     },
   );
 
+  for (final brightness in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'an acknowledged association read failure reopens in $brightness at $textScale as a read-only retry',
+        (tester) async {
+          await create(tester);
+          final alpha = await favorite(tester, 'Alpha');
+          await show(tester, brightness: brightness, textScale: textScale);
+          await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+          await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
+          await tap(tester, checkboxLabel('想读'));
+          server.loseNextResponse = true;
+          await tap(tester, find.text('保存'));
+          expect(find.textContaining('尚未确认保存'), findsWidgets);
+          final original = posts('/api/state/mutations').last.body;
+          var failRead = true;
+          final received = Completer<void>();
+          final release = Completer<void>();
+          addTearDown(() {
+            if (!release.isCompleted) release.complete();
+          });
+          platform.afterBusinessReply = (request, reply) async {
+            if (failRead &&
+                request.method == 'GET' &&
+                request.uri.path == '/api/state/manga/${alpha.mangaKey}') {
+              if (!received.isCompleted) received.complete();
+              await release.future;
+              return const ApiReply(
+                status: 503,
+                headers: {'content-type': 'text/plain'},
+                body: 'Confirmed association read unavailable',
+                redirected: false,
+              );
+            }
+            return reply;
+          };
+          await tapDuringRead(tester, find.text('重试'));
+          await tester.runAsync(() => received.future);
+          expect(find.text('正在读取已确认修改后的书架。'), findsOneWidget);
+          expect(find.text('正在等待服务端确认分类修改。'), findsNothing);
+          expect(
+            tester
+                .widget<CupertinoButton>(
+                  find.widgetWithText(CupertinoButton, '稍后'),
+                )
+                .onPressed,
+            isNotNull,
+          );
+          release.complete();
+          await tester.pumpAndSettle();
+          final postCount = posts('/api/state/mutations').length;
+          final applied = server.appliedMutations;
+          expect(posts('/api/state/mutations').last.body, original);
+          expect(server.manga(alpha.mangaKey)!.categoryIds, [_first]);
+          expect(find.text('修改已确认，但未能读取最新书架。请重试读取。'), findsWidgets);
+          expect(find.textContaining('尚未确认保存'), findsNothing);
+          final retryRead = find.byWidgetPredicate(
+            (widget) => widget is Text && widget.semanticsLabel == '重试读取',
+          );
+          expect(retryRead, findsOneWidget);
+          await tap(tester, find.text('稍后').last);
+          expect(find.text('继续读取最新书架'), findsOneWidget);
+          await tap(tester, find.text('继续读取最新书架'));
+          expect(retryRead, findsOneWidget);
+          expect(posts('/api/state/mutations'), hasLength(postCount));
+          failRead = false;
+          await tap(tester, retryRead);
+          expect(posts('/api/state/mutations'), hasLength(postCount));
+          expect(server.appliedMutations, applied);
+          expect(tester.takeException(), isNull);
+          await hide(tester);
+        },
+      );
+    }
+  }
+
   testWidgets(
     'a service identity switch disables a category draft instead of writing it to the new account',
     (tester) async {

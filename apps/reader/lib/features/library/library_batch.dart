@@ -9,8 +9,10 @@ enum LibraryBatchAction { removeFavorites, addCategories, removeCategories }
 enum LibraryBatchItemStatus {
   notStarted,
   sending,
+  reading,
   confirmed,
   uncertain,
+  readFailed,
   blocked,
 }
 
@@ -56,12 +58,20 @@ final class LibraryBatchDraft extends ChangeNotifier {
 
   bool get attempted => _attempted;
   bool get busy => _busy;
-  bool get completed => confirmedCount == items.length;
+  bool get completed =>
+      items.every((item) => item.status == LibraryBatchItemStatus.confirmed);
   bool get finished => _finished;
   bool get pauseRequested => _pauseRequested;
   String? get error => _error;
   int get confirmedCount => items
-      .where((item) => item.status == LibraryBatchItemStatus.confirmed)
+      .where(
+        (item) => switch (item.status) {
+          LibraryBatchItemStatus.confirmed ||
+          LibraryBatchItemStatus.reading ||
+          LibraryBatchItemStatus.readFailed => true,
+          _ => false,
+        },
+      )
       .length;
   int get notStartedCount => items
       .where((item) => item.status == LibraryBatchItemStatus.notStarted)
@@ -69,6 +79,7 @@ final class LibraryBatchDraft extends ChangeNotifier {
   LibraryBatchItem? get failedItem {
     for (final item in items) {
       if (item.status == LibraryBatchItemStatus.uncertain ||
+          item.status == LibraryBatchItemStatus.readFailed ||
           item.status == LibraryBatchItemStatus.blocked) {
         return item;
       }
@@ -85,7 +96,10 @@ final class LibraryBatchDraft extends ChangeNotifier {
   bool get canRetry =>
       !busy &&
       !finished &&
-      failedItem?.status == LibraryBatchItemStatus.uncertain;
+      (failedItem?.status == LibraryBatchItemStatus.uncertain ||
+          retryNeedsRead);
+  bool get retryNeedsRead =>
+      failedItem?.status == LibraryBatchItemStatus.readFailed;
   bool get canReloadAndFinish =>
       !busy &&
       !finished &&
@@ -114,7 +128,7 @@ final class LibraryBatchDraft extends ChangeNotifier {
     await _runRemaining(isCurrent);
   }
 
-  /// Retry only the uncertain original write. Starting the remaining writes
+  /// Retry only the original item or its unfinished reads. Starting the rest
   /// requires a separate explicit action after this result is confirmed.
   Future<void> retry({required bool Function() isCurrent}) async {
     if (!canRetry || !isCurrent()) return;
@@ -192,12 +206,18 @@ final class LibraryBatchDraft extends ChangeNotifier {
     item._status = LibraryBatchItemStatus.sending;
     item._error = null;
     notifyListeners();
+    void onAcknowledged() {
+      item._status = LibraryBatchItemStatus.reading;
+      notifyListeners();
+    }
+
     try {
       switch (action) {
         case LibraryBatchAction.removeFavorites:
           await repository.removeFavorite(
             mangaKey: item.entry.mangaKey,
             expectedMangaRevision: item.entry.revision,
+            onAcknowledged: onAcknowledged,
           );
         case LibraryBatchAction.addCategories:
         case LibraryBatchAction.removeCategories:
@@ -206,6 +226,7 @@ final class LibraryBatchDraft extends ChangeNotifier {
             categoryIds: item.categoryIds,
             expectedCatalogRevision: view.categoryRevision,
             expectedMangaRevision: item.entry.revision,
+            onAcknowledged: onAcknowledged,
           );
       }
       // A late ACK may settle the old draft, but the loop checks the caller's
@@ -215,21 +236,34 @@ final class LibraryBatchDraft extends ChangeNotifier {
       item._status = LibraryBatchItemStatus.blocked;
       item._error = '该漫画已有另一项未确认修改，请先处理原操作，再重新读取书架并确认新清单。';
     } on BusinessStateException catch (failure) {
-      final blocked = failure.conflict || !failure.error.retryable;
-      item._status = blocked
-          ? LibraryBatchItemStatus.blocked
-          : LibraryBatchItemStatus.uncertain;
-      item._error = failure.conflict
-          ? '该漫画或分类已变化，请重新读取书架并确认新的清单。'
-          : blocked
-          ? '服务端拒绝了该项修改，请重新读取书架后处理。'
-          : '尚未确认该项修改，请原样重试；后续项目尚未发送。';
+      final blocked =
+          !repository.client.mutationNeedsRead(item.entry.mangaKey) &&
+          (failure.conflict || !failure.error.retryable);
+      if (blocked) {
+        item._status = LibraryBatchItemStatus.blocked;
+        item._error = failure.conflict
+            ? '该漫画或分类已变化，请重新读取书架并确认新的清单。'
+            : '服务端拒绝了该项修改，请重新读取书架后处理。';
+      } else {
+        _retryableFailure(item);
+      }
     } catch (_) {
-      item._status = LibraryBatchItemStatus.uncertain;
-      item._error = '尚未确认该项修改，请原样重试；后续项目尚未发送。';
+      _retryableFailure(item);
     }
     _error = item.error;
     notifyListeners();
+  }
+
+  void _retryableFailure(LibraryBatchItem item) {
+    final acknowledged = repository.client.mutationNeedsRead(
+      item.entry.mangaKey,
+    );
+    item._status = acknowledged
+        ? LibraryBatchItemStatus.readFailed
+        : LibraryBatchItemStatus.uncertain;
+    item._error = acknowledged
+        ? '该项修改已确认，但未能读取最新书架。请重试读取；后续项目尚未发送。'
+        : '尚未确认该项修改，请原样重试；后续项目尚未发送。';
   }
 
   void _finish() {

@@ -228,8 +228,10 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                 switch (item.status) {
                   LibraryBatchItemStatus.notStarted => '未开始',
                   LibraryBatchItemStatus.sending => '正在等待服务端确认',
+                  LibraryBatchItemStatus.reading => '修改已确认，正在读取最新书架',
                   LibraryBatchItemStatus.confirmed => '已由服务端确认',
                   LibraryBatchItemStatus.uncertain => '尚未确认，需重试原操作',
+                  LibraryBatchItemStatus.readFailed => '修改已确认，需重试读取',
                   LibraryBatchItemStatus.blocked => '未保存，需重新读取',
                 },
                 style: TextStyle(
@@ -237,6 +239,7 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                     LibraryBatchItemStatus.confirmed =>
                       AppColors.label.resolveFrom(context),
                     LibraryBatchItemStatus.uncertain ||
+                    LibraryBatchItemStatus.readFailed ||
                     LibraryBatchItemStatus.blocked =>
                       AppColors.error.resolveFrom(context),
                     _ => AppColors.secondaryLabel.resolveFrom(context),
@@ -307,7 +310,12 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                 padding: EdgeInsets.zero,
                 foregroundColor: actionColor,
                 onPressed: _expired ? null : _retry,
-                child: const Text('重试', semanticsLabel: '重试原未确认操作'),
+                child: Text(
+                  draft.retryNeedsRead ? '重试读取' : '重试',
+                  semanticsLabel: draft.retryNeedsRead
+                      ? '重试已确认修改的读取'
+                      : '重试原未确认操作',
+                ),
               )
             : draft.canContinue
             ? CupertinoButton(
@@ -401,7 +409,9 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                         const Text('原批次已结束，剩余漫画未再发送。请按最新书架重新确认。'),
                       if (draft.attempted && !draft.finished)
                         Text(
-                          '当前会话保留原清单和未确认操作；关闭不会撤回已发请求。',
+                          draft.retryNeedsRead
+                              ? '该项修改已保存；当前会话保留原清单，可稍后继续读取最新书架。'
+                              : '当前会话保留原清单和当前操作；关闭不会撤回已发请求。',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppColors.secondaryLabel.resolveFrom(

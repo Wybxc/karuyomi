@@ -80,7 +80,7 @@ Future<void> showLibraryCategoryPicker({
     title: '设置分类',
     categories: view.categories,
     selection: entry.categoryIds.toSet(),
-    submit: (_, selection, _) => repository.setCategories(
+    submit: (_, selection, onAcknowledged) => repository.setCategories(
       mangaKey: entry.mangaKey,
       categoryIds: view.categories
           .where((category) => selection.contains(category.id))
@@ -88,6 +88,7 @@ Future<void> showLibraryCategoryPicker({
           .toList(),
       expectedCatalogRevision: view.categoryRevision,
       expectedMangaRevision: entry.revision,
+      onAcknowledged: onAcknowledged,
     ),
   );
   return _showCommand(context, controller, lifecycle, isCurrent, draft);
@@ -155,7 +156,9 @@ final class _CategoryDraft extends ChangeNotifier {
 
   bool get confirmationReceived =>
       confirmed ||
-      (entry == null && repository.client.categoryMutationNeedsRead);
+      (entry == null
+          ? repository.client.categoryMutationNeedsRead
+          : repository.client.mutationNeedsRead(entry!.mangaKey));
   bool get waitingForConfirmation => busy && !blocked && !confirmationReceived;
   String get commandSummary =>
       description ?? (name == null ? title : '$title：“$name”。');
