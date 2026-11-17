@@ -716,6 +716,20 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 本轮仅浅色正式Web，不补深色，也不把Source多选/文本分项当作全部30.K业务范围。15.K3新增单侧，跨版本主图仍108/169（63.9%）、单侧9、双侧均缺52；拒绝颜色修复须新正式Web复验，全部变体、生产及原生门槛保持原记录。PR #8继续草稿、未合并、未部署。
 
+## Source 与选源的正式 Web 双主题复验
+
+2026-11-17，拒绝反馈修复`a12c779195e26a481ee868e7766c43b89155a472`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/44014133238)与[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44014141353)均完成成功，Web及push Wasm通过，deploy跳过。正式Web归档`web-build-a12c779195e26a481ee868e7766c43b89155a472`的artifact ID为14297979259，大小16,299,039字节，传输边界SHA-256为`448c9b7e487530bfb75f71ba5a924500d8ac70d34f329cd6b8ca06a9ccbb74ba`；校验后复用并核验39条Flutter资源。客户端来自CI，本机只经官方Vite装配既有静态资源、Wrangler临时D1/R2和`editor-ui`，没有本地Flutter/AOT编译。内置浏览器360×800、`acceptance-owner`、独立验收地址`127.0.0.1:60414`，不等同生产或原生。
+
+浅/深分别进入真实MangaDex英文热门与Source偏好。文本空值提交`not-a-uuid`后，Source拒绝、当前空值不变，提示采用系统错误角色；顶部原因与底部现值/明确重读各有主图。显式重新读取后回到顶部实看，旧拒绝与旧成功说明均清除。输入测试UUID `00000000-0000-4000-8000-000000000001`并明确应用，确认后同会话重开保留；随后明确清空并应用恢复原值。Default content rating点击Safe名称可改变草稿，取消后Safe/Suggestive仍原值；明确关闭Suggestive、应用与重开后只有Safe，最后应用恢复两项。`source-text-{empty,rejected-top,rejected-bottom,recovered-top,valid-draft,confirmed-top,applied}-{light,dark}`及`source-multiple-{current,draft,applied}-{light,dark}`保留实拍与完整AX；深色拒绝主图采用单独稳定后的`source-text-rejected-stable-top-dark`。旧`0a02ee6`普通正文拒绝图继续作为失败记录，不被新通过覆盖。
+
+两主题选源主图`cross-scope-{light,dark}`均过滤xkcd五个语言源，未选源时查询、语言、0/32、刷新与开始在同屏。真实名称点击选择英文源，改查MangaDex后已选数仍1；返回xkcd后Tab进入勾选框、Space取消再恢复。空查询显示原输入及1–500字符错误，不创建分源任务。真实`one piece`查询xkcd返回零项，源名继承官方正文、状态为13px次级角色。两轮同包五源查询均先收起范围，`cross-five-start-candidate-{light,dark}`实际图像均显示0/5、英文源旋转及其余源等待，停止此源/全部入口可见；文件名的candidate不表示推测。随后取得的AX已推进至浅色1/5、深色2/5，不能当作截图同一瞬时；最终五源均返回零项，另存`cross-five-completed-{light,dark}`。没有用这些完成图替代正在停止、取消未确认或清理失败。
+
+主题草稿分别选择DARK和LIGHT时，当前画面仍保持此前主题，独立API状态不变；各一次明确保存后才分别成为DARK和LIGHT。十组六路快照共60条响应按七个相等区间核对，主题区间之间仅accountRevision 2→3→4、全局revision 1→2→3及LIGHT→DARK→LIGHT变化；收藏、分类、书签、漫画设置和阅读进度等其余内容不变。三条独立MangaDex偏好响应经生成ProtoJSON模型核对精确包/目录身份、sources为空及对应账户revision。87条连续审计均完成且透传200，仅前两次独立准备POST和两次明确UI主题保存POST；原正文与独立收据/快照完全一致，没有其它业务写入。审计不包含Source运行时调用与偏好API，后者由独立状态及单调账户revision核对，不称为完整网络日志。
+
+忽略目录`.local/mihon-reference/`保存38张360×800 JPEG及各自完整AX、十组快照、三条偏好响应、`karuyomi-a12c779-ui-source-audit-final.json`、`karuyomi-a12c779-ui-evidence-receipt.json`与`a12c779-ui-evidence-check.log`。校验入口`verify-a12c779-source-scope-evidence.ts`复算上述响应、相等区间、四条写入边界及图像尺寸。截图和AX逐项实看后离开客户端、恢复视口，harness正常退出0。
+
+新增14.K6（Source拒绝输入这一失败分项）、15.K3及15.K4三组主图，跨版本成对主图108→111/169（65.7%），仅单侧8、双侧均缺50，剩余58个主状态。15.K1替换为新完整选源主图，15.K5补新真实加载主图并保留旧独立重试证据，不重复计数。多选/文本是14.03/14.04和共享编辑面的真实业务补充分项，不代表30.K全部范围通过；38张图不等于38个新状态，历史主图覆盖也不是当前HEAD全部验收或PR整体完成。受阻进度从书架重开、同名作品身份、全部剩余状态/变体、真实生产Access和原生门槛仍按原记录。PR #8继续草稿、未合并、未部署。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。
