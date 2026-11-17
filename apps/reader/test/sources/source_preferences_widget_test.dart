@@ -82,6 +82,82 @@ void main() {
   for (final appearance in Brightness.values) {
     for (final textScale in [1.0, 2.0]) {
       testWidgets(
+        'rejected session input uses the error role and remains correctable in $appearance at $textScale',
+        (tester) async {
+          fixture.editGate = (_) async => wire.SourceResult(
+            preferenceEdit: wire.PreferenceEditResult(
+              snapshot: fixture.snapshot(),
+            ),
+          );
+          await open(
+            tester,
+            appearance: appearance,
+            textScale: textScale,
+            size: const Size(360, 800),
+          );
+          await item(tester, '4.1');
+          await tester.enterText(
+            find.byType(CupertinoTextField).last,
+            'not-accepted-value',
+          );
+          await apply(tester);
+          final rejection = find.text('漫画源未接受输入；设置未更改。');
+          final scrollable = find
+              .descendant(
+                of: find.byKey(const ValueKey('source-preferences-form')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(
+            rejection,
+            -250,
+            scrollable: scrollable,
+          );
+          await tester.pumpAndSettle();
+          expect(rejection, findsOneWidget);
+          await tester.ensureVisible(rejection);
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<Text>(rejection).style?.color,
+            AppColors.error.resolveFrom(tester.element(rejection)),
+          );
+          expect(find.text('设置已确认。'), findsNothing);
+          expect(fixture.callbacks, 1);
+          expect(fixture.postedBodies, isEmpty);
+
+          await item(tester, '4.1');
+          expect(
+            tester
+                .widget<CupertinoTextField>(
+                  find.byType(CupertinoTextField).last,
+                )
+                .controller!
+                .text,
+            '原备注',
+          );
+          fixture.editGate = null;
+          await tester.enterText(
+            find.byType(CupertinoTextField).last,
+            '已修正的会话备注',
+          );
+          await apply(tester);
+          await tester.scrollUntilVisible(
+            find.text('设置已确认。'),
+            -250,
+            scrollable: scrollable,
+          );
+          await tester.pumpAndSettle();
+          expect(rejection, findsNothing);
+          expect(find.text('设置已确认。'), findsOneWidget);
+          expect(fixture.values['note']!.value.text, '已修正的会话备注');
+          expect(fixture.callbacks, 2);
+          expect(fixture.postedBodies, isEmpty);
+          expect(tester.takeException(), isNull);
+          await tester.tap(iconLabel('关闭设置'));
+          await tester.pumpAndSettle();
+        },
+      );
+      testWidgets(
         'multi-choice preferences group long options and keep cancel and apply explicit in $appearance at $textScale',
         (tester) async {
           final original = fixture.platform.invokeHandler!;

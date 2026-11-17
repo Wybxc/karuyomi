@@ -698,6 +698,24 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 本轮内置浏览器控制仍未取得页面，已询问用户手动打开标签的实际结果；参考模拟器和组件回归均不能替代正式Karuyomi浏览器、原生或生产验证。Karuyomi跨版本主图仍108/169（63.9%），剩余61个主状态及全部变体/转换继续待验，PR #8保持草稿、未合并、未部署。
 
+## 内置浏览器恢复后的 Source 实测与拒绝提示修复
+
+2026-11-17，`0a02ee6ec13872592e1240586206a73793c25199`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/44008902136)及[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44008910235)完整成功，包含正式Web和push Wasm，部署跳过。正式Web artifact `14295504068`长16,299,027字节，下载边界核对GitHub SHA-256 `6efe1596596396f8764083dcf6589763712ac5319d2ee784f05471e9dd1f3ea9`，再核验39项Flutter资源。本机仅通过官方Vite组装四包已发布静态快照与acceptance入口，没有Flutter或AOT编译。
+
+内置浏览器控制随后实际恢复：IAB标签列表成功返回、空白标签成功打开，再以360×800打开上述正式客户端。恢复原因未确定，不把它归因于审批服务恢复。官方Wrangler临时D1/R2、`editor-ui`与`acceptance-owner`保持隔离；独立API只准备浅色、xkcd/Komiic/MangaDex三包精确安装及英文xkcd收藏，两次准备写入单列。首轮准备脚本的嵌套模型序列化曾在发出写入前失败，改用生成模型创建后通过，实际审计确认只有这两次准备POST。
+
+浅色选源实际点击xkcd名称后勾选，输入MangaDex过滤后已选数仍1；改查xkcd后，Tab从输入框进入原英文源，Space取消并再次恢复。空查询显示系统错误色且没有分源结果，补15.K3浅色图`karuyomi-0a02ee6-cross-validation-empty-light.jpg`。实际查询`one piece`得到xkcd零项，结果标题/状态采用新的正文/13px角色。`cross-scope-stable-light`、`cross-selection-hidden-light`及`cross-xkcd-result-light`是分项图；首段未展示完整目录尾部的刷新/开始，不据此替换15.K1，未截到实际旋转图也不补加载格。首次选源入场残影保留并排除主图。
+
+真实MangaDex英文源加载热门列表和完整偏好后，打开Default content rating多选子面。名称点击修改草稿，取消后Safe/Suggestive原值保持；明确关闭Suggestive并应用后，同会话重开仅Safe选中，再明确应用恢复原值。已逐图实看`source-multiple-{current,draft,applied}-light.jpg`。`source-multiple-apply-first-light`是退出转场，虽然含真实处理指示，仍有原子面残片，不计14.K4主图；`source-preferences-opening-light`已经是内容，不计14.K1读取态。文本子面`source-text-empty-light`使用官方输入装饰，真实提交`not-a-uuid`后Source拒绝并保留空值。
+
+本次保留真实视觉失败：`source-text-rejected-light`的“漫画源未接受输入；设置未更改。”仍按普通正文显示，不是错误角色。控制器现将“拒绝且实际值未变”交给已有error通道，有真实回调副作用时仍提示核对实际值；每次新操作清除上次message，避免旧成功说明与本次拒绝并列。没有改变Source回调、原值恢复、账户/会话范围或精确重试规则。
+
+新增四项浅/深×1x/2x、360×800组件流程，先在缺少错误色处失败；初轮双倍字号未滚到反馈处，修正滚动步骤后四项均在颜色断言失败，不把用例步骤问题算产品缺陷。修复后验证拒绝保留原会话值、继续编辑并明确修正、旧拒绝清除、零账户POST及无溢出；原控制器拒绝用例另核对旧成功说明清除和明确重读后反馈复位。33项组件、10项控制器和4项共享编辑面共47项单并发通过，三文件严格分析无问题。日志为`source-rejection-role-{red,red-visible,regressions,analyze}.log`。新提交完整CI与修复后正式双主题仍待。
+
+独立核对三组六路快照（18条响应）完全相等；单独的MangaDex偏好响应经生成ProtoJSON模型确认sources为空、精确目录/包身份及accountRevision仍2。23条范围内审计均完成，只有与准备收据完全相同的两次POST，普通UI操作没有账户写入；审计不包括Source运行时调用和偏好API，后者由独立状态与单调账户revision核对，不把它当作完整网络日志。审计文件为`karuyomi-0a02ee6-ui-source-audit-light.json`。已导航离开客户端、恢复视口，harness正常退出0。
+
+本轮仅浅色正式Web，不补深色，也不把Source多选/文本分项当作全部30.K业务范围。15.K3新增单侧，跨版本主图仍108/169（63.9%）、单侧9、双侧均缺52；拒绝颜色修复须新正式Web复验，全部变体、生产及原生门槛保持原记录。PR #8继续草稿、未合并、未部署。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。

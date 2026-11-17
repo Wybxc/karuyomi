@@ -1792,7 +1792,9 @@ stateDiagram-v2
     Q14 --> Q5: 返回原查询与结果
     Q0 --> Q12: 退出时清理失败
     Q12 --> Q0: 重试清理确认后返回
+    classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
+    class Q2 partial
     class Q0,Q4,Q5,Q6,Q7,Q8,Q10,Q14 paired
 ```
 
@@ -1800,7 +1802,7 @@ stateDiagram-v2
 | ------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | 15.K1   | 查询、源数/上限、语言及明确选择、刷新和开始；主图为未选源                 | `karuyomi-b826249-cross-scope-light.jpg`                                           | `karuyomi-b826249-cross-scope-dark.jpg`                                          |
 | 15.K2   | 无可选源原因及安装/刷新入口                                               | 待                                                                                 | 待                                                                               |
-| 15.K3   | 原输入与校验原因、可修正入口，不创建搜索任务                              | 待                                                                                 | 待                                                                               |
+| 15.K3   | 原输入与校验原因、可修正入口，不创建搜索任务                              | `karuyomi-0a02ee6-cross-validation-empty-light.jpg`                                | 待                                                                               |
 | 15.K4   | 源身份、等待执行及停止入口；同包排队要真实截到                            | 待                                                                                 | 待                                                                               |
 | 15.K5   | 源名、语言、真实旋转指示、停止此源/全部和总进度；独立重试保留 xkcd 空结果 | `karuyomi-07342fb-cross-start-light.jpg`、`karuyomi-07342fb-cross-retry-light.jpg` | `karuyomi-07342fb-cross-start-dark.jpg`、`karuyomi-07342fb-cross-retry-dark.jpg` |
 | 15.K6   | Komiic 备用镜像的三项真实结果；标题在封面下，普通封面仍占位               | `karuyomi-b826249-cross-results-light.jpg`                                         | `karuyomi-b826249-cross-results-dark.jpg`                                        |
@@ -1813,6 +1815,8 @@ stateDiagram-v2
 | 15.K13  | 页面资源尚未释放、精确清理重试、退出受阻                                  | 待                                                                                 | 待                                                                               |
 | 15.K14  | 正在打开、原分源结果与冻结操作；实际过渡图仍待                            | 待                                                                                 | 待                                                                               |
 | 15.K15  | 《ONE PIECE航海王》、尾田榮一郎、238 章；返回保留原查询与三项结果         | `karuyomi-b826249-cross-open-light.jpg`、`karuyomi-b826249-cross-return-light.jpg` | `karuyomi-b826249-cross-open-dark.jpg`、`karuyomi-b826249-cross-return-dark.jpg` |
+
+2026-11-17，内置浏览器恢复后使用`0a02ee6`正式CI Web补选源浅色分项及15.K3空查询浅色图，实际名称点击、Tab/Space、过滤隐藏选择仍保留通过；`cross-selection-hidden-light`保留完整AX。`cross-scope-stable-light`只展示67源目录的首段，不替代15.K1完整主图，初入场的`cross-scope-light`有转场残影，排除主图。真实xkcd查询`one piece`返回零项，`cross-xkcd-result-light`用于结果字号分项，不替代成功/空结果混合同屏或加载主图。新增15.K3只是一侧，成对覆盖仍108/169；单侧由8增至9，双侧均缺由53减至52。MangaDex多选/文本子面和输入拒绝的实际浅色过程见[本轮记录](mihon-cupertino-fidelity.md#内置浏览器恢复后的-source-实测与拒绝提示修复)，原普通正文拒绝提示保留为修复前失败，不计修复后通过。
 
 `07342fb` 的三张 `cross-{start,errors,operations}-pairs.jpg` 联系表已实看，浅深均为 360×800、同样的 xkcd en / Komiic 和查询 `航海王`。两主题重试按钮 DOM 均为 `x=8,y=588,width=106.359375,height=57`，名称仅为“重试此源”。独立重试帧的 Komiic 旋转指示和 xkcd 已返回空态同时存在；深色 DOM 在截图后已回到失败，不用后续 DOM 冒充截图瞬间。错误详情为完整 HTTP 500 和原始 JS/Java 堆栈，关闭后仍为原失败。超长诊断的实际滚动、无请求的独立网络审计及取消 ACK 失败等仍待浏览器分项；100 行诊断/关闭不请求/取消失败恢复另有 29 项组件与控制器回归，不能互相替代。验收采用临时 D1、`acceptance-owner`、无 fixture；视口已恢复且 harness 已停止。
 

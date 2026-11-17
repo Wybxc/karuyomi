@@ -201,7 +201,11 @@ final class SourcePreferencesController extends ChangeNotifier {
               before.sessionValues,
               result.snapshot.sessionValues,
             );
-        message = changed ? '漫画源已更新设置；请核对实际值。' : '漫画源未接受输入；设置未更改。';
+        if (changed) {
+          message = '漫画源已更新设置；请核对实际值。';
+        } else {
+          error = '漫画源未接受输入；设置未更改。';
+        }
       }
       return _reopenAndDescribe();
     });
@@ -269,6 +273,7 @@ final class SourcePreferencesController extends ChangeNotifier {
     if (!available || busy || catalog.busy) return false;
     busy = true;
     error = null;
+    message = null;
     notifyListeners();
     try {
       return await action();
