@@ -6,7 +6,12 @@ Finder iconLabel(String label) => find.byWidgetPredicate(
 );
 
 Finder checkboxLabel(String label) => find.descendant(
-  of: find.widgetWithText(CupertinoFormRow, label),
+  of: find.ancestor(
+    of: find.text(label),
+    matching: find.byWidgetPredicate(
+      (widget) => widget is CupertinoFormRow || widget is CupertinoListTile,
+    ),
+  ),
   matching: find.byType(CupertinoCheckbox),
 );
 

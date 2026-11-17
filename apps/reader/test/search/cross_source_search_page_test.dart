@@ -3,6 +3,7 @@ import 'package:karuyomi/widgets/app_page_route.dart';
 import '../test_app.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
@@ -83,6 +84,160 @@ void main() {
   }
 
   for (final brightness in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'source scope uses native sections, complete names and whole-row selection in $brightness at $scale',
+        (tester) async {
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final original = searchTarget(1);
+          final name = '完整漫画源名称与备用站点' * 5;
+          final target = SourceSearchTarget(
+            build: original.build,
+            source: original.source.deepCopy()..name = name,
+            bundleSha256: original.bundleSha256,
+          );
+          final service = FakeSourceSearch(targets: [target, searchTarget(2)]);
+          await openPage(
+            tester,
+            service,
+            brightness: brightness,
+            textScaler: TextScaler.linear(scale),
+          );
+          final checkbox = find.byKey(
+            ValueKey(('cross-search-source', target.key)),
+          );
+          expect(
+            find.ancestor(
+              of: checkbox,
+              matching: find.byType(CupertinoFormSection),
+            ),
+            findsOneWidget,
+          );
+          final caption = tester.element(
+            find.text('仅列出已安装、启用且来源仍有效的漫画源；最多选择32个。'),
+          );
+          expect(DefaultTextStyle.of(caption).style.fontSize, 13);
+          expect(
+            DefaultTextStyle.of(caption).style.color,
+            AppColors.secondaryLabel.resolveFrom(caption),
+          );
+          final label = find.text(name);
+          expect(
+            tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+            isFalse,
+          );
+          await tester.ensureVisible(label);
+          await tester.tap(label);
+          await tester.pumpAndSettle();
+          expect(tester.widget<CupertinoCheckbox>(checkbox).value, isTrue);
+          expect(find.text('选择漫画源（已选 1 / 32）'), findsOneWidget);
+          expect(service.tasks, isEmpty);
+          final semantics = tester.ensureSemantics();
+          await tester.pump();
+          try {
+            final spoken = tester.getSemantics(checkbox).label;
+            expect(spoken, contains(name));
+            expect(spoken, isNot(contains('仅列出已安装')));
+            expect(spoken, isNot(contains('选择漫画源')));
+          } finally {
+            semantics.dispose();
+          }
+          final filter = find.byKey(
+            const ValueKey('cross-search-source-filter'),
+          );
+          await tester.ensureVisible(filter);
+          await tester.enterText(filter, '没有匹配的来源');
+          await tester.pumpAndSettle();
+          expect(find.text('没有符合筛选条件的漫画源。'), findsOneWidget);
+          expect(find.text('选择漫画源（已选 1 / 32）'), findsOneWidget);
+          await tester.enterText(filter, '');
+          await tester.pumpAndSettle();
+          expect(tester.widget<CupertinoCheckbox>(checkbox).value, isTrue);
+          Key? focusedCheckbox() => FocusManager.instance.primaryFocus?.context
+              ?.findAncestorWidgetOfExactType<CupertinoCheckbox>()
+              ?.key;
+          for (
+            var attempt = 0;
+            attempt < 16 && focusedCheckbox() != tester.widget(checkbox).key;
+            attempt++
+          ) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.pump();
+          }
+          expect(focusedCheckbox(), tester.widget(checkbox).key);
+          await tester.sendKeyEvent(LogicalKeyboardKey.space);
+          await tester.pumpAndSettle();
+          expect(tester.widget<CupertinoCheckbox>(checkbox).value, isFalse);
+          expect(service.tasks, isEmpty);
+          expect(tester.takeException(), isNull);
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        },
+      );
+      testWidgets(
+        'search validation and cleanup failures keep native error roles in $brightness at $scale',
+        (tester) async {
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final service = FakeSourceSearch();
+          var closes = 0;
+          service.beforeClose = () async {
+            if (++closes == 1) throw const FormatException('关闭未确认，请明确重试');
+          };
+          await openPage(
+            tester,
+            service,
+            brightness: brightness,
+            textScaler: TextScaler.linear(scale),
+          );
+          final submit = find.byKey(const ValueKey('cross-search-submit'));
+          await tester.ensureVisible(submit);
+          await tester.pumpAndSettle();
+          await tester.tap(submit);
+          await tester.pumpAndSettle();
+          final validation = find.byKey(const ValueKey('cross-search-error'));
+          expect(
+            tester.widget<Text>(validation).style?.color,
+            AppColors.error.resolveFrom(tester.element(validation)),
+          );
+          expect(service.tasks, isEmpty);
+          await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+          await tester.pumpAndSettle();
+          final cleanup = find.byKey(
+            const ValueKey('cross-search-cleanup-error'),
+          );
+          expect(
+            tester.widget<Text>(cleanup).style?.color,
+            AppColors.error.resolveFrom(tester.element(cleanup)),
+          );
+          expect(
+            find.ancestor(
+              of: cleanup,
+              matching: find.byType(CupertinoFormSection),
+            ),
+            findsOneWidget,
+          );
+          final retry = find.byKey(
+            const ValueKey('cross-search-cleanup-retry'),
+          );
+          await tester.ensureVisible(retry);
+          expect(retry.hitTestable(), findsOneWidget);
+          expect(service.tasks, isEmpty);
+          await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+          await tester.pumpAndSettle();
+          expect(find.byType(CrossSourceSearchPage), findsNothing);
+          expect(closes, 2);
+          expect(tester.takeException(), isNull);
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
     testWidgets('search scope opens and closes by keyboard in $brightness', (
       tester,
     ) async {

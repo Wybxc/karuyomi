@@ -82,6 +82,17 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
     return mounted && !_expired;
   }
 
+  void _selectCategory(String id, bool selected) {
+    if (!_current || _draft != null) return;
+    setState(() {
+      if (selected) {
+        _categoryIds.add(id);
+      } else {
+        _categoryIds.remove(id);
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -323,20 +334,28 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                 children: [
                   for (final category in _view.categories)
                     MergeSemantics(
-                      child: CupertinoFormRow(
-                        prefix: Expanded(flex: 3, child: Text(category.name)),
-                        child: CupertinoCheckbox(
+                      child: CupertinoListTile(
+                        onTap: locked
+                            ? null
+                            : () => _selectCategory(
+                                category.id,
+                                !_categoryIds.contains(category.id),
+                              ),
+                        title: Builder(
+                          builder: (context) => DefaultTextStyle(
+                            style: DefaultTextStyle.of(context).style,
+                            child: Text(category.name),
+                          ),
+                        ),
+                        trailing: CupertinoCheckbox(
                           key: ValueKey(('batch-category', category.id)),
                           value: _categoryIds.contains(category.id),
                           onChanged: locked
                               ? null
-                              : (selected) => setState(() {
-                                  if (selected == true) {
-                                    _categoryIds.add(category.id);
-                                  } else {
-                                    _categoryIds.remove(category.id);
-                                  }
-                                }),
+                              : (selected) => _selectCategory(
+                                  category.id,
+                                  selected == true,
+                                ),
                         ),
                       ),
                     ),

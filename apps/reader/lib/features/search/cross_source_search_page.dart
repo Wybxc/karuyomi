@@ -97,106 +97,124 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     final page = pages == 0 ? 0 : _sourcePage.clamp(0, pages - 1);
     final start = page * 50;
     final end = (start + 50).clamp(0, visible.length);
-    return CupertinoListSection.insetGrouped(
-      margin: const EdgeInsets.only(bottom: 8),
-      backgroundColor: AppColors.background.resolveFrom(context),
-      separatorColor: AppColors.separator.resolveFrom(context),
-      decoration: BoxDecoration(
-        color: AppColors.groupedSurface.resolveFrom(context),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      children: [
-        Text(
-          '选择漫画源（已选 ${controller.selected.length} / 32）',
-          style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
-          key: const ValueKey('cross-search-selection-count'),
-        ),
-        const Text('仅列出已安装、启用且来源仍有效的漫画源；最多选择32个。'),
-        const SizedBox(height: 12),
-        ChoiceField<String>(
-          key: const ValueKey('cross-search-language'),
-          label: '语言',
-          value: controller.language,
-          options: {
-            null: '全部语言',
-            for (final language in controller.languages)
-              language: language.isEmpty ? '未标注语言' : language,
-          },
-          onChanged: controller.canChange
-              ? (value) {
-                  controller.selectLanguage(value);
-                  setState(() => _sourcePage = 0);
-                }
-              : null,
-        ),
-        const SizedBox(height: 12),
-        CupertinoTextField(
-          autofillHints: null,
-          key: const ValueKey('cross-search-source-filter'),
-          controller: _sourceFilter,
-          onChanged: (_) => setState(() => _sourcePage = 0),
-          placeholder: '查找漫画源名称或扩展包',
-          placeholderStyle: TextStyle(
-            color: AppColors.secondaryLabel.resolveFrom(context),
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.background.resolveFrom(context),
-            border: Border.all(color: AppColors.separator.resolveFrom(context)),
-            borderRadius: BorderRadius.circular(6),
-          ),
-        ),
-        if (controller.loadingTargets)
-          const CupertinoActivityIndicator()
-        else if (controller.targets.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('没有可选漫画源，请先在扩展管理中安装并启用扩展。'),
-          )
-        else if (visible.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('没有符合筛选条件的漫画源。'),
-          ),
-        for (final target in visible.sublist(start, end))
-          MergeSemantics(
-            child: CupertinoFormRow(
-              prefix: Expanded(flex: 3, child: Text(target.source.name)),
-              helper: Text(
-                '${sourceLanguage(target.source.lang)} · ${extensionName(target.build.packageName, target.build.sources)}',
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: CupertinoCheckbox(
-                key: ValueKey(('cross-search-source', target.key)),
-                value: controller.selected.contains(target.key),
-                onChanged: controller.canSelect
-                    ? (selected) => controller.select(target, selected == true)
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CupertinoFormSection.insetGrouped(
+            margin: const EdgeInsets.only(bottom: 8),
+            header: Text(
+              '选择漫画源（已选 ${controller.selected.length} / 32）',
+              key: const ValueKey('cross-search-selection-count'),
+            ),
+            footer: const Text('仅列出已安装、启用且来源仍有效的漫画源；最多选择32个。'),
+            children: [
+              ChoiceField<String>(
+                inline: false,
+                key: const ValueKey('cross-search-language'),
+                label: '语言',
+                value: controller.language,
+                options: {
+                  null: '全部语言',
+                  for (final language in controller.languages)
+                    language: language.isEmpty ? '未标注语言' : language,
+                },
+                onChanged: controller.canChange
+                    ? (value) {
+                        controller.selectLanguage(value);
+                        setState(() => _sourcePage = 0);
+                      }
                     : null,
               ),
-            ),
-          ),
-        if (visible.isNotEmpty)
-          Wrap(
-            spacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text('显示 ${start + 1}–$end / ${visible.length}'),
-              if (pages > 1) ...[
-                CupertinoButton(
-                  onPressed: page > 0
-                      ? () => setState(() => _sourcePage = page - 1)
-                      : null,
-                  child: const Text('上一组漫画源'),
-                ),
-                CupertinoButton(
-                  onPressed: page + 1 < pages
-                      ? () => setState(() => _sourcePage = page + 1)
-                      : null,
-                  child: const Text('下一组漫画源'),
-                ),
-              ],
+              CupertinoTextFormFieldRow(
+                autofillHints: null,
+                key: const ValueKey('cross-search-source-filter'),
+                controller: _sourceFilter,
+                onChanged: (_) => setState(() => _sourcePage = 0),
+                placeholder: '查找漫画源名称或扩展包',
+              ),
             ],
           ),
-      ],
+          CupertinoFormSection.insetGrouped(
+            margin: const EdgeInsets.only(bottom: 8),
+            footer: visible.isEmpty
+                ? null
+                : Wrap(
+                    spacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text('显示 ${start + 1}–$end / ${visible.length}'),
+                      if (pages > 1) ...[
+                        CupertinoButton(
+                          onPressed: page > 0
+                              ? () => setState(() => _sourcePage = page - 1)
+                              : null,
+                          child: const Text('上一组漫画源'),
+                        ),
+                        CupertinoButton(
+                          onPressed: page + 1 < pages
+                              ? () => setState(() => _sourcePage = page + 1)
+                              : null,
+                          child: const Text('下一组漫画源'),
+                        ),
+                      ],
+                    ],
+                  ),
+            children: [
+              if (controller.loadingTargets)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CupertinoActivityIndicator(),
+                )
+              else if (controller.targets.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('没有可选漫画源，请先在扩展管理中安装并启用扩展。'),
+                )
+              else if (visible.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('没有符合筛选条件的漫画源。'),
+                ),
+              for (final target in visible.sublist(start, end))
+                MergeSemantics(
+                  child: CupertinoListTile(
+                    onTap: controller.canSelect
+                        ? () => controller.select(
+                            target,
+                            !controller.selected.contains(target.key),
+                          )
+                        : null,
+                    title: Builder(
+                      builder: (context) => DefaultTextStyle(
+                        style: DefaultTextStyle.of(context).style,
+                        child: Text(target.source.name),
+                      ),
+                    ),
+                    subtitle: Builder(
+                      builder: (context) => DefaultTextStyle(
+                        style: DefaultTextStyle.of(context).style,
+                        child: Text(
+                          '${sourceLanguage(target.source.lang)} · ${extensionName(target.build.packageName, target.build.sources)}',
+                        ),
+                      ),
+                    ),
+                    trailing: CupertinoCheckbox(
+                      key: ValueKey(('cross-search-source', target.key)),
+                      value: controller.selected.contains(target.key),
+                      onChanged: controller.canSelect
+                          ? (selected) =>
+                                controller.select(target, selected == true)
+                          : null,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -493,27 +511,26 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                             child: Text(
                               controller.error!,
                               key: const ValueKey('cross-search-error'),
+                              style: TextStyle(
+                                color: AppColors.error.resolveFrom(context),
+                              ),
                             ),
                           ),
                         if (controller.cleanupError != null)
-                          CupertinoListSection.insetGrouped(
-                            backgroundColor: AppColors.background.resolveFrom(
-                              context,
-                            ),
-                            separatorColor: AppColors.separator.resolveFrom(
-                              context,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.groupedSurface.resolveFrom(
-                                context,
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+                          CupertinoFormSection.insetGrouped(
+                            header: const Text('搜索资源尚未释放'),
+                            footer: const Text('确认释放后才能继续搜索或离开。'),
                             children: [
-                              Text(
-                                controller.cleanupError!,
-                                key: const ValueKey(
-                                  'cross-search-cleanup-error',
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Text(
+                                  controller.cleanupError!,
+                                  key: const ValueKey(
+                                    'cross-search-cleanup-error',
+                                  ),
+                                  style: TextStyle(
+                                    color: AppColors.error.resolveFrom(context),
+                                  ),
                                 ),
                               ),
                               CupertinoButton(

@@ -602,6 +602,17 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
   bool Function() get isCurrent => widget.isCurrent;
   bool get editable => !expired && !draft.attempted;
 
+  void _selectCategory(String id, bool selected) {
+    if (!current || !editable) return;
+    setState(() {
+      if (selected) {
+        _selection.add(id);
+      } else {
+        _selection.remove(id);
+      }
+    });
+  }
+
   Future<void> _save() async {
     if (!current || draft.busy || draft.blocked) return;
     if (!draft.attempted) {
@@ -716,21 +727,26 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
                     children: [
                       for (final category in categories)
                         MergeSemantics(
-                          child: CupertinoFormRow(
-                            prefix: Expanded(
-                              flex: 3,
-                              child: Text(category.name),
+                          child: CupertinoListTile(
+                            onTap: editable
+                                ? () => _selectCategory(
+                                    category.id,
+                                    !_selection.contains(category.id),
+                                  )
+                                : null,
+                            title: Builder(
+                              builder: (context) => DefaultTextStyle(
+                                style: DefaultTextStyle.of(context).style,
+                                child: Text(category.name),
+                              ),
                             ),
-                            child: CupertinoCheckbox(
+                            trailing: CupertinoCheckbox(
                               value: _selection.contains(category.id),
                               onChanged: editable
-                                  ? (selected) => setState(() {
-                                      if (selected == true) {
-                                        _selection.add(category.id);
-                                      } else {
-                                        _selection.remove(category.id);
-                                      }
-                                    })
+                                  ? (selected) => _selectCategory(
+                                      category.id,
+                                      selected == true,
+                                    )
                                   : null,
                             ),
                           ),

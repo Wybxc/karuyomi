@@ -304,8 +304,8 @@ void main() {
       await show(tester);
       await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
       await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
-      await tap(tester, checkboxLabel('想读'));
-      await tap(tester, checkboxLabel('科幻'));
+      await tap(tester, find.text('想读').last);
+      await tap(tester, find.text('科幻').last);
       await tap(tester, find.text('保存'));
       expect(server.manga(alpha.mangaKey)!.categoryIds, [_first, _second]);
       await filter(tester, '想读');

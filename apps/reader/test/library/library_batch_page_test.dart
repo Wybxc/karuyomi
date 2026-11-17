@@ -337,8 +337,8 @@ void main() {
         find.byKey(const ValueKey('library-batch-add-categories')),
       );
       expect(find.text('确认清单：2 部漫画'), findsOneWidget);
-      await tap(tester, category(_first));
-      await tap(tester, category(_third));
+      await tap(tester, find.text('想读').last);
+      await tap(tester, find.text('本月').last);
       expect(mutations(), isEmpty);
       await tap(tester, find.text('开始'));
       expect(server.manga(alpha.mangaKey)!.categoryIds, [_first, _third]);
