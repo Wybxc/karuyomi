@@ -770,11 +770,11 @@ void main() {
           addTearDown(() {
             if (!readGate.isCompleted) readGate.complete();
           });
-          Widget page() => CupertinoApp(
+          Widget page({bool fromShelf = false}) => CupertinoApp(
             home: MigrationPage(
               catalog: catalog,
               client: catalog.library!.client,
-              seed: seed,
+              seed: fromShelf ? MigrationSeed(metadata: seed.metadata) : seed,
             ),
           );
           Finder control(String key) => find.byKey(ValueKey(key));
@@ -1015,11 +1015,13 @@ void main() {
               await reopenGate.future;
             }
           };
-          await tester.pumpApp(page());
+          await tester.pumpApp(page(fromShelf: true));
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 400));
           expect(find.text('正在读取迁移输入'), findsOneWidget);
           await reveal(find.text('原迁移尚未确认'), settle: false);
+          expect(find.text('原操作的复制范围已固定，原作品保留。'), findsOneWidget);
+          expect(find.text('先读取原源章节，或明确选择仅迁移收藏和分类。'), findsNothing);
           expect(find.text('等待服务端确认'), findsNothing);
           expect(posts(), hasLength(writes + 1));
           reopenGate.complete();
@@ -1041,6 +1043,8 @@ void main() {
           expect(platform.businessServer.appliedMutations, applied + 1);
           await tap('migration-retry-original');
           expect(find.textContaining('原迁移操作已由服务端确认'), findsOneWidget);
+          expect(find.text('原作品已保留；迁移结果见下方服务端确认。'), findsOneWidget);
+          expect(find.text('先读取原源章节，或明确选择仅迁移收藏和分类。'), findsNothing);
           expect(find.text('目标作品 · 目标源 · zh'), findsOneWidget);
           expect(posts(), hasLength(writes + 2));
           expect(posts().last, original);

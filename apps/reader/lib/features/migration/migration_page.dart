@@ -483,7 +483,11 @@ class _MigrationPageState extends State<MigrationPage> {
               CupertinoFormSection.insetGrouped(
                 header: const Text('原作品'),
                 footer: Text(
-                  controller.sourceSequence != null
+                  controller.completed
+                      ? '原作品已保留；迁移结果见下方服务端确认。'
+                      : pending != null
+                      ? '原操作的复制范围已固定，原作品保留。'
+                      : controller.sourceSequence != null
                       ? '已捕获 ${controller.sourceSequence!.entries.length} 章；切换目标源后仍保留本次章节快照。'
                       : controller.categoriesOnly
                       ? '已选择仅迁移收藏和分类，章节标记不复制。'

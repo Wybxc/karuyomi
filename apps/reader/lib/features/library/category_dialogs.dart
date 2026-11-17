@@ -75,7 +75,6 @@ Future<void> showLibraryCategoryPicker({
     view: view,
     entry: entry,
     title: '设置分类',
-    description: entry.title,
     categories: view.categories,
     selection: entry.categoryIds.toSet(),
     submit: (_, selection) => repository.setCategories(
@@ -687,6 +686,19 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
           key: _form,
           child: ListView(
             children: [
+              if (draft.entry case final entry?)
+                CupertinoFormSection.insetGrouped(
+                  header: const Text('漫画'),
+                  footer: Text('${entry.sourceLang} · ${entry.sourceName}'),
+                  children: [
+                    CupertinoFormRow(
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(entry.title),
+                      ),
+                    ),
+                  ],
+                ),
               if (draft.description case final description?)
                 Padding(
                   padding: const EdgeInsets.all(16),

@@ -135,6 +135,22 @@ void main() {
             await tester.tap(iconLabel('更多操作：$title · en · $name'));
             await tester.pumpAndSettle();
             expect(find.text('迁移到其他漫画源'), findsOneWidget);
+            await tester.tap(iconLabel('设置分类：$title · en · $name'));
+            await tester.pumpAndSettle();
+            final editor = find.byKey(const ValueKey('category-command'));
+            expect(
+              find.descendant(of: editor, matching: find.text(title)),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(of: editor, matching: find.text('en · $name')),
+              findsOneWidget,
+              reason: 'The open editor must distinguish the same-title Source',
+            );
+            await tester.tap(find.text('取消'));
+            await tester.pumpAndSettle();
+            expect(editor, findsNothing);
+            expect(find.text('en · $name'), findsOneWidget);
             expect(
               platform.businessServer.requests
                   .where((request) => request.method == 'POST')
