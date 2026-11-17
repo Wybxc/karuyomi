@@ -958,7 +958,7 @@ stateDiagram-v2
     ExpiredBatch --> [*]: 关闭，不发送剩余
     ConfirmedBatch --> [*]: 完成返回书架
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class EmptyCategories,Categories,CategoryMenu,EmptyCategoryName,CategoryName,InvalidCategoryName,DeleteCategory,NoCategoryChoices,CategoryChoices,CategoryChoiceDraft,RemoveReview,BatchCategoryReview,ConfirmedBatch paired
+    class EmptyCategories,Categories,CategoryMenu,EmptyCategoryName,CategoryName,InvalidCategoryName,DeleteCategory,NoCategoryChoices,CategoryChoices,CategoryChoiceDraft,RemoveReview,BatchCategoryReview,SendingBatch,PausedBatch,ConfirmedBatch paired
 ```
 
 | 状态 ID | 最小必要信息                                                        | 浅色正式Web                                           | 深色正式Web                                          |
@@ -979,9 +979,9 @@ stateDiagram-v2
 | 06.K3   | 未提交选择、未分类含义、保存/取消、原服务端值保留                   | `karuyomi-a9fb310-category-picker-draft-light.jpg`    | `karuyomi-a9fb310-category-picker-draft-dark.jpg`    |
 | 04.K1   | 完整漫画清单、数量、保留进度/书签/分类的影响、危险确认及取消        | `karuyomi-a9fb310-batch-remove-preview-light.jpg`     | `karuyomi-a9fb310-batch-remove-preview-dark.jpg`     |
 | 04.K2   | 添加/移出范围、待选分类、逐项原→目标关联、数量、确认/取消           | `karuyomi-a9fb310-batch-categories-preview-light.jpg` | `karuyomi-a9fb310-batch-categories-preview-dark.jpg` |
-| 04.K3   | 确认数/未开始数、逐项状态、当前等待、暂停及忙碌关闭禁用             | 待                                                    | 待                                                   |
+| 04.K3   | 确认数/未开始数、逐项状态、当前等待、暂停及忙碌关闭禁用             | `karuyomi-94b7b82-category-batch-waiting-light.jpg`   | `karuyomi-94b7b82-category-batch-waiting-dark.jpg`   |
 | 04.K4   | 已确认/未开始/未确认项、系统红错误、仅重试原项、稍后处理            | 待                                                    | 待                                                   |
-| 04.K5   | 冻结的剩余清单、当前确认数、明确继续或结束、无隐式发送              | 待                                                    | 待                                                   |
+| 04.K5   | 冻结的剩余清单、当前确认数、明确继续或结束、无隐式发送              | `karuyomi-94b7b82-category-batch-paused-light.jpg`    | `karuyomi-94b7b82-category-batch-paused-dark.jpg`    |
 | 04.K6   | 逐项拒绝原因、原清单、重新读取并结束、不得直接重试新revision        | 待                                                    | 待                                                   |
 | 04.K7   | 全部确认文字、逐项确认状态、完成及返回实际书架                      | `karuyomi-bbf69d7-batch-confirmed-light.jpg`          | `karuyomi-bbf69d7-batch-confirmed-dark.jpg`          |
 | 04.K8   | 失效说明、原清单只读、关闭、迟到确认不得发送剩余                    | 待                                                    | 待                                                   |
@@ -1872,3 +1872,5 @@ stateDiagram-v2
 2026-11-16，`e8646f5`新读取提示的完整CI及正式Web双主题复验通过，33组九路快照与202条完成审计核对未知/拒绝的读取反馈、原请求保留及精确重试零重复。19.K11、21.K6、24.K11只登记有效深色主图；名义浅色截图实际也为系统深色，故成对主图仍107/169（63.3%）。其余触发阶段及设置禁用语义继续待验；20.K8/K10未截到进度，仍不计通过。连接阶段和阅读进度被迁移阻塞的提示已发现缺口，新增组件修复不能代替正式Web主图，详见[本轮复验](mihon-cupertino-fidelity.md#迁移读取提示及失效状态的正式-web-复验)。
 
 2026-11-17，`ef5f3dd`正式CI Web双主题新增20.K10主图，首次热门、搜索与两种追加共八张实际旋转画面均已实看，文件为`karuyomi-ef5f3dd-selection-migration-{popular,more-popular,search,more-search}-loading-candidate-{light,dark}.jpg`。未提交输入不改变热门或原查询`one piece`的追加说明，等待时原候选保留；返回后实际取得新的列表尾部。开源候选已经是搜索内容，不填20.K8。九组九路快照、七个相等区间和43条完成审计核对三次独立准备、一次明确UI主题保存及其余零业务POST；另补同名勾选框实际键盘与四张空分类对象分项。跨版本成对主图111→112/169（66.3%），仅单侧8、双侧均缺49，剩余57个主状态及全部变体/转换/最终产物；历史主图覆盖不代表当前HEAD全部验收或PR整体完成。完整环境、23张实拍及边界见[正式双主题复验](mihon-cupertino-fidelity.md#勾选身份与目标列表加载的正式-web-双主题复验)。
+
+2026-11-17，正式CI客户端`ef5f3dd`与独立记录的官方夹具`94b7b82`在内置浏览器补齐04.K3/K5双主题主图：相同两作品批量添加“待读”，首项实际提交后等待确认，请求暂停并释放后保留1/2确认和剩余原清单。两主题暂停时独立重复快照均相等；浅色明确继续后仅第二项应用，深色明确结束则第二项保持原值并在书架保留选择。13组九路快照、五个相等区间与94条审计已核对，首次分类挂起sequence17未完成交付单列，另外93条完成，不记全部生命周期通过。分类正常等待的旧“重试”提示缺口已复现并修复，35项回归通过，新正式Web仍待，不补05.K8。跨版本成对主图112→114/169（67.5%），仅单侧8、双侧均缺47，剩余55个主状态及全部变体/最终产物；不代表PR整体完成，详见[正式分项复验](mihon-cupertino-fidelity.md#批量等待与暂停的正式-web-复验)。

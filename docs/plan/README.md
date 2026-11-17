@@ -69,9 +69,9 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 2026-11-16，调整PR #8的推进顺序：先收敛同类最终界面实现并提交，再集中验收正式产物；不再为已知即将修改的中间布局反复补拍全套主图。停止使用没有固定权重的“约50%”，改为报告“最终界面代码、最终版本逐状态验收、合并发布与生产闭环”三项实绩和剩余门槛，详见[当前交付表](mihon-cupertino-fidelity.md#目标与当前状态)。状态覆盖和双主题验收范围保持不变。
 
-**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)继续逐状态推进，最终统一Cupertino导航、控件、动态语义配色与转场。`ef5f3dd`完整push/PR CI与Web/Wasm通过；正式Web双主题完成独立勾选框身份/键盘、空分类对象分组、真实热门/搜索及追加的准确说明，写入边界经独立API和审计核对，见[最新正式产物复验](../verification/mihon-cupertino-fidelity.md#勾选身份与目标列表加载的正式-web-双主题复验)。跨版本双主题主图为112/169（66.3%），剩余57个主状态及全部相关变体、转换和最终产物门槛；该计数不代表PR整体完成率。
+**当前视觉重构**：[Mihon 全界面布局与配色对照](mihon-cupertino-fidelity.md)继续逐状态推进，最终统一Cupertino导航、控件、动态语义配色与转场。`ef5f3dd`完整push/PR CI与Web/Wasm通过；正式Web双主题完成独立勾选框身份/键盘、空分类对象分组、真实热门/搜索及追加的准确说明，写入边界经独立API和审计核对，见[最新正式产物复验](../verification/mihon-cupertino-fidelity.md#勾选身份与目标列表加载的正式-web-双主题复验)。跨版本双主题主图为114/169（67.5%），剩余55个主状态及全部相关变体、转换和最终产物门槛；该计数不代表PR整体完成率。
 
-接下来集中分类目录与书架批量的等待、未知、暂停、拒绝和失效状态，沿用真实D1事务与现有官方[故障验收入口](../verification/mihon-cupertino-fidelity.md#分类目录与批量操作的故障验收入口)。Source与选源、连接浅色及其它编辑面剩余状态继续按[状态机](../verification/mihon-state-coverage.md)验收。各版本实拍、历史失败、像素/配色依据与环境限制保存在[验证记录](../verification/mihon-cupertino-fidelity.md)，逐项里程碑和剩余门槛维护在[交付表](mihon-cupertino-fidelity.md#目标与当前状态)。PR #8保持草稿，未合并、未部署；真实生产Access、图片/保存/新文档续读仍待，Karuyomi原生现场验收保持停止。
+`94b7b82`完整CI/Web/Wasm通过，[批量等待与暂停](../verification/mihon-cupertino-fidelity.md#批量等待与暂停的正式-web-复验)已用正式CI客户端和独立夹具补齐双主题主图；浅色明确继续、深色明确结束均按原范围处理，首次分类交付未完成的记录单列保留。分类等待提示已复现并修正，接下来验证新提示及分类/批量剩余未知、拒绝、失效和转换，沿用真实D1事务与官方[故障验收入口](../verification/mihon-cupertino-fidelity.md#分类目录与批量操作的故障验收入口)。Source与选源、连接浅色及其它编辑面剩余状态继续按[状态机](../verification/mihon-state-coverage.md)验收。各版本实拍、历史失败、像素/配色依据与环境限制保存在[验证记录](../verification/mihon-cupertino-fidelity.md)，逐项里程碑和剩余门槛维护在[交付表](mihon-cupertino-fidelity.md#目标与当前状态)。PR #8保持草稿，未合并、未部署；真实生产Access、图片/保存/新文档续读仍待，Karuyomi原生现场验收保持停止。
 
 **当前 UI 交付**：[统一 Cupertino 已恢复并生产上线](cupertino-ui.md#恢复-cupertino)。PR #7 合入后主线 CI、742 项 Dart 回归、46 条公开资源和 Access 门禁通过；内置浏览器重新确认导航、真实图片、设置保存和独立新文档续读，独立 D1 核对状态一致，见[恢复验证](../verification/cupertino-ui.md#恢复-cupertino-后的生产复验)。Web / iOS / Android 保持一套 Cupertino 共享实现，沿用 generator、Hooks 与现有权威读写/生命周期。[Liquid Glass](liquid-glass.md)已终止，玻璃库、专用材质设置及资源已移除；[评估](../design/liquid-glass-evaluation.md)与[执行证据](../verification/liquid-glass.md)保留历史及未完成性能门，不宣称能耗结论。[代码削减](ui-code-consolidation.md)仍独立规划，原生现场验证继续停止。
 

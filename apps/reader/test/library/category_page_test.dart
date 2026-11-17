@@ -248,6 +248,95 @@ void main() {
           await tap(tester, find.text('取消'));
           expect(posts('/api/categories/mutations'), isEmpty);
           expect(server.catalog().categories.first.name, name);
+          for (final reorder in [false, true]) {
+            final received = Completer<void>();
+            final release = Completer<void>();
+            late Finder action;
+            if (reorder) {
+              await tap(tester, iconLabel('分类选项 已确认名称'));
+              action = find.widgetWithText(CupertinoMenuItem, '下移分类');
+            } else {
+              await tap(tester, rename);
+              await tester.enterText(
+                find.byType(CupertinoTextField).last,
+                '已确认名称',
+              );
+              action = find.text('保存').hitTestable();
+            }
+            platform.afterBusinessReply = (request, reply) async {
+              if (request.method != 'POST' ||
+                  request.uri.path != '/api/categories/mutations') {
+                return reply;
+              }
+              platform.afterBusinessReply = null;
+              received.complete();
+              await release.future;
+              return reply;
+            };
+            try {
+              await tester.tap(action);
+              await tester.pump();
+              await tester.runAsync(
+                () => received.future.timeout(const Duration(seconds: 5)),
+              );
+              await tester.pump(const Duration(milliseconds: 400));
+              final editor = reorder
+                  ? manager
+                  : find.byKey(const ValueKey('category-command'));
+              final waiting = find.descendant(
+                of: editor,
+                matching: find.text('正在等待服务端确认分类修改。'),
+              );
+              await tester.ensureVisible(
+                find.descendant(
+                  of: editor,
+                  matching: find.byType(CupertinoActivityIndicator),
+                ),
+              );
+              await tester.pump();
+              expect(waiting, findsOneWidget);
+              expect(
+                find.descendant(
+                  of: editor,
+                  matching: find.text('原修改暂存在当前会话，关闭窗口不会撤回请求。请继续处理这次修改。'),
+                ),
+                findsNothing,
+              );
+              final saving = find.descendant(
+                of: editor,
+                matching: find.widgetWithText(CupertinoButton, '保存中'),
+              );
+              expect(saving, findsOneWidget);
+              expect(tester.widget<CupertinoButton>(saving).onPressed, isNull);
+              await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+              await tester.pump(const Duration(milliseconds: 400));
+              expect(editor, findsOneWidget);
+              expect(
+                posts('/api/categories/mutations'),
+                hasLength(reorder ? 2 : 1),
+              );
+              expect(
+                server.catalog().categories.first.name,
+                reorder ? '科幻' : '已确认名称',
+              );
+              expect(tester.takeException(), isNull);
+            } finally {
+              await tester.runAsync(() async {
+                release.complete();
+                await Future<void>.delayed(Duration.zero);
+              });
+              await tester.pumpAndSettle();
+            }
+            expect(
+              posts('/api/categories/mutations'),
+              hasLength(reorder ? 2 : 1),
+            );
+            expect(
+              find.byKey(const ValueKey('category-command')),
+              findsNothing,
+            );
+            expect(tester.takeException(), isNull);
+          }
           await hide(tester);
         },
       );

@@ -147,6 +147,12 @@ final class _CategoryDraft extends ChangeNotifier {
   LibraryView? confirmedView;
 
   String get retryLabel => confirmed ? '重试读取' : '重试保存';
+  String get busyLabel => blocked || confirmed ? '读取中' : '保存中';
+  String get activityLabel => blocked
+      ? '正在重新读取服务端分类。'
+      : confirmed
+      ? '正在读取已确认修改后的书架。'
+      : '正在等待服务端确认分类修改。';
 
   void _finish() {
     completed = true;
@@ -269,7 +275,20 @@ abstract class _CategorySession<W extends StatefulHookWidget> extends State<W> {
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      if (draft?.busy == true) const CupertinoActivityIndicator(),
+      if (!expired && draft?.busy == true)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Semantics(
+            container: true,
+            liveRegion: true,
+            child: Row(
+              children: [
+                Expanded(child: Text(draft!.activityLabel)),
+                const CupertinoActivityIndicator(),
+              ],
+            ),
+          ),
+        ),
       if (expired || draft?.error != null)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -283,7 +302,10 @@ abstract class _CategorySession<W extends StatefulHookWidget> extends State<W> {
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Text(draft!.reloaded ? '已重新读取，请关闭后重新打开编辑。' : '分类修改已由服务端确认。'),
         ),
-      if (!expired && draft?.attempted == true && !draft!.completed)
+      if (!expired &&
+          draft?.attempted == true &&
+          !draft!.busy &&
+          !draft.completed)
         const Padding(
           padding: EdgeInsets.only(bottom: 12),
           child: Text('原修改暂存在当前会话，关闭窗口不会撤回请求。请继续处理这次修改。'),
@@ -500,13 +522,17 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
                 child: draft.blocked && !draft.completed
                     ? CupertinoButton.filled(
                         onPressed: draft.busy ? null : _reload,
-                        child: const Text('重新读取并关闭'),
+                        child: Text(draft.busy ? draft.busyLabel : '重新读取并关闭'),
                       )
                     : draft.attempted && !draft.completed
                     ? CupertinoButton.filled(
                         onPressed: draft.busy ? null : () => _execute(draft),
                         child: Text(
-                          draft.reorder ? draft.retryLabel : '继续未确认修改',
+                          draft.busy
+                              ? draft.busyLabel
+                              : draft.reorder
+                              ? draft.retryLabel
+                              : '继续未确认修改',
                         ),
                       )
                     : const SizedBox.shrink(),
@@ -663,7 +689,10 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
             ? CupertinoButton(
                 padding: EdgeInsets.zero,
                 onPressed: expired || draft.busy ? null : _reload,
-                child: const Text('重读', semanticsLabel: '重新读取并关闭'),
+                child: Text(
+                  draft.busy ? draft.busyLabel : '重读',
+                  semanticsLabel: draft.busy ? null : '重新读取并关闭',
+                ),
               )
             : CupertinoButton(
                 padding: EdgeInsets.zero,
@@ -678,8 +707,14 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
                     ? null
                     : _save,
                 child: Text(
-                  draft.attempted ? '重试' : draft.submitLabel,
-                  semanticsLabel: draft.attempted ? draft.retryLabel : null,
+                  draft.busy
+                      ? draft.busyLabel
+                      : draft.attempted
+                      ? '重试'
+                      : draft.submitLabel,
+                  semanticsLabel: !draft.busy && draft.attempted
+                      ? draft.retryLabel
+                      : null,
                 ),
               ),
         content: Form(
