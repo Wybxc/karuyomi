@@ -830,6 +830,20 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 本轮没有新的正式Web主图，仍114/169（67.5%）、仅单侧8、双侧均缺47，剩余55个主状态以及全部相关变体、转换和最终产物门槛。组件响应门不替代真实浏览器、Access或原生证据，PR #8仍草稿、未合并、未部署。
 
+## 内置浏览器恢复后的分类浅色复验
+
+2026-11-17，`49f34823503bfa63aae73d7fb2e69c5133e63e5e`的[push CI](https://github.com/Wybxc/karuyomi/actions/runs/44096952683)和[PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44096963798)完整成功，Web与push Wasm通过，deploy跳过。正式Web artifact 14335076593为16,299,923字节，传输边界摘要`52a11bcc89f19f8c272ce659f6d3c40415543f97ec551c9362971bde58a076e8`和39条CI资源校验通过。官方API与acceptance Vite分别构建后，实际HTTP交付35条Web资源与CI相等，入口`main.dart.2fab9a56.js`；`49f3482-category-recovery-served-client-check.json`分别记录相同客户端/夹具提交。官方Wrangler临时D1/R2、`acceptance-owner`、四包既有输入与三包安装、`editor-ui`、内置浏览器360×800，仅浅色，地址`127.0.0.1:64096`；未本地编译Flutter/AOT，未验Source、原生或生产。
+
+刷新浏览器库存后，当次控制会话中ID1为内置浏览器、ID2为MCP Apps；选择实际内置浏览器后，新建空白页、读取UI和产品交互成功。数字ID不跨会话沿用。不能由这次库存差异推断先前四次超时的共同根因，先前包括显式`iab`创建的失败仍保留，也不归因于审批额度；本轮没有换用其它桌面浏览器。
+
+五次独立API准备仍为浅色/三包安装、英文/法文同名收藏和“待读”/“稍后”两分类，原收据`karuyomi-49f3482-category-recovery-setup.json`保留。UI把“待读”重命名为“已读”，`rename-waiting-light`实际显示保存中、等待确认及冻结输入。人工释放后首次确认交付仍没有终态，审计sequence17的Worker/客户端状态均为空；原因未完整测量，不把工具往返延迟推断为产品超时，也不计正常释放。UI转为未知结果，独立读回已见目录revision3和“已读”。明确“重试保存”沿用同一UUID/CAS/完整正文，sequence23正常200，目录与账户均不再增长；随后稳定分类列表和书架均已实看。
+
+`verify-49f3482-initial-category-probe.ts`以生成ProtoJSON模型核对四组九路快照（36条响应）、两个完全相等区间及36条连续审计，35条完成、仅sequence17未完成。七条POST为五次独立准备、一条UI原命令及一次精确重试；UI原命令只应用一次。账户5→6、目录2→3，最终“已读”/“稍后”；两作品始终revision1且已收藏，分类关联、书签、阅读进度、续读、资料与其它设置不变，全局1/LIGHT。没有UI主题或其它业务写入，审计仍不含Source运行时请求。
+
+忽略目录`.local/mihon-reference/`保存前缀`karuyomi-49f3482-category-recovery-`的四张完整DOM/JPEG：`rename-waiting-light`、`initial-gate-unknown-light`、`initial-gate-retried-list-light`及`initial-probe-library-final-light`；辅助`library-baseline-light`为AX图，未当作新主状态。快照、初始及最终原审计、`initial-probe-evidence-receipt.json`与`49f3482-initial-category-probe-evidence-check.log`均保留。读取关闭/重开、排序、已确认读取失败、冲突、身份失效及深色尚未在本轮完成；不补05.K8/K9，仍114/169（67.5%）、仅单侧8、双侧均缺47。客户端已离开并恢复默认视口，harness正常退出0。
+
+为避免瞬时确认状态依赖人工释放往返，既有官方夹具新增`delay-confirm`（2秒）、`delay-read`（5秒）和`confirm-read-failure`（真实提交与2秒后正常ACK，再令后续读取503）。等待仍逐秒检查取消和control generation，显式改模式优先；人工挂起仍30秒失败，不能静默当作成功。仅测试夹具生效，产品超时、生产入口、绑定和协议不变，256条审计上限保留。57项Workers/D1/R2回归及API/test严格类型通过，覆盖真实事务先完成、自动交付、原响应不变、取消、显式模式覆盖和无关进度透传，日志`editor-ui-automatic-delay-{workers,typecheck}.log`。新夹具完整CI与正式Web尚待，组件/夹具通过不算主状态完成。
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。

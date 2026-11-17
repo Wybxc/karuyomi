@@ -342,6 +342,210 @@ async function seedLibraryScope(scope: 'categories' | 'classification') {
 }
 
 test.each(['categories', 'classification'] as const)(
+  '%s automatically delivers a delayed ACK after its real D1 transaction',
+  async (scope) => {
+    const fixture = await seedLibraryScope(scope);
+    await setEditorUiMode(env.DB, 'delay-confirm', scope);
+    const original = fixture.command();
+    let delivered = false;
+    const pending = request(fixture.path, original.body).then((reply) => {
+      delivered = true;
+      return reply;
+    });
+    try {
+      await entered();
+      for (let attempt = 0; attempt < 30; attempt++) {
+        if (
+          (await fixture.read()).source.accountRevision ===
+          fixture.committed.source.accountRevision
+        )
+          break;
+        await new Promise<void>((resolve) => setTimeout(resolve, 50));
+      }
+      expect(await fixture.read()).toEqual(fixture.committed);
+      expect(delivered).toBe(false);
+    } finally {
+      await pending;
+    }
+    const reply = await pending;
+    expect(reply.status).toBe(200);
+    const json = await reply.json();
+    const ack =
+      scope === 'categories'
+        ? categoryMutationResponseSchema.parse(json)
+        : stateMutationResponseSchema.parse(json);
+    expect(ack.mutationId).toBe(original.mutationId);
+    expect(await editorUiAttempts(env.DB)).toEqual([
+      expect.objectContaining({
+        body: original.body,
+        mode: 'delay-confirm',
+        worker_status: 200,
+        client_status: 200,
+      }),
+    ]);
+  },
+  15_000,
+);
+
+test.each(['categories', 'classification'] as const)(
+  '%s confirms the real write before automatically failing its read-back',
+  async (scope) => {
+    const fixture = await seedLibraryScope(scope);
+    await setEditorUiMode(env.DB, 'confirm-read-failure', scope);
+    const original = fixture.command();
+    const reply = await request(fixture.path, original.body);
+    expect(reply.status).toBe(200);
+    const json = await reply.json();
+    const ack =
+      scope === 'categories'
+        ? categoryMutationResponseSchema.parse(json)
+        : stateMutationResponseSchema.parse(json);
+    expect(ack.mutationId).toBe(original.mutationId);
+    expect((await request(fixture.readPath)).status).toBe(503);
+    expect((await request('/api/library')).status).toBe(503);
+    expect(await fixture.read()).toEqual(fixture.committed);
+    await setEditorUiMode(env.DB, 'pass', scope);
+    expect((await request(fixture.readPath)).status).toBe(200);
+    expect(await fixture.read()).toEqual(fixture.committed);
+    const audit = await editorUiAttempts(env.DB);
+    expect(audit).toHaveLength(4);
+    expect(audit[0]).toMatchObject({
+      method: 'POST',
+      body: original.body,
+      mode: 'confirm-read-failure',
+      worker_status: 200,
+      client_status: 200,
+    });
+    expect(audit.slice(1, 3)).toEqual(
+      [1, 2].map(() =>
+        expect.objectContaining({
+          method: 'GET',
+          mode: 'fail-read',
+          worker_status: null,
+          client_status: 503,
+        }),
+      ),
+    );
+    expect(audit[3]).toMatchObject({
+      method: 'GET',
+      mode: 'pass',
+      worker_status: 200,
+      client_status: 200,
+    });
+  },
+  15_000,
+);
+
+test.each([
+  ['categories', '/api/categories'],
+  ['categories', '/api/library'],
+  ['classification', coverPath],
+  ['classification', '/api/library'],
+] as const)(
+  'an automatic %s read delay returns the original %s response',
+  async (scope, path) => {
+    const fixture = await seedLibraryScope(scope);
+    const expected = await (await request(path, undefined, false)).json();
+    await setEditorUiMode(env.DB, 'delay-read', scope);
+    let delivered = false;
+    const pending = request(path).then((reply) => {
+      delivered = true;
+      return reply;
+    });
+    try {
+      await entered();
+      expect(delivered).toBe(false);
+    } finally {
+      await pending;
+    }
+    const reply = await pending;
+    expect(reply.status).toBe(200);
+    expect(await reply.json()).toEqual(expected);
+    expect(await fixture.read()).toEqual(fixture.before);
+    expect(await editorUiAttempts(env.DB)).toEqual([
+      expect.objectContaining({
+        path,
+        method: 'GET',
+        mode: 'delay-read',
+        worker_status: 200,
+        client_status: 200,
+      }),
+    ]);
+  },
+  15_000,
+);
+
+test.each(['delay-read', 'delay-confirm', 'confirm-read-failure'] as const)(
+  'an aborted %s request cannot outlive its automatic gate',
+  async (mode) => {
+    const fixture = await seedLibraryScope('categories');
+    await setEditorUiMode(env.DB, mode, 'categories');
+    const controller = new AbortController();
+    const original = fixture.command();
+    const saving = mode !== 'delay-read';
+    const pending = request(
+      saving ? fixture.path : fixture.readPath,
+      saving ? original.body : undefined,
+      true,
+      origin,
+      controller.signal,
+    );
+    const rejected = expect(pending).rejects.toThrow();
+    try {
+      await entered();
+      if (saving) {
+        for (let attempt = 0; attempt < 30; attempt++) {
+          if (
+            (await fixture.read()).source.accountRevision ===
+            fixture.committed.source.accountRevision
+          )
+            break;
+          await new Promise<void>((resolve) => setTimeout(resolve, 50));
+        }
+        expect(await fixture.read()).toEqual(fixture.committed);
+      }
+    } finally {
+      controller.abort();
+      await rejected;
+    }
+    expect((await editorUiAttempts(env.DB))[0]).toMatchObject({
+      mode,
+      worker_status: null,
+      client_status: null,
+    });
+    expect(await fixture.read()).toEqual(
+      saving ? fixture.committed : fixture.before,
+    );
+  },
+  15_000,
+);
+
+test('an explicit control change wins over a scheduled read-back fault', async () => {
+  const fixture = await seedLibraryScope('categories');
+  await setEditorUiMode(env.DB, 'confirm-read-failure', 'categories');
+  const original = fixture.command();
+  const pending = request(fixture.path, original.body);
+  try {
+    await entered();
+    for (let attempt = 0; attempt < 30; attempt++) {
+      if (
+        (await fixture.read()).source.accountRevision ===
+        fixture.committed.source.accountRevision
+      )
+        break;
+      await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    }
+    expect(await fixture.read()).toEqual(fixture.committed);
+  } finally {
+    await setEditorUiMode(env.DB, 'pass', 'categories');
+    await pending;
+  }
+  expect((await pending).status).toBe(200);
+  expect((await request(fixture.readPath)).status).toBe(200);
+  expect(await fixture.read()).toEqual(fixture.committed);
+}, 15_000);
+
+test.each(['categories', 'classification'] as const)(
   '%s waits for ACK delivery after its real D1 transaction, retaining unrelated works',
   async (scope) => {
     const fixture = await seedLibraryScope(scope);
@@ -530,6 +734,9 @@ test.each([
   ['lose-confirm', 'classification'],
   ['reject-save', 'categories'],
   ['login-required', 'classification'],
+  ['delay-read', 'categories'],
+  ['delay-confirm', 'categories'],
+  ['confirm-read-failure', 'classification'],
 ])(
   'unrelated progress is audited without %s faults in %s',
   async (mode, scope) => {

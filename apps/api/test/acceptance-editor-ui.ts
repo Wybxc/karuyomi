@@ -15,9 +15,12 @@ import {
 const modes = [
   'pass',
   'hold-read',
+  'delay-read',
   'fail-read',
   'fail-image',
   'hold-confirm',
+  'delay-confirm',
+  'confirm-read-failure',
   'lose-confirm',
   'reject-save',
   'login-required',
@@ -112,14 +115,18 @@ async function waitForRelease(
   db: D1Database,
   generation: number,
   signal: AbortSignal,
+  automaticDelayMs?: number,
 ): Promise<void> {
-  // Bounded, one-second polling keeps the local fixture inexpensive. A timeout
-  // fails the request instead of silently claiming that the gate was released.
-  const deadline = Date.now() + 30_000;
+  // One-second polling keeps both manual gates and automatic delays bounded.
+  // A manual timeout fails instead of claiming a successful release.
+  const deadline = Date.now() + (automaticDelayMs ?? 30_000);
   signal.throwIfAborted();
   while ((await readControl(db)).generation === generation) {
     signal.throwIfAborted();
-    if (Date.now() >= deadline) throw new Error('Editor UI gate expired');
+    if (Date.now() >= deadline) {
+      if (automaticDelayMs !== undefined) return;
+      throw new Error('Editor UI gate expired');
+    }
     await new Promise<void>((resolve) => setTimeout(resolve, 1000));
   }
   signal.throwIfAborted();
@@ -284,12 +291,38 @@ export async function withEditorUi(
       { status: 400, headers: { 'Content-Type': 'application/json' } },
     );
   } else {
-    if (reading && mode === 'hold-read')
-      await waitForRelease(db, control.generation, request.signal);
+    if (reading && (mode === 'hold-read' || mode === 'delay-read'))
+      await waitForRelease(
+        db,
+        control.generation,
+        request.signal,
+        mode === 'delay-read' ? 5_000 : undefined,
+      );
     response = await dispatch();
     workerStatus = response.status;
-    if (command && mode === 'hold-confirm')
-      await waitForRelease(db, control.generation, request.signal);
+    if (
+      command &&
+      (mode === 'hold-confirm' ||
+        mode === 'delay-confirm' ||
+        mode === 'confirm-read-failure')
+    ) {
+      await waitForRelease(
+        db,
+        control.generation,
+        request.signal,
+        mode === 'hold-confirm' ? undefined : 2_000,
+      );
+      if (mode === 'confirm-read-failure' && response.ok) {
+        // Arm only this generation. An explicit control change wins over a
+        // delayed response and must never be replaced by its scheduled fault.
+        await db
+          .prepare(
+            "UPDATE acceptance_editor_ui_control SET mode = 'fail-read', generation = generation + 1 WHERE singleton = 1 AND generation = ? AND scope = ?",
+          )
+          .bind(control.generation, control.scope)
+          .run();
+      }
+    }
     if (command && mode === 'lose-confirm' && response.ok) {
       // The real transaction has committed. Only delivery of its ACK is lost.
       response = new Response('Injected committed editor ACK loss', {
