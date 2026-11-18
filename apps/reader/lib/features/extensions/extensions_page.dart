@@ -397,6 +397,7 @@ class const ExtensionOperationStatus({
   super.key,
   required final ExtensionsController controller,
   final bool showStorageAction = true,
+  final bool showProgress = true,
 }) extends HookWidget {
   @override
   Widget build(BuildContext context) {
@@ -409,7 +410,7 @@ class const ExtensionOperationStatus({
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (controller.busy) ...[
+        if (showProgress && controller.busy) ...[
           const CupertinoActivityIndicator(),
           Text(
             controller.settings.pending?.acknowledged == true &&
@@ -1174,7 +1175,11 @@ class const ExtensionStoragePage({
     final diagnostics = useMemoized(ExpansibleController.new);
     useEffect(() => diagnostics.dispose, [diagnostics]);
     final cache = controller.cache;
-    final actionStyle = CupertinoTheme.of(context).textTheme.actionTextStyle;
+    final checking =
+        cache == null &&
+        controller.available &&
+        controller.activity == ExtensionActivity.reading &&
+        controller.settings.pending?.acknowledged != true;
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(middle: const Text('本机存储')),
       child: SafeArea(
@@ -1186,20 +1191,27 @@ class const ExtensionStoragePage({
               child: ExtensionOperationStatus(
                 controller: controller,
                 showStorageAction: false,
+                showProgress: !checking,
               ),
             ),
             CupertinoFormSection.insetGrouped(
               footer: const Text('清理副本后仍是账户已安装状态，重新打开时会再次下载。书架与阅读记录保留。'),
               children: [
                 CupertinoListTile(
-                  title: Text(cache == null ? '正在检查本机副本' : '扩展副本占用'),
+                  title: Text(
+                    checking
+                        ? '正在检查本机副本'
+                        : cache == null
+                        ? '尚未读取本机副本'
+                        : '扩展副本占用',
+                  ),
                   subtitle: cache == null
                       ? null
                       : Text(
                           '${cache.artifacts.length} 个副本 · ${_bytes(cache.totalBytes)}',
                           key: const ValueKey('extensions-cache-usage'),
                         ),
-                  trailing: cache == null
+                  trailing: checking
                       ? const CupertinoActivityIndicator()
                       : null,
                 ),
@@ -1298,14 +1310,16 @@ class const ExtensionStoragePage({
             ],
             CupertinoListSection.insetGrouped(
               hasLeading: false,
+              clipBehavior: Clip.none,
               children: [
-                CupertinoButton(
-                  onPressed: !controller.available || controller.busy
-                      ? null
-                      : () => unawaited(controller.refresh()),
-                  padding: EdgeInsets.zero,
-                  child: CupertinoListTile(
-                    title: Text('重新读取本机副本', style: actionStyle, maxLines: 2),
+                SizedBox(
+                  width: double.infinity,
+                  child: CupertinoButton(
+                    alignment: AlignmentDirectional.centerStart,
+                    onPressed: !controller.available || controller.busy
+                        ? null
+                        : () => unawaited(controller.refresh()),
+                    child: const Text('重新读取本机副本'),
                   ),
                 ),
               ],

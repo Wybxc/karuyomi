@@ -712,6 +712,66 @@ void main() {
       },
     );
 
+    testWidgets(
+      'storage shows one truthful progress indicator and disables rereading in $appearance',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final fresh = ExtensionsController(
+          container: container,
+          catalog: catalog,
+          repository: manager.repository,
+          isCurrent: () => current,
+        );
+        final release = Completer<void>();
+        platform.beforeApiFetch = (path) async {
+          if (path == '/api/settings') await release.future;
+        };
+        try {
+          await tester.pumpApp(
+            CupertinoApp(
+              theme: readerAppTheme(appearance),
+              home: ExtensionStoragePage(controller: fresh),
+            ),
+          );
+          await tester.pump();
+          final showedIdle = find.text('尚未读取本机副本').evaluate().isNotEmpty;
+          final refreshLabel = find.text('重新读取本机副本');
+          final refresh = find.widgetWithText(CupertinoButton, '重新读取本机副本');
+          await tester.tap(refresh);
+          await tester.pump();
+
+          expect(find.text('正在检查本机副本'), findsOneWidget);
+          expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+          expect(find.text('正在读取账户、目录与本机副本'), findsNothing);
+          expect(showedIdle, isTrue);
+          expect(tester.widget<CupertinoButton>(refresh).enabled, isFalse);
+          final labelContext = tester.element(refreshLabel);
+          expect(
+            DefaultTextStyle.of(labelContext).style.color,
+            CupertinoColors.tertiaryLabel.resolveFrom(labelContext),
+          );
+
+          release.complete();
+          await tester.pumpAndSettle();
+          expect(find.byType(CupertinoActivityIndicator), findsNothing);
+          expect(find.text('本机没有扩展副本'), findsOneWidget);
+          expect(tester.widget<CupertinoButton>(refresh).enabled, isTrue);
+          expect(
+            platform.businessServer.requests.where(
+              (request) => request.method == 'POST',
+            ),
+            isEmpty,
+          );
+        } finally {
+          if (!release.isCompleted) release.complete();
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          fresh.dispose();
+        }
+      },
+    );
+
     for (final scale in [1.0, 2.0]) {
       testWidgets(
         'storage exposes keyboard diagnostics and clears only the local copy at $appearance / $scale',
