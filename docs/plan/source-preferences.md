@@ -83,6 +83,7 @@ AOT 清单承载已审核键，Worker 与运行时不再按扩展名配置。当
 - [x] 正式 Dart/Flutter 控制与业务链的工程回归：D1 值在 Source 构造前生效；丢 ACK 不重跑回调；只读刷新不重放 pending；关闭/取消/换身份及迟到响应不复活旧状态；未确认草稿有明确可恢复路径。
 - [x] 按 v6 ABI 在固定提交的独立目录本地重建 Komiic，通过完整性及静态装配门；候选保持 compiled_unverified/runtimeReady=false。
 - [x] Komiic 正式 Web 入口切换原镜像设置、确认到 D1、重开并加载真实热门；第二项保存保留前一值，新 Web 文档从确认状态恢复两项非默认值。实际范围见[记录](../verification/source-preferences.md#komiic-v6-真实-web-分项)。
+- [x] Komiic 正式 Web 浅、深色均验证整包读取、未知结果重开及精确重试、有效确认后的只读恢复。独立 Web 文档实际读回两项确认值。[正式验收](../verification/mihon-cupertino-fidelity.md#source-偏好读取与恢复的正式-web-双主题验收)
 - [x] 以未修改的 FoolSlide Customizable 和 MangaDex 原包完成固定提交的隔离 AOT，见[工程与构建证据](../verification/source-preferences.md#文本设置绑定与输入校验)。
 - [x] MangaDex 英文 Source 的正式 Web 设置入口验证无效 UUID 拒绝、有效值读回及新文档不继承会话值。
 - [x] FoolSlide Customizable 的正式 Web 设置入口验证默认值全选、无效 URL 拒绝、原回调归一化写入及新文档恢复默认；无 D1 设置行。后续按实际存储区分提示的变更由 Flutter 定向测试验证，详见[验收记录](../verification/source-preferences.md#双包正式-web-设置)。

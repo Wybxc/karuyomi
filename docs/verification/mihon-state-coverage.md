@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-18，Karuyomi跨版本双主题主图现为129/169（76.3%），剩余40个主状态：8个仅单侧、32个双侧均缺。新增仓库10.K4/K7/K9三对，见[正式双主题验收](mihon-cupertino-fidelity.md#仓库预览与操作恢复的正式-web-双主题验收)。这是已登记主状态的历史覆盖，不代表当前HEAD全部像素、变体、转换或PR整体完成率。
+2026-11-18，Karuyomi 跨版本双主题主图现为 131/169（77.5%），剩余 38 个主状态，其中 8 个仅有单侧、30 个双侧均缺。新增 Source 偏好 14.K1/K5 两对。[正式双主题验收](mihon-cupertino-fidelity.md#source-偏好读取与恢复的正式-web-双主题验收)
 
 2026-11-14，进行中。用户要求截图触及每个 UI 状态，并同时考虑浅色、深色。此表细化[30 组界面矩阵](../design/mihon-cupertino-fidelity.md)，作为参考采集与后续 Cupertino 对照的工作清单。**目前尚无一组完成包含全部转换与变体的双主题验收；绿色只代表该节点的两张主状态参考图已核对。**
 
@@ -1743,16 +1743,16 @@ stateDiagram-v2
     EmptyPreferences --> LoadingPreferences: 明确重新读取
     GroupedPreferences --> LoadingPreferences: 明确重新读取
     classDef paired fill:#dbeafe,color:#172554,stroke:#2563eb
-    class ToggleOff,ToggleOn,ChangingPreference,PreferenceFailed,UnsupportedPreference,NewDocument paired
+    class LoadingPreferences,ToggleOff,ToggleOn,ChangingPreference,PreferencePending,PreferenceFailed,UnsupportedPreference,NewDocument paired
 ```
 
 | 状态 ID | 最小必要信息                                               | 浅色正式Web                                                                                                     | 深色正式Web                                                                                                          |
 | ------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 14.K1   | 源身份、正在读取、关闭可取消                               | 待                                                                                                              | 待                                                                                                                   |
+| 14.K1   | 源身份、正在读取、关闭可取消                               | `karuyomi-92d4f93-source-preferences-formal-loading-main-light.jpg`                                             | `karuyomi-92d4f93-source-preferences-formal-loading-dark.jpg`                                                        |
 | 14.K2   | 设置名、关闭值、会话范围                                   | `karuyomi-16baf47-source-preferences-off-light.jpg`                                                             | `karuyomi-16baf47-source-preferences-off-dark.jpg`                                                                   |
 | 14.K3   | 设置名、开启值、会话范围                                   | `karuyomi-16baf47-source-preferences-on-light.jpg`                                                              | `karuyomi-16baf47-source-preferences-on-dark.jpg`                                                                    |
 | 14.K4   | 请求进行中、重复操作禁用、关闭的影响                       | `karuyomi-bcac704-editors-source-preference-writing-on-light.jpg`                                               | `karuyomi-bcac704-editors-source-preference-writing-on-dark.jpg`                                                     |
-| 14.K5   | 原请求身份/值、未知结果、精确重试与恢复                    | 待                                                                                                              | 待                                                                                                                   |
+| 14.K5   | 原请求身份/值、未知结果、精确重试与恢复                    | `karuyomi-92d4f93-source-preferences-formal-unknown-expanded-light.jpg`                                         | `karuyomi-92d4f93-source-preferences-formal-unknown-expanded-dark.jpg`                                               |
 | 14.K6   | Source拒绝输入的原因、未改现值、明确重读；其余失败变体仍待 | `karuyomi-a12c779-source-text-rejected-top-light.jpg`、`karuyomi-a12c779-source-text-rejected-bottom-light.jpg` | `karuyomi-a12c779-source-text-rejected-stable-top-dark.jpg`、`karuyomi-a12c779-source-text-rejected-bottom-dark.jpg` |
 | 14.K7   | 设置名、不支持原因、不可误操作                             | `karuyomi-16baf47-source-preferences-off-light.jpg`                                                             | `karuyomi-16baf47-source-preferences-off-dark.jpg`                                                                   |
 | 14.K8   | 同一会话、已改值、范围说明                                 | `karuyomi-2df0551-source-preferences-reopened-light.jpg`                                                        | `karuyomi-2df0551-source-preferences-reopened-dark.jpg`                                                              |
@@ -1765,6 +1765,8 @@ stateDiagram-v2
 随后`16baf47`完整CI通过（807项Dart/531项Vitest及Web/Wasm）。正式Web的新关闭/开启主图与`source-preferences-pair.png`已双主题实看，系统浅色/显式深色的Sheet顶部不再露出宿主浅灰背景；标准绿/灰开关与次级说明正常。同会话浅色0→1、改深色再进Source仍1、深色键盘Space恢复0及重开仍0通过。深色跨源范围也完成实际Tab/Enter收起/展开，图为`karuyomi-16baf47-cross-scope-{collapsed,expanded}-dark.jpg`，该缺口已补；独立API确认会话修改与范围导航不写账户。新文档转换仍只保留上版浅色证据，诊断首次缺项和其它类型/变体继续待办；这不是全组通过。
 
 `bcac704`双主题分别实际开启动漫屋会话开关，再reload进入独立新文档，确认默认值恢复0，补齐14.K9；安装与主题由账户恢复。14.K4主图在实际0→1后立即取得，显示源名、spinner、关闭取消说明及禁用恢复/刷新；此时Source会话修改已确认，正在重开/重取描述，不代表账户保存等待或14.K5未知结果。首次`source-preference-processing-dark.jpg`实际已完成，排除K4；浅色另一次1→0仅作分项。镜像菜单Escape取消、unsupported Cookie未执行，七路快照确认会话开关及筛选零账户写入。MangaDex af容器中断，真实多选子面未进入；xkcd有Organization Method，不作为空偏好证据。详见[其余编辑面复验](mihon-cupertino-fidelity.md#顶部导航其余编辑面的正式-web-复验)。
+
+`92d4f93` 双主题补齐 14.K1/K5。关闭读取弹层后回到 Komiic 热门。展开原保存请求可见原 Source、基线版本和两个同步值。关闭重开后可按原文重试，结果已确认时只重试读取。14.K4 的实际账户提交等待另有两张辅助图。14.K10/K11 继续待验。[Source 偏好读取与恢复](mihon-cupertino-fidelity.md#source-偏好读取与恢复的正式-web-双主题验收)
 
 ### 15：Karuyomi 跨源搜索的目标状态
 
