@@ -2,6 +2,10 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-19，`78f4c4b` 正式 Web 双主题确认 257／256 条映射时禁用，减去一条后能进入二次确认，退出后权威状态一致。20.K18 补齐，主图累计 148/169（87.6%）。[实拍与读回](verification/mihon-cupertino-fidelity.md#章节映射超限的正式-web-双主题验收)
+
+2026-11-19，`5f5d287` 正式 Web 通过真实英语 Commit Strip 的设置空态双主题，重读及关闭无额外写入，主图累计 147/169（87.0%）。[实拍与读回](verification/mihon-cupertino-fidelity.md#漫画源设置空态的正式-web-双主题验收)
+
 2026-11-19，`5f5d287` 正式 Web 补齐批量分类身份失效双主题，达到 146/169（86.4%）。三轮均只有首部写入，次部收到 401，末部未发送。迁移超限用隔离上游夹具复现并修正确认按钮语义，正式双主题仍待。[批量实拍](verification/mihon-cupertino-fidelity.md#批量分类失效的正式-web-双主题验收) · [迁移复现](verification/mihon-cupertino-fidelity.md#章节映射超限的复现)
 
 2026-11-19，`1ef627b` 正式 Web 验证封面等待的三个禁用语义及失效迁移首个观测帧。三作品批量实测首项确认、次项 401、末项未发送，随后修正旧窗口的重试入口和文案，72 项书架相关回归通过。04.K8 修复后双主题仍待。[实拍与修正](verification/mihon-cupertino-fidelity.md#编辑复验与批量窗口失效)
