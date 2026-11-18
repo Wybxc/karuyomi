@@ -25,12 +25,14 @@ class const SourceFiltersSheet({
 
 class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
   late final CatalogSourceRef _source;
+  late final String _sourceName;
   late final String? _subject;
   late final String _worker;
   wire.FilterSnapshot? _draft;
   String? _requestId;
   String? _error;
   _FilterWork? _work;
+  bool _retryReset = false;
   bool _disposing = false;
   bool _closing = false;
 
@@ -40,6 +42,7 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
   void initState() {
     super.initState();
     _source = widget.catalog.sourceReference;
+    _sourceName = widget.catalog.activeSource!.name;
     _subject = widget.catalog.subject;
     _worker = widget.catalog.session!.workerInstanceId;
     final snapshot = widget.catalog.sourceFilterSnapshot;
@@ -117,6 +120,7 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
         _seed(snapshot);
       } else {
         _draft = null;
+        _retryReset = reset;
         _error = widget.catalog.sourceFilterError ?? '筛选条件未能加载，仍可默认浏览。';
       }
     });
@@ -188,6 +192,7 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
   }
 
   void _close() {
+    if (_closing) return;
     setState(() => _closing = true);
     final requestId = _requestId;
     _requestId = null;
@@ -347,14 +352,17 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
             ),
             CupertinoFormRow(
               prefix: const Expanded(flex: 3, child: Text('排序方向')),
-              child: CupertinoButton(
-                key: key('ascending'),
-                onPressed: enabled && selection != null
-                    ? () => setState(
-                        () => selection.ascending = !selection.ascending,
-                      )
-                    : null,
-                child: Text(selection?.ascending == false ? '降序' : '升序'),
+              child: Semantics(
+                enabled: enabled && selection != null,
+                child: CupertinoButton(
+                  key: key('ascending'),
+                  onPressed: enabled && selection != null
+                      ? () => setState(
+                          () => selection.ascending = !selection.ascending,
+                        )
+                      : null,
+                  child: Text(selection?.ascending == false ? '降序' : '升序'),
+                ),
               ),
             ),
           ],
@@ -370,105 +378,148 @@ class _SourceFiltersSheetState extends State<SourceFiltersSheet> {
   @override
   Widget build(BuildContext context) {
     useListenable(widget.catalog);
-    final current = _current;
     final sameSession = _sameSession;
-    final enabled = current && !_working && !widget.catalog.busy;
+    final enabled = _current && !_working && !widget.catalog.busy;
     final draft = _draft;
+    final work = sameSession ? _work : null;
+    final error = sameSession ? _error : '漫画源会话已变化，请关闭后重新打开筛选。';
+    final canApply = enabled && draft != null;
+    final query = widget.query.isEmpty ? '应用后按筛选条件搜索' : '搜索词：${widget.query}';
     return EditSheet(
       title: const Text('筛选漫画'),
-      leading: CupertinoButton(
-        onPressed: _close,
-        padding: EdgeInsets.zero,
-        child: Icon(
-          CupertinoIcons.xmark,
-          semanticLabel: _working ? '取消请求并关闭筛选' : '取消筛选编辑',
+      leading: Semantics(
+        enabled: !_closing,
+        child: CupertinoButton(
+          onPressed: _closing ? null : _close,
+          padding: EdgeInsets.zero,
+          child: Icon(
+            CupertinoIcons.xmark,
+            semanticLabel: !sameSession
+                ? '关闭筛选'
+                : work != null
+                ? '取消请求并关闭筛选'
+                : '取消筛选编辑',
+          ),
         ),
       ),
-      trailing: CupertinoButton(
-        key: const ValueKey('source-filter-apply'),
-        padding: EdgeInsets.zero,
-        onPressed: enabled && draft != null ? _apply : null,
-        child: const Text('应用', semanticsLabel: '应用筛选'),
+      trailing: Semantics(
+        enabled: canApply,
+        child: CupertinoButton(
+          key: const ValueKey('source-filter-apply'),
+          padding: EdgeInsets.zero,
+          onPressed: canApply ? _apply : null,
+          child: const Text('应用', semanticsLabel: '应用筛选'),
+        ),
       ),
-      content: ListView(
-        key: const ValueKey('source-filter-form'),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  widget.query.isEmpty ? '应用后按筛选条件搜索' : '搜索词：${widget.query}',
-                ),
-                if (_work case final work?) ...[
-                  Row(
-                    children: [
-                      const CupertinoActivityIndicator(),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(switch (work) {
-                          _FilterWork.loading => '正在读取筛选条件',
-                          _FilterWork.resetting => '正在重置筛选条件',
-                          _FilterWork.applying => '正在应用筛选条件',
-                        }),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    '关闭将取消请求，可能需要重新连接漫画源。',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.secondaryLabel.resolveFrom(context),
-                    ),
-                  ),
-                ],
-                if (!sameSession)
-                  Text(
-                    '漫画源会话已变化，请关闭后重新打开筛选。',
-                    style: TextStyle(
-                      color: AppColors.error.resolveFrom(context),
-                    ),
-                  )
-                else ...[
-                  if (_error != null)
+      content: LayoutBuilder(
+        builder: (context, constraints) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: constraints.maxHeight / 2),
+              child: SingleChildScrollView(
+                primary: false,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     Text(
-                      _error!,
-                      style: TextStyle(
-                        color: AppColors.error.resolveFrom(context),
+                      '$_sourceName · $query',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (work != null)
+                      Semantics(
+                        container: true,
+                        liveRegion: true,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                const CupertinoActivityIndicator(),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(switch (work) {
+                                    _FilterWork.loading => '正在读取筛选条件',
+                                    _FilterWork.resetting => '正在重置筛选条件',
+                                    _FilterWork.applying => '正在应用筛选条件',
+                                  }),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              '关闭将取消请求，可能需要重新连接漫画源。',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.secondaryLabel.resolveFrom(
+                                  context,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (error != null)
+                      Semantics(
+                        container: true,
+                        liveRegion: true,
+                        child: Text(
+                          error,
+                          style: TextStyle(
+                            color: AppColors.error.resolveFrom(context),
+                          ),
+                        ),
+                      ),
+                    if (sameSession && draft == null && error != null)
+                      Semantics(
+                        container: true,
+                        enabled: enabled,
+                        child: CupertinoButton(
+                          onPressed: enabled
+                              ? () => _load(reset: _retryReset)
+                              : null,
+                          child: Text(_retryReset ? '重试重置筛选' : '重试加载筛选'),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                key: const ValueKey('source-filter-form'),
+                padding: const EdgeInsets.only(bottom: 16),
+                children: [
+                  if (sameSession && draft != null)
+                    KeyedSubtree(
+                      key: ValueKey(draft.snapshotId),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (draft.nodes.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Text('这个漫画源没有额外筛选条件。'),
+                            ),
+                          ..._sections(draft.nodes, [], enabled),
+                        ],
                       ),
                     ),
-                  if (draft == null && !_working)
-                    CupertinoButton(
-                      onPressed: enabled ? () => _load() : null,
-                      child: const Text('重试加载筛选'),
+                  if (sameSession && (draft != null || work != null))
+                    Semantics(
+                      enabled: canApply,
+                      child: CupertinoButton(
+                        key: const ValueKey('source-filter-reset'),
+                        onPressed: canApply ? () => _load(reset: true) : null,
+                        child: const Text('重置筛选'),
+                      ),
                     ),
-                ],
-              ],
-            ),
-          ),
-          if (sameSession && draft != null)
-            KeyedSubtree(
-              key: ValueKey(draft.snapshotId),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (draft.nodes.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Text('这个漫画源没有额外筛选条件。'),
-                    ),
-                  ..._sections(draft.nodes, [], enabled),
                 ],
               ),
             ),
-          CupertinoButton(
-            key: const ValueKey('source-filter-reset'),
-            onPressed: enabled ? () => _load(reset: true) : null,
-            child: const Text('重置筛选'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -13,6 +13,8 @@ import {
   type RuntimeSlot,
 } from '@karuyomi/protocol';
 
+import { filterAcceptanceControl } from './acceptance-filters.js';
+
 interface BrowserRuntime {
   control(input: unknown): Promise<ControlResponseJson>;
 }
@@ -24,11 +26,19 @@ const originalHost = new URL(
 );
 await import(/* @vite-ignore */ originalHost.href);
 
-if (profile === 'stop' || profile === 'close' || profile === 'cache') {
-  const browser = window as Window & { karuyomiRuntime?: BrowserRuntime };
-  const host = browser.karuyomiRuntime;
-  if (!host) throw new Error('Acceptance requires the verified Web host');
+const browser = window as Window & { karuyomiRuntime?: BrowserRuntime };
+const host = browser.karuyomiRuntime;
+if (!host) throw new Error('Acceptance requires the verified Web host');
 
+if (profile === 'filters') {
+  const outcome = new URLSearchParams(location.search).get('filter-outcome');
+  browser.karuyomiRuntime = {
+    ...host,
+    control: filterAcceptanceControl((input) => host.control(input), outcome),
+  };
+}
+
+if (profile === 'stop' || profile === 'close' || profile === 'cache') {
   let heldSearch:
     | {
         requestId: string;

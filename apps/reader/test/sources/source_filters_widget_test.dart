@@ -2,6 +2,7 @@ import '../../test_support/cupertino.dart';
 import '../test_app.dart';
 
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -209,6 +210,58 @@ void main() {
         hasLength(writesBefore),
       );
       expect(tester.takeException(), isNull);
+      await hide(tester);
+    },
+  );
+
+  testWidgets(
+    'a long form keeps reset progress visible and can retry a failed reset',
+    (tester) async {
+      final description = filterSnapshot('long');
+      description.nodes[6].group.nodes.addAll([
+        for (var index = 0; index < 25; index++)
+          wire.FilterNode(name: '类型 $index', checkBox: wire.FilterCheckBox()),
+      ]);
+      final resetting = Completer<wire.SourceResult>();
+      var reads = 0;
+      platform.invokeHandler = (call) async {
+        if (!call.hasGetFilters()) {
+          return wire.SourceResult(
+            mangaPage: wire.MangaPage(mangas: [testManga]),
+          );
+        }
+        return ++reads == 2
+            ? resetting.future
+            : wire.SourceResult(filters: description.deepCopy());
+      };
+      await show(tester, size: const Size(360, 800), textScale: 2);
+      await tap(tester, open());
+      await reveal(tester, reset());
+      expect(control('text', '1').hitTestable(), findsNothing);
+      await tester.tap(reset());
+      await tester.pump();
+      expect(find.text('正在重置筛选条件').hitTestable(), findsOneWidget);
+
+      resetting.completeError(
+        const RuntimeException(RuntimeErrorCode.sourceError, '重置暂时失败'),
+      );
+      await tester.pumpAndSettle();
+      expect(catalog.mangas.single.title, testManga.title);
+      expect(catalog.listing, 'popular');
+      expect(reset(), findsNothing);
+      final retry = find.text('重试重置筛选');
+      final semantics = tester.ensureSemantics();
+      try {
+        await tester.pump();
+        expect(tester.getSemantics(retry).label, '重试重置筛选');
+      } finally {
+        semantics.dispose();
+      }
+      await tester.tap(retry);
+      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(reads, 3);
+      expect(control('text', '1'), findsOneWidget);
       await hide(tester);
     },
   );
@@ -443,6 +496,22 @@ void main() {
         expect(find.text('正在读取筛选条件'), findsOneWidget);
         expect(tester.widget<CupertinoButton>(apply()).onPressed, isNull);
         expect(tester.widget<CupertinoButton>(reset()).onPressed, isNull);
+        final semantics = tester.ensureSemantics();
+        try {
+          await tester.pump();
+          for (final action in [apply(), reset()]) {
+            expect(
+              tester
+                  .getSemantics(action)
+                  .getSemanticsData()
+                  .flagsCollection
+                  .isEnabled,
+              Tristate.isFalse,
+            );
+          }
+        } finally {
+          semantics.dispose();
+        }
         loading.complete(wire.SourceResult(filters: filterSnapshot('busy')));
         await tester.pumpAndSettle();
         await reveal(tester, control('text', '1'));

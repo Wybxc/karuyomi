@@ -57,3 +57,5 @@ ACCEPTANCE_FIXTURE=runtime-control pnpm acceptance:serve
 ```
 
 使用验收地址的 `?acceptance-runtime=stop`、`close` 或 `cache`。验收脚本调用原 CI runtime host 和扩展。`stop` 暂扣第一笔搜索的结果，最长 25 秒；结束等待时按原 requestId 和 generation 向真实 host 发送停止，在 6.5 秒后模拟停止确认丢失，并丢弃第一次已成功重置的确认。`close` 从同样的有活动搜索点击返回，另丢弃一次关闭中尝试的重置确认。确认失败后，界面应提供原停止或原关闭的重试。`cache` 在真实清除成功后保留同一摘要的确认 7 秒。通过浏览器控制台的 `ACCEPTANCE_RUNTIME_CONTROL` 和前后权威 API 读回核对结果。脚本及路由仅由显式验收构建和本机启动选项启用。
+
+`?acceptance-runtime=filters` 在正式 Source 枚举筛选说明或执行带筛选条件的搜索时，最多将相同请求的结果暂扣八秒。打开长筛选表单，滚到底后点重置，再明确应用，核对进度、禁用语义与实际恢复。新文档还可加上 `filter-outcome=read-error` 或 `reset-error`，分别把第一次或第二次筛选说明结果替换为 `SOURCE_ERROR`，再用界面重试。加上 `filter-outcome=retire` 会在第二次读取完成后通过正式 host 重建运行时，并向原请求返回 `RUNTIME_LOST`。核对旧草稿退出、重连、重新打开筛选，按审计中的 requestId、generation、snapshotId 以及前后账户读回确认隔离。

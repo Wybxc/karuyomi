@@ -26,42 +26,46 @@ class const ChoiceField<T>({
       }
     }
 
-    Widget button(VoidCallback open) => CupertinoButton(
-      focusNode: focus,
-      padding: inline
-          ? const EdgeInsets.symmetric(horizontal: 8)
-          : EdgeInsets.zero,
-      onPressed: onChanged == null || options.isEmpty ? null : open,
-      child: inline
-          ? Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('$label：'),
-                Flexible(
-                  child: Text(
-                    options[value] ?? '选择',
-                    overflow: TextOverflow.ellipsis,
+    final enabled = onChanged != null && options.isNotEmpty;
+    Widget button(VoidCallback open) => Semantics(
+      enabled: enabled,
+      child: CupertinoButton(
+        focusNode: focus,
+        padding: inline
+            ? const EdgeInsets.symmetric(horizontal: 8)
+            : EdgeInsets.zero,
+        onPressed: enabled ? open : null,
+        child: inline
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('$label：'),
+                  Flexible(
+                    child: Text(
+                      options[value] ?? '选择',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(CupertinoIcons.chevron_down, size: 14),
+                ],
+              )
+            : CupertinoListTile(
+                title: Builder(
+                  builder: (context) => DefaultTextStyle(
+                    style: DefaultTextStyle.of(context).style,
+                    child: Text(label),
                   ),
                 ),
-                const SizedBox(width: 6),
-                const Icon(CupertinoIcons.chevron_down, size: 14),
-              ],
-            )
-          : CupertinoListTile(
-              title: Builder(
-                builder: (context) => DefaultTextStyle(
-                  style: DefaultTextStyle.of(context).style,
-                  child: Text(label),
+                subtitle: Builder(
+                  builder: (context) => DefaultTextStyle(
+                    style: DefaultTextStyle.of(context).style,
+                    child: Text(options[value] ?? '选择'),
+                  ),
                 ),
+                trailing: const CupertinoListTileChevron(),
               ),
-              subtitle: Builder(
-                builder: (context) => DefaultTextStyle(
-                  style: DefaultTextStyle.of(context).style,
-                  child: Text(options[value] ?? '选择'),
-                ),
-              ),
-              trailing: const CupertinoListTileChevron(),
-            ),
+      ),
     );
 
     final initialMenuValue =
