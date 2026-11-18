@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-18，Karuyomi 跨版本双主题主图现为 132/169（78.1%），剩余 37 个主状态，其中 8 个仅有单侧、29 个双侧均缺。Source 偏好 14.K1/K5 与迁移打开目标源 20.K8 各有浅、深主图。[Source 验收](mihon-cupertino-fidelity.md#source-偏好读取与恢复的正式-web-双主题验收) · [迁移验收](mihon-cupertino-fidelity.md#迁移打开目标源的正式-web-双主题验收)
+2026-11-18，Karuyomi 跨版本双主题主图现为 136/169（80.5%），剩余 33 个主状态，其中 8 个仅有单侧、25 个双侧均缺。扩展准备 08.K6、本机存储 11.K1/K5 和选源空态 15.K2 各补齐一对。[正式双主题验收](mihon-cupertino-fidelity.md#扩展与选源的正式-web-双主题验收)
 
 2026-11-14，进行中。用户要求截图触及每个 UI 状态，并同时考虑浅色、深色。此表细化[30 组界面矩阵](../design/mihon-cupertino-fidelity.md)，作为参考采集与后续 Cupertino 对照的工作清单。**目前尚无一组完成包含全部转换与变体的双主题验收；绿色只代表该节点的两张主状态参考图已核对。**
 
@@ -1543,17 +1543,17 @@ stateDiagram-v2
     CacheDiagnostics --> NoCopies: 收起且无副本
     NoCopies --> ReadingCache: 重新读取
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class CachedCopies,NoCopies,CacheDiagnostics paired
+    class ReadingCache,CachedCopies,NoCopies,CleaningFailed,CacheDiagnostics paired
 ```
 
-| 状态 ID | 最小必要信息                                               | 浅色正式Web                                      | 深色正式Web                                     |
-| ------- | ---------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------- |
-| 11.K1   | 正在检查、读取指示及账户/缓存作用范围                      | 待                                               | 待                                              |
-| 11.K2   | 数量/总占用、每副本名称/大小、含对象名的独立清理与作用范围 | `karuyomi-1e50a82-storage-copies-light.jpg`      | `karuyomi-1e50a82-storage-copies-dark.jpg`      |
-| 11.K3   | 正在清理、重复操作受阻、账户安装保持                       | 待                                               | 待                                              |
-| 11.K4   | 零副本/占用、可重新下载与重新读取入口                      | `karuyomi-1e50a82-storage-empty-light.jpg`       | `karuyomi-1e50a82-storage-empty-dark.jpg`       |
-| 11.K5   | 失败原因、未完成资源、精确重试/必要重建                    | 待                                               | 待                                              |
-| 11.K6   | 容量/数量限额、完整副本哈希、滚动与收起                    | `karuyomi-76309ed-storage-diagnostics-light.jpg` | `karuyomi-76309ed-storage-diagnostics-dark.jpg` |
+| 状态 ID | 最小必要信息                                               | 浅色正式Web                                                   | 深色正式Web                                                  |
+| ------- | ---------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
+| 11.K1   | 正在检查、读取指示及账户/缓存作用范围                      | `karuyomi-a8997fa-extension-flow-storage-checking-light`      | `karuyomi-a8997fa-extension-flow-storage-checking-dark`      |
+| 11.K2   | 数量/总占用、每副本名称/大小、含对象名的独立清理与作用范围 | `karuyomi-1e50a82-storage-copies-light.jpg`                   | `karuyomi-1e50a82-storage-copies-dark.jpg`                   |
+| 11.K3   | 正在清理、重复操作受阻、账户安装保持                       | 待                                                            | 待                                                           |
+| 11.K4   | 零副本/占用、可重新下载与重新读取入口                      | `karuyomi-1e50a82-storage-empty-light.jpg`                    | `karuyomi-1e50a82-storage-empty-dark.jpg`                    |
+| 11.K5   | 失败原因、未完成资源、精确重试/必要重建                    | `karuyomi-a8997fa-extension-flow-cleanup-failed-stable-light` | `karuyomi-a8997fa-extension-flow-cleanup-failed-stable-dark` |
+| 11.K6   | 容量/数量限额、完整副本哈希、滚动与收起                    | `karuyomi-76309ed-storage-diagnostics-light.jpg`              | `karuyomi-76309ed-storage-diagnostics-dark.jpg`              |
 
 ### 08–09：Karuyomi 最终 Cupertino 扩展管理
 
@@ -1605,7 +1605,7 @@ stateDiagram-v2
     Uninstalled --> Available: 返回列表
     Enabled --> Candidate: 从候选页安装后再卸载
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class Available,Installed,EmptySearch,Language,Options,Saving,Pending,Candidate,Enabled,Disabled,Diagnostics,Uninstalled paired
+    class Available,Installed,EmptySearch,Language,Options,Preparing,Saving,Pending,Candidate,Enabled,Disabled,Diagnostics,Uninstalled paired
 ```
 
 | 状态 ID | 最小必要信息                                          | 浅色正式Web                                                                           | 深色正式Web                                                                       |
@@ -1615,7 +1615,7 @@ stateDiagram-v2
 | 08.K3   | 当前查询、无匹配原因、清空或清除筛选                  | `karuyomi-9a09331-extensions-empty-light.jpg`                                         | `karuyomi-9a09331-extensions-empty-system-dark.jpg`                               |
 | 08.K4   | 当前语言、可选语言、全部语言与取消                    | `karuyomi-9a09331-extensions-language-light.jpg`                                      | `karuyomi-9a09331-extensions-language-system-dark.jpg`                            |
 | 08.K5   | 仓库管理、本机存储和关闭                              | `karuyomi-9a09331-extensions-menu-light.jpg`                                          | `karuyomi-9a09331-extensions-menu-system-dark.jpg`                                |
-| 08.K6   | 正在准备的状态、取消准备；不提前标记账户安装          | 待                                                                                    | 待                                                                                |
+| 08.K6   | 正在准备的状态、取消准备；不提前标记账户安装          | `karuyomi-a8997fa-extension-flow-preparing-light`                                     | `karuyomi-a8997fa-extension-flow-preparing-dark`                                  |
 | 08.K7   | 等待账户确认、停用重复写入、保留原操作                | `karuyomi-2512c51-extension-recovery-formal-extension-install-auto-waiting-light.jpg` | `karuyomi-2512c51-extension-recovery-formal-extension-install-waiting-dark.jpg`   |
 | 08.K8   | 未确认/冲突原因、原操作摘要、精确重试/重取            | `karuyomi-2512c51-extension-recovery-formal-extension-uninstall-unknown-light.jpg`    | `karuyomi-2512c51-extension-recovery-formal-extension-uninstall-unknown-dark.jpg` |
 | 09.K1   | 候选版本/语言/状态、安装与源清单；未安装不打开源      | `karuyomi-9a09331-extension-candidate-enter-light.jpg`                                | `karuyomi-9a09331-extension-candidate-enter-system-dark.jpg`                      |
@@ -1817,16 +1817,17 @@ stateDiagram-v2
     Q13 --> Q14: 详情就绪
     Q14 --> Q5: 返回原查询与结果
     Q0 --> Q12: 退出时清理失败
-    Q12 --> Q0: 重试清理确认后返回
+    Q12 --> Q0: 页面内重试释放成功
+    Q12 --> [*]: 重试原退出后返回上一页或打开扩展管理
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class Q0,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q10,Q14 paired
+    class Q0,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q10,Q14 paired
 ```
 
 | 状态 ID | 最小必要信息与实际边界                                                      | 浅色                                                                                              | 深色                                                                                            |
 | ------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | 15.K1   | 查询、源数/上限、语言及明确选择、刷新和开始；主图过滤xkcd且未选源           | `karuyomi-a12c779-cross-scope-light.jpg`                                                          | `karuyomi-a12c779-cross-scope-dark.jpg`                                                         |
-| 15.K2   | 无可选源原因及安装/刷新入口                                                 | 待                                                                                                | 待                                                                                              |
+| 15.K2   | 无可选源原因及安装/刷新入口                                                 | `karuyomi-a8997fa-extension-flow-no-available-source-light`                                       | `karuyomi-a8997fa-extension-flow-no-available-source-stable-dark`                               |
 | 15.K3   | 原输入与校验原因、可修正入口，不创建搜索任务                                | `karuyomi-a12c779-cross-validation-empty-light.jpg`                                               | `karuyomi-a12c779-cross-validation-empty-dark.jpg`                                              |
 | 15.K4   | 源身份、等待执行及停止入口；同包五源的真实排队                              | `karuyomi-a12c779-cross-five-start-candidate-light.jpg`                                           | `karuyomi-a12c779-cross-five-start-candidate-dark.jpg`                                          |
 | 15.K5   | 源名、语言、真实旋转指示、停止此源/全部和总进度；旧独立重试保留 xkcd 空结果 | `karuyomi-a12c779-cross-five-start-candidate-light.jpg`、`karuyomi-07342fb-cross-retry-light.jpg` | `karuyomi-a12c779-cross-five-start-candidate-dark.jpg`、`karuyomi-07342fb-cross-retry-dark.jpg` |

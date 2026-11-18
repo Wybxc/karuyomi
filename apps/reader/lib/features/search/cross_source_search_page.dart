@@ -32,6 +32,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
   int _sourcePage = 0;
   bool _allowPop = false;
   bool _leaving = false;
+  bool? _closeDestination;
   bool _foreground = true;
 
   @override
@@ -51,17 +52,28 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     final foreground = state == AppLifecycleState.resumed;
     final leftForeground = _foreground && !foreground;
     _foreground = foreground;
-    if (leftForeground) unawaited(controller.stop());
+    if (leftForeground && _closeDestination == null) {
+      unawaited(controller.stop());
+    }
   }
 
   Future<void> _leave({bool openExtensions = false}) async {
-    if (_leaving) return;
+    if (_leaving || controller.transitioning) return;
     _leaving = true;
+    _closeDestination = openExtensions;
     final closed = await controller.close();
     _leaving = false;
     if (!mounted || !closed) return;
     setState(() => _allowPop = true);
     Navigator.of(context).pop(openExtensions);
+  }
+
+  void _retryCleanup() {
+    if (_closeDestination case final openExtensions?) {
+      unawaited(_leave(openExtensions: openExtensions));
+    } else {
+      unawaited(controller.stop());
+    }
   }
 
   Future<void> _open(SourceSearchGroup group, MangaEntry manga) async {
@@ -355,9 +367,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                       )),
                       padding: const EdgeInsets.all(4),
                       alignment: Alignment.topLeft,
-                      onPressed:
-                          controller.canChange &&
-                              controller.cleanupError == null
+                      onPressed: controller.canSearch
                           ? () => unawaited(_open(group, group.mangas[index]))
                           : null,
                       child: Column(
@@ -468,6 +478,39 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     );
   }
 
+  Widget _searchLayout(Widget results) => ConstrainedBox(
+    constraints: const BoxConstraints(maxWidth: 1000),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (controller.openingTarget case final target?)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Semantics(
+              key: const ValueKey('cross-search-opening'),
+              container: true,
+              explicitChildNodes: true,
+              child: CupertinoFormSection.insetGrouped(
+                margin: EdgeInsets.zero,
+                header: Semantics(
+                  liveRegion: true,
+                  child: const Text('正在打开作品详情'),
+                ),
+                children: [
+                  CupertinoListTile(
+                    title: Text(target.title, maxLines: 2),
+                    subtitle: Text(target.sourceName, maxLines: 2),
+                    trailing: const CupertinoActivityIndicator(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        Expanded(child: results),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     _query = useTextEditingController();
@@ -491,9 +534,8 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
         ),
         child: SafeArea(
           child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1000),
-              child: ListView(
+            child: _searchLayout(
+              ListView(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 children: [
                   Padding(
@@ -501,7 +543,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (!controller.available)
+                        if (!controller.available && _closeDestination == null)
                           Padding(
                             padding: const EdgeInsets.all(16),
                             child: Text(
@@ -522,8 +564,16 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                           ),
                         if (controller.cleanupError != null)
                           CupertinoFormSection.insetGrouped(
-                            header: const Text('搜索资源尚未释放'),
-                            footer: const Text('确认释放后才能继续搜索或离开。'),
+                            margin: EdgeInsets.zero,
+                            header: Semantics(
+                              liveRegion: true,
+                              child: const Text('搜索资源尚未释放'),
+                            ),
+                            footer: Text(switch (_closeDestination) {
+                              true => '资源释放后打开扩展管理。',
+                              false => '资源释放后返回。',
+                              null => '确认释放后才能继续搜索或离开。',
+                            }),
                             children: [
                               Padding(
                                 padding: const EdgeInsets.all(16),
@@ -543,7 +593,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                                 ),
                                 onPressed: controller.transitioning
                                     ? null
-                                    : () => unawaited(controller.stop()),
+                                    : _retryCleanup,
                                 child: const Text('重试释放搜索资源'),
                               ),
                             ],
@@ -555,7 +605,9 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                           enabled: controller.available && !controller.opening,
                           maxLength: crossSourceQueryLimit,
                           textInputAction: TextInputAction.search,
-                          onSubmitted: (value) => unawaited(_start(value)),
+                          onSubmitted: controller.canStart
+                              ? (value) => unawaited(_start(value))
+                              : null,
                           placeholder: '搜索漫画',
                           placeholderStyle: TextStyle(
                             color: AppColors.secondaryLabel.resolveFrom(
@@ -634,7 +686,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                           children: [
                             CupertinoButton.filled(
                               key: const ValueKey('cross-search-submit'),
-                              onPressed: controller.canChange
+                              onPressed: controller.canStart
                                   ? () => unawaited(_start(_query.text))
                                   : null,
                               child: const Text('搜索所选漫画源'),
@@ -642,17 +694,21 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                             if (controller.hasActive)
                               CupertinoButton(
                                 key: const ValueKey('cross-search-stop'),
-                                onPressed: controller.transitioning
+                                onPressed:
+                                    controller.transitioning ||
+                                        controller.opening ||
+                                        _closeDestination != null
                                     ? null
                                     : () => unawaited(controller.stop()),
                                 child: const Text('停止全部'),
                               ),
                           ],
                         ),
-                        if (controller.transitioning || controller.opening) ...[
+                        if (controller.transitioning &&
+                            !controller.opening) ...[
                           const SizedBox(height: 12),
                           const CupertinoActivityIndicator(),
-                          Text(controller.opening ? '正在打开作品详情' : '正在释放搜索资源'),
+                          const Text('正在释放搜索资源'),
                         ],
                         if (controller.groups.isNotEmpty) ...[
                           const SizedBox(height: 16),

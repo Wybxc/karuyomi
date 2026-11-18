@@ -63,7 +63,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
   String? cleanupError;
   bool loadingTargets = false;
   bool transitioning = false;
-  bool opening = false;
+  ({String title, String sourceName})? _openingTarget;
   bool _retired = false;
   bool _disposed = false;
   bool _closed = false;
@@ -74,11 +74,23 @@ final class CrossSourceSearchController extends ChangeNotifier {
   String? get unavailableReason =>
       available ? null : service.unavailableReason ?? '身份或服务已改变，请关闭后重新开始搜索。';
   bool get hasActive => groups.any((group) => group.active);
+  bool get opening => _openingTarget != null;
+  ({String title, String sourceName})? get openingTarget =>
+      available ? _openingTarget : null;
   int get resultCount =>
       groups.fold(0, (count, group) => count + group.mangas.length);
   bool get canChange =>
       available && !loadingTargets && !transitioning && !opening;
-  bool get canSelect => canChange && !hasActive && cleanupError == null;
+  bool get canSearch =>
+      canChange &&
+      cleanupError == null &&
+      !groups.any(
+        (group) =>
+            group.status == SourceSearchStatus.cancelling ||
+            group.status == SourceSearchStatus.cancellationFailed,
+      );
+  bool get canStart => canSearch && targets.isNotEmpty;
+  bool get canSelect => canSearch && !hasActive;
   List<String> get languages =>
       targets.map((target) => target.source.lang).toSet().toList()..sort();
   List<SourceSearchTarget> get visibleTargets => List.unmodifiable(
@@ -145,7 +157,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
   }
 
   Future<void> start(String value) async {
-    if (!canChange || !isCurrent()) return;
+    if (!canStart || !isCurrent()) return;
     final text = value.trim();
     if (text.isEmpty || text.length > crossSourceQueryLimit) {
       error = '请输入1至500字的搜索词。';
@@ -239,8 +251,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
   }
 
   bool canContinue(SourceSearchGroup group) =>
-      canChange &&
-      cleanupError == null &&
+      canSearch &&
       !group.active &&
       group.limitReason == null &&
       (group.status == SourceSearchStatus.error ||
@@ -318,18 +329,17 @@ final class CrossSourceSearchController extends ChangeNotifier {
     ({MangaEntry manga, List<ChapterEntry> chapters, CatalogSourceRef source})?
   >
   open(SourceSearchGroup group, MangaEntry manga) async {
-    if (!canChange ||
+    if (!canSearch ||
         !groups.contains(group) ||
         !group.mangas.contains(manga) ||
         !isCurrent()) {
       return null;
     }
-    if (!await stop() || !available || !isCurrent()) return null;
-    opening = true;
-    error = null;
+    _openingTarget = (title: manga.title, sourceName: group.target.source.name);
+    final stopped = stop();
     final epoch = _epoch;
-    notifyListeners();
     try {
+      if (!await stopped || !_current(epoch)) return null;
       final details = await service.openResult(
         group.target,
         manga,
@@ -343,7 +353,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       return null;
     } finally {
       if (!_disposed) {
-        opening = false;
+        _openingTarget = null;
         notifyListeners();
       }
     }
@@ -354,6 +364,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
     if (_disposed || transitioning) return false;
     transitioning = true;
     ++_epoch;
+    error = null;
     notifyListeners();
     try {
       await service.close();

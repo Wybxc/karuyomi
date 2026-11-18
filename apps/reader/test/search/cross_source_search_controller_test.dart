@@ -132,6 +132,11 @@ void main() {
       expect(group.status, SourceSearchStatus.cancellationFailed);
       expect(group.error, contains('ACK丢失'));
       expect(task.completion.isCompleted, false);
+      final stops = service.stops;
+      await controller.start('新查询');
+      expect(service.stops, stops);
+      expect(service.tasks, [task]);
+      expect(controller.query, '作品');
       await controller.cancel(group);
       expect(group.status, SourceSearchStatus.cancelled);
       controller.next(group);

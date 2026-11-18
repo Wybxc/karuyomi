@@ -580,11 +580,14 @@ class const ExtensionOperationStatus({
           ),
         ],
         if (cleaning || cleanupError != null)
-          _ExtensionCleanupStatus(
-            controller: controller,
-            copy: copy,
-            cleaning: cleaning,
-            error: cleanupError,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _ExtensionCleanupStatus(
+              controller: controller,
+              copy: copy,
+              cleaning: cleaning,
+              error: cleanupError,
+            ),
           ),
         if (pending != null ||
             failure != null ||
@@ -1284,7 +1287,7 @@ class const ExtensionStoragePage({
           padding: const EdgeInsets.symmetric(vertical: 16),
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: ExtensionOperationStatus(
                 controller: controller,
                 showStorageAction: false,

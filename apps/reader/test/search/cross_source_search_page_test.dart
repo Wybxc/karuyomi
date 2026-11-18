@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:karuyomi/widgets/app_page_route.dart';
 
 import '../test_app.dart';
@@ -33,6 +35,7 @@ void main() {
     WidgetTester tester,
     FakeSourceSearch service, {
     OpenSourceSearchDetails? onOpen,
+    ValueChanged<bool?>? onExit,
     Brightness? brightness,
     TextScaler textScaler = TextScaler.noScaling,
   }) async {
@@ -46,14 +49,17 @@ void main() {
         home: Builder(
           builder: (context) => CupertinoPageScaffold(
             child: CupertinoButton(
-              onPressed: () => Navigator.of(context).push<bool>(
-                AppPageRoute<bool>(
-                  builder: (_) => CrossSourceSearchPage(
-                    service: service,
-                    onOpen: onOpen ?? (_) async {},
+              onPressed: () async {
+                final result = await Navigator.of(context).push<bool>(
+                  AppPageRoute<bool>(
+                    builder: (_) => CrossSourceSearchPage(
+                      service: service,
+                      onOpen: onOpen ?? (_) async {},
+                    ),
                   ),
-                ),
-              ),
+                );
+                onExit?.call(result);
+              },
               child: const Text('开始'),
             ),
           ),
@@ -119,6 +125,10 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(find.textContaining('没有可选漫画源'), findsOneWidget);
+          final submit = find.byKey(const ValueKey('cross-search-submit'));
+          final refresh = find.byKey(const ValueKey('cross-search-refresh'));
+          expect(tester.widget<CupertinoButton>(submit).enabled, isFalse);
+          expect(tester.widget<CupertinoButton>(refresh).enabled, isTrue);
           final manage = find.widgetWithText(CupertinoButton, '打开扩展管理');
           expect(manage, findsOneWidget);
           await tester.ensureVisible(manage);
@@ -292,7 +302,7 @@ void main() {
           await tester.ensureVisible(retry);
           expect(retry.hitTestable(), findsOneWidget);
           expect(service.tasks, isEmpty);
-          await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+          await tester.tap(retry);
           await tester.pumpAndSettle();
           expect(find.byType(CrossSourceSearchPage), findsNothing);
           expect(closes, 2);
@@ -302,6 +312,131 @@ void main() {
         },
       );
     }
+    testWidgets(
+      'search waits for the same stop acknowledgement in $brightness',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final service = FakeSourceSearch();
+        final stopReply = Completer<void>();
+        try {
+          await openPage(tester, service, brightness: brightness);
+          await chooseAndSearch(tester, service);
+          await tester.pump(const Duration(milliseconds: 400));
+          final task = service.tasks.single;
+          task.beforeCancel = () async {
+            if (task.cancelCalls == 1) await stopReply.future;
+          };
+          final stop = find.byKey(
+            ValueKey(('cross-search-cancel', task.target.key)),
+          );
+          final submit = find.byKey(const ValueKey('cross-search-submit'));
+          await tester.ensureVisible(stop);
+          await tester.tap(stop);
+          await tester.pump();
+          expect(find.textContaining('正在停止'), findsOneWidget);
+          expect(tester.widget<CupertinoButton>(submit).enabled, isFalse);
+
+          stopReply.completeError(const FormatException('停止确认丢失'));
+          await tester.pumpAndSettle();
+          expect(find.textContaining('停止确认丢失'), findsOneWidget);
+          expect(tester.widget<CupertinoButton>(submit).enabled, isFalse);
+          expect(service.tasks, [task]);
+          final retry = find.byKey(
+            ValueKey(('cross-search-cancel-retry', task.target.key)),
+          );
+          await tester.ensureVisible(retry);
+          await tester.tap(retry);
+          await tester.pumpAndSettle();
+          expect(task.cancelCalls, 2);
+          expect(service.tasks, [task]);
+          expect(tester.widget<CupertinoButton>(submit).enabled, isTrue);
+          expect(find.textContaining('已停止'), findsOneWidget);
+        } finally {
+          if (!stopReply.isCompleted) stopReply.complete();
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        }
+      },
+    );
+
+    testWidgets(
+      'opening keeps the exact work above the results until ready in $brightness',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final service = FakeSourceSearch();
+        final releaseStop = Completer<void>();
+        final releaseOpen = Completer<void>();
+        MangaEntry? opened;
+        try {
+          await openPage(
+            tester,
+            service,
+            brightness: brightness,
+            textScaler: const _NonlinearTextScaler(),
+            onOpen: (details) async {
+              opened = details.manga;
+            },
+          );
+          await chooseAndSearch(tester, service);
+          final task = service.tasks.single;
+          final work = searchManga('保持精确身份的长篇作品名称');
+          task.complete([work]);
+          await tester.pumpAndSettle();
+          final result = find.byKey(
+            ValueKey(('cross-search-result', task.target.key, 0)),
+          );
+          service.beforeStop = () => releaseStop.future;
+          service.beforeOpen = () => releaseOpen.future;
+          await tester.ensureVisible(result);
+          await tester.tap(result);
+          await tester.pump();
+
+          final status = find.byKey(const ValueKey('cross-search-opening'));
+          expect(status.hitTestable(), findsOneWidget);
+          expect(
+            find.ancestor(of: status, matching: find.byType(Scrollable)),
+            findsNothing,
+          );
+          expect(
+            find.descendant(of: status, matching: find.text(work.title)),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: status,
+              matching: find.text(task.target.source.name),
+            ),
+            findsOneWidget,
+          );
+          expect(tester.widget<CupertinoButton>(result).enabled, isFalse);
+          expect(opened, isNull);
+
+          releaseStop.complete();
+          await tester.pump();
+          expect(status, findsOneWidget);
+          expect(service.openedTarget, same(task.target));
+          expect(opened, isNull);
+
+          releaseOpen.complete();
+          await tester.pumpAndSettle();
+          expect(status, findsNothing);
+          expect(opened, same(work));
+          expect(result, findsOneWidget);
+          final heading = find.byKey(
+            const ValueKey('cross-search-results-heading'),
+          );
+          expect(tester.widget<Text>(heading).data, contains('测试作品'));
+        } finally {
+          if (!releaseStop.isCompleted) releaseStop.complete();
+          if (!releaseOpen.isCompleted) releaseOpen.complete();
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        }
+      },
+    );
+
     testWidgets('search scope opens and closes by keyboard in $brightness', (
       tester,
     ) async {
@@ -552,6 +687,37 @@ void main() {
       expect(find.text('开始'), findsOneWidget);
     },
   );
+
+  testWidgets('retrying exit cleanup keeps the extension destination', (
+    tester,
+  ) async {
+    final service = FakeSourceSearch(targets: const []);
+    service.beforeClose = () async {
+      if (service.closes == 1) throw const FormatException('关闭未确认');
+    };
+    bool? destination;
+    await openPage(tester, service, onExit: (result) => destination = result);
+    final manage = find.widgetWithText(CupertinoButton, '打开扩展管理');
+    await tester.ensureVisible(manage);
+    await tester.tap(manage);
+    await tester.pumpAndSettle();
+    expect(service.closes, 1);
+    expect(destination, isNull);
+
+    setAppLifecycleState(tester.binding, AppLifecycleState.inactive);
+    await tester.pump();
+    expect(service.stops, 0);
+    setAppLifecycleState(tester.binding, AppLifecycleState.resumed);
+    await tester.pump();
+    final retry = find.byKey(const ValueKey('cross-search-cleanup-retry'));
+    await tester.ensureVisible(retry);
+    await tester.tap(retry);
+    await tester.pumpAndSettle();
+    expect(service.closes, 2);
+    expect(service.stops, 1);
+    expect(destination, isTrue);
+    expect(find.byType(CrossSourceSearchPage), findsNothing);
+  });
 
   testWidgets(
     'retirement before first frame never loads or searches new identity',

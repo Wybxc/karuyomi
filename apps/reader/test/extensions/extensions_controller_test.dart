@@ -629,6 +629,14 @@ void main() {
             find.descendant(of: status, matching: find.text(original)),
             findsOneWidget,
           );
+          final usage = find.ancestor(
+            of: find.text('扩展副本占用'),
+            matching: find.byType(CupertinoFormSection),
+          );
+          expect(
+            tester.getBottomLeft(status).dy,
+            lessThan(tester.getTopLeft(usage).dy),
+          );
           final refresh = find.text('重新读取本机副本');
           await tester.ensureVisible(refresh);
           await tester.tap(refresh);
