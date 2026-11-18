@@ -490,6 +490,7 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
   Widget build(BuildContext context) {
     useSession();
     useOnListenableChange(_draft, _draftChanged);
+    final canCreate = editable && _view.categories.length < 64;
     return PopScope(
       canPop: expired || _draft?.waitingForConfirmation != true,
       child: EditSheet(
@@ -531,18 +532,24 @@ class _CategoryManagerState extends _CategorySession<_CategoryManager> {
                   _categoryRow(_view.categories[index], index),
                 Semantics(
                   container: true,
+                  enabled: canCreate,
                   child: CupertinoButton(
                     padding: EdgeInsets.zero,
-                    onPressed: editable && _view.categories.length < 64
-                        ? _command
-                        : null,
+                    onPressed: canCreate ? _command : null,
                     child: CupertinoListTile(
                       leading: const Icon(CupertinoIcons.add),
                       title: Text(
                         '新建分类',
                         style: CupertinoTheme.of(context)
                             .textTheme
-                            .actionTextStyle,
+                            .actionTextStyle
+                            .copyWith(
+                              color: canCreate
+                                  ? null
+                                  : CupertinoColors.tertiaryLabel.resolveFrom(
+                                      context,
+                                    ),
+                            ),
                       ),
                     ),
                   ),
@@ -697,6 +704,7 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
     useSession();
     _name = useTextEditingController(text: draft.name ?? '');
     useListenable(draft);
+    final canSubmit = !expired && !draft.busy && !draft.completed;
     return PopScope(
       canPop: expired || !draft.waitingForConfirmation,
       child: EditSheet(
@@ -720,37 +728,34 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
                 onPressed: () => Navigator.pop(context),
                 child: const Text('完成'),
               )
-            : draft.blocked
-            ? CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: expired || draft.busy ? null : _reload,
-                child: Text(
-                  draft.busy ? draft.busyLabel : '重读',
-                  semanticsLabel: draft.busy ? null : '重新读取并关闭',
-                ),
-              )
-            : CupertinoButton(
-                padding: EdgeInsets.zero,
-                foregroundColor:
-                    draft.destructive &&
-                        !expired &&
-                        !draft.busy &&
-                        !draft.completed
-                    ? AppColors.error.resolveFrom(context)
-                    : null,
-                onPressed: expired || draft.busy || draft.completed
-                    ? null
-                    : _save,
-                child: Text(
-                  draft.busy
-                      ? draft.busyLabel
-                      : draft.attempted
-                      ? '重试'
-                      : draft.submitLabel,
-                  semanticsLabel: !draft.busy && draft.attempted
-                      ? draft.retryLabel
-                      : null,
-                ),
+            : Semantics(
+                enabled: canSubmit,
+                child: draft.blocked
+                    ? CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: canSubmit ? _reload : null,
+                        child: Text(
+                          draft.busy ? draft.busyLabel : '重读',
+                          semanticsLabel: draft.busy ? null : '重新读取并关闭',
+                        ),
+                      )
+                    : CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        foregroundColor: draft.destructive && canSubmit
+                            ? AppColors.error.resolveFrom(context)
+                            : null,
+                        onPressed: canSubmit ? _save : null,
+                        child: Text(
+                          draft.busy
+                              ? draft.busyLabel
+                              : draft.attempted
+                              ? '重试'
+                              : draft.submitLabel,
+                          semanticsLabel: !draft.busy && draft.attempted
+                              ? draft.retryLabel
+                              : null,
+                        ),
+                      ),
               ),
         content: Form(
           key: _form,

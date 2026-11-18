@@ -4,6 +4,7 @@ import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
@@ -210,6 +211,13 @@ void main() {
               gate.complete();
             }
           });
+          final refresh = find.widgetWithText(CupertinoButton, '重新读取设置');
+          final retry = find.widgetWithText(CupertinoButton, '重试原设置操作');
+          Tristate enabled(Finder action) => tester
+              .getSemantics(action)
+              .getSemanticsData()
+              .flagsCollection
+              .isEnabled;
           var failRead = true;
           server.beforeRequest = (request) async {
             if (request.method == 'GET' &&
@@ -245,6 +253,7 @@ void main() {
           expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsNothing);
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
           expect(find.byType(ChoiceField<wire.ReaderMode>), findsNothing);
+          expect(enabled(refresh), Tristate.isFalse);
           expect(writes(), isEmpty);
 
           initialRead.complete();
@@ -253,6 +262,7 @@ void main() {
           expect(find.text('未能读取服务端设置；当前阅读仍可继续。'), findsOneWidget);
           expect(find.text('正在读取服务端设置'), findsNothing);
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
+          expect(enabled(refresh), Tristate.isTrue);
           failRead = false;
           await tap(tester, find.text('重新读取设置'));
           expect(find.text('当前设置已获服务端确认。'), findsOneWidget);
@@ -293,6 +303,7 @@ void main() {
           expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
           expect(find.text('设置尚未确认，本会话保留原操作。').hitTestable(), findsOneWidget);
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
+          expect(enabled(retry), Tristate.isTrue);
           expect(writes(), hasLength(1));
           final original = writes().single.body;
           failRead = true;
@@ -369,6 +380,7 @@ void main() {
           expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
           expect(find.byType(ChoiceField<wire.ReaderMode>), findsNothing);
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
+          expect(enabled(refresh), Tristate.isFalse);
           expect(writes(), hasLength(writesBeforeRead));
           expect(tester.takeException(), isNull);
           await hide(tester);

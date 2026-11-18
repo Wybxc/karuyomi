@@ -149,23 +149,29 @@ class const SettingsStatus({
         children: [
           if (state.pending?.acknowledged != true ||
               state.pending?.retryable != true)
-            CupertinoButton(
-              onPressed: state.canRefresh
-                  ? () async {
-                      if (await controller.refresh()) onReloaded?.call();
-                    }
-                  : null,
-              child: const Text('重新读取设置'),
+            Semantics(
+              enabled: state.canRefresh,
+              child: CupertinoButton(
+                onPressed: state.canRefresh
+                    ? () async {
+                        if (await controller.refresh()) onReloaded?.call();
+                      }
+                    : null,
+                child: const Text('重新读取设置'),
+              ),
             ),
           if (state.pending?.retryable == true)
-            CupertinoButton(
-              onPressed: state.canRetry
-                  ? () async {
-                      if (await controller.retry()) onReloaded?.call();
-                    }
-                  : null,
-              child: Text(
-                state.pending?.acknowledged == true ? '重试读取最新设置' : '重试原设置操作',
+            Semantics(
+              enabled: state.canRetry,
+              child: CupertinoButton(
+                onPressed: state.canRetry
+                    ? () async {
+                        if (await controller.retry()) onReloaded?.call();
+                      }
+                    : null,
+                child: Text(
+                  state.pending?.acknowledged == true ? '重试读取最新设置' : '重试原设置操作',
+                ),
               ),
             ),
         ],

@@ -8,6 +8,7 @@ import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -245,6 +246,15 @@ void main() {
           await openSettingsSection(tester, 'connection');
           expect(find.text('已连接，身份已确认'), findsOneWidget);
           expect(find.text('owner@example.com'), findsOneWidget);
+          final connectAction = find.widgetWithText(CupertinoButton, '连接服务');
+          final loginAction = find.widgetWithText(CupertinoButton, '登录');
+          Tristate enabledState(Finder action) => tester
+              .getSemantics(action)
+              .getSemanticsData()
+              .flagsCollection
+              .isEnabled;
+          expect(enabledState(connectAction), Tristate.isTrue);
+          expect(enabledState(loginAction), Tristate.isTrue);
           final rebuilding = Completer<void>();
           final rebuilt = Completer<void>();
           final bootstrapping = Completer<void>();
@@ -263,7 +273,7 @@ void main() {
             await bootstrapped.future;
           };
           await tester.runAsync(() async {
-            await tester.tap(find.text('连接服务'));
+            await tester.tap(connectAction);
             await Future<void>.delayed(Duration.zero);
           });
           await tester.pump(const Duration(milliseconds: 500));
@@ -273,13 +283,15 @@ void main() {
           expect(find.text('正在连接服务'), findsOneWidget);
           expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
           expect(find.text('owner@example.com'), findsNothing);
+          expect(enabledState(connectAction), Tristate.isFalse);
+          expect(enabledState(loginAction), Tristate.isFalse);
+          final disabledLogin = tester.widget<CupertinoButton>(loginAction);
+          expect(disabledLogin.enabled, isFalse);
           expect(
-            tester
-                .widget<CupertinoButton>(
-                  find.widgetWithText(CupertinoButton, '登录'),
-                )
-                .onPressed,
-            isNull,
+            disabledLogin.foregroundColor,
+            CupertinoColors.tertiaryLabel.resolveFrom(
+              tester.element(loginAction),
+            ),
           );
           await tester.runAsync(() async {
             platform.beforeRebuild = null;
@@ -292,6 +304,8 @@ void main() {
           );
           expect(find.text('正在连接服务'), findsOneWidget);
           expect(find.text('owner@example.com'), findsNothing);
+          expect(enabledState(connectAction), Tristate.isFalse);
+          expect(enabledState(loginAction), Tristate.isFalse);
           await tester.runAsync(() async {
             bootstrapped.complete();
             await Future<void>.delayed(Duration.zero);
@@ -301,6 +315,8 @@ void main() {
           platform.beforeApiFetch = null;
           expect(find.text('已连接，身份已确认'), findsOneWidget);
           expect(find.text('owner@example.com'), findsOneWidget);
+          expect(enabledState(connectAction), Tristate.isTrue);
+          expect(enabledState(loginAction), Tristate.isTrue);
           for (final (status, label) in [
             (401, '需要重新登录'),
             (403, '访问被拒绝'),
@@ -311,6 +327,8 @@ void main() {
             expect(find.text(label), findsOneWidget);
             expect(find.text('owner@example.com'), findsNothing);
             expect(find.text('已连接，身份已确认'), findsNothing);
+            expect(enabledState(connectAction), Tristate.isTrue);
+            expect(enabledState(loginAction), Tristate.isTrue);
           }
           expect(tester.takeException(), isNull);
           await tester.pumpApp(const SizedBox.shrink());

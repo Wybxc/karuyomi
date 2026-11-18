@@ -6,6 +6,7 @@ import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
@@ -1096,10 +1097,19 @@ void main() {
   testWidgets('reconnecting the same identity never revives the old draft', (
     tester,
   ) async {
+    final save = find.widgetWithText(CupertinoButton, '保存');
+    final create = find.widgetWithText(CupertinoButton, '新建分类');
+    Tristate enabled(Finder action) => tester
+        .getSemantics(action)
+        .getSemanticsData()
+        .flagsCollection
+        .isEnabled;
     await show(tester);
     await tap(tester, find.text('管理分类'));
+    expect(enabled(create), Tristate.isTrue);
     await tap(tester, find.text('新建分类'));
     await tester.enterText(find.byType(CupertinoTextField).last, '旧会话草稿');
+    expect(enabled(save), Tristate.isTrue);
     await tester.runAsync(controller.connect);
     await tester.pumpAndSettle();
     expect(find.text(_expired), findsWidgets);
@@ -1109,16 +1119,19 @@ void main() {
           .enabled,
       false,
     );
-    expect(
-      tester
-          .widget<CupertinoButton>(find.widgetWithText(CupertinoButton, '保存'))
-          .onPressed,
-      isNull,
-    );
+    expect(tester.widget<CupertinoButton>(save).enabled, isFalse);
+    expect(enabled(save), Tristate.isFalse);
     expect(posts('/api/categories/mutations'), isEmpty);
     await tap(tester, find.text('取消'));
+    expect(enabled(create), Tristate.isFalse);
+    final createLabel = find.text('新建分类');
+    expect(
+      tester.widget<Text>(createLabel).style?.color,
+      CupertinoColors.tertiaryLabel.resolveFrom(tester.element(createLabel)),
+    );
     await tap(tester, find.text('完成'));
     await tap(tester, find.text('管理分类'));
+    expect(enabled(create), Tristate.isTrue);
     await tap(tester, find.text('新建分类'));
     await nameAndSave(tester, '新会话修改');
     expect(server.catalog().categories.map((category) => category.name), [

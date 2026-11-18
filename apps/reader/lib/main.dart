@@ -482,6 +482,9 @@ class _AppShellState extends ConsumerState<AppShell> {
         !_restoringOrigin &&
         !connecting &&
         controller?.status == ServiceStatus.ready;
+    final canConnect =
+        controller?.busy != true && !_changingService && !_restoringOrigin;
+    final canAuthenticate = canConnect && _platform != null;
     final status = _restoringOrigin
         ? '正在读取服务地址'
         : connecting
@@ -518,24 +521,22 @@ class _AppShellState extends ConsumerState<AppShell> {
           spacing: 12,
           runSpacing: 8,
           children: [
-            CupertinoButton(
-              onPressed:
-                  controller?.busy == true ||
-                      _changingService ||
-                      _restoringOrigin
-                  ? null
-                  : _changeService,
-              child: const Text('连接服务'),
+            Semantics(
+              enabled: canConnect,
+              child: CupertinoButton(
+                onPressed: canConnect ? _changeService : null,
+                child: const Text('连接服务'),
+              ),
             ),
-            CupertinoButton.filled(
-              onPressed:
-                  _platform == null ||
-                      controller?.busy == true ||
-                      _changingService ||
-                      _restoringOrigin
-                  ? null
-                  : _authenticate,
-              child: const Text('登录'),
+            Semantics(
+              enabled: canAuthenticate,
+              child: CupertinoButton.filled(
+                foregroundColor: canAuthenticate
+                    ? null
+                    : CupertinoColors.tertiaryLabel.resolveFrom(context),
+                onPressed: canAuthenticate ? _authenticate : null,
+                child: const Text('登录'),
+              ),
             ),
           ],
         ),
