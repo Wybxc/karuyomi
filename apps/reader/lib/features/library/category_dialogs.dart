@@ -762,17 +762,10 @@ class _CategoryCommandState extends _CategorySession<_CategoryCommand> {
           child: ListView(
             children: [
               if (draft.entry case final entry?)
-                CupertinoFormSection.insetGrouped(
-                  header: const Text('漫画'),
-                  footer: Text('${entry.sourceLang} · ${entry.sourceName}'),
-                  children: [
-                    CupertinoFormRow(
-                      child: Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Text(entry.title),
-                      ),
-                    ),
-                  ],
+                MangaEditContext(
+                  title: entry.title,
+                  sourceName: entry.sourceName,
+                  sourceLang: entry.sourceLang,
                 ),
               if (draft.description case final description?)
                 Padding(

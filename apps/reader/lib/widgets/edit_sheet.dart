@@ -28,3 +28,24 @@ class const EditSheet({
     ),
   );
 }
+
+class const MangaEditContext({
+  super.key,
+  required final String title,
+  required final String sourceName,
+  required final String sourceLang,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => CupertinoFormSection.insetGrouped(
+    header: const Text('漫画'),
+    footer: Text('${sourceLang.isEmpty ? '未标注语言' : sourceLang} · $sourceName'),
+    children: [
+      CupertinoFormRow(
+        child: Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: Text(title),
+        ),
+      ),
+    ],
+  );
+}

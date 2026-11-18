@@ -446,16 +446,22 @@ void main() {
           buildId: 'different-build',
           sourceId: sourceId,
           generation: 'generation-1',
+          sourceName: '测试漫画源',
+          sourceLang: 'zh',
         ),
         CatalogSourceRef(
           buildId: 'build-1',
           sourceId: 'different-source',
           generation: 'generation-1',
+          sourceName: '另一个漫画源',
+          sourceLang: 'zh',
         ),
         CatalogSourceRef(
           buildId: 'build-1',
           sourceId: sourceId,
           generation: 'old-generation',
+          sourceName: '测试漫画源',
+          sourceLang: 'zh',
         ),
       ]) {
         expect(

@@ -161,10 +161,14 @@ final class CatalogSourceRef {
     required this.buildId,
     required this.sourceId,
     required this.generation,
+    required this.sourceName,
+    required this.sourceLang,
   });
   final String buildId;
   final String sourceId;
   final String generation;
+  final String sourceName;
+  final String sourceLang;
 }
 
 final class SourcePreferencesTarget {
@@ -1887,6 +1891,8 @@ final class CatalogController extends ChangeNotifier {
       buildId: build.id,
       sourceId: source.id,
       generation: current.generation,
+      sourceName: source.name,
+      sourceLang: source.lang,
     );
   }
 

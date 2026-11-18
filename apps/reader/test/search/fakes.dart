@@ -164,6 +164,8 @@ final class FakeSourceSearch extends CatalogSourceSearch {
         buildId: target.build.id,
         sourceId: target.source.id,
         generation: 'generation-1',
+        sourceName: target.source.name,
+        sourceLang: target.source.lang,
       ),
     );
   }

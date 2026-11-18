@@ -156,7 +156,13 @@ void main() {
             settle: false,
           );
           await tester.pump(const Duration(milliseconds: 500));
-          expect(find.byKey(const ValueKey('cover-editor')), findsOneWidget);
+          final editor = find.byKey(const ValueKey('cover-editor'));
+          expect(editor, findsOneWidget);
+          expect(
+            find.descendant(of: editor, matching: find.text(testManga.title)),
+            findsOneWidget,
+          );
+          expect(find.text('zh · 测试漫画源'), findsOneWidget);
           expect(find.text('正在读取封面'), findsOneWidget);
           final close = find.widgetWithText(CupertinoButton, '关闭');
           expect(
@@ -346,17 +352,14 @@ void main() {
           server.loseNextResponse = true;
           await _tap(tester, control('cover-save'), settle: false);
           expect(find.text('正在等待服务端确认'), findsOneWidget);
-          expect(
-            tester
-                .widget<CupertinoButton>(
-                  find.widgetWithText(CupertinoButton, '稍后'),
-                )
-                .onPressed,
-            isNull,
-          );
+          expect(find.text('保存中'), findsOneWidget);
+          expect(enabled(control('cover-save')), Tristate.isFalse);
+          expect(control('cover-retry'), findsNothing);
+          expect(find.textContaining('重试不会更换图片'), findsNothing);
+          expect(enabled(close), Tristate.isFalse);
           expect(find.text('服务端已确认'), findsNothing);
           expect(find.text('上次服务端确认'), findsOneWidget);
-          expect(find.text('尚未确认的修改'), findsOneWidget);
+          expect(find.text('正在提交的修改'), findsOneWidget);
           expect(find.text('未设置自定义封面'), findsOneWidget);
           expect(server.appliedMutations, writes);
           saveGate.complete();

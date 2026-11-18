@@ -15,6 +15,7 @@ import 'package:karuyomi/features/settings/settings_controller.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/theme/app_theme.dart';
 import 'package:karuyomi/widgets/app_page_route.dart';
+import 'package:karuyomi/widgets/edit_sheet.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../data/business_state_server.dart';
@@ -22,6 +23,11 @@ import 'settings_fixture.dart';
 import 'settings_probe.dart';
 
 const _key = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const _target = MangaEditContext(
+  title: '同名作品在书架和阅读设置中需要保留完整的标题与漫画源',
+  sourceName: '测试漫画源',
+  sourceLang: 'zh',
+);
 wire.GlobalSettingsValues _global({
   wire.AppTheme theme = wire.AppTheme.APP_THEME_DARK,
   wire.ReaderPageLayout layout = wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
@@ -84,7 +90,11 @@ void main() {
           child: child!,
         ),
         home: manga
-            ? MangaSettingsEditor(catalog: fixture.catalog, mangaKey: _key)
+            ? MangaSettingsEditor(
+                catalog: fixture.catalog,
+                mangaKey: _key,
+                target: _target,
+              )
             : GlobalSettingsPanel(catalog: fixture.catalog),
       ),
       container: fixture.container,
@@ -161,6 +171,7 @@ void main() {
                           builder: (_) => MangaSettingsEditor(
                             catalog: fixture.catalog,
                             mangaKey: _key,
+                            target: _target,
                           ),
                         ),
                       ),
@@ -267,6 +278,8 @@ void main() {
           await tap(tester, find.text('重新读取设置'));
           expect(find.text('当前设置已获服务端确认。'), findsOneWidget);
           expect(find.text('当前设置已获服务端确认。').hitTestable(), findsOneWidget);
+          expect(find.text(_target.title).hitTestable(), findsOneWidget);
+          expect(find.text('zh · 测试漫画源').hitTestable(), findsOneWidget);
           final inheritance = find.text('选择“跟随全局”时，之后的全局修改会应用到此漫画。');
           expect(
             find.ancestor(
@@ -287,6 +300,14 @@ void main() {
           expect(find.text('正在读取服务端设置'), findsNothing);
           expect(find.text('修改尚未保存。'), findsNothing);
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
+          expect(
+            enabled(find.widgetWithText(CupertinoButton, '保存')),
+            Tristate.isFalse,
+          );
+          expect(
+            enabled(find.widgetWithText(CupertinoButton, '关闭')),
+            Tristate.isFalse,
+          );
           expect(
             tester
                 .widget<CupertinoButton>(

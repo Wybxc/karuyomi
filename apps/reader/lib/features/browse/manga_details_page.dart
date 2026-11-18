@@ -1,5 +1,6 @@
 import '../../widgets/app_page_route.dart';
 import '../../widgets/choice_field.dart';
+import '../../widgets/edit_sheet.dart';
 import '../../theme/app_theme.dart';
 
 import 'dart:async';
@@ -389,6 +390,11 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         controller: catalog,
         repository: repository,
         mangaKey: sequence.mangaKey,
+        target: MangaEditContext(
+          title: manga.title,
+          sourceName: selectedSource.sourceName,
+          sourceLang: selectedSource.sourceLang,
+        ),
         lifecycle: _coverLifecycle,
         isCurrent: current,
       );

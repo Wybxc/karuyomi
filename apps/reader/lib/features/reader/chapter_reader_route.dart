@@ -10,6 +10,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/reading_progress.dart';
 import '../../diagnostics/reader_baseline.dart';
+import '../../widgets/edit_sheet.dart';
 import '../browse/catalog_controller.dart';
 import '../bookmarks/chapter_bookmarks_controller.dart';
 import '../bookmarks/bookmark_status.dart';
@@ -184,12 +185,19 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
   Future<void> _editSettings() async {
     final controller = _settings;
     if (controller == null || _accessPaused || _recovering || _closing) return;
+    final mangaKey = _sequence.mangaKey;
+    final target = MangaEditContext(
+      title: _manga.title,
+      sourceName: _source.sourceName,
+      sourceLang: _source.sourceLang,
+    );
     await showCupertinoSheet<void>(
       context: context,
       enableDrag: false,
       scrollableBuilder: (context, _) => settings_ui.MangaSettingsEditor(
         catalog: widget.catalog,
-        mangaKey: _sequence.mangaKey,
+        mangaKey: mangaKey,
+        target: target,
       ),
     );
   }

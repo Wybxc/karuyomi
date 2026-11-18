@@ -19,6 +19,7 @@ Future<bool?> showCustomCoverEditor({
   required CatalogController controller,
   required CoverRepository repository,
   required String mangaKey,
+  required MangaEditContext target,
   required Listenable lifecycle,
   required bool Function() isCurrent,
 }) => showCupertinoSheet<bool>(
@@ -28,6 +29,7 @@ Future<bool?> showCustomCoverEditor({
     controller: controller,
     repository: repository,
     mangaKey: mangaKey,
+    target: target,
     lifecycle: lifecycle,
     isCurrent: isCurrent,
   ),
@@ -37,6 +39,7 @@ class const _CoverEditor({
   required final CatalogController controller,
   required final CoverRepository repository,
   required final String mangaKey,
+  required final MangaEditContext target,
   required final Listenable lifecycle,
   required final bool Function() isCurrent,
 }) extends StatefulHookWidget {
@@ -215,6 +218,12 @@ class _CoverEditorState extends State<_CoverEditor> {
     final pending = _pending;
     final preview = pending?.bytes ?? _selected;
     final clearing = pending != null ? pending.cover == null : _clearing;
+    final saving = _operation == _CoverOperation.save;
+    final retry = pending?.retryable == true;
+    final drafted = pending == null && (_selected != null || _clearing);
+    final showSubmit = !_expired && !_blocked && (saving || retry || drafted);
+    final canSubmit = !_busy && (retry || _confirmed != null);
+    final canDefer = !_expired && !saving && pending != null;
     final editable =
         !_expired &&
         !_busy &&
@@ -235,27 +244,26 @@ class _CoverEditorState extends State<_CoverEditor> {
             padding: EdgeInsets.zero,
             onPressed: _canClose ? _close : null,
             child: Text(
-              pending != null ? '稍后' : '关闭',
-              semanticsLabel: pending != null ? '稍后处理' : null,
+              canDefer ? '稍后' : '关闭',
+              semanticsLabel: canDefer ? '稍后处理' : null,
             ),
           ),
         ),
-        trailing: !_expired && !_blocked && pending?.retryable == true
-            ? CupertinoButton(
-                key: const ValueKey('cover-retry'),
-                padding: EdgeInsets.zero,
-                onPressed: _busy ? null : () => _save(retry: true),
-                child: const Text('重试', semanticsLabel: '重试原修改'),
-              )
-            : !_expired &&
-                  pending == null &&
-                  !_blocked &&
-                  (_selected != null || _clearing)
-            ? CupertinoButton(
-                key: const ValueKey('cover-save'),
-                padding: EdgeInsets.zero,
-                onPressed: _busy || _confirmed == null ? null : _save,
-                child: const Text('保存', semanticsLabel: '保存封面'),
+        trailing: showSubmit
+            ? Semantics(
+                enabled: canSubmit,
+                child: CupertinoButton(
+                  key: ValueKey(
+                    retry && !saving ? 'cover-retry' : 'cover-save',
+                  ),
+                  padding: EdgeInsets.zero,
+                  onPressed: canSubmit ? () => _save(retry: retry) : null,
+                  child: saving
+                      ? const Text('保存中')
+                      : retry
+                      ? const Text('重试', semanticsLabel: '重试原修改')
+                      : const Text('保存', semanticsLabel: '保存封面'),
+                ),
               )
             : null,
         content: SingleChildScrollView(
@@ -278,6 +286,7 @@ class _CoverEditorState extends State<_CoverEditor> {
                   ],
                 )
               else ...[
+                widget.target,
                 CupertinoFormSection.insetGrouped(
                   header: Text(
                     _confirmed == null
@@ -374,10 +383,16 @@ class _CoverEditorState extends State<_CoverEditor> {
                 if (preview != null || clearing)
                   CupertinoFormSection.insetGrouped(
                     header: Text(
-                      _attempted || pending != null ? '尚未确认的修改' : '待保存的修改',
+                      saving
+                          ? '正在提交的修改'
+                          : _attempted || pending != null
+                          ? '尚未确认的修改'
+                          : '待保存的修改',
                     ),
                     footer: Text(
-                      _blocked || pending?.retryable == false
+                      saving
+                          ? '收到服务端确认后更新封面。'
+                          : _blocked || pending?.retryable == false
                           ? '当前会话保留原修改。请重新读取后再修改，不会覆盖新的远端版本。'
                           : pending != null
                           ? '当前会话保留原操作。重试不会更换图片或覆盖新的远端版本。'
@@ -395,7 +410,9 @@ class _CoverEditorState extends State<_CoverEditor> {
                                 width: 120,
                                 height: 160,
                                 fit: BoxFit.cover,
-                                semanticLabel: _attempted || pending != null
+                                semanticLabel: saving
+                                    ? '正在提交的封面预览'
+                                    : _attempted || pending != null
                                     ? '尚未确认的封面预览'
                                     : '待保存的封面预览',
                               ),

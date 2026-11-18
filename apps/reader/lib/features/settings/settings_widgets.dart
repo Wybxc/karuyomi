@@ -109,33 +109,38 @@ class const SettingsStatus({
     mainAxisSize: MainAxisSize.min,
     children: [
       if (state.activity case final activity?)
-        Row(
-          children: [
-            const CupertinoActivityIndicator(),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                switch (activity) {
-                  SettingsActivity.reading =>
-                    state.pending?.acknowledged == true
-                        ? '原设置已确认，正在读取最新状态'
-                        : '正在读取服务端设置',
-                  SettingsActivity.saving => '正在等待服务端确认设置修改',
-                },
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.secondaryLabel.resolveFrom(context),
+        Semantics(
+          container: true,
+          liveRegion: true,
+          child: Row(
+            children: [
+              const CupertinoActivityIndicator(),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  switch (activity) {
+                    SettingsActivity.reading =>
+                      state.pending?.acknowledged == true
+                          ? '原设置已确认，正在读取最新状态'
+                          : '正在读取服务端设置',
+                    SettingsActivity.saving => '正在等待服务端确认设置修改',
+                  },
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.secondaryLabel.resolveFrom(context),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       if (state.error case final error?)
         Text(
           error,
           style: TextStyle(color: AppColors.error.resolveFrom(context)),
         ),
-      if (state.pending?.retryable == true)
+      if (state.activity != SettingsActivity.saving &&
+          state.pending?.retryable == true)
         Text(
           state.pending?.acknowledged == true
               ? '原设置已确认，本会话保留原操作等待读取。'
@@ -160,7 +165,8 @@ class const SettingsStatus({
                 child: const Text('重新读取设置'),
               ),
             ),
-          if (state.pending?.retryable == true)
+          if (state.activity != SettingsActivity.saving &&
+              state.pending?.retryable == true)
             Semantics(
               enabled: state.canRetry,
               child: CupertinoButton(
@@ -205,7 +211,8 @@ class MangaSettingsEditor extends _SettingsEditor {
     super.key,
     required super.catalog,
     required String mangaKey,
-  }) : super(mangaKey: mangaKey);
+    required MangaEditContext target,
+  }) : super(mangaKey: mangaKey, mangaContext: target);
 }
 
 /// One UI-only draft implements the same controls for global values and manga
@@ -261,6 +268,7 @@ class const _SettingsEditor({
   super.key,
   required final CatalogController catalog,
   final String? mangaKey,
+  final MangaEditContext? mangaContext,
   final Widget? connection,
 }) extends HookConsumerWidget {
   @override
@@ -336,6 +344,8 @@ class const _SettingsEditor({
     );
     final draft = edit.value;
     final r = draft?.reader;
+    final canSave = state.canEdit;
+    final canClose = state.activity != SettingsActivity.saving;
     final dim = r?.hasDimPercent() == true ? r!.dimPercent : null;
     final inheritedDim = state.snapshot?.global.reader.dimPercent ?? 0;
     Widget group(String title, List<Widget> fields, {String? footer}) =>
@@ -350,7 +360,7 @@ class const _SettingsEditor({
         ? null
         : CupertinoButton(
             padding: manga ? EdgeInsets.zero : null,
-            onPressed: state.canEdit
+            onPressed: canSave
                 ? () async {
                     final saved = manga
                         ? await controller.saveOverrides(
@@ -383,7 +393,13 @@ class const _SettingsEditor({
             state.pending == null)
           const Text('当前设置已获服务端确认。'),
         if (!manga && save != null)
-          CupertinoButton.filled(onPressed: save.onPressed, child: save.child),
+          Semantics(
+            enabled: canSave,
+            child: CupertinoButton.filled(
+              onPressed: save.onPressed,
+              child: save.child,
+            ),
+          ),
         SettingsStatus(controller: controller, state: state, onReloaded: reset),
       ],
     );
@@ -391,6 +407,7 @@ class const _SettingsEditor({
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (owner != null) ?mangaContext,
         if (connection != null &&
             section != _SettingsSection.connection &&
             catalog.status != ServiceStatus.ready) ...[
@@ -563,17 +580,20 @@ class const _SettingsEditor({
     );
     return manga
         ? PopScope(
-            canPop: state.activity != SettingsActivity.saving,
+            canPop: canClose,
             child: EditSheet(
               title: const Text('本漫画阅读设置'),
-              leading: CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: state.activity == SettingsActivity.saving
-                    ? null
-                    : () => Navigator.pop(context),
-                child: const Text('关闭', semanticsLabel: '关闭设置'),
+              leading: Semantics(
+                enabled: canClose,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: canClose ? () => Navigator.pop(context) : null,
+                  child: const Text('关闭', semanticsLabel: '关闭设置'),
+                ),
               ),
-              trailing: save,
+              trailing: save == null
+                  ? null
+                  : Semantics(enabled: canSave, child: save),
               content: Column(
                 children: [
                   Padding(

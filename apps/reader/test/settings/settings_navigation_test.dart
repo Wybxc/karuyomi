@@ -1121,6 +1121,14 @@ void main() {
       await _tap(tester, find.text('阅读设置'));
       await _chooseField<wire.ReaderFit>(tester, '图像适配', '适宽');
       expect(find.text('修改尚未保存。'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(MangaSettingsEditor),
+          matching: find.text(testManga.title),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('zh · 测试漫画源'), findsOneWidget);
       await _tap(tester, find.text('关闭'));
       expect(find.byType(MangaSettingsEditor), findsNothing);
       final untouched = await tester.runAsync(
