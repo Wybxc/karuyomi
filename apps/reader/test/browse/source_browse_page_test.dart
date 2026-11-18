@@ -3,8 +3,10 @@ import 'package:karuyomi/widgets/app_page_route.dart';
 import '../test_app.dart';
 
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
@@ -98,6 +100,42 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       await hide(tester);
+    },
+  );
+
+  testWidgets(
+    'an occupied Source has a separate retry action that activates with Enter',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        platform.preparationFailure = wire.RuntimeError(
+          code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_STORAGE_BUSY,
+          message: 'Source storage namespace is already in use',
+        );
+        await show(tester);
+        expect(find.text('这个漫画源已在其他标签页或窗口运行，请先关闭后再连接'), findsOneWidget);
+        final retry = find.text('重试');
+        final action = tester.getSemantics(retry).getSemanticsData();
+        expect(action.label, '重试');
+        expect(action.hasAction(SemanticsAction.tap), isTrue);
+
+        platform.preparationFailure = null;
+        final focus = Focus.of(tester.element(retry));
+        focus.requestFocus();
+        await tester.pumpAndSettle();
+        expect(focus.hasPrimaryFocus, isTrue);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+
+        expect(platform.preparations, hasLength(2));
+        expect(platform.openedBuilds, ['build-1']);
+        expect(find.text(testManga.title), findsOneWidget);
+        expect(retry, findsNothing);
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      } finally {
+        semantics.dispose();
+      }
     },
   );
 

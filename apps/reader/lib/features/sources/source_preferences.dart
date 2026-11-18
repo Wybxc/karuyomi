@@ -168,10 +168,10 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
     final account =
         node.syncScope ==
         wire.PreferenceSyncScope.PREFERENCE_SYNC_SCOPE_ACCOUNT;
+    final scopeLabel = account ? '服务端确认后同步' : '仅当前客户端会话';
     final caption = <String>[
       if (account && node.summary.isNotEmpty) node.summary,
-      if (node.whichKind() != wire.PreferenceNode_Kind.group)
-        account ? '服务端确认后同步' : '仅当前客户端会话',
+      if (node.whichKind() != wire.PreferenceNode_Kind.group) scopeLabel,
     ];
     final captionStyle = TextStyle(
       fontSize: 13,
@@ -221,6 +221,15 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
           ),
         );
       case wire.PreferenceNode_Kind.choice:
+        final choice = node.choice;
+        final value = choice.hasValue() ? choice.value : null;
+        final options = <String?, String>{
+          null: '未保存，使用漫画源默认值',
+          if (value != null &&
+              !choice.options.any((option) => option.value == value))
+            value: '当前值已不在可选列表中',
+          for (final option in choice.options) option.value: option.label,
+        };
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -228,22 +237,10 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
               inline: false,
               key: key,
               label: node.title,
-              value: node.choice.hasValue() ? node.choice.value : null,
-              options: {
-                null: '未保存，使用漫画源默认值',
-                if (node.choice.hasValue() &&
-                    !node.choice.options.any(
-                      (option) => option.value == node.choice.value,
-                    ))
-                  node.choice.value: '当前值已不在可选列表中',
-                for (final option in node.choice.options)
-                  option.value: option.label,
-              },
-              disabledValues: {
-                null,
-                if (node.choice.hasValue()) node.choice.value,
-              },
-              onChanged: enabled && node.choice.options.isNotEmpty
+              value: value,
+              options: options,
+              disabledValues: {null, ?value},
+              onChanged: enabled && choice.options.isNotEmpty
                   ? (value) {
                       if (_current && _controller.canEdit && value != null) {
                         unawaited(
@@ -256,10 +253,15 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
                     }
                   : null,
             ),
-            if (node.choice.options.isEmpty) const Text('目前没有可选项'),
+            if (choice.options.isEmpty) const Text('目前没有可选项'),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(caption.join('\n'), style: captionStyle),
+              child: Text(
+                node.summary == options[value]
+                    ? scopeLabel
+                    : caption.join('\n'),
+                style: captionStyle,
+              ),
             ),
           ],
         );

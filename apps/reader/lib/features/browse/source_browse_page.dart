@@ -304,40 +304,44 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
     }
   }
 
-  Widget _failure(String title) => CupertinoListSection.insetGrouped(
-    backgroundColor: AppColors.background.resolveFrom(context),
-    separatorColor: AppColors.separator.resolveFrom(context),
-    decoration: BoxDecoration(
-      color: AppColors.groupedSurface.resolveFrom(context),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    children: [
-      Text(
-        title,
-        style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+  Widget _failure(String title) => Semantics(
+    container: true,
+    explicitChildNodes: true,
+    child: CupertinoListSection.insetGrouped(
+      backgroundColor: AppColors.background.resolveFrom(context),
+      separatorColor: AppColors.separator.resolveFrom(context),
+      decoration: BoxDecoration(
+        color: AppColors.groupedSurface.resolveFrom(context),
+        borderRadius: BorderRadius.circular(10),
       ),
-      const SizedBox(height: 8),
-      Text(_error ?? catalog.error ?? '请返回后重新选择漫画源。'),
-      for (final recovery in catalog.sourcePreferenceRecoveries.where(
-        (target) =>
-            target.build.packageName == widget.build.packageName &&
-            target.build.catalog == widget.build.catalog,
-      ))
+      children: [
+        Text(
+          title,
+          style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
+        ),
+        const SizedBox(height: 8),
+        Text(_error ?? catalog.error ?? '请返回后重新选择漫画源。'),
+        for (final recovery in catalog.sourcePreferenceRecoveries.where(
+          (target) =>
+              target.build.packageName == widget.build.packageName &&
+              target.build.catalog == widget.build.catalog,
+        ))
+          CupertinoButton(
+            onPressed: _loading != null || _leaving
+                ? null
+                : () => unawaited(_preferences(recovery)),
+            child: const Text('处理漫画源设置'),
+          ),
         CupertinoButton(
           onPressed: _loading != null || _leaving
               ? null
-              : () => unawaited(_preferences(recovery)),
-          child: const Text('处理漫画源设置'),
+              : catalog.accessPaused
+              ? widget.onAuthenticate
+              : _retry,
+          child: Text(catalog.accessPaused ? '登录' : '重试'),
         ),
-      CupertinoButton(
-        onPressed: _loading != null || _leaving
-            ? null
-            : catalog.accessPaused
-            ? widget.onAuthenticate
-            : _retry,
-        child: Text(catalog.accessPaused ? '登录' : '重试'),
-      ),
-    ],
+      ],
+    ),
   );
   @override
   Widget build(BuildContext context) {

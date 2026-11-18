@@ -83,6 +83,37 @@ void main() {
   }
 
   for (final appearance in Brightness.values) {
+    testWidgets(
+      'an account choice shows a repeated option label once and keeps distinct help in $appearance',
+      (tester) async {
+        final invoke = fixture.platform.invokeHandler!;
+        fixture.platform.invokeHandler = (call) async {
+          final result = await invoke(call);
+          if (result.hasPreferences()) {
+            final node = result.preferences.nodes[2];
+            node.summary = node.choice.value == 'a' ? '服务器甲' : '优先使用该镜像浏览';
+          }
+          return result;
+        };
+        await open(tester, appearance: appearance, size: const Size(360, 800));
+        expect(find.textContaining('服务器甲'), findsOneWidget);
+        final choice = find.byKey(const ValueKey(('source-preference', '2')));
+        await item(tester, '2');
+        await tester.tap(find.widgetWithText(CupertinoMenuItem, '服务器乙'));
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: choice, matching: find.text('服务器乙')),
+          findsOneWidget,
+        );
+        expect(find.text('优先使用该镜像浏览\n服务端确认后同步'), findsOneWidget);
+        expect(fixture.callbacks, 1);
+        expect(fixture.postedBodies, hasLength(1));
+        expect(tester.takeException(), isNull);
+        await tester.tap(iconLabel('关闭设置'));
+        await tester.pumpAndSettle();
+      },
+    );
+
     for (final textScale in [1.0, 2.0]) {
       testWidgets(
         'rejected session input uses the error role and remains correctable in $appearance at $textScale',
