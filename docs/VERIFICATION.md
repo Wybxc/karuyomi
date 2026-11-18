@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-19，`7461850` 正式 Web 双主题通过真实 Komiic 的读取、重置、应用、描述失败和会话失效复验。两组四路权威读回一致，主图累计 157/169（92.9%）。[筛选实拍与运行时验证](verification/mihon-cupertino-fidelity.md#漫画源筛选过程与恢复的正式-web-双主题验收)
+
 2026-11-19，`a251191` 正式 Web 双主题核对退出等待、失败提示、精确重试与返回，两组前后权威读回一致。15.K13 补齐，跨版本主图累计 152/169（89.9%）。[整页退出实拍](verification/mihon-cupertino-fidelity.md#跨源退出清理的正式-web-双主题验收)
 
 2026-11-19，`ad41606` 正式 Web 双主题确认清理和重读在等待中实际禁用，清理后零副本且账户安装一致。11.K3 补齐，主图累计 151/169（89.3%）。[清理实拍与读回](verification/mihon-cupertino-fidelity.md#本机副本清理的正式-web-双主题验收)

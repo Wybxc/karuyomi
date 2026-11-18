@@ -64,6 +64,8 @@ Komiic 的 Select 描述首轮已能呈现，但其默认 `komiic.com` 在当前
 
 ## 复验与交付限制
 
+2026-11-19，正式 `7461850` Web 使用既有 Komiic AOT 的真实镜像验证筛选等待、取消、失败重试和换代后的读取。遮住重置反馈和缺少禁用语义的旧版缺口已修复。两个主题均在取消或失败恢复后核对原列表一致，前后账户权威读回一致。[正式双主题记录](mihon-cupertino-fidelity.md#漫画源筛选过程与恢复的正式-web-双主题验收)
+
 ```sh
 pnpm exec vitest run packages/contracts/test/filters.test.ts packages/runtime-host/test/teavm-entry.test.ts packages/runtime-host/test/manager.test.ts
 pnpm teavm:check

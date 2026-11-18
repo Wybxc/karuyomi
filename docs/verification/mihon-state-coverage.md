@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-19，Karuyomi 跨版本双主题主图现为 152/169（89.9%），余下 17 个主状态均缺两侧。新增 15.K10 跨源正在停止、15.K12 停止尚未确认、15.K13 退出清理失败、11.K3 正在清理本机副本。身份或 Source 失效后的资源释放、选择器手动关闭、其他变体及转场继续验收。[单源停止](mihon-cupertino-fidelity.md#跨源单源停止的正式-web-双主题验收) · [整页退出](mihon-cupertino-fidelity.md#跨源退出清理的正式-web-双主题验收) · [本机清理](mihon-cupertino-fidelity.md#本机副本清理的正式-web-双主题验收)
+2026-11-19，Karuyomi 跨版本双主题主图现为 157/169（92.9%），余下 12 个主状态均缺两侧。新增 13.K1、13.K5–K7、13.K9，覆盖漫画源筛选的读取、重置、应用、描述失败和会话失效。共享编辑状态、身份或 Source 失效后的资源释放、最终像素复核与其余变体继续验收。[筛选双主题](mihon-cupertino-fidelity.md#漫画源筛选过程与恢复的正式-web-双主题验收)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -1644,7 +1644,8 @@ stateDiagram-v2
     LoadingFilters --> FiltersReady: 描述成功且有字段
     LoadingFilters --> EmptyFilters: 描述成功且无字段
     LoadingFilters --> FilterLoadFailed: 读取失败
-    FilterLoadFailed --> LoadingFilters: 明确重试
+    FilterLoadFailed --> LoadingFilters: 重试首次读取
+    FilterLoadFailed --> ResettingFilters: 重试重置
     FiltersReady --> FilterDraft: 编辑开关或文本
     FiltersReady --> FilterChoice: 打开选择
     FilterDraft --> FilterChoice: 打开选择
@@ -1665,6 +1666,7 @@ stateDiagram-v2
     ApplyingFilters --> DismissingFilters: 搜索成功后关闭
     LoadingFilters --> FilterSessionChanged: 身份或会话变化
     FiltersReady --> FilterSessionChanged: 身份或会话变化
+    ResettingFilters --> FilterSessionChanged: 身份或会话变化
     ApplyingFilters --> FilterSessionChanged: 身份或会话变化
     FiltersReady --> DismissingFilters: 取消并丢弃未应用草稿
     FilterDraft --> DismissingFilters: 取消并丢弃未应用草稿
@@ -1675,24 +1677,26 @@ stateDiagram-v2
     ApplyingFilters --> [*]: 取消请求并关闭，会话可能退役
     FilterSessionChanged --> [*]: 关闭后重新打开
     classDef paired fill:#dbeafe,color:#172554,stroke:#2563eb
-    class FiltersReady,FilterDraft,FilterChoice,FilterApplyFailed,EmptyFilters,DismissingFilters paired
+    class LoadingFilters,FiltersReady,FilterDraft,FilterChoice,ResettingFilters,ApplyingFilters,FilterLoadFailed,FilterApplyFailed,FilterSessionChanged,EmptyFilters,DismissingFilters paired
 ```
 
-| 状态 ID | 最小必要信息                                                 | 浅色正式Web                                              | 深色正式Web                                             |
-| ------- | ------------------------------------------------------------ | -------------------------------------------------------- | ------------------------------------------------------- |
-| 13.K1   | 源内查询上下文、读取进度、取消后果、重复动作禁用             | 待                                                       | 待                                                      |
-| 13.K2   | 分组与typed当前值、重置/应用/取消；说明标题与空分组不丢失    | `karuyomi-75c618a-filters-ready-light.jpg`               | `karuyomi-75c618a-filters-ready-dark.jpg`               |
-| 13.K3   | 修改后的值、仍未应用、原列表保持、明确应用/取消              | `karuyomi-75c618a-filters-draft-light.jpg`               | `karuyomi-75c618a-filters-draft-dark.jpg`               |
-| 13.K4   | 选项、当前选择及键盘焦点、取消；长选项另走29组查询页         | `karuyomi-75c618a-filters-choice-light-390.jpg`          | `karuyomi-75c618a-filters-choice-dark-390.jpg`          |
-| 13.K5   | 明确重置进度、旧已应用条件不变、取消后果、重复动作禁用       | 待                                                       | 待                                                      |
-| 13.K6   | 明确应用进度、冻结的草稿、原列表保持、取消后果、重复动作禁用 | 待                                                       | 待                                                      |
-| 13.K7   | 读取/重置失败原因、重试/关闭、原列表保持                     | 待                                                       | 待                                                      |
-| 13.K8   | 应用失败原因、保留的草稿、可编辑并重试/取消、原列表保持      | `karuyomi-86e7925-clean-filters-apply-outcome-light.jpg` | `karuyomi-86e7925-clean-filters-apply-outcome-dark.jpg` |
-| 13.K9   | 会话变化说明、停止使用旧草稿、关闭并重新打开                 | 待                                                       | 待                                                      |
-| 13.K10  | 无额外筛选说明、默认条件搜索与取消、仍可重置                 | `karuyomi-86e7925-filters-empty-light.jpg`               | `karuyomi-86e7925-filters-empty-dark.jpg`               |
-| 13.K11  | 退场期间保留原内容、停止接受操作、正常关闭不误报会话变化     | `karuyomi-c353604-filters-closing-observation-light.jpg` | `karuyomi-c353604-filters-closing-observation-dark.jpg` |
+| 状态 ID | 最小必要信息                                                 | 浅色正式Web                                               | 深色正式Web                                              |
+| ------- | ------------------------------------------------------------ | --------------------------------------------------------- | -------------------------------------------------------- |
+| 13.K1   | 源内查询上下文、读取进度、取消后果、重复动作禁用             | `karuyomi-7461850-filters-loading-light.jpg`              | `karuyomi-7461850-filters-loading-dark.jpg`              |
+| 13.K2   | 分组与typed当前值、重置/应用/取消；说明标题与空分组不丢失    | `karuyomi-75c618a-filters-ready-light.jpg`                | `karuyomi-75c618a-filters-ready-dark.jpg`                |
+| 13.K3   | 修改后的值、仍未应用、原列表保持、明确应用/取消              | `karuyomi-75c618a-filters-draft-light.jpg`                | `karuyomi-75c618a-filters-draft-dark.jpg`                |
+| 13.K4   | 选项、当前选择及键盘焦点、取消；长选项另走29组查询页         | `karuyomi-75c618a-filters-choice-light-390.jpg`           | `karuyomi-75c618a-filters-choice-dark-390.jpg`           |
+| 13.K5   | 明确重置进度、旧已应用条件不变、取消后果、重复动作禁用       | `karuyomi-7461850-filters-resetting-light.jpg`            | `karuyomi-7461850-filters-resetting-dark.jpg`            |
+| 13.K6   | 明确应用进度、冻结的草稿、原列表保持、取消后果、重复动作禁用 | `karuyomi-7461850-filters-applying-light.jpg`             | `karuyomi-7461850-filters-applying-dark.jpg`             |
+| 13.K7   | 读取/重置失败原因、重试/关闭、原列表保持                     | `karuyomi-7461850-filters-{read,reset}-failure-light.jpg` | `karuyomi-7461850-filters-{read,reset}-failure-dark.jpg` |
+| 13.K8   | 应用失败原因、保留的草稿、可编辑并重试/取消、原列表保持      | `karuyomi-86e7925-clean-filters-apply-outcome-light.jpg`  | `karuyomi-86e7925-clean-filters-apply-outcome-dark.jpg`  |
+| 13.K9   | 会话变化说明、停止使用旧草稿、关闭并重新打开                 | `karuyomi-7461850-filters-session-retired-light.jpg`      | `karuyomi-7461850-filters-session-retired-dark.jpg`      |
+| 13.K10  | 无额外筛选说明、默认条件搜索与取消、仍可重置                 | `karuyomi-86e7925-filters-empty-light.jpg`                | `karuyomi-86e7925-filters-empty-dark.jpg`                |
+| 13.K11  | 退场期间保留原内容、停止接受操作、正常关闭不误报会话变化     | `karuyomi-c353604-filters-closing-observation-light.jpg`  | `karuyomi-c353604-filters-closing-observation-dark.jpg`  |
 
-两主题取消后返回焦点至筛选入口：浅色使用Tab/Return，深色使用Tab/Space。重置与应用走真实Source，浅色应用后空结果主图为`karuyomi-86e7925-filters-applied-empty-result-light.jpg`，深色稳定同状态图为`karuyomi-86e7925-filters-cancel-space-dark.jpg`；两张联系表已实看。最后一次深色应用截图缺文字，排除主图；工具观察到的正常退场误报保留为修复依据，不能填作13.K9真正会话失效。全部瞬时进度、typed字段和失败变体仍待补齐。
+两主题取消后返回焦点至筛选入口：浅色使用Tab/Return，深色使用Tab/Space。重置与应用走真实Source，浅色应用后空结果主图为`karuyomi-86e7925-filters-applied-empty-result-light.jpg`，深色稳定同状态图为`karuyomi-86e7925-filters-cancel-space-dark.jpg`；两张联系表已实看。最后一次深色应用截图缺文字，排除主图；正常退场误报保留为修复依据。
+
+`7461850` 使用真实 Komiic `.cc` 镜像，补齐首次读取、应用、长表单底部重置、读取及重置失败、真实重建后的会话失效。两主题均确认原热门或已应用结果保持，失败可重试，失效前后的筛选分别绑定不同运行代次。typed 字段的其它真实 Source、全部失败变体及最终像素门仍待。[筛选验收](mihon-cupertino-fidelity.md#漫画源筛选过程与恢复的正式-web-双主题验收)
 
 13.K11为`c353604`正式Web真实xkcd成功应用后的两个自然退场时刻，浅深动画位置不同；不是全部转场帧或减少动态效果验收。
 
