@@ -230,9 +230,12 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                   LibraryBatchItemStatus.sending => '正在等待服务端确认',
                   LibraryBatchItemStatus.reading => '修改已确认，正在读取最新书架',
                   LibraryBatchItemStatus.confirmed => '已由服务端确认',
-                  LibraryBatchItemStatus.uncertain => '尚未确认，需重试原操作',
-                  LibraryBatchItemStatus.readFailed => '修改已确认，需重试读取',
-                  LibraryBatchItemStatus.blocked => '未保存，需重新读取',
+                  LibraryBatchItemStatus.uncertain =>
+                    _expired ? '尚未确认' : '尚未确认，需重试原操作',
+                  LibraryBatchItemStatus.readFailed =>
+                    _expired ? '修改已确认，读取未完成' : '修改已确认，需重试读取',
+                  LibraryBatchItemStatus.blocked =>
+                    _expired ? '未保存' : '未保存，需重新读取',
                 },
                 style: TextStyle(
                   color: switch (item.status) {
@@ -246,7 +249,7 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                   },
                 ),
               ),
-            if (item?.error case final error?)
+            if (item?.error case final error? when !_expired)
               Text(
                 error,
                 style: TextStyle(color: AppColors.error.resolveFrom(context)),
@@ -274,6 +277,7 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
     final actionColor = !_expired && !_needsCategories
         ? AppColors.error.resolveFrom(context)
         : null;
+    final canClose = _expired || draft?.busy != true;
     return PopScope<Set<String>>(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -282,17 +286,28 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
       child: EditSheet(
         key: const ValueKey('library-batch-review'),
         title: Text(_title),
-        leading: draft?.finished == true
+        leading: !_expired && draft?.finished == true
             ? null
-            : CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: !_expired && draft?.busy == true ? null : _close,
-                child: Text(
-                  draft == null || !draft.attempted ? '取消' : '稍后',
-                  semanticsLabel: draft?.attempted == true ? '稍后处理' : null,
+            : Semantics(
+                enabled: canClose,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: canClose ? _close : null,
+                  child: Text(
+                    _expired
+                        ? '关闭'
+                        : draft?.attempted == true
+                        ? '稍后'
+                        : '取消',
+                    semanticsLabel: !_expired && draft?.attempted == true
+                        ? '稍后处理'
+                        : null,
+                  ),
                 ),
               ),
-        trailing: draft?.finished == true
+        trailing: _expired
+            ? null
+            : draft?.finished == true
             ? CupertinoButton(
                 padding: EdgeInsets.zero,
                 onPressed: _close,
@@ -309,7 +324,7 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
             ? CupertinoButton(
                 padding: EdgeInsets.zero,
                 foregroundColor: actionColor,
-                onPressed: _expired ? null : _retry,
+                onPressed: _retry,
                 child: Text(
                   draft.retryNeedsRead ? '重试读取' : '重试',
                   semanticsLabel: draft.retryNeedsRead
@@ -321,19 +336,20 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
             ? CupertinoButton(
                 padding: EdgeInsets.zero,
                 foregroundColor: actionColor,
-                onPressed: _expired ? null : _continue,
+                onPressed: _continue,
                 child: const Text('继续', semanticsLabel: '继续剩余原清单'),
               )
             : draft.canReloadAndFinish
             ? CupertinoButton(
                 padding: EdgeInsets.zero,
-                onPressed: _expired ? null : _reload,
+                onPressed: _reload,
                 child: const Text('重读', semanticsLabel: '重新读取并结束原批次'),
               )
             : null,
         content: ListView(
           children: [
-            if (_needsCategories &&
+            if (!_expired &&
+                _needsCategories &&
                 draft == null &&
                 _view.categories.isNotEmpty)
               CupertinoFormSection.insetGrouped(
@@ -382,7 +398,7 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                           color: AppColors.error.resolveFrom(context),
                         ),
                       ),
-                    if (_error case final error?)
+                    if (_error case final error? when !_expired)
                       Text(
                         error,
                         style: TextStyle(
@@ -394,9 +410,9 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                         '已确认 ${draft.confirmedCount} / ${draft.items.length} 部 · 未开始 ${draft.notStartedCount} 部',
                       ),
                       if (draft.busy) const CupertinoActivityIndicator(),
-                      if (draft.pauseRequested && draft.busy)
+                      if (!_expired && draft.pauseRequested && draft.busy)
                         const Text('已请求暂停，等待当前操作结束后可关闭。'),
-                      if (draft.error case final error?)
+                      if (draft.error case final error? when !_expired)
                         Text(
                           error,
                           style: TextStyle(
@@ -407,7 +423,7 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                         const Text('全部修改已由服务端确认。'),
                       if (!_expired && draft.finished && !draft.completed)
                         const Text('原批次已结束，剩余漫画未再发送。请按最新书架重新确认。'),
-                      if (draft.attempted && !draft.finished)
+                      if (!_expired && draft.attempted && !draft.finished)
                         Text(
                           draft.retryNeedsRead
                               ? '该项修改已保存；当前会话保留原清单，可稍后继续读取最新书架。'
@@ -431,9 +447,11 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
             else
               CupertinoFormSection.insetGrouped(
                 header: Text('确认清单：${_entries.length} 部漫画'),
-                footer: Text(
-                  '逐部保存，以服务端确认结果为准；一项失败时暂停剩余操作。${_needsCategories ? '' : '\n移出书架后仍保留阅读进度、书签和分类。'}',
-                ),
+                footer: _expired
+                    ? null
+                    : Text(
+                        '逐部保存，以服务端确认结果为准；一项失败时暂停剩余操作。${_needsCategories ? '' : '\n移出书架后仍保留阅读进度、书签和分类。'}',
+                      ),
                 children: [
                   if (draft != null)
                     for (final item in draft.items)
@@ -447,13 +465,11 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
                 onPressed: draft!.pauseRequested ? null : draft.pause,
                 child: const Text('暂停剩余操作'),
               ),
-            if (draft?.canContinue == true)
+            if (!_expired && draft?.canContinue == true)
               CupertinoButton(
-                onPressed: _expired
-                    ? null
-                    : () {
-                        if (_current) draft!.finishRemaining();
-                      },
+                onPressed: () {
+                  if (_current) draft!.finishRemaining();
+                },
                 child: const Text('结束剩余操作'),
               ),
           ],

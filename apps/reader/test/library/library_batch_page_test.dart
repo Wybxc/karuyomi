@@ -14,6 +14,7 @@ import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+import 'package:source_runtime/source_runtime.dart' show RuntimeException;
 
 import '../browse/fakes.dart';
 import '../data/business_state_server.dart';
@@ -634,6 +635,62 @@ void main() {
   );
 
   testWidgets(
+    'an expired category batch keeps its list and offers only closing',
+    (tester) async {
+      await createCategory(tester, _first, '待读');
+      final books = [
+        await favorite(tester, 'Alpha'),
+        await favorite(tester, 'Beta'),
+        await favorite(tester, 'Gamma'),
+      ];
+      await show(tester);
+      server.requests.clear();
+      final applied = server.appliedMutations;
+      server.beforeRequest = (request) {
+        if (request.method == 'POST' &&
+            request.uri.path == '/api/state/mutations' &&
+            mutations().length == 2) {
+          throw RuntimeException.fromProto(
+            wire.RuntimeError(
+              code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED,
+              message: 'Access expired before dispatching the second title',
+            ),
+          );
+        }
+        return null;
+      };
+      await selectAll(tester);
+      await tap(
+        tester,
+        find.byKey(const ValueKey('library-batch-add-categories')),
+      );
+      await tap(tester, category(_first));
+      await tap(tester, find.text('开始'));
+
+      expect(controller.accessPaused, isTrue);
+      expect(find.textContaining('原窗口已停用'), findsOneWidget);
+      expect(find.text('已确认 1 / 3 部 · 未开始 1 部'), findsOneWidget);
+      expect(find.text('尚未确认'), findsOneWidget);
+      expect(find.textContaining('重试'), findsNothing);
+      expect(find.text('结束剩余操作'), findsNothing);
+      expect(find.text('关闭').hitTestable(), findsOneWidget);
+      for (final book in books) {
+        expect(batchEntry(book.mangaKey), findsOneWidget);
+      }
+      final attempts = mutations().map(command).toList();
+      expect(attempts, hasLength(2));
+      expect(server.manga(attempts.first.mangaKey)?.categoryIds, [_first]);
+      expect(server.manga(attempts.last.mangaKey)?.categoryIds, isEmpty);
+      expect(server.appliedMutations, applied + 1);
+      await tap(tester, find.text('关闭'));
+      expect(find.byKey(const ValueKey('library-batch-review')), findsNothing);
+      expect(mutations(), hasLength(2));
+      expect(tester.takeException(), isNull);
+      await hide(tester);
+    },
+  );
+
+  testWidgets(
     'an identity change retires the batch and a late acknowledgement cannot send its remainder',
     (tester) async {
       await favorite(tester, 'Alpha');
@@ -690,7 +747,7 @@ void main() {
             .value,
         'owner-subject',
       );
-      await tap(tester, find.text('稍后'));
+      await tap(tester, find.text('关闭'));
       expect(find.text('书架还是空的'), findsOneWidget);
       expect(find.byKey(const ValueKey('library-resume-batch')), findsNothing);
       expect(find.textContaining('已选 '), findsNothing);
