@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-18，Karuyomi 跨版本双主题主图现为 131/169（77.5%），剩余 38 个主状态，其中 8 个仅有单侧、30 个双侧均缺。新增 Source 偏好 14.K1/K5 两对。[正式双主题验收](mihon-cupertino-fidelity.md#source-偏好读取与恢复的正式-web-双主题验收)
+2026-11-18，Karuyomi 跨版本双主题主图现为 132/169（78.1%），剩余 37 个主状态，其中 8 个仅有单侧、29 个双侧均缺。Source 偏好 14.K1/K5 与迁移打开目标源 20.K8 各有浅、深主图。[Source 验收](mihon-cupertino-fidelity.md#source-偏好读取与恢复的正式-web-双主题验收) · [迁移验收](mihon-cupertino-fidelity.md#迁移打开目标源的正式-web-双主题验收)
 
 2026-11-14，进行中。用户要求截图触及每个 UI 状态，并同时考虑浅色、深色。此表细化[30 组界面矩阵](../design/mihon-cupertino-fidelity.md)，作为参考采集与后续 Cupertino 对照的工作清单。**目前尚无一组完成包含全部转换与变体的双主题验收；绿色只代表该节点的两张主状态参考图已核对。**
 
@@ -1258,7 +1258,7 @@ stateDiagram-v2
 | 20.K5  | 已选择仅收藏/分类、章节与位置不复制、可选目标源                                                                                | `karuyomi-9228c11-migration-categories-only-light.jpg`                                      | `karuyomi-86d27e7-migration-categories-only-dark.jpg`                                 |
 | 20.K6  | 已捕获章节数、快照随目标切换保留、可选目标源                                                                                   | `karuyomi-9228c11-migration-original-snapshot-light.jpg`                                    | `karuyomi-9228c11-migration-original-snapshot-dark.jpg`                               |
 | 20.K7  | 已确认无其他已安装且启用的源、扩展管理指引、只读刷新和返回                                                                     | `karuyomi-3a57cdf-migration-k7-light.jpg`                                                   | `karuyomi-3a57cdf-migration-k7-dark.jpg`                                              |
-| 20.K8  | 正在打开的精确目标源、原作品上下文、操作禁用；失败不得误标已切换                                                               | 待                                                                                          | 待                                                                                    |
+| 20.K8  | 正在打开的精确目标源、原作品上下文、操作禁用；失败不得误标已切换                                                               | `karuyomi-92d4f93-migration-open-target-opening-light.jpg`                                  | `karuyomi-92d4f93-migration-open-target-opening-dark.jpg`                             |
 | 20.K9  | 当前目标源、查询、搜索/热门动作及原作品；尚未请求不显示无结果                                                                  | `karuyomi-9228c11-migration-search-ready-light.jpg`                                         | `karuyomi-9228c11-migration-search-ready-dark.jpg`                                    |
 | 20.K10 | 当前目标源、查询或热门、首次/追加进度；追加时保留已有结果                                                                      | `karuyomi-ef5f3dd-selection-migration-popular-loading-candidate-light.jpg`                  | `karuyomi-ef5f3dd-selection-migration-popular-loading-candidate-dark.jpg`             |
 | 20.K11 | 当前源和查询或热门、成功为空、修改查询或改浏览热门；两种空态分别验                                                             | `karuyomi-86d27e7-migration-search-empty-light.jpg`，仅搜索                                 | `karuyomi-86d27e7-migration-search-empty-dark.jpg`，仅搜索                            |
@@ -1281,6 +1281,8 @@ stateDiagram-v2
 `3a57cdf`新增20.K1/K2/K4/K7/K14/K15和21.K2/K3/K4九对双主题主图；19.K10改用修正拒绝说明后的当前正式图。33组九路快照与256条审计核对三条原迁移各应用一次、两次原正文精确重试无重复、两次真实409与四次迁移/封面400零覆盖。浅色挂起sequence49未完整释放，深色sequence149正常释放；深色502后重开和只读失败无新POST，精确重试只应用一次。21.K3/K4的读取失败提示存在实际缺口，已在组件先复现并修正，但新产物Web仍待；原问题图不记该变体最终通过。K8/K10没有截到加载指示，保持待验；最终有效快照之后夹具达到256条上限，额外封面读取失败排除。详情、原始图与五张联系表见[迁移故障正式Web复验](mihon-cupertino-fidelity.md#迁移加载与故障的正式-web-复验)。
 
 `25be6f5`正式Web另补21.K3/K5的待确认、书架重开及精确重试后阶段页脚双主题分项，前缀为`karuyomi-25be6f5-object-migration-{pending-footer,reopened-pending-footer,confirmed-footer}-{light,dark}.jpg`。两个仅分类原命令各应用一次、原文重试不重复；不替代上述正常新请求及其它复制范围证据。21组九路快照与107条完成审计已核对，四次独立准备单列，详见[正式双主题复验](mihon-cupertino-fidelity.md#分类对象与迁移页脚的正式-web-双主题复验)。20.K8候选有转场，20.K10候选虽有真实热门旋转却缺准确操作说明，均不填主图；准确说明已通过组件修复，正式Web仍待。书架独立勾选框名称缺失同样记录后修复，不以相邻卡片名称代替控件身份。
+
+`92d4f93` 双主题补齐 20.K8。等待时显示 Komiic、语言和原作品 xkcd，原作品操作与目标选择禁用。整包偏好读取失败保留未选目标，明确重试成功才出现查找目标作品。目标源列表请求与迁移写入保持各自独立验收。[正式双主题验收](mihon-cupertino-fidelity.md#迁移打开目标源的正式-web-双主题验收)
 
 ### 24：Karuyomi 本漫画阅读设置的目标状态
 
