@@ -16,6 +16,7 @@ import {
 import { filterAcceptanceControl } from './acceptance-filters.js';
 import { migrationAcceptanceControl } from './acceptance-migration.js';
 import { preferenceGroupAcceptanceControl } from './acceptance-preference-groups.js';
+import { searchRetirementAcceptanceControl } from './acceptance-search-retirement.js';
 
 interface BrowserRuntime {
   control(input: unknown): Promise<ControlResponseJson>;
@@ -61,6 +62,13 @@ if (profile === 'preference-groups') {
   browser.karuyomiRuntime = {
     ...host,
     control: preferenceGroupAcceptanceControl((input) => host.control(input)),
+  };
+}
+
+if (profile === 'retire-search') {
+  browser.karuyomiRuntime = {
+    ...host,
+    control: searchRetirementAcceptanceControl((input) => host.control(input)),
   };
 }
 

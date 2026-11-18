@@ -73,6 +73,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       !_disposed && !_retired && !_closed && !service.retired;
   bool get retired => !_ownsSearch;
   bool get available => _ownsSearch && service.available;
+  SourceSearchRetirement? get retirement => service.retirement;
   String? get unavailableReason =>
       available ? null : service.unavailableReason ?? '身份或服务已改变，请关闭后重新开始搜索。';
   String? get cleanupNotice =>
@@ -111,6 +112,14 @@ final class CrossSourceSearchController extends ChangeNotifier {
     if (service.retired && !_retired) {
       _retired = true;
       ++_epoch;
+    }
+    if (retirement != null) {
+      targets = const [];
+      groups = const [];
+      _selected.clear();
+      query = '';
+      language = null;
+      error = null;
     }
     notifyListeners();
   }

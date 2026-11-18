@@ -33,12 +33,19 @@ abstract interface class SourceSearchTask {
   Future<void> cancel();
 }
 
+typedef SourceSearchRetirement = ({
+  String reason,
+  bool releasing,
+  String? releaseError,
+});
+
 /// A page-scoped search: account authority stays with CatalogController/D1.
 /// Closing an operation never closes a reader or borrows its execution slot.
 abstract class CatalogSourceSearch extends ChangeNotifier {
   bool get available;
   bool get retired;
   String? get unavailableReason;
+  SourceSearchRetirement? get retirement;
   Future<List<SourceSearchTarget>> loadTargets();
   SourceSearchTask search(
     SourceSearchTarget target,
@@ -216,6 +223,15 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
   bool get available => !retired && _cleanupFailure == null;
   @override
   String? get unavailableReason => _reason ?? _cleanupFailure;
+  @override
+  SourceSearchRetirement? get retirement => switch (_reason) {
+    final reason? => (
+      reason: reason,
+      releasing: _stopping != null,
+      releaseError: _cleanupFailure,
+    ),
+    null => null,
+  };
 
   void _notify() {
     if (!_disposed) notifyListeners();
@@ -238,7 +254,7 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
           RuntimeErrorCode.accessRequired,
           RuntimeErrorCode.accessDenied,
         }.contains(event.code)) {
-      _retire('运行容器或访问身份已改变，请关闭后重新开始搜索。');
+      _retire('运行容器或访问身份已改变。');
     }
   }
 
@@ -259,20 +275,22 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
         }
       }
     } else {
-      _retire('身份或服务已改变，请关闭后重新开始搜索。');
+      _retire(switch (catalog.status) {
+        ServiceStatus.loginRequired => '访问验证已失效，请重新登录。',
+        ServiceStatus.denied => '当前身份没有访问权限。',
+        _ => '身份或服务已改变。',
+      });
     }
   }
 
   void _retire(String reason) {
-    if (_retired) return;
+    if (_reason != null || _closed || _disposed) return;
     _retired = true;
     _reason = reason;
-    _notify();
-    unawaited(
-      stop().catchError((Object failure) {
-        _cleanupError(failure);
-      }),
-    );
+    final alreadyStopping = _stopping != null;
+    final releasing = stop();
+    if (alreadyStopping) _notify();
+    unawaited(releasing.catchError((Object _) {}));
   }
 
   void _cleanupError(Object failure) {
@@ -676,9 +694,27 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
   }
 
   @override
-  Future<void> stop() => _stopping ??= _stop().whenComplete(() {
-    _stopping = null;
-  });
+  Future<void> stop() {
+    if (_stopping case final active?) return active;
+    final completion = Completer<void>();
+    _stopping = completion.future;
+    if (_reason != null) _notify();
+    completion.complete(_finishStopping());
+    return completion.future;
+  }
+
+  Future<void> _finishStopping() async {
+    try {
+      await _stop();
+    } catch (failure) {
+      if (_reason != null) _cleanupError(failure);
+      rethrow;
+    } finally {
+      _stopping = null;
+      if (_reason != null) _notify();
+    }
+  }
+
   Future<void> _stop() async {
     final jobs = _jobs.toList();
     await Future.wait(
@@ -757,7 +793,6 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
   });
   Future<void> _close() async {
     _retired = true;
-    _reason ??= '搜索页面已关闭。';
     await stop();
     if (_closed) return;
     _closed = true;

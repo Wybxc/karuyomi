@@ -52,24 +52,32 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     final foreground = state == AppLifecycleState.resumed;
     final leftForeground = _foreground && !foreground;
     _foreground = foreground;
-    if (leftForeground && _closeDestination == null) {
+    if (leftForeground &&
+        _closeDestination == null &&
+        controller.retirement == null) {
       unawaited(controller.stop());
     }
   }
 
   Future<void> _leave({bool openExtensions = false}) async {
-    if (_leaving || controller.transitioning) return;
+    if (_leaving ||
+        controller.transitioning ||
+        controller.retirement?.releasing == true) {
+      return;
+    }
     _leaving = true;
     final destination = _closeDestination ??= openExtensions;
     final closed = await controller.close();
     _leaving = false;
     if (!mounted || !closed) return;
     setState(() => _allowPop = true);
-    Navigator.of(context).pop(destination);
+    Navigator.of(context).pop(controller.retirement == null && destination);
   }
 
   void _retryCleanup() {
-    if (_closeDestination case final openExtensions?) {
+    if (controller.retirement != null) {
+      unawaited(_leave());
+    } else if (_closeDestination case final openExtensions?) {
       unawaited(_leave(openExtensions: openExtensions));
     } else {
       unawaited(controller.stop());
@@ -484,7 +492,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     );
   }
 
-  Widget _searchLayout(Widget results) => ConstrainedBox(
+  Widget _searchLayout(Widget results, {Widget? retired}) => ConstrainedBox(
     constraints: const BoxConstraints(maxWidth: 1000),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -512,9 +520,85 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
               ),
             ),
           ),
-        Expanded(child: results),
+        Expanded(child: retired ?? results),
       ],
     ),
+  );
+
+  Widget _retiredSearch(
+    SourceSearchRetirement retirement, {
+    required bool releasing,
+    required String? releaseError,
+  }) => ListView(
+    key: const PageStorageKey('cross-search-retired'),
+    padding: const EdgeInsets.symmetric(vertical: 16),
+    children: [
+      CupertinoFormSection.insetGrouped(
+        header: const Text('搜索已停用'),
+        children: [
+          CupertinoFormRow(
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(
+                retirement.reason,
+                key: const ValueKey('cross-search-unavailable'),
+              ),
+            ),
+          ),
+          if (releasing)
+            CupertinoFormRow(
+              child: Semantics(
+                container: true,
+                liveRegion: true,
+                child: const Row(
+                  children: [
+                    CupertinoActivityIndicator(),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [Text('正在释放搜索资源'), Text('确认释放后可以返回。')],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (releaseError != null) ...[
+            CupertinoFormRow(
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Semantics(
+                  container: true,
+                  liveRegion: true,
+                  child: Text(
+                    releaseError,
+                    key: const ValueKey('cross-search-cleanup-error'),
+                    style: TextStyle(
+                      color: AppColors.error.resolveFrom(context),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Semantics(
+              container: true,
+              child: CupertinoButton(
+                key: const ValueKey('cross-search-cleanup-retry'),
+                onPressed: _retryCleanup,
+                child: const Text('重试释放搜索资源'),
+              ),
+            ),
+          ] else
+            const CupertinoFormRow(
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text('搜索资源已释放，可以返回。'),
+              ),
+            ),
+        ],
+      ),
+    ],
   );
 
   @override
@@ -528,7 +612,12 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     }, [_scope]);
     useListenable(controller);
     useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
-    final canGoBack = !controller.transitioning && _closeDestination != true;
+    final retirement = controller.retirement;
+    final releasing = controller.transitioning || retirement?.releasing == true;
+    final releaseError = controller.cleanupError ?? retirement?.releaseError;
+    final canGoBack =
+        !releasing &&
+        (retirement != null ? releaseError == null : _closeDestination != true);
     final canStopAll =
         !controller.transitioning &&
         !controller.opening &&
@@ -754,6 +843,13 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                   for (final group in controller.groups) _results(group),
                 ],
               ),
+              retired: retirement == null
+                  ? null
+                  : _retiredSearch(
+                      retirement,
+                      releasing: releasing,
+                      releaseError: releaseError,
+                    ),
             ),
           ),
         ),

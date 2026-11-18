@@ -792,6 +792,91 @@ void main() {
   );
 
   testWidgets(
+    'retirement hides previous results and waits for an explicit release retry',
+    (tester) async {
+      final service = FakeSourceSearch();
+      final retry = Completer<void>();
+      var returned = false;
+      await tester.binding.setSurfaceSize(const Size(360, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final semantics = tester.ensureSemantics();
+      try {
+        await openPage(
+          tester,
+          service,
+          textScaler: TextScaler.linear(2),
+          brightness: Brightness.dark,
+          onExit: (value) => returned = value == false,
+        );
+        await chooseAndSearch(tester, service);
+        service.tasks.single.complete([searchManga('上一会话的作品')]);
+        await tester.pumpAndSettle();
+        expect(find.text('上一会话的作品'), findsOneWidget);
+
+        const reason = '访问验证已失效，请重新登录。';
+        service.reportRetirement((
+          reason: reason,
+          releasing: true,
+          releaseError: null,
+        ));
+        await tester.pump();
+        final back = find.byType(CupertinoNavigationBarBackButton);
+        final releaseRetry = find.byKey(
+          const ValueKey('cross-search-cleanup-retry'),
+        );
+        expect(find.text('正在释放搜索资源').hitTestable(), findsOneWidget);
+        expect(find.text('上一会话的作品'), findsNothing);
+        expect(find.byKey(const ValueKey('cross-search-query')), findsNothing);
+        expect(find.byKey(const ValueKey('cross-search-submit')), findsNothing);
+        expect(releaseRetry, findsNothing);
+        expect(
+          tester
+              .getSemantics(back)
+              .getSemanticsData()
+              .flagsCollection
+              .isEnabled,
+          Tristate.isFalse,
+        );
+
+        service.reportRetirement((
+          reason: reason,
+          releasing: false,
+          releaseError: '搜索资源尚未确认关闭。',
+        ));
+        await tester.pumpAndSettle();
+        expect(find.text(reason), findsOneWidget);
+        expect(find.text('搜索资源尚未确认关闭。'), findsOneWidget);
+        expect(releaseRetry.hitTestable(), findsOneWidget);
+        final stops = service.stops;
+        setAppLifecycleState(tester.binding, AppLifecycleState.inactive);
+        await tester.pump();
+        setAppLifecycleState(tester.binding, AppLifecycleState.resumed);
+        await tester.pump();
+        expect(service.stops, stops);
+        expect(service.closes, 0);
+
+        service.beforeClose = () => retry.future;
+        await tester.tap(releaseRetry);
+        await tester.pump();
+        expect(find.text('正在释放搜索资源'), findsOneWidget);
+        expect(releaseRetry, findsNothing);
+        expect(service.closes, 1);
+        expect(returned, false);
+        retry.complete();
+        await tester.pumpAndSettle();
+        expect(returned, true);
+        expect(service.tasks, hasLength(1));
+        expect(find.byType(CrossSourceSearchPage), findsNothing);
+      } finally {
+        if (!retry.isCompleted) retry.complete();
+        semantics.dispose();
+        await tester.pumpApp(const SizedBox());
+        await tester.pump();
+      }
+    },
+  );
+
+  testWidgets(
     'backgrounding cancels active searches without replay on resume',
     (tester) async {
       final service = FakeSourceSearch();
