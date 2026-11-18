@@ -1,5 +1,7 @@
 # Mihon 参考截图状态机
 
+2026-11-18，Karuyomi跨版本双主题主图现为129/169（76.3%），剩余40个主状态：8个仅单侧、32个双侧均缺。新增仓库10.K4/K7/K9三对，见[正式双主题验收](mihon-cupertino-fidelity.md#仓库预览与操作恢复的正式-web-双主题验收)。这是已登记主状态的历史覆盖，不代表当前HEAD全部像素、变体、转换或PR整体完成率。
+
 2026-11-14，进行中。用户要求截图触及每个 UI 状态，并同时考虑浅色、深色。此表细化[30 组界面矩阵](../design/mihon-cupertino-fidelity.md)，作为参考采集与后续 Cupertino 对照的工作清单。**目前尚无一组完成包含全部转换与变体的双主题验收；绿色只代表该节点的两张主状态参考图已核对。**
 
 ## 记录规则
@@ -1497,7 +1499,7 @@ stateDiagram-v2
     Repositories --> RepositoryDiagnostics: 展开
     RepositoryDiagnostics --> Repositories: 收起
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class Repositories,EmptyRepositoryInput,RepositoryInput,RepositoryError,ConfirmingRepository,RemovingRepository,RepositoryDiagnostics paired
+    class Repositories,EmptyRepositoryInput,RepositoryInput,PreviewingRepository,RepositoryError,ConfirmingRepository,SavingRepository,RemovingRepository,SavingRemoval,RepositoryDiagnostics paired
 ```
 
 | 状态 ID | 最小必要信息                                                         | 浅色正式Web                                                                                        | 深色正式Web                                                                                      |
@@ -1505,15 +1507,17 @@ stateDiagram-v2
 | 10.K1   | 仓库名、地址/状态、默认标记、独立移除、添加/刷新与诊断入口           | `karuyomi-4467ceb-repositories-added-light.jpg`、`karuyomi-4467ceb-repositories-removed-light.jpg` | `karuyomi-4467ceb-repositories-added-dark.jpg`、`karuyomi-4467ceb-repositories-removed-dark.jpg` |
 | 10.K2   | 地址、可选名称、预览与取消                                           | `karuyomi-4467ceb-repositories-input-empty-light.jpg`                                              | `karuyomi-4467ceb-repositories-input-empty-dark.jpg`                                             |
 | 10.K3   | 已填写地址/名称、预览与取消、键盘                                    | `karuyomi-4467ceb-repositories-input-filled-light.jpg`                                             | `karuyomi-4467ceb-repositories-input-filled-dark.jpg`                                            |
-| 10.K4   | 正在预览、列表上下文、编辑禁用且尚未写账户                           | 待                                                                                                 | 待                                                                                               |
+| 10.K4   | 正在预览、列表上下文、编辑禁用且尚未写账户                           | `karuyomi-270db05-repository-phases-formal-repository-preview-active-light.jpg`                    | `karuyomi-270db05-repository-phases-formal-repository-preview-active-dark.jpg`                   |
 | 10.K5   | 具体错误、修改/重试入口和已登记列表                                  | `karuyomi-76309ed-repositories-invalid-light.jpg`                                                  | `karuyomi-76309ed-repositories-invalid-dark.jpg`                                                 |
 | 10.K6   | 解析后的名称/域名/扩展数、明确添加与取消、真实Tab与键盘确认          | `karuyomi-4467ceb-repositories-add-confirm-light.jpg`                                              | `karuyomi-4467ceb-repositories-add-confirm-dark.jpg`                                             |
-| 10.K7   | 原提交对象、等待服务端、禁止新操作                                   | 待                                                                                                 | 待                                                                                               |
+| 10.K7   | 原提交对象、等待服务端、禁止新操作                                   | `karuyomi-270db05-repository-phases-formal-repository-saving-light.jpg`                            | `karuyomi-270db05-repository-phases-formal-repository-saving-dark.jpg`                           |
 | 10.K8   | 待移除对象、影响为空时明确“无”、危险确认与取消、真实Tab/Return/Space | `karuyomi-4467ceb-repositories-remove-confirm-light.jpg`                                           | `karuyomi-4467ceb-repositories-remove-confirm-dark.jpg`                                          |
-| 10.K9   | 待移除对象、未确认状态和恢复入口                                     | 待                                                                                                 | 待                                                                                               |
+| 10.K9   | 待移除对象、未确认状态和恢复入口                                     | `karuyomi-270db05-repository-phases-formal-repository-remove-unknown-light.jpg`                    | `karuyomi-270db05-repository-phases-formal-repository-remove-unknown-dark.jpg`                   |
 | 10.K10  | 仓库完整URL/身份与读取错误、滚动和收起                               | `karuyomi-76309ed-repositories-diagnostics-light.jpg`                                              | `karuyomi-76309ed-repositories-diagnostics-dark.jpg`                                             |
 
-`4467ceb`已实际完成两主题输入→预览→取消/确认添加→列表→取消/确认移除→列表的键盘转换，独立API确认取消不写入，五次明确写入至revision5。此处的主图标记仍不代表预览/保存瞬态、错误恢复、其它变体或整组已验；旧版`1e50a82`浅色确认点击未提交与诊断缺帧继续保留在验证记录。
+`4467ceb`已实际完成两主题输入→预览→取消/确认添加→列表→取消/确认移除→列表的键盘转换，独立API确认取消不写入，五次明确写入至revision5。该批次未取得预览/保存瞬态及错误恢复主图，其它变体与整组验收也未完成；旧版`1e50a82`浅色确认点击未提交与诊断缺帧继续保留在验证记录。
+
+`270db05`正式CI Web与官方Wrangler隔离夹具随后补齐10.K4/K7/K9双主题主图：预览保留完整对象且取消零写入，提交前后分别显示等待确认和目录读取；移除丢确认后的刷新、书架往返及精确重试保留原名称/地址。有效ACK后读取失败只恢复读取，中性原值标题、完整内容末端和确认清除后再次重开均已实看。23组六路完整快照、13个相等区间和114条终态审计核对九次UI原操作、两次零重复重试；40张图包含转场、校验失败及错过时刻的排除项，不当作40个状态。跨版本双主题主图126→129/169（76.3%），详情见[正式双主题验收](mihon-cupertino-fidelity.md#仓库预览与操作恢复的正式-web-双主题验收)。全部变体、真实CAS/身份、禁用辅助语义、Mihon参考和最终像素门仍待。
 
 ```mermaid
 stateDiagram-v2
