@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
+import 'package:karuyomi/features/extensions/extensions_page.dart';
 import 'package:karuyomi/features/search/cross_source_search_page.dart';
 import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -45,8 +46,8 @@ void main() {
         home: Builder(
           builder: (context) => CupertinoPageScaffold(
             child: CupertinoButton(
-              onPressed: () => Navigator.of(context).push<void>(
-                AppPageRoute<void>(
+              onPressed: () => Navigator.of(context).push<bool>(
+                AppPageRoute<bool>(
                   builder: (_) => CrossSourceSearchPage(
                     service: service,
                     onOpen: onOpen ?? (_) async {},
@@ -84,6 +85,69 @@ void main() {
   }
 
   for (final brightness in Brightness.values) {
+    testWidgets(
+      'no available Source opens extension management in $brightness',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final platform = TestPlatform(seedDefaultInstallation: false);
+        final catalog = CatalogController(
+          api: platform,
+          runtime: platform.runtime,
+          rebuildRuntime: platform.rebuild,
+          deploymentOrigin: platform.origin,
+        );
+        try {
+          await catalog.connect();
+          await tester.pumpApp(
+            CupertinoApp(
+              theme: readerAppTheme(brightness),
+              home: CupertinoPageScaffold(
+                child: CatalogPage(
+                  controller: catalog,
+                  onConnect: () {},
+                  onAuthenticate: () {},
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('cross-source-search-open')),
+          );
+          await tester.pumpAndSettle();
+          expect(find.textContaining('没有可选漫画源'), findsOneWidget);
+          final manage = find.widgetWithText(CupertinoButton, '打开扩展管理');
+          expect(manage, findsOneWidget);
+          await tester.ensureVisible(manage);
+          await tester.tap(manage);
+          await tester.pump();
+          // The real search service cancels transport subscriptions before pop.
+          await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+          await tester.pumpAndSettle();
+
+          expect(find.byType(CrossSourceSearchPage), findsNothing);
+          expect(find.byType(ExtensionsPage), findsOneWidget);
+          expect(platform.openedBuilds, isEmpty);
+          expect(
+            platform.businessServer.requests.where(
+              (request) => request.method == 'POST',
+            ),
+            isEmpty,
+          );
+          expect(tester.takeException(), isNull);
+        } finally {
+          await tester.pumpApp(const SizedBox());
+          await tester.pump();
+          catalog.dispose();
+          await catalog.closeReadingProgress();
+          await platform.dispose();
+        }
+      },
+    );
+
     for (final scale in [1.0, 2.0]) {
       testWidgets(
         'source scope uses native sections, complete names and whole-row selection in $brightness at $scale',

@@ -54,14 +54,14 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     if (leftForeground) unawaited(controller.stop());
   }
 
-  Future<void> _leave() async {
+  Future<void> _leave({bool openExtensions = false}) async {
     if (_leaving) return;
     _leaving = true;
     final closed = await controller.close();
     _leaving = false;
     if (!mounted || !closed) return;
     setState(() => _allowPop = true);
-    Navigator.of(context).pop();
+    Navigator.of(context).pop(openExtensions);
   }
 
   Future<void> _open(SourceSearchGroup group, MangaEntry manga) async {
@@ -168,12 +168,19 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                   padding: EdgeInsets.all(16),
                   child: CupertinoActivityIndicator(),
                 )
-              else if (controller.targets.isEmpty)
+              else if (controller.targets.isEmpty) ...[
                 const Padding(
                   padding: EdgeInsets.all(16),
-                  child: Text('没有可选漫画源，请先在扩展管理中安装并启用扩展。'),
-                )
-              else if (visible.isEmpty)
+                  child: Text('没有可选漫画源。请先安装并启用扩展。'),
+                ),
+                if (controller.available)
+                  CupertinoButton(
+                    onPressed: controller.canSelect
+                        ? () => unawaited(_leave(openExtensions: true))
+                        : null,
+                    child: const Text('打开扩展管理'),
+                  ),
+              ] else if (visible.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(16),
                   child: Text('没有符合筛选条件的漫画源。'),
@@ -472,7 +479,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     }, [_scope]);
     useListenable(controller);
     useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
-    return PopScope<void>(
+    return PopScope<bool>(
       canPop: _allowPop,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) unawaited(_leave());

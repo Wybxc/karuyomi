@@ -63,10 +63,17 @@ class const CatalogPage({
     );
   }
 
-  Future<void> _search(BuildContext context) async {
+  Future<void> _search(
+    BuildContext context,
+    VoidCallback openExtensions,
+  ) async {
     final catalog = controller;
     final client = catalog?.library?.client;
     if (catalog == null || client == null || catalog.busy) return;
+    bool currentIdentity() =>
+        context.mounted &&
+        !catalog.accessPaused &&
+        identical(catalog.library?.client, client);
     final CatalogSourceSearch service;
     try {
       service = catalog.createSourceSearch();
@@ -88,16 +95,13 @@ class const CatalogPage({
       );
       return;
     }
-    await Navigator.of(context).push<void>(
+    final manageExtensions = await Navigator.of(context).push<bool>(
       AppPageRoute(
         builder: (_) => CrossSourceSearchPage(
           service: service,
           onOpen: (details) async {
             bool current() =>
-                context.mounted &&
-                !catalog.accessPaused &&
-                identical(catalog.library?.client, client) &&
-                catalog.isCurrentSource(details.source);
+                currentIdentity() && catalog.isCurrentSource(details.source);
             if (!current()) return;
             await Navigator.of(context).push<void>(
               AppPageRoute(
@@ -125,6 +129,7 @@ class const CatalogPage({
         ),
       ),
     );
+    if (manageExtensions == true && currentIdentity()) openExtensions();
   }
 
   @override
@@ -228,7 +233,8 @@ class const CatalogPage({
                       onManage: () => tabs.value = 1,
                       onOpen: (extension, source) =>
                           _open(context, extension, source),
-                      onSearch: () => unawaited(_search(context)),
+                      onSearch: () =>
+                          unawaited(_search(context, () => tabs.value = 1)),
                       onPreferences: (target) =>
                           unawaited(_preferences(context, target)),
                     )
