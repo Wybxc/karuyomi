@@ -60,12 +60,12 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
   Future<void> _leave({bool openExtensions = false}) async {
     if (_leaving || controller.transitioning) return;
     _leaving = true;
-    _closeDestination = openExtensions;
+    final destination = _closeDestination ??= openExtensions;
     final closed = await controller.close();
     _leaving = false;
     if (!mounted || !closed) return;
     setState(() => _allowPop = true);
-    Navigator.of(context).pop(openExtensions);
+    Navigator.of(context).pop(destination);
   }
 
   void _retryCleanup() {
@@ -249,8 +249,9 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     };
     final count = group.mangas.length;
     final loading =
-        group.status == SourceSearchStatus.loading ||
-        group.status == SourceSearchStatus.cancelling;
+        !controller.transitioning &&
+        (group.status == SourceSearchStatus.loading ||
+            group.status == SourceSearchStatus.cancelling);
     final hasAction =
         group.active ||
         group.hasNextPage ||
@@ -442,7 +443,8 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                         child: const Text('停止此源'),
                       ),
                     ),
-                  if (group.status == SourceSearchStatus.cancellationFailed)
+                  if (group.status == SourceSearchStatus.cancellationFailed &&
+                      controller.cleanupError == null)
                     Semantics(
                       enabled: canCancel,
                       child: CupertinoButton(
@@ -526,14 +528,30 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     }, [_scope]);
     useListenable(controller);
     useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
+    final canGoBack = !controller.transitioning && _closeDestination != true;
+    final canStopAll =
+        !controller.transitioning &&
+        !controller.opening &&
+        controller.cleanupError == null &&
+        _closeDestination == null;
     return PopScope<bool>(
       canPop: _allowPop,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) unawaited(_leave());
+        if (!didPop && canGoBack) unawaited(_leave());
       },
       child: CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
-          leading: CupertinoNavigationBarBackButton(onPressed: _leave),
+          leading: Semantics(
+            enabled: canGoBack,
+            child: CupertinoNavigationBarBackButton(
+              color: canGoBack
+                  ? null
+                  : CupertinoColors.tertiaryLabel.resolveFrom(context),
+              onPressed: () {
+                if (canGoBack) unawaited(_leave());
+              },
+            ),
+          ),
           middle: const Text('跨源搜索'),
         ),
         child: SafeArea(
@@ -704,15 +722,15 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                               ),
                             ),
                             if (controller.hasActive)
-                              CupertinoButton(
-                                key: const ValueKey('cross-search-stop'),
-                                onPressed:
-                                    controller.transitioning ||
-                                        controller.opening ||
-                                        _closeDestination != null
-                                    ? null
-                                    : () => unawaited(controller.stop()),
-                                child: const Text('停止全部'),
+                              Semantics(
+                                enabled: canStopAll,
+                                child: CupertinoButton(
+                                  key: const ValueKey('cross-search-stop'),
+                                  onPressed: canStopAll
+                                      ? () => unawaited(controller.stop())
+                                      : null,
+                                  child: const Text('停止全部'),
+                                ),
                               ),
                           ],
                         ),

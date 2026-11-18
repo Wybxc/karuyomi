@@ -693,23 +693,42 @@ void main() {
     'back waits for confirmed cleanup and exposes a retry on failure',
     (tester) async {
       final service = FakeSourceSearch();
+      final firstClose = Completer<void>();
       var attempts = 0;
       service.beforeClose = () async {
-        if (++attempts == 1) throw const FormatException('关闭未确认');
+        if (++attempts == 1) await firstClose.future;
       };
-      await openPage(tester, service);
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
-      await tester.pumpAndSettle();
-      expect(find.byType(CrossSourceSearchPage), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('cross-search-cleanup-error')),
-        findsOneWidget,
-      );
-      expect(find.textContaining('关闭未确认'), findsOneWidget);
-      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
-      await tester.pumpAndSettle();
-      expect(find.byType(CrossSourceSearchPage), findsNothing);
-      expect(find.text('开始'), findsOneWidget);
+      try {
+        await openPage(tester, service);
+        await chooseAndSearch(tester, service);
+        await tester.pump(const Duration(milliseconds: 400));
+        final back = find.byType(CupertinoNavigationBarBackButton);
+        await tester.tap(back);
+        await tester.pump();
+        expect(find.text('正在释放搜索资源'), findsOneWidget);
+        expect(find.textContaining('正在停止'), findsOneWidget);
+        expect(find.textContaining('正在搜索'), findsNothing);
+        expect(find.widgetWithText(CupertinoButton, '停止此源'), findsNothing);
+
+        firstClose.completeError(const FormatException('关闭未确认'));
+        await tester.pumpAndSettle();
+        expect(find.byType(CrossSourceSearchPage), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('cross-search-cleanup-error')),
+          findsOneWidget,
+        );
+        expect(find.text('关闭未确认'), findsOneWidget);
+        expect(find.textContaining('停止尚未确认'), findsOneWidget);
+        expect(find.widgetWithText(CupertinoButton, '重试停止'), findsNothing);
+        await tester.tap(back);
+        await tester.pumpAndSettle();
+        expect(find.byType(CrossSourceSearchPage), findsNothing);
+        expect(find.text('开始'), findsOneWidget);
+      } finally {
+        if (!firstClose.isCompleted) firstClose.complete();
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      }
     },
   );
 

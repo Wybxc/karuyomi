@@ -273,6 +273,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       _ownsSearch &&
       !transitioning &&
       !opening &&
+      cleanupError == null &&
       group._task != null &&
       (group.status == SourceSearchStatus.cancellationFailed ||
           service.available &&
@@ -305,12 +306,35 @@ final class CrossSourceSearchController extends ChangeNotifier {
     }
   }
 
-  Future<bool> stop() async {
-    if (_disposed || transitioning) return false;
+  void _beginCleanup() {
     transitioning = true;
     ++_epoch;
     error = null;
+    cleanupError = null;
+    for (final group in groups.where((group) => group.active)) {
+      group.status = SourceSearchStatus.cancelling;
+      group.error = null;
+      group.errorDetails = null;
+    }
     notifyListeners();
+  }
+
+  void _cleanupFailed(Object failure) {
+    cleanupError =
+        failure is RuntimeException &&
+            failure.code == RuntimeErrorCode.runtimeLost
+        ? '运行时未确认资源释放。'
+        : _message(failure);
+    for (final group in groups) {
+      if (group.status == SourceSearchStatus.cancelling) {
+        group.status = SourceSearchStatus.cancellationFailed;
+      }
+    }
+  }
+
+  Future<bool> stop() async {
+    if (_disposed || transitioning) return false;
+    _beginCleanup();
     try {
       await service.stop();
       if (_disposed) return false;
@@ -326,7 +350,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       cleanupError = null;
       return true;
     } catch (failure) {
-      if (!_disposed) cleanupError = '搜索资源尚未释放：${_message(failure)}';
+      if (!_disposed) _cleanupFailed(failure);
       return false;
     } finally {
       if (!_disposed) {
@@ -373,10 +397,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
   Future<bool> close() async {
     if (_closed) return true;
     if (_disposed || transitioning) return false;
-    transitioning = true;
-    ++_epoch;
-    error = null;
-    notifyListeners();
+    _beginCleanup();
     try {
       await service.close();
       if (_disposed) return false;
@@ -388,7 +409,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       }
       return true;
     } catch (failure) {
-      if (!_disposed) cleanupError = '搜索资源尚未释放：${_message(failure)}';
+      if (!_disposed) _cleanupFailed(failure);
       return false;
     } finally {
       if (!_disposed) {
