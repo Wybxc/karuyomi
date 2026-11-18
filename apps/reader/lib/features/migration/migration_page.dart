@@ -417,6 +417,81 @@ class _MigrationPageState extends State<MigrationPage> {
     );
   }
 
+  Widget _readButton({
+    required String id,
+    required String label,
+    required bool enabled,
+    required VoidCallback read,
+  }) => Semantics(
+    container: true,
+    enabled: enabled,
+    child: CupertinoButton(
+      key: ValueKey(id),
+      alignment: AlignmentDirectional.centerStart,
+      onPressed: enabled ? read : null,
+      child: Text(label),
+    ),
+  );
+
+  Widget _operationFeedback(BuildContext context) =>
+      CupertinoFormSection.insetGrouped(
+        header: Text(controller.operationLabel),
+        children: [
+          if (controller.targetReadContext case final target?)
+            CupertinoFormRow(child: Text(target)),
+          if (controller.busy)
+            Semantics(
+              container: true,
+              liveRegion: true,
+              child: CupertinoFormRow(
+                prefix: Expanded(child: Text('正在${controller.operationLabel}')),
+                child: const CupertinoActivityIndicator(),
+              ),
+            ),
+          if (controller.error case final value?)
+            CupertinoFormRow(
+              child: Semantics(
+                container: true,
+                liveRegion: true,
+                child: Text(
+                  value,
+                  key: const ValueKey('migration-error'),
+                  style: TextStyle(color: AppColors.error.resolveFrom(context)),
+                ),
+              ),
+            ),
+          if (controller.targetRetryLabel case final retry?)
+            _readButton(
+              id: 'migration-retry-target',
+              label: retry,
+              enabled: controller.canChange,
+              read: () => unawaited(controller.retryTargetRead()),
+            ),
+        ],
+      );
+
+  Widget _contentWithTargetFeedback({
+    required bool pinFeedback,
+    required Widget child,
+  }) => SafeArea(
+    child: LayoutBuilder(
+      builder: (context, constraints) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (pinFeedback)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: constraints.maxHeight / 2),
+              child: SingleChildScrollView(
+                primary: false,
+                child: _operationFeedback(context),
+              ),
+            ),
+          Expanded(child: child),
+        ],
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     _search = useTextEditingController(text: widget.seed.metadata.manga.title);
@@ -425,13 +500,15 @@ class _MigrationPageState extends State<MigrationPage> {
     final available = controller.available;
     final pending = controller.pending;
     final selectedKey = controller.selectedSource?.key;
+    final pinFeedback = available && controller.hasTargetReadFeedback;
     final target =
         pending?.request.migrateFrom.targetMetadata ??
         controller.targetMetadata;
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background.resolveFrom(context),
       navigationBar: CupertinoNavigationBar(middle: const Text('迁移到其他漫画源')),
-      child: SafeArea(
+      child: _contentWithTargetFeedback(
+        pinFeedback: pinFeedback,
         child: ListView(
           // The retired view has its own scroll position from the first frame.
           key: ValueKey(available),
@@ -457,37 +534,8 @@ class _MigrationPageState extends State<MigrationPage> {
                 ],
               )
             else ...[
-              if (controller.busy || controller.error != null)
-                CupertinoFormSection.insetGrouped(
-                  header: Text(controller.operationLabel),
-                  children: [
-                    if (controller.busy)
-                      Semantics(
-                        container: true,
-                        liveRegion: true,
-                        child: CupertinoFormRow(
-                          prefix: Expanded(
-                            child: Text('正在${controller.operationLabel}'),
-                          ),
-                          child: const CupertinoActivityIndicator(),
-                        ),
-                      ),
-                    if (controller.error case final value?)
-                      CupertinoFormRow(
-                        child: Semantics(
-                          container: true,
-                          liveRegion: true,
-                          child: Text(
-                            value,
-                            key: const ValueKey('migration-error'),
-                            style: TextStyle(
-                              color: AppColors.error.resolveFrom(context),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+              if (!pinFeedback && (controller.busy || controller.error != null))
+                _operationFeedback(context),
               CupertinoFormSection.insetGrouped(
                 header: const Text('原作品'),
                 footer: Text(
@@ -513,21 +561,17 @@ class _MigrationPageState extends State<MigrationPage> {
                   if (!controller.completed &&
                       pending == null &&
                       controller.selectedSource == null) ...[
-                    CupertinoButton(
-                      key: const ValueKey('migration-load-source'),
-                      alignment: AlignmentDirectional.centerStart,
-                      onPressed: controller.canChange
-                          ? () => unawaited(controller.readOriginalChapters())
-                          : null,
-                      child: const Text('读取原漫画源章节'),
+                    _readButton(
+                      id: 'migration-load-source',
+                      label: '读取原漫画源章节',
+                      enabled: controller.canChange,
+                      read: () => unawaited(controller.readOriginalChapters()),
                     ),
-                    CupertinoButton(
-                      key: const ValueKey('migration-categories-only'),
-                      alignment: AlignmentDirectional.centerStart,
-                      onPressed: controller.canChange
-                          ? controller.chooseCategoriesOnly
-                          : null,
-                      child: const Text('仅迁移收藏和分类'),
+                    _readButton(
+                      id: 'migration-categories-only',
+                      label: '仅迁移收藏和分类',
+                      enabled: controller.canChange,
+                      read: controller.chooseCategoriesOnly,
                     ),
                   ],
                 ],
@@ -652,13 +696,11 @@ class _MigrationPageState extends State<MigrationPage> {
                             }
                           : null,
                     ),
-                    CupertinoButton(
-                      key: const ValueKey('migration-refresh-sources'),
-                      alignment: AlignmentDirectional.centerStart,
-                      onPressed: !controller.busy
-                          ? () => unawaited(controller.refreshSources())
-                          : null,
-                      child: const Text('重新读取可用漫画源（只读）'),
+                    _readButton(
+                      id: 'migration-refresh-sources',
+                      label: '重新读取可用漫画源（只读）',
+                      enabled: !controller.busy,
+                      read: () => unawaited(controller.refreshSources()),
                     ),
                   ],
                 ),
@@ -678,21 +720,17 @@ class _MigrationPageState extends State<MigrationPage> {
                           decoration: null,
                         ),
                       ),
-                      CupertinoButton(
-                        key: const ValueKey('migration-search-submit'),
-                        alignment: AlignmentDirectional.centerStart,
-                        onPressed: controller.canChange
-                            ? () => unawaited(controller.search(_search.text))
-                            : null,
-                        child: const Text('搜索'),
+                      _readButton(
+                        id: 'migration-search-submit',
+                        label: '搜索',
+                        enabled: controller.canChange,
+                        read: () => unawaited(controller.search(_search.text)),
                       ),
-                      CupertinoButton(
-                        key: const ValueKey('migration-popular'),
-                        alignment: AlignmentDirectional.centerStart,
-                        onPressed: controller.canChange
-                            ? () => unawaited(controller.browsePopular())
-                            : null,
-                        child: const Text('浏览目标源热门作品'),
+                      _readButton(
+                        id: 'migration-popular',
+                        label: '浏览目标源热门作品',
+                        enabled: controller.canChange,
+                        read: () => unawaited(controller.browsePopular()),
                       ),
                     ],
                   ),
@@ -710,46 +748,47 @@ class _MigrationPageState extends State<MigrationPage> {
                         index < controller.results.length;
                         index++
                       )
-                        SizedBox(
-                          width: double.infinity,
-                          child: CupertinoButton(
-                            key: ValueKey(('migration-result', index)),
-                            alignment: AlignmentDirectional.centerStart,
-                            onPressed: controller.canChange
-                                ? () {
-                                    _mappingPage = 0;
-                                    unawaited(
-                                      controller.chooseManga(
-                                        controller.results[index],
-                                      ),
-                                    );
-                                  }
-                                : null,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(controller.results[index].title),
-                                Text(
-                                  controller.results[index].url,
-                                  style: TextStyle(
-                                    color: AppColors.secondaryLabel.resolveFrom(
-                                      context,
+                        Semantics(
+                          container: true,
+                          enabled: controller.canChange,
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: CupertinoButton(
+                              key: ValueKey(('migration-result', index)),
+                              alignment: AlignmentDirectional.centerStart,
+                              onPressed: controller.canChange
+                                  ? () {
+                                      _mappingPage = 0;
+                                      unawaited(
+                                        controller.chooseManga(
+                                          controller.results[index],
+                                        ),
+                                      );
+                                    }
+                                  : null,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(controller.results[index].title),
+                                  Text(
+                                    controller.results[index].url,
+                                    style: TextStyle(
+                                      color: AppColors.secondaryLabel
+                                          .resolveFrom(context),
+                                      fontSize: 13,
                                     ),
-                                    fontSize: 13,
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       if (controller.hasNextPage)
-                        CupertinoButton(
-                          key: const ValueKey('migration-search-more'),
-                          alignment: AlignmentDirectional.centerStart,
-                          onPressed: controller.canChange
-                              ? () => unawaited(controller.loadMore())
-                              : null,
-                          child: const Text('加载更多目标结果'),
+                        _readButton(
+                          id: 'migration-search-more',
+                          label: '加载更多目标结果',
+                          enabled: controller.canChange,
+                          read: () => unawaited(controller.loadMore()),
                         ),
                     ],
                   ),

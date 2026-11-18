@@ -14,6 +14,7 @@ import {
 } from '@karuyomi/protocol';
 
 import { filterAcceptanceControl } from './acceptance-filters.js';
+import { migrationAcceptanceControl } from './acceptance-migration.js';
 
 interface BrowserRuntime {
   control(input: unknown): Promise<ControlResponseJson>;
@@ -35,6 +36,23 @@ if (profile === 'filters') {
   browser.karuyomiRuntime = {
     ...host,
     control: filterAcceptanceControl((input) => host.control(input), outcome),
+  };
+}
+
+if (profile === 'migration') {
+  const parameters = new URLSearchParams(location.search);
+  const rejectBuild = parameters.get('migration-reject-build');
+  const listingSource = parameters.get('migration-listing-source');
+  if (!rejectBuild || !listingSource) {
+    throw new Error('Migration acceptance requires exact fixture targets');
+  }
+  browser.karuyomiRuntime = {
+    ...host,
+    control: migrationAcceptanceControl(
+      (input) => host.control(input),
+      rejectBuild,
+      listingSource,
+    ),
   };
 }
 

@@ -2,6 +2,7 @@ import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/rendering.dart';
@@ -227,6 +228,40 @@ void main() {
     await controller.refreshSources();
     expect(controller.notice, notice);
     expect(platform.businessServer.requests, hasLength(requests));
+  });
+
+  test('a failed target open preserves the listing and can reopen the selected source for its next page', () async {
+    await controller.refreshSources();
+    final target = controller.sources.single;
+    await controller.chooseSource(target);
+    await controller.search('原查询');
+    final oldResults = controller.results;
+    final writes = posts().length;
+    platform.businessServer.beforeRequest = (request) =>
+        request.method == 'GET' &&
+            request.uri.path == '/api/source-preferences/packages/$_package'
+        ? const ApiReply(
+            status: 503,
+            redirected: false,
+            headers: {'content-type': 'text/plain'},
+            body: 'Injected read failure',
+          )
+        : null;
+    await controller.chooseSource(target);
+    expect(controller.error, isNotNull);
+    expect(controller.selectedSource, same(target));
+    expect(controller.results, same(oldResults));
+    expect(catalog.session, isNull);
+    platform.businessServer.beforeRequest = null;
+
+    await controller.loadMore();
+    expect(controller.error, isNull);
+    expect(controller.results, hasLength(2));
+    final searches = platform.invocations.where((call) => call.hasSearch());
+    expect(searches.map((call) => call.search.page), [1, 2]);
+    expect(searches.every((call) => call.search.query == '原查询'), isTrue);
+    expect(searches.every((call) => call.sourceId == _targetId), isTrue);
+    expect(posts(), hasLength(writes));
   });
 
   test('lost ACK survives closing the wizard and only explicit retry resends its original body', () async {
@@ -1142,6 +1177,93 @@ void main() {
   );
 
   testWidgets(
+    'failed pagination keeps the original query and exposes an exact retry at the bottom of a long listing',
+    (tester) async {
+      var failed = false;
+      platform.invokeHandler = (call) async {
+        if (call.search.page == 2 && !failed) {
+          failed = true;
+          throw const RuntimeException(
+            RuntimeErrorCode.sourceError,
+            'next page temporarily unavailable',
+          );
+        }
+        return wire.SourceResult(
+          mangaPage: wire.MangaPage(
+            mangas: call.search.page == 1
+                ? [
+                    for (var index = 0; index < 18; index++)
+                      wire.Manga(url: '/first-$index', title: '候选 $index'),
+                  ]
+                : [wire.Manga(url: '/second', title: '第二页作品')],
+            hasNextPage: call.search.page == 1,
+          ),
+        );
+      };
+      await tester.binding.setSurfaceSize(const Size(360, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpApp(
+        CupertinoApp(
+          home: MigrationPage(
+            catalog: catalog,
+            client: catalog.library!.client,
+            seed: seed,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final before = posts().length;
+      await tester.tap(find.byKey(const ValueKey('migration-source')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('目标源 · zh · eu.kanade.source.test').last);
+      await tester.pumpAndSettle();
+      final search = find.byKey(const ValueKey('migration-search'));
+      await tester.enterText(search, '原查询');
+      await tester.tap(find.byKey(const ValueKey('migration-search-submit')));
+      await tester.pumpAndSettle();
+      await tester.enterText(search, '新草稿');
+      tester.testTextInput.hide();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final more = find.byKey(const ValueKey('migration-search-more'));
+      final scrollable = find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(more, 280, scrollable: scrollable);
+      await tester.ensureVisible(more);
+      await tester.pumpAndSettle();
+      expect(more.hitTestable(), findsOneWidget);
+      await tester.tap(more);
+      await tester.pumpAndSettle();
+      expect(failed, isTrue);
+      final error = find.byKey(const ValueKey('migration-error'));
+      expect(error.hitTestable(), findsOneWidget);
+      expect(find.text('加载更多“原查询”的搜索结果'), findsOneWidget);
+      expect(find.text('目标源 · zh · 第 2 页'), findsOneWidget);
+      expect(find.text('候选 17'), findsOneWidget);
+      final retry = find.text('重试读取第 2 页');
+      expect(retry.hitTestable(), findsOneWidget);
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      final calls = platform.invocations.where((call) => call.hasSearch());
+      expect(calls.map((call) => call.search.page), [1, 2, 2]);
+      expect(calls.every((call) => call.search.query == '原查询'), isTrue);
+      await tester.scrollUntilVisible(
+        find.text('第二页作品'),
+        250,
+        scrollable: scrollable,
+      );
+      expect(retry, findsNothing);
+      expect(posts(), hasLength(before));
+      await tester.pumpApp(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'wizard browses a target without search results and filters marks before confirmation',
     (tester) async {
       final normal = platform.invokeHandler!;
@@ -1199,6 +1321,27 @@ void main() {
         await tester.ensureVisible(find.byType(CupertinoActivityIndicator));
         await tester.pump();
         expect(find.text('正在浏览目标源热门作品'), findsOneWidget);
+        final semantics = tester.ensureSemantics();
+        try {
+          await tester.pump();
+          for (final id in [
+            'migration-refresh-sources',
+            'migration-search-submit',
+            'migration-popular',
+          ]) {
+            final button = find.byKey(ValueKey(id));
+            expect(
+              tester
+                  .getSemantics(button)
+                  .getSemanticsData()
+                  .flagsCollection
+                  .isEnabled,
+              Tristate.isFalse,
+            );
+          }
+        } finally {
+          semantics.dispose();
+        }
         expect(posts(), hasLength(before));
       } finally {
         release.complete();
