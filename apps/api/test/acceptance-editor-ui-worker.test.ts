@@ -6,6 +6,8 @@ import {
   categoryMutationResponseSchema,
   settingsMutationResponseSchema,
   settingsResponseSchema,
+  sourcePreferencesMutationResponseSchema,
+  sourcePreferencesResponseSchema,
   mangaStateResponseSchema,
   stateMutationResponseSchema,
 } from '@karuyomi/contracts';
@@ -16,6 +18,7 @@ import {
   LibraryMetadataSchema,
   ReaderMode,
   SettingsMutationSchema,
+  SourcePreferencesMutationSchema,
   StateMutationSchema,
 } from '@karuyomi/protocol';
 import { applyD1Migrations, createExecutionContext } from 'cloudflare:test';
@@ -109,6 +112,79 @@ async function snapshot() {
   expect(reply.status).toBe(200);
   return settingsResponseSchema.parse(await reply.json());
 }
+
+const preferencePackage = 'eu.kanade.tachiyomi.extension.zh.komiic';
+const preferenceCatalog = {
+  catalogUrl: origin + '/extensions/index.json',
+  repoId: 'keiyoushi',
+};
+const preferencePath = '/api/source-preferences/packages/' + preferencePackage;
+const preferenceRead =
+  preferencePath + '?' + new URLSearchParams(preferenceCatalog);
+const preferenceWrite = '/api/source-preferences/mutations';
+
+test('Source preferences confirm a real write before faulting only its canonical read', async () => {
+  const mutation = create(SourcePreferencesMutationSchema, {
+    schemaVersion: businessSchemaVersion,
+    mutationId: crypto.randomUUID(),
+    catalog: preferenceCatalog,
+    packageName: preferencePackage,
+    sourceId: '792932060924485302',
+    expectedRevision: 0,
+    entries: [
+      {
+        key: 'preferred_mirror',
+        value: { value: { case: 'text', value: '1' } },
+      },
+    ],
+  });
+  const body = toJsonString(SourcePreferencesMutationSchema, mutation);
+  await setEditorUiMode(env.DB, 'confirm-read-failure', 'preferences');
+  const reply = await request(preferenceWrite, body);
+  expect(reply.status).toBe(200);
+  const ack = sourcePreferencesMutationResponseSchema.parse(await reply.json());
+  expect(ack.mutationId).toBe(mutation.mutationId);
+  expect(ack.preferences?.revision).toBe(1);
+  expect(ack.preferences?.entries).toEqual(mutation.entries);
+  expect((await request(preferenceRead)).status).toBe(503);
+  expect((await request(preferenceRead + '&unrelated=1')).status).toBe(200);
+  expect((await request('/api/settings')).status).toBe(200);
+  const independent = sourcePreferencesResponseSchema.parse(
+    await (await request(preferenceRead, undefined, false)).json(),
+  );
+  expect(independent.sources).toEqual([ack.preferences]);
+  await setEditorUiMode(env.DB, 'pass', 'preferences');
+  const readBack = sourcePreferencesResponseSchema.parse(
+    await (await request(preferenceRead)).json(),
+  );
+  expect(readBack).toEqual(independent);
+  const audit = (await editorUiAttempts(env.DB)).filter((row) =>
+    row.path.startsWith('/api/source-preferences/'),
+  );
+  expect(audit).toEqual([
+    expect.objectContaining({
+      method: 'POST',
+      body,
+      mode: 'confirm-read-failure',
+      worker_status: 200,
+      client_status: 200,
+    }),
+    expect.objectContaining({
+      method: 'GET',
+      body: null,
+      mode: 'fail-read',
+      worker_status: null,
+      client_status: 503,
+    }),
+    expect.objectContaining({
+      method: 'GET',
+      body: null,
+      mode: 'pass',
+      worker_status: 200,
+      client_status: 200,
+    }),
+  ]);
+}, 15_000);
 
 const coverPath = '/api/state/manga/' + mangaKey;
 const image = Uint8Array.from(

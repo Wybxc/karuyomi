@@ -39,7 +39,7 @@ setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主�
 
 编辑基线必须是该 Source 构造时注入的 revision/entries。打开设置页先 GET；若与构造基线不同，先重开 Source 再取描述，不能把旧 runtime 的值套到新 revision 上。编辑后只上传 snapshot.syncValues；sessionValues 在当前部署/身份会话内按 catalog URL、repoId、package 和 Source 隔离保留，供确认后重开注入。
 
-业务响应丢失时保留冻结的 UUID、body 和 CAS，显式重试只重发这份业务请求，不重跑插件回调。收到旧幂等 ACK 后再次 GET 整包再重开，不能用旧 ACK 回退 runtime 基线。只读刷新不重放 pending；冲突、显式放弃或未知运行结果都读取当前 D1 后重开。关闭表单、切换 Source/包/身份/部署及迟到结果不能复活旧草稿；切换身份/部署清空客户端秘密值；同包换仓不能注入原仓秘密、D1 值或可变存储。额外仓库边界见[设计](additional-repositories.md)。
+业务响应丢失时保留冻结的 UUID、body 和 CAS。显式重试重发这份业务请求，插件回调仍只执行原编辑一次。校验 ACK 的身份、版本和提交值后，在原会话保存确认，随后的失败恢复只 GET 整包。读回校验确认版本并采用当前 D1 数据，再重开运行容器。未确认和已确认的恢复均可查看本次提交的同步值。冲突、显式放弃或未知运行结果可读取 D1 当前状态后重开。关闭表单、切换 Source/包/身份/部署及迟到结果不能复活旧草稿。切换身份/部署清空客户端秘密值。同包换仓的 Session、D1 值和可变存储按仓库隔离。额外仓库边界见[设计](additional-repositories.md)。
 
 ## 统一限额
 

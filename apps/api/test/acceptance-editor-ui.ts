@@ -3,12 +3,14 @@ import {
   businessSchemaVersion,
   categoryMutationSchema,
   settingsMutationSchema,
+  sourcePreferencesMutationSchema,
   stateMutationSchema,
 } from '@karuyomi/contracts';
 import {
   BusinessStateErrorCode,
   CategoryMutationResponseSchema,
   SettingsMutationResponseSchema,
+  SourcePreferencesMutationResponseSchema,
   StateMutationResponseSchema,
 } from '@karuyomi/protocol';
 
@@ -28,14 +30,17 @@ const modes = [
   'access-denied',
 ] as const;
 type EditorUiMode = (typeof modes)[number];
-type EditorUiScope =
-  | 'manga'
-  | 'global'
-  | 'cover'
-  | 'migration'
-  | 'connection'
-  | 'categories'
-  | 'classification';
+export const editorUiScopes = [
+  'manga',
+  'global',
+  'cover',
+  'migration',
+  'connection',
+  'categories',
+  'classification',
+  'preferences',
+] as const;
+type EditorUiScope = (typeof editorUiScopes)[number];
 interface Control {
   mode: EditorUiMode;
   scope: EditorUiScope;
@@ -66,16 +71,10 @@ export async function setEditorUiMode(
 ) {
   if (
     !modes.some((value) => value === mode) ||
-    (scope !== 'manga' &&
-      scope !== 'global' &&
-      scope !== 'cover' &&
-      scope !== 'migration' &&
-      scope !== 'connection' &&
-      scope !== 'categories' &&
-      scope !== 'classification')
+    !editorUiScopes.some((value) => value === scope)
   ) {
     throw new Error(
-      'Expected an editor UI mode and manga/global/cover/migration/connection/categories/classification scope',
+      'Expected an editor UI mode and ' + editorUiScopes.join('/') + ' scope',
     );
   }
   await db
@@ -141,10 +140,19 @@ export async function withEditorUi(
   dispatch: () => Promise<Response>,
 ): Promise<Response> {
   const url = new URL(request.url);
+  const defaultCatalog = origin + '/extensions/index.json';
+  const preferencesReading =
+    request.method === 'GET' &&
+    /^\/api\/source-preferences\/packages\/[a-zA-Z0-9._-]{1,200}$/.test(
+      url.pathname,
+    ) &&
+    url.searchParams.size === 2 &&
+    url.searchParams.get('catalogUrl') === defaultCatalog &&
+    !!url.searchParams.get('repoId');
   if (
     url.origin !== origin ||
     url.hostname !== '127.0.0.1' ||
-    url.search !== ''
+    (url.search !== '' && !preferencesReading)
   )
     return dispatch();
   const bootstrapReading =
@@ -160,6 +168,9 @@ export async function withEditorUi(
     request.method === 'GET' && url.pathname.startsWith('/api/covers/');
   const settingsSaving =
     request.method === 'POST' && url.pathname === '/api/settings/mutations';
+  const preferencesSaving =
+    request.method === 'POST' &&
+    url.pathname === '/api/source-preferences/mutations';
   const categoriesReading =
     request.method === 'GET' && url.pathname === '/api/categories';
   const libraryReading =
@@ -174,6 +185,8 @@ export async function withEditorUi(
     !mangaReading &&
     !coverImage &&
     !settingsSaving &&
+    !preferencesReading &&
+    !preferencesSaving &&
     !categoriesReading &&
     !libraryReading &&
     !categoriesSaving &&
@@ -189,6 +202,14 @@ export async function withEditorUi(
   const categoryCommand = categoriesSaving
     ? categoryMutationSchema.parse(await readJson(request.clone()))
     : undefined;
+  const preferencesCommand = preferencesSaving
+    ? sourcePreferencesMutationSchema.parse(await readJson(request.clone()))
+    : undefined;
+  if (
+    preferencesCommand &&
+    preferencesCommand.catalog?.catalogUrl !== defaultCatalog
+  )
+    return dispatch();
   const classificationSaving = stateCommand?.operation.case === 'setCategories';
   // Audit bounded JSON state commands, including progress, while faulting only
   // cover clears, migration and classification. Multipart upload stays real.
@@ -198,7 +219,8 @@ export async function withEditorUi(
     stateCommand.operation.case !== 'migrateFrom' &&
     (stateCommand.operation.case !== 'setCustomCover' ||
       stateCommand.operation.value.cover !== undefined);
-  const command = settingsCommand ?? stateCommand ?? categoryCommand;
+  const command =
+    settingsCommand ?? stateCommand ?? categoryCommand ?? preferencesCommand;
   const control = await readControl(db);
   if (
     libraryReading &&
@@ -219,6 +241,7 @@ export async function withEditorUi(
   )
     scope = 'classification';
   else if (bootstrapReading) scope = 'connection';
+  else if (preferencesReading || preferencesCommand) scope = 'preferences';
   else if (
     stateCommand?.operation.case === 'migrateFrom' ||
     (mangaReading && control.scope === 'migration')
@@ -235,6 +258,7 @@ export async function withEditorUi(
   const reading =
     bootstrapReading ||
     settingsReading ||
+    preferencesReading ||
     mangaReading ||
     categoriesReading ||
     libraryReading;
@@ -285,10 +309,18 @@ export async function withEditorUi(
               StateMutationResponseSchema,
               create(StateMutationResponseSchema, rejection),
             )
-          : toJsonString(
-              SettingsMutationResponseSchema,
-              create(SettingsMutationResponseSchema, rejection),
-            ),
+          : preferencesCommand
+            ? toJsonString(
+                SourcePreferencesMutationResponseSchema,
+                create(SourcePreferencesMutationResponseSchema, {
+                  ...rejection,
+                  catalog: preferencesCommand.catalog,
+                }),
+              )
+            : toJsonString(
+                SettingsMutationResponseSchema,
+                create(SettingsMutationResponseSchema, rejection),
+              ),
       { status: 400, headers: { 'Content-Type': 'application/json' } },
     );
   } else {

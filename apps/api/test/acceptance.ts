@@ -39,6 +39,7 @@ import {
   prepareEditorUi,
   setEditorUiMode,
   editorUiAttempts,
+  editorUiScopes,
 } from './acceptance-editor-ui.ts';
 
 const keys = await generateKeyPair('RS256', { extractable: true });
@@ -236,7 +237,9 @@ try {
       }
     } else if (editorUi) {
       console.log(
-        'Use editor <mode> [manga|global|cover|migration|connection|categories|classification] to control faults, audit to inspect exact requests, or stop to close the server.',
+        'Use editor <mode> [' +
+          editorUiScopes.join('|') +
+          '] to control faults, audit to inspect exact requests, or stop to close the server.',
       );
     } else {
       console.log(

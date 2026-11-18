@@ -136,6 +136,7 @@ final class _PendingSourcePreferencesMutation {
   final String fingerprint;
   final wire.SourcePreferencesMutation request;
   final String body;
+  wire.SourcePreferencesMutationResponse? confirmation;
   BusinessStateException? rejection;
 }
 
@@ -1559,7 +1560,7 @@ final class BusinessStateClient {
     return current;
   }
 
-  ({wire.SourcePreferencesMutation request, bool retryable})?
+  ({wire.SourcePreferencesMutation request, bool retryable, bool acknowledged})?
   pendingSourcePreferences(
     String packageName,
     String sourceId, {
@@ -1574,7 +1575,11 @@ final class BusinessStateClient {
         )];
     return pending == null
         ? null
-        : (request: pending.request, retryable: pending.rejection == null);
+        : (
+            request: pending.request,
+            retryable: pending.rejection == null,
+            acknowledged: pending.confirmation != null,
+          );
   }
 
   bool hasPendingSourcePreferences(
@@ -1609,6 +1614,7 @@ final class BusinessStateClient {
     required wire.CatalogReference catalog,
     bool clearRejected = false,
   }) async {
+    readAttempts:
     for (var attempt = 0; attempt < 3; attempt++) {
       final reply = await _get(
         Uri(
@@ -1648,6 +1654,33 @@ final class BusinessStateClient {
         }
       }
       if (stale) continue;
+      for (final pending in _pendingSourcePreferences.values) {
+        final confirmation = pending.confirmation;
+        if (confirmation == null ||
+            pending.request.catalog != catalog ||
+            pending.request.packageName != packageName) {
+          continue;
+        }
+        final source = value.sources
+            .where((source) => source.sourceId == pending.request.sourceId)
+            .firstOrNull;
+        if (source == null ||
+            source.revision < confirmation.preferences.revision) {
+          continue readAttempts;
+        }
+        // The server can project different keys when the permitted rules change.
+        if (source.revision == confirmation.preferences.revision &&
+            const ListEquality<wire.PreferenceSyncRule>().equals(
+              value.syncRules,
+              confirmation.syncRules,
+            ) &&
+            !samePreferenceEntries(
+              source.entries,
+              confirmation.preferences.entries,
+            )) {
+          throw const FormatException('Source settings read differs from ACK');
+        }
+      }
       _ensureOpen();
       final confirmed = value.deepCopy()..freeze();
       _sourcePreferences[_sourcePreferenceScope(catalog, packageName)] =
@@ -1667,8 +1700,9 @@ final class BusinessStateClient {
   }
 
   Future<wire.SourcePreferencesResponse> mutateSourcePreferences(
-    wire.SourcePreferencesMutation operation,
-  ) {
+    wire.SourcePreferencesMutation operation, {
+    void Function()? onAcknowledged,
+  }) {
     final command = operation.deepCopy()
       ..schemaVersion = _schemaVersion
       ..clearMutationId();
@@ -1696,7 +1730,10 @@ final class BusinessStateClient {
           if (previous.fingerprint != fingerprint) {
             throw StateError('请先处理这个漫画源未确认的原设置操作。');
           }
-          return _sendSourcePreferences(previous);
+          return _sendSourcePreferences(
+            previous,
+            onAcknowledged: onAcknowledged,
+          );
         }
         command.mutationId = _uuid.v4();
         final body = jsonEncode(
@@ -1709,7 +1746,7 @@ final class BusinessStateClient {
           body,
         );
         _pendingSourcePreferences[key] = pending;
-        return _sendSourcePreferences(pending);
+        return _sendSourcePreferences(pending, onAcknowledged: onAcknowledged);
       },
     );
   }
@@ -1718,6 +1755,7 @@ final class BusinessStateClient {
     String packageName,
     String sourceId, {
     required wire.CatalogReference catalog,
+    void Function()? onAcknowledged,
   }) => _serial(
     'source-preferences:${_sourcePreferenceScope(catalog, packageName)}',
     () {
@@ -1728,7 +1766,7 @@ final class BusinessStateClient {
             sourceId,
           )];
       if (pending == null) throw StateError('没有待确认的原漫画源设置。');
-      return _sendSourcePreferences(pending);
+      return _sendSourcePreferences(pending, onAcknowledged: onAcknowledged);
     },
   );
 
@@ -1751,55 +1789,67 @@ final class BusinessStateClient {
   );
 
   Future<wire.SourcePreferencesResponse> _sendSourcePreferences(
-    _PendingSourcePreferencesMutation pending,
-  ) async {
+    _PendingSourcePreferencesMutation pending, {
+    void Function()? onAcknowledged,
+  }) async {
     _ensureOpen();
     if (pending.rejection != null) throw pending.rejection!;
-    final reply = await api.fetchApi(
-      '/api/source-preferences/mutations',
-      method: 'POST',
-      headers: {..._headers, 'Content-Type': 'application/json'},
-      body: pending.body,
-    );
+    var value = pending.confirmation;
+    if (value == null) {
+      final reply = await api.fetchApi(
+        '/api/source-preferences/mutations',
+        method: 'POST',
+        headers: {..._headers, 'Content-Type': 'application/json'},
+        body: pending.body,
+      );
+      _ensureOpen();
+      _budget(reply);
+      value = wire.decodeProtoJson(
+        wire.SourcePreferencesMutationResponse(),
+        jsonDecode(reply.body),
+        maxBytes: 128 * 1024,
+      );
+      _version(value.schemaVersion);
+      if (!value.hasCatalog() || value.catalog != pending.request.catalog) {
+        throw const FormatException('Source settings ACK repository mismatch');
+      }
+      validateBusinessRevision(value.accountRevision);
+      wire.validatePreferenceSyncRules(value.syncRules);
+      if (value.mutationId != pending.request.mutationId &&
+          (!value.hasError() || value.mutationId.isNotEmpty)) {
+        throw const FormatException(
+          'Source settings mutation identity mismatch',
+        );
+      }
+      if (value.hasError()) {
+        final failure = BusinessStateException(value.error);
+        if (!value.error.retryable) pending.rejection = failure;
+        throw failure;
+      }
+      _success(reply);
+      if (!value.hasPreferences()) {
+        throw const FormatException(
+          'Source settings ACK has no confirmed values',
+        );
+      }
+      validateSourcePreferences(value.preferences, pending.request.packageName);
+      if (value.preferences.sourceId != pending.request.sourceId ||
+          value.preferences.revision != pending.request.expectedRevision + 1 ||
+          !samePreferenceEntries(
+            value.preferences.entries,
+            pending.request.entries,
+          )) {
+        throw const FormatException(
+          'Source settings ACK differs from submitted values',
+        );
+      }
+      pending.confirmation = value..freeze();
+    }
+    if (value.accountRevision > _accountRevision) {
+      _accountRevision = value.accountRevision;
+    }
+    onAcknowledged?.call();
     _ensureOpen();
-    _budget(reply);
-    final value = wire.decodeProtoJson(
-      wire.SourcePreferencesMutationResponse(),
-      jsonDecode(reply.body),
-      maxBytes: 128 * 1024,
-    );
-    _version(value.schemaVersion);
-    if (!value.hasCatalog() || value.catalog != pending.request.catalog) {
-      throw const FormatException('Source settings ACK repository mismatch');
-    }
-    validateBusinessRevision(value.accountRevision);
-    wire.validatePreferenceSyncRules(value.syncRules);
-    if (value.mutationId != pending.request.mutationId &&
-        (!value.hasError() || value.mutationId.isNotEmpty)) {
-      throw const FormatException('Source settings mutation identity mismatch');
-    }
-    if (value.hasError()) {
-      final failure = BusinessStateException(value.error);
-      if (!value.error.retryable) pending.rejection = failure;
-      throw failure;
-    }
-    _success(reply);
-    if (!value.hasPreferences()) {
-      throw const FormatException(
-        'Source settings ACK has no confirmed values',
-      );
-    }
-    validateSourcePreferences(value.preferences, pending.request.packageName);
-    if (value.preferences.sourceId != pending.request.sourceId ||
-        value.preferences.revision != pending.request.expectedRevision + 1 ||
-        !samePreferenceEntries(
-          value.preferences.entries,
-          pending.request.entries,
-        )) {
-      throw const FormatException(
-        'Source settings ACK differs from submitted values',
-      );
-    }
     final current = await _readSourcePreferences(
       pending.request.packageName,
       catalog: pending.request.catalog,

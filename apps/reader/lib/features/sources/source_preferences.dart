@@ -389,7 +389,8 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
   Widget build(BuildContext context) {
     useListenable(_controller);
     final snapshot = _controller.snapshot;
-    final pending = _controller.pending;
+    final pending = _controller.available ? _controller.pending : null;
+    final activity = _controller.activity;
     return EditSheet(
       title: const Text('漫画源设置'),
       leading: CupertinoButton(
@@ -410,12 +411,26 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (snapshot == null) Text(widget.target.source.name),
-                if (_controller.busy) ...[
+                if (snapshot == null && pending == null)
+                  Text(
+                    '${widget.target.source.name} · ${widget.target.source.lang}',
+                  ),
+                if (activity != null) ...[
                   const CupertinoActivityIndicator(),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    child: Text('正在处理。关闭会取消运行中的请求，可能需要重新连接。'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 8,
+                    ),
+                    child: Text(switch (activity) {
+                      SourcePreferencesActivity.reading => '正在读取漫画源设置。可关闭此页。',
+                      SourcePreferencesActivity.editing =>
+                        '正在应用漫画源设置。关闭会取消运行中的漫画源请求。',
+                      SourcePreferencesActivity.saving =>
+                        '正在保存漫画源设置，等待服务端确认。关闭后仍可处理原请求。',
+                      SourcePreferencesActivity.readingConfirmed =>
+                        '保存已确认，正在读取最新设置。',
+                    }),
                   ),
                 ],
                 if (!_current) const Text('身份或服务已变化，请关闭后重新打开设置。'),
@@ -428,22 +443,25 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
                   ),
                 if (_controller.message != null) Text(_controller.message!),
                 if (pending != null) ...[
-                  Text('未确认的原保存请求 · 基于版本 ${pending.request.expectedRevision}'),
-                  Text(
-                    '包含 ${pending.request.entries.length} 项可同步设置；密码和会话值不在请求中。',
+                  _PendingSourcePreferences(
+                    source:
+                        '${widget.target.source.name} · ${widget.target.source.lang}',
+                    draft: pending,
                   ),
-                  CupertinoButton.filled(
-                    key: const ValueKey('source-preferences-retry'),
-                    onPressed:
-                        _controller.available &&
-                            !_controller.busy &&
-                            pending.retryable
-                        ? () => unawaited(_controller.retry())
-                        : null,
-                    child: const Text('重试原保存请求'),
-                  ),
+                  if (pending.retryable)
+                    CupertinoButton.filled(
+                      key: const ValueKey('source-preferences-retry'),
+                      onPressed: _controller.busy
+                          ? null
+                          : () => unawaited(_controller.retry()),
+                      child: Text(
+                        pending.acknowledged ? '重试读取最新设置' : '重试原保存请求',
+                      ),
+                    ),
                 ],
-                if (_controller.needsRecovery || pending != null)
+                if ((_controller.needsRecovery || pending != null) &&
+                    !(pending?.acknowledged == true &&
+                        pending?.retryable == true))
                   CupertinoButton(
                     key: const ValueKey('source-preferences-recover'),
                     onPressed: _controller.available && !_controller.busy
@@ -501,6 +519,88 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
     _closing = true;
     _controller.dispose();
     super.dispose();
+  }
+}
+
+class const _PendingSourcePreferences({
+  required final String source,
+  required final SourcePreferencesDraft draft,
+}) extends HookWidget {
+  static String _value(wire.PreferenceValue value) => switch (value
+      .whichValue()) {
+    wire.PreferenceValue_Value.boolean => value.boolean ? '开启' : '关闭',
+    wire.PreferenceValue_Value.text => value.text.isEmpty ? '空文本' : value.text,
+    wire.PreferenceValue_Value.integer => value.integer.toString(),
+    wire.PreferenceValue_Value.decimal => value.decimal.toString(),
+    wire.PreferenceValue_Value.strings =>
+      value.strings.values.isEmpty ? '空列表' : value.strings.values.join('、'),
+    wire.PreferenceValue_Value.longInteger => value.longInteger.toString(),
+    wire.PreferenceValue_Value.notSet => '无值',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final expansion = useMemoized(ExpansibleController.new);
+    useEffect(() => expansion.dispose, [expansion]);
+    final request = draft.request;
+    final status = draft.acknowledged
+        ? '已确认'
+        : draft.retryable
+        ? '未确认'
+        : '已拒绝';
+    return CupertinoListSection.insetGrouped(
+      margin: EdgeInsets.zero,
+      header: Text('$status的原保存请求 · 基于版本 ${request.expectedRevision}'),
+      children: [
+        CupertinoListTile(
+          title: DefaultTextStyle(
+            style: CupertinoTheme.of(context).textTheme.textStyle,
+            child: Text(source),
+          ),
+          subtitle: Text('${request.entries.length} 项同步值'),
+        ),
+        Expansible(
+          key: const PageStorageKey('source-preferences-submitted-values'),
+          controller: expansion,
+          animationStyle:
+              MediaQuery.reduceMotionOf(context) ||
+                  MediaQuery.disableAnimationsOf(context)
+              ? AnimationStyle.noAnimation
+              : null,
+          headerBuilder: (context, animation) => Semantics(
+            expanded: expansion.isExpanded,
+            child: CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: () => expansion.isExpanded
+                  ? expansion.collapse()
+                  : expansion.expand(),
+              child: CupertinoListTile(
+                title: const Text('查看原提交值'),
+                trailing: RotationTransition(
+                  turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
+                  child: Icon(
+                    CupertinoIcons.chevron_right,
+                    size: 16,
+                    color: AppColors.accent.resolveFrom(context),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          bodyBuilder: (context, animation) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (request.entries.isEmpty) const Text('清空此漫画源的同步值'),
+                for (final entry in request.entries)
+                  Text('${entry.key}：${_value(entry.value)}'),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

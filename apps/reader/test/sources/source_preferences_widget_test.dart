@@ -1,5 +1,7 @@
 import '../../test_support/cupertino.dart';
 
+import 'dart:async';
+
 import 'package:karuyomi/widgets/choice_field.dart';
 
 import '../test_app.dart';
@@ -9,6 +11,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/sources/source_preferences.dart';
+import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -491,6 +494,11 @@ void main() {
       await item(tester, '0');
       final original = fixture.postedBodies.single;
       expect(find.text('未确认的原保存请求 · 基于版本 0'), findsOneWidget);
+      expect(find.text('测试漫画源 · zh'), findsOneWidget);
+      await tester.tap(find.text('查看原提交值'));
+      await tester.pumpAndSettle();
+      expect(find.text('alias：开启'), findsOneWidget);
+      expect(find.textContaining('password：'), findsNothing);
       await tester.tap(iconLabel('关闭设置'));
       await tester.pumpAndSettle();
       final recovery = find.text('处理漫画源设置');
@@ -517,6 +525,89 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+
+  for (final appearance in Brightness.values) {
+    testWidgets(
+      'Source save transitions from confirmed reading to recoverable failure in $appearance',
+      (tester) async {
+        await open(
+          tester,
+          appearance: appearance,
+          textScale: 2,
+          size: const Size(360, 800),
+        );
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        var failReads = true;
+        fixture.platform.afterBusinessReply = (request, reply) async {
+          if (request.method == 'GET' &&
+              request.uri.path.startsWith(
+                '/api/source-preferences/packages/',
+              ) &&
+              fixture.postedBodies.isNotEmpty &&
+              failReads) {
+            if (!entered.isCompleted) {
+              entered.complete();
+              await release.future;
+            }
+            return const ApiReply(
+              status: 503,
+              headers: {'content-type': 'application/json'},
+              body: '{}',
+              redirected: false,
+            );
+          }
+          return reply;
+        };
+        await tester.tap(
+          find.byKey(const ValueKey(('source-preference', '0'))),
+        );
+        await tester.pump();
+        try {
+          expect(entered.isCompleted, true);
+          expect(find.text('保存已确认，正在读取最新设置。'), findsOneWidget);
+          expect(find.text('未确认的原保存请求 · 基于版本 0'), findsNothing);
+          expect(fixture.postedBodies, hasLength(1));
+        } finally {
+          release.complete();
+          await tester.pumpAndSettle();
+        }
+        expect(find.text('已确认的原保存请求 · 基于版本 0'), findsOneWidget);
+        expect(find.text('重试原保存请求'), findsNothing);
+        await tester.tap(iconLabel('关闭设置'));
+        await tester.pumpAndSettle();
+        final recovery = find.text('处理漫画源设置');
+        final scrollable = find
+            .descendant(
+              of: find.byType(SourceBrowsePage),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(recovery, -300, scrollable: scrollable);
+        await tester.ensureVisible(recovery);
+        await tester.tap(recovery);
+        await tester.pumpAndSettle();
+        expect(find.text('已确认的原保存请求 · 基于版本 0'), findsOneWidget);
+        expect(fixture.postedBodies, hasLength(1));
+        final retry = find.text('重试读取最新设置');
+        await tester.ensureVisible(retry);
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        expect(find.text('已确认的原保存请求 · 基于版本 0'), findsOneWidget);
+        expect(fixture.postedBodies, hasLength(1));
+        failReads = false;
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        expect(find.text('已确认的原保存请求 · 基于版本 0'), findsNothing);
+        expect(fixture.postedBodies, hasLength(1));
+        expect(fixture.callbacks, 1);
+        expect(fixture.platform.businessServer.appliedMutations, 1);
+        expect(tester.takeException(), isNull);
+        await tester.tap(iconLabel('关闭设置'));
+        await tester.pumpAndSettle();
+      },
+    );
+  }
   for (final denied in [true, false]) {
     testWidgets(
       'settings sheet keeps the clicked repository when ${denied ? 'Access fails' : 'the account changes'} before its first frame',

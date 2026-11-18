@@ -8,6 +8,8 @@ import '../../data/source_preferences_repository.dart';
 import '../../data/source_preferences_validation.dart';
 import '../browse/catalog_controller.dart';
 
+enum SourcePreferencesActivity { reading, editing, saving, readingConfirmed }
+
 /// Edits invoke the original Source once. Only the resulting immutable business
 /// command can be retried; an unknown runtime result always requires reopening.
 final class SourcePreferencesController extends ChangeNotifier {
@@ -32,7 +34,8 @@ final class SourcePreferencesController extends ChangeNotifier {
   String? error;
   String? message;
   String? _requestId;
-  bool busy = false;
+  SourcePreferencesActivity? activity;
+  bool get busy => activity != null;
   bool _disposed = false;
   bool _retired = false;
   bool needsRecovery = false;
@@ -41,6 +44,11 @@ final class SourcePreferencesController extends ChangeNotifier {
 
   void _retire() {
     _retired = true;
+    snapshot = null;
+    confirmed = null;
+    activity = null;
+    needsRecovery = false;
+    message = null;
     error = '身份或服务已改变，请关闭后重新打开漫画源设置。';
   }
 
@@ -80,53 +88,60 @@ final class SourcePreferencesController extends ChangeNotifier {
   bool _sameBaseline(wire.SourcePreferences a, wire.SourcePreferences b) =>
       a.revision == b.revision && samePreferenceEntries(a.entries, b.entries);
 
-  Future<bool> load({bool reopen = false}) => _perform(() async {
-    final latest = await repository.load(
-      target.build.packageName,
-      catalog: target.build.catalog,
-    );
-    if (!available) return false;
-    final current = latest.source(target.source.id);
-    if (pending != null) {
-      confirmed = current;
-      needsRecovery = true;
-      snapshot = null;
-      message = '原设置操作尚未确认；只能重试原操作，或读取服务端状态后重新打开。';
-      return true;
-    }
-    final loaded = catalog.loadedSourcePreferences?.source(target.source.id);
-    if (reopen ||
-        loaded == null ||
-        !_sameBaseline(loaded, current) ||
-        !catalog.isCurrentPreferencesTarget(target) ||
-        catalog.sourcePreferencesBlocked) {
-      if (!await catalog.reopenSourcePreferences(
-            target,
-            shouldContinue: () => available,
-          ) ||
-          !available) {
+  Future<bool> load({bool reopen = false}) => _perform(
+    pending?.acknowledged == true
+        ? SourcePreferencesActivity.readingConfirmed
+        : SourcePreferencesActivity.reading,
+    () async {
+      final latest = await repository.load(
+        target.build.packageName,
+        catalog: target.build.catalog,
+      );
+      if (!available) return false;
+      final current = latest.source(target.source.id);
+      if (pending case final draft?) {
+        confirmed = current;
+        needsRecovery = true;
+        snapshot = null;
+        message = draft.acknowledged
+            ? '原保存已确认。请读取最新设置以重新打开漫画源。'
+            : '原设置操作尚未确认，可重试原保存或读取服务端状态。';
+        return true;
+      }
+      final loaded = catalog.loadedSourcePreferences?.source(target.source.id);
+      if (reopen ||
+          loaded == null ||
+          !_sameBaseline(loaded, current) ||
+          !catalog.isCurrentPreferencesTarget(target) ||
+          catalog.sourcePreferencesBlocked) {
+        if (!await catalog.reopenSourcePreferences(
+              target,
+              shouldContinue: () => available,
+            ) ||
+            !available) {
+          return false;
+        }
+      }
+      confirmed = catalog.loadedSourcePreferences!.source(target.source.id);
+      final value = await catalog.describeSourcePreferences(
+        target,
+        shouldContinue: () => available,
+        onRequest: (id) => _requestId = id,
+      );
+      _requestId = null;
+      if (!available) return false;
+      if (value == null) {
+        error = catalog.error ?? '未能读取漫画源设置，可明确重试；默认浏览仍可继续。';
+        snapshot = null;
         return false;
       }
-    }
-    confirmed = catalog.loadedSourcePreferences!.source(target.source.id);
-    final value = await catalog.describeSourcePreferences(
-      target,
-      shouldContinue: () => available,
-      onRequest: (id) => _requestId = id,
-    );
-    _requestId = null;
-    if (!available) return false;
-    if (value == null) {
-      error = catalog.error ?? '未能读取漫画源设置，可明确重试；默认浏览仍可继续。';
-      snapshot = null;
-      return false;
-    }
-    snapshot = value;
-    _reference = catalog.sourceReference;
-    _worker = catalog.session!.workerInstanceId;
-    needsRecovery = false;
-    return true;
-  });
+      snapshot = value;
+      _reference = catalog.sourceReference;
+      _worker = catalog.session!.workerInstanceId;
+      needsRecovery = false;
+      return true;
+    },
+  );
 
   Future<bool> change(List<int> path, wire.PreferenceValue value) {
     if (!canEdit) return Future.value(false);
@@ -154,7 +169,7 @@ final class SourcePreferencesController extends ChangeNotifier {
     if (!canEdit) return Future.value(false);
     final baseline = confirmed!;
     final before = snapshot!;
-    return _perform(() async {
+    return _perform(SourcePreferencesActivity.editing, () async {
       final result = await catalog.editSourcePreference(
         target,
         request,
@@ -178,12 +193,15 @@ final class SourcePreferencesController extends ChangeNotifier {
             result.snapshot.syncValues,
             baseline.entries,
           )) {
+        _setActivity(SourcePreferencesActivity.saving);
         await repository.save(
           catalog: target.build.catalog,
           packageName: target.build.packageName,
           sourceId: target.source.id,
           basedOnRevision: baseline.revision,
           entries: result.snapshot.syncValues,
+          onAcknowledged: () =>
+              _setActivity(SourcePreferencesActivity.readingConfirmed),
         );
         if (!available) return false;
       }
@@ -215,21 +233,28 @@ final class SourcePreferencesController extends ChangeNotifier {
     if (!available || busy || pending?.retryable != true) {
       return Future.value(false);
     }
-    return _perform(() async {
-      await repository.retry(
-        target.build.packageName,
-        target.source.id,
-        catalog: target.build.catalog,
-      );
-      if (!available) return false;
-      message = '原设置操作已确认。';
-      return _reopenAndDescribe();
-    });
+    return _perform(
+      pending?.acknowledged == true
+          ? SourcePreferencesActivity.readingConfirmed
+          : SourcePreferencesActivity.saving,
+      () async {
+        await repository.retry(
+          target.build.packageName,
+          target.source.id,
+          catalog: target.build.catalog,
+          onAcknowledged: () =>
+              _setActivity(SourcePreferencesActivity.readingConfirmed),
+        );
+        if (!available) return false;
+        message = '原设置操作已确认。';
+        return _reopenAndDescribe();
+      },
+    );
   }
 
   Future<bool> recover() {
     if (!available || busy) return Future.value(false);
-    return _perform(() async {
+    return _perform(SourcePreferencesActivity.reading, () async {
       await repository.discard(
         target.build.packageName,
         target.source.id,
@@ -269,9 +294,18 @@ final class SourcePreferencesController extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> _perform(Future<bool> Function() action) async {
+  void _setActivity(SourcePreferencesActivity phase) {
+    if (!available || activity == phase) return;
+    activity = phase;
+    notifyListeners();
+  }
+
+  Future<bool> _perform(
+    SourcePreferencesActivity phase,
+    Future<bool> Function() action,
+  ) async {
     if (!available || busy || catalog.busy) return false;
-    busy = true;
+    activity = phase;
     error = null;
     message = null;
     notifyListeners();
@@ -279,10 +313,15 @@ final class SourcePreferencesController extends ChangeNotifier {
       return await action();
     } catch (failure) {
       if (available) {
-        needsRecovery = catalog.sourcePreferencesBlocked || pending != null;
+        final draft = pending;
+        needsRecovery = catalog.sourcePreferencesBlocked || draft != null;
         error = failure is BusinessStateException && failure.conflict
             ? '设置已在另一端修改。请读取服务端状态并重新打开，再确认新编辑。'
-            : pending != null
+            : draft?.acknowledged == true && draft?.retryable == true
+            ? '原保存已确认，读取最新设置未完成。请重试读取。'
+            : draft?.retryable == false
+            ? '原保存请求已被拒绝。请读取服务端状态并重新打开。'
+            : draft != null
             ? '设置尚未确认；重试只发送原保存请求，不会重跑漫画源操作。'
             : '设置处理未完成，请读取服务端状态后重新打开。';
       }
@@ -290,7 +329,7 @@ final class SourcePreferencesController extends ChangeNotifier {
     } finally {
       _requestId = null;
       if (!_disposed) {
-        busy = false;
+        activity = null;
         notifyListeners();
       }
     }

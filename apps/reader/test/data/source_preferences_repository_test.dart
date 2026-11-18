@@ -155,6 +155,120 @@ void main() {
     expect(repository.pending(_package, _source, catalog: _catalog), isNull);
   });
 
+  test('a validated Source ACK is retained through a failed read and retry sends no second POST', () async {
+    server.beforeRequest = (request) {
+      if (request.method == 'GET') throw StateError('Injected read failure');
+      return null;
+    };
+    await expectLater(save([_toggle(true)]), throwsStateError);
+    final replacement = SourcePreferencesRepository(client);
+    expect(
+      replacement.pending(_package, _source, catalog: _catalog)?.acknowledged,
+      true,
+    );
+    expect(writes(), hasLength(1));
+    server.beforeRequest = null;
+    final current = await replacement.retry(
+      _package,
+      _source,
+      catalog: _catalog,
+    );
+    expect(writes(), hasLength(1));
+    expect(server.appliedMutations, 1);
+    expect(current.source(_source).revision, 1);
+    expect(current.source(_source).entries, [_toggle(true)]);
+    expect(replacement.pending(_package, _source, catalog: _catalog), isNull);
+  });
+
+  test('a stale read and different values at the acknowledged Source revision never reach the cache', () async {
+    var reads = 0;
+    server.beforeRequest = (request) {
+      if (request.method != 'GET' || ++reads > 2) return null;
+      return ApiReply(
+        status: 200,
+        headers: const {'content-type': 'application/json'},
+        body: jsonEncode(
+          wire.encodeProtoJson(
+            wire.SourcePreferencesResponse(
+              schemaVersion: 1,
+              accountRevision: 1,
+              packageName: _package,
+              catalog: _catalog,
+              sources: [
+                wire.SourcePreferences(
+                  packageName: _package,
+                  sourceId: _source,
+                  revision: reads - 1,
+                  entries: [_toggle(false)],
+                ),
+              ],
+            ),
+          ),
+        ),
+        redirected: false,
+      );
+    };
+    await expectLater(save([_toggle(true)]), throwsFormatException);
+    expect(reads, 2);
+    expect(
+      repository.pending(_package, _source, catalog: _catalog)?.acknowledged,
+      true,
+    );
+    final current = await repository.retry(
+      _package,
+      _source,
+      catalog: _catalog,
+    );
+    expect(current.source(_source).entries, [_toggle(true)]);
+    expect(reads, 3);
+    expect(writes(), hasLength(1));
+  });
+
+  test('an acknowledgement with different Source values leaves the exact write retryable', () async {
+    server.beforeRequest = (request) {
+      if (request.method != 'POST') return null;
+      final submitted = wire.decodeProtoJson(
+        wire.SourcePreferencesMutation(),
+        jsonDecode(request.body!),
+      );
+      return ApiReply(
+        status: 200,
+        headers: const {'content-type': 'application/json'},
+        body: jsonEncode(
+          wire.encodeProtoJson(
+            wire.SourcePreferencesMutationResponse(
+              schemaVersion: 1,
+              mutationId: submitted.mutationId,
+              catalog: submitted.catalog,
+              accountRevision: 1,
+              preferences: wire.SourcePreferences(
+                packageName: _package,
+                sourceId: _source,
+                revision: 1,
+                entries: [_toggle(false)],
+              ),
+            ),
+          ),
+        ),
+        redirected: false,
+      );
+    };
+    await expectLater(save([_toggle(true)]), throwsFormatException);
+    final draft = repository.pending(_package, _source, catalog: _catalog)!;
+    expect(draft.acknowledged, false);
+    expect(server.requests.map((request) => request.method), ['POST']);
+    final original = writes().single.body;
+    server.beforeRequest = null;
+    final current = await repository.retry(
+      _package,
+      _source,
+      catalog: _catalog,
+    );
+    expect(writes().map((request) => request.body), [original, original]);
+    expect(server.appliedMutations, 1);
+    expect(current.source(_source).entries, [_toggle(true)]);
+  });
+
   test('an old ACK never overwrites newer remote values; rejected drafts clear only on current GET', () async {
     server.loseNextResponse = true;
     await expectLater(save([_toggle(true)]), throwsStateError);

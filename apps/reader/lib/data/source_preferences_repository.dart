@@ -29,10 +29,14 @@ final class SourcePreferencesSnapshot {
 }
 
 final class SourcePreferencesDraft {
-  SourcePreferencesDraft(wire.SourcePreferencesMutation value, this.retryable)
-    : request = value.deepCopy()..freeze();
+  SourcePreferencesDraft(
+    wire.SourcePreferencesMutation value, {
+    required this.retryable,
+    required this.acknowledged,
+  }) : request = value.deepCopy()..freeze();
   final wire.SourcePreferencesMutation request;
   final bool retryable;
+  final bool acknowledged;
 }
 
 /// The identity-bound business client owns the exact pending request, so a
@@ -54,7 +58,11 @@ final class SourcePreferencesRepository {
     );
     return value == null
         ? null
-        : SourcePreferencesDraft(value.request, value.retryable);
+        : SourcePreferencesDraft(
+            value.request,
+            retryable: value.retryable,
+            acknowledged: value.acknowledged,
+          );
   }
 
   bool hasPendingPackage(
@@ -75,6 +83,7 @@ final class SourcePreferencesRepository {
     required String sourceId,
     required int basedOnRevision,
     required List<wire.PreferenceEntry> entries,
+    void Function()? onAcknowledged,
   }) async => SourcePreferencesSnapshot(
     await client.mutateSourcePreferences(
       wire.SourcePreferencesMutation(
@@ -84,6 +93,7 @@ final class SourcePreferencesRepository {
         expectedRevision: basedOnRevision,
         entries: entries,
       ),
+      onAcknowledged: onAcknowledged,
     ),
   );
 
@@ -91,11 +101,13 @@ final class SourcePreferencesRepository {
     String packageName,
     String sourceId, {
     required wire.CatalogReference catalog,
+    void Function()? onAcknowledged,
   }) async => SourcePreferencesSnapshot(
     await client.retrySourcePreferences(
       packageName,
       sourceId,
       catalog: catalog,
+      onAcknowledged: onAcknowledged,
     ),
   );
 
