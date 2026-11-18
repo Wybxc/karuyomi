@@ -591,7 +591,7 @@ export async function forwardBinary(
   }
 }
 
-export function createHttpBridge() {
+export function createHttpBridge(fetchUpstream?: typeof fetch) {
   const app = new Hono<AppEnv>();
   app.post('/http', async (c) => {
     const contentType = c.req.header('content-type')?.trim().toLowerCase();
@@ -600,7 +600,7 @@ export function createHttpBridge() {
       return c.json({ error: 'unsupported_bridge_protocol' }, 415);
     if (accept !== HTTP_BRIDGE_MEDIA_TYPE)
       return c.json({ error: 'unsupported_bridge_response_protocol' }, 406);
-    return forwardBinary(c.req.raw);
+    return forwardBinary(c.req.raw, fetchUpstream);
   });
   return app;
 }

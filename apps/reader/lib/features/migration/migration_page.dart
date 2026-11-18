@@ -217,6 +217,7 @@ class _MigrationPageState extends State<MigrationPage> {
     final start = page * 50;
     final end = (start + 50).clamp(0, mappings.length);
     final selected = controller.selectedChapters.length;
+    final canConfirm = controller.canChange && !controller.tooMany;
     return Semantics(
       container: true,
       explicitChildNodes: true,
@@ -397,13 +398,17 @@ class _MigrationPageState extends State<MigrationPage> {
                     : null,
                 child: const Text('重新读取迁移预览（只读）'),
               ),
-              CupertinoButton.filled(
-                key: const ValueKey('migration-confirm'),
-                focusNode: _confirmFocus,
-                onPressed: controller.canChange && !controller.tooMany
-                    ? () => unawaited(_confirm())
-                    : null,
-                child: const Text('检查并确认迁移'),
+              Semantics(
+                enabled: canConfirm,
+                child: CupertinoButton.filled(
+                  key: const ValueKey('migration-confirm'),
+                  focusNode: _confirmFocus,
+                  foregroundColor: canConfirm
+                      ? null
+                      : CupertinoColors.tertiaryLabel.resolveFrom(context),
+                  onPressed: canConfirm ? () => unawaited(_confirm()) : null,
+                  child: const Text('检查并确认迁移'),
+                ),
               ),
             ],
           ),

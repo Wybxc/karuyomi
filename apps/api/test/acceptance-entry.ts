@@ -29,6 +29,7 @@ import {
   withProgressD1Error,
 } from './acceptance-progress-d1-error.ts';
 import { withEditorUi } from './acceptance-editor-ui.ts';
+import { fetchMigrationChapters } from './acceptance-migration-chapters.ts';
 
 export { RuntimeSession } from '../src/runtime-session.js';
 
@@ -42,6 +43,7 @@ export interface AcceptanceBindings extends Bindings {
   ACCEPTANCE_PROGRESS_D1_ERROR?: '1';
   ACCEPTANCE_BRIDGE_ERROR_URL?: string;
   ACCEPTANCE_EDITOR_UI?: '1';
+  ACCEPTANCE_MIGRATION_CHAPTERS?: '1';
 }
 
 export default {
@@ -121,7 +123,14 @@ export default {
         ? { ...env, DB: progressRaceDatabase(env.DB, progressContender) }
         : env;
       const dispatch = () =>
-        verifiedWorker.fetch(forwarded, workerEnv, context);
+        verifiedWorker.fetch(
+          forwarded,
+          workerEnv,
+          context,
+          env.ACCEPTANCE_MIGRATION_CHAPTERS === '1'
+            ? fetchMigrationChapters
+            : undefined,
+        );
       const run = () =>
         progressD1Error
           ? withProgressD1Error(

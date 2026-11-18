@@ -46,3 +46,5 @@ Wrangler 只让 `/api`、`/api/*` 和 `/runtime/host.html` 优先经过 Worker�
 `editor <mode> preferences` 对应默认仓库的 Source 偏好。读取要求整包路径和标准的 `catalogUrl`、`repoId` 参数，写入使用正式 Source 偏好命令与 D1 事务。以 `delay-read` 验收打开表单，以 `lose-confirm` 验收未确认原请求，以 `confirm-read-failure` 验收已确认后的只读恢复。
 
 `editor delay-read extension-manifest` 延迟同源的标准构建清单 GET 五秒。打开扩展安装或本机准备时，可在等待界面取消，再用 `editor pass extension-manifest` 复验正常完成。清单仍由官方 Static Assets 提供，索引、压缩产物与运行时资源照常交付。取消观测以真实请求的终态和临时账户快照为准。
+
+`ACCEPTANCE_FIXTURE=migration-chapters pnpm acceptance:serve` 在隔离验收入口为固定的英语、中文 xkcd 上游章节列表各提供 257 条可唯一匹配的记录。正式扩展解析响应，Worker 仍经过正常鉴权、二进制桥和 D1。先收藏英语作品，再按 `/1/` 至 `/257/` 通过正式书签 API 保存标记。切到中文源的迁移预览后，检查超限时禁用确认，取消一条映射后可进入二次确认。返回检查且不提交；通过前后读回核对作品和全部书签。夹具只替换两个章节列表的响应，结果仅用于验收选择上限。

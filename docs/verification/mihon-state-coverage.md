@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-19，Karuyomi 跨版本双主题主图现为 145/169（85.8%），余下 24 个主状态均缺两侧。19.K5 补齐同一封面的选图等待双主题，05.K11、19.K11、21.K6、24.K11 补齐身份失效浅色。选择器手动关闭、各触发变体及迁移转场继续验收。[封面选图](mihon-cupertino-fidelity.md#选图等待的正式-web-双主题验收) · [身份失效](mihon-cupertino-fidelity.md#身份失效的正式-web-浅色复验)
+2026-11-19，Karuyomi 跨版本双主题主图现为 146/169（86.4%），余下 23 个主状态均缺两侧。`5f5d287` 正式 Web 补齐 04.K8 批量分类失效。此前补齐 19.K5 选图等待双主题与 05.K11、19.K11、21.K6、24.K11 失效浅色。选择器手动关闭、各触发变体及迁移转场继续验收。[批量失效](mihon-cupertino-fidelity.md#批量分类失效的正式-web-双主题验收) · [选图等待](mihon-cupertino-fidelity.md#选图等待的正式-web-双主题验收) · [身份失效](mihon-cupertino-fidelity.md#身份失效的正式-web-浅色复验)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -962,7 +962,7 @@ stateDiagram-v2
     ExpiredBatch --> [*]: 关闭，不发送剩余
     ConfirmedBatch --> [*]: 完成返回书架
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class EmptyCategories,Categories,CategoryMenu,EmptyCategoryName,CategoryName,InvalidCategoryName,DeleteCategory,SavingCategory,UncertainCategory,NoCategoryChoices,CategoryChoices,CategoryChoiceDraft,RemoveReview,BatchCategoryReview,SendingBatch,PausedBatch,ConfirmedBatch,RejectedCategory,UncertainBatch,RejectedBatch,ExpiredCategory paired
+    class EmptyCategories,Categories,CategoryMenu,EmptyCategoryName,CategoryName,InvalidCategoryName,DeleteCategory,SavingCategory,UncertainCategory,NoCategoryChoices,CategoryChoices,CategoryChoiceDraft,RemoveReview,BatchCategoryReview,SendingBatch,PausedBatch,ConfirmedBatch,RejectedCategory,UncertainBatch,RejectedBatch,ExpiredCategory,ExpiredBatch paired
 ```
 
 | 状态 ID | 最小必要信息                                                        | 浅色正式Web                                                                                                           | 深色正式Web                                                                                                         |
@@ -988,7 +988,7 @@ stateDiagram-v2
 | 04.K5   | 冻结的剩余清单、当前确认数、明确继续或结束、无隐式发送              | `karuyomi-94b7b82-category-batch-paused-light.jpg`                                                                    | `karuyomi-94b7b82-category-batch-paused-dark.jpg`                                                                   |
 | 04.K6   | 逐项拒绝原因、原清单、重新读取并结束、不得直接重试新revision        | `karuyomi-9a1c03c-library-ack-read-batch-rejected-light.jpg`                                                          | `karuyomi-9a1c03c-library-ack-read-batch-rejected-dark.jpg`                                                         |
 | 04.K7   | 全部确认文字、逐项确认状态、完成及返回实际书架                      | `karuyomi-bbf69d7-batch-confirmed-light.jpg`                                                                          | `karuyomi-bbf69d7-batch-confirmed-dark.jpg`                                                                         |
-| 04.K8   | 失效说明、原清单只读、关闭、迟到确认不得发送剩余                    | 待                                                                                                                    | 待                                                                                                                  |
+| 04.K8   | 失效说明、原清单只读、关闭、迟到确认不得发送剩余                    | `karuyomi-5f5d287-batch-expired-light.jpg`                                                                            | `karuyomi-5f5d287-batch-expired-dark.jpg`                                                                           |
 
 `a9fb310`浅色实际执行重排再恢复，名称草稿跨360↔390保留后取消；深色核对相同名称/顺序、菜单边界、输入校验与取消。浅色单作品初次勾选后误点保存，后续独立重做取消，不能把该次写入记为零写。批量全部确认浅色为添加分类、深色为移出分类，二者不是同一操作的全部变体。`bbf69d7`正式双主题主图进一步核对空态/列表独立新建、Tab/Return和批量系统正文色；新建草稿取消零附写。实际Web没有软件键盘，05.K5的软键盘上方操作仅有组件证据，仍待目标平台。独立API和完整边界见[分类验证](mihon-cupertino-fidelity.md#分类管理与批量确认的-cupertino-分组)。
 

@@ -19,7 +19,10 @@ import {
 
 import type { AppEnv } from './env.js';
 
-export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
+export function createApp(
+  verifyAccess: VerifyAccess = createAccessVerifier(),
+  fetchUpstream?: typeof fetch,
+) {
   const app = new Hono<AppEnv>();
 
   // Global dispatch prevents encoded API paths or unknown API routes from
@@ -118,7 +121,7 @@ export function createApp(verifyAccess: VerifyAccess = createAccessVerifier()) {
     };
     return c.json(encodeBootstrap(body));
   });
-  app.route('/api/bridge', createHttpBridge());
+  app.route('/api/bridge', createHttpBridge(fetchUpstream));
   app.route('/api', createStateRoutes());
   app.route('/api/settings', createSettingsRoutes());
   app.route('/api/source-preferences', createSourcePreferencesRoutes());
