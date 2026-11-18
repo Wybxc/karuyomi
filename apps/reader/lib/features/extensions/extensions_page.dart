@@ -1275,6 +1275,8 @@ class const ExtensionStoragePage({
     final diagnostics = useMemoized(ExpansibleController.new);
     useEffect(() => diagnostics.dispose, [diagnostics]);
     final cache = controller.cache;
+    final canRefresh = controller.available && !controller.busy;
+    final canForget = canRefresh && !controller.catalog.busy;
     final checking =
         cache == null &&
         controller.available &&
@@ -1333,19 +1335,17 @@ class const ExtensionStoragePage({
                         subtitle: Text(_bytes(artifact.byteLength)),
                         trailing: Semantics(
                           container: true,
+                          enabled: canForget,
                           child: CupertinoButton(
                             key: ValueKey((
                               'extension-forget',
                               artifact.sha256,
                             )),
-                            onPressed:
-                                !controller.available ||
-                                    controller.busy ||
-                                    controller.catalog.busy
-                                ? null
-                                : () => unawaited(
+                            onPressed: canForget
+                                ? () => unawaited(
                                     controller.forget(artifact.sha256),
-                                  ),
+                                  )
+                                : null,
                             child: Text(
                               '清理副本',
                               semanticsLabel:
@@ -1416,14 +1416,17 @@ class const ExtensionStoragePage({
               hasLeading: false,
               clipBehavior: Clip.none,
               children: [
-                SizedBox(
-                  width: double.infinity,
-                  child: CupertinoButton(
-                    alignment: AlignmentDirectional.centerStart,
-                    onPressed: !controller.available || controller.busy
-                        ? null
-                        : () => unawaited(controller.refresh()),
-                    child: const Text('重新读取本机副本'),
+                Semantics(
+                  enabled: canRefresh,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: CupertinoButton(
+                      alignment: AlignmentDirectional.centerStart,
+                      onPressed: canRefresh
+                          ? () => unawaited(controller.refresh())
+                          : null,
+                      child: const Text('重新读取本机副本'),
+                    ),
                   ),
                 ),
               ],

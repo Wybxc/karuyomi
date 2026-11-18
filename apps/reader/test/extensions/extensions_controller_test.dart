@@ -4,6 +4,7 @@ import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -586,6 +587,7 @@ void main() {
           return null;
         };
 
+        final semantics = tester.ensureSemantics();
         try {
           await tester.pumpApp(
             CupertinoApp(
@@ -599,6 +601,7 @@ void main() {
             ValueKey(('extension-forget', original)),
           );
           final otherAction = find.byKey(ValueKey(('extension-forget', other)));
+          final refresh = find.text('重新读取本机副本');
           await tester.ensureVisible(originalAction);
           await tester.tap(originalAction);
           await tester.pump();
@@ -613,6 +616,18 @@ void main() {
             findsOneWidget,
           );
           expect(tester.widget<CupertinoButton>(otherAction).enabled, isFalse);
+          for (final control in [originalAction, otherAction, refresh]) {
+            await tester.ensureVisible(control);
+            await tester.pump();
+            expect(
+              tester
+                  .getSemantics(control)
+                  .getSemanticsData()
+                  .flagsCollection
+                  .isEnabled,
+              Tristate.isFalse,
+            );
+          }
           expect(manager.installed.single, confirmed);
 
           release.complete(
@@ -637,7 +652,6 @@ void main() {
             tester.getBottomLeft(status).dy,
             lessThan(tester.getTopLeft(usage).dy),
           );
-          final refresh = find.text('重新读取本机副本');
           await tester.ensureVisible(refresh);
           await tester.tap(refresh);
           await tester.pumpAndSettle();
@@ -658,6 +672,7 @@ void main() {
             writes,
           );
         } finally {
+          semantics.dispose();
           if (!release.isCompleted) release.complete(null);
           await tester.pumpApp(const SizedBox.shrink());
           await tester.pumpAndSettle();

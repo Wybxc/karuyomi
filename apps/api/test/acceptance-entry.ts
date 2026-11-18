@@ -44,6 +44,7 @@ export interface AcceptanceBindings extends Bindings {
   ACCEPTANCE_BRIDGE_ERROR_URL?: string;
   ACCEPTANCE_EDITOR_UI?: '1';
   ACCEPTANCE_MIGRATION_CHAPTERS?: '1';
+  ACCEPTANCE_RUNTIME_CONTROL?: '1';
 }
 
 export default {
@@ -53,6 +54,14 @@ export default {
     context: ExecutionContext,
   ) {
     const url = new URL(request.url);
+    if (
+      env.ACCEPTANCE_RUNTIME_CONTROL === '1' &&
+      request.method === 'GET' &&
+      url.pathname === '/runtime/host.js' &&
+      url.searchParams.get('acceptance-original') !== '1'
+    ) {
+      return env.ASSETS.fetch(new URL('/runtime/acceptance-control.js', url));
+    }
     if (url.pathname.startsWith('/extensions/builds/')) {
       const dispatch = () => env.ASSETS.fetch(request);
       return env.ACCEPTANCE_EDITOR_UI === '1'

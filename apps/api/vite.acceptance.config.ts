@@ -18,12 +18,35 @@ export default defineConfig(({ mode }) => ({
           upstream_protocol: mode === 'native-acceptance' ? 'https' : 'http',
         },
         // The plugin merges this route with the existing Worker-first routes.
-        assets: { run_worker_first: ['/extensions/builds/*'] },
+        assets: {
+          run_worker_first: [
+            '/extensions/builds/*',
+            ...(mode === 'runtime-acceptance' ? ['/runtime/host.js'] : []),
+          ],
+        },
         main: fileURLToPath(
           new URL('./test/acceptance-entry.ts', import.meta.url),
         ),
       }),
     }),
   ],
+  environments:
+    mode === 'runtime-acceptance'
+      ? {
+          client: {
+            build: {
+              rolldownOptions: {
+                input: fileURLToPath(
+                  new URL(
+                    '../../packages/runtime-host/test/browser/fixtures/acceptance-control.ts',
+                    import.meta.url,
+                  ),
+                ),
+                output: { entryFileNames: 'runtime/acceptance-control.js' },
+              },
+            },
+          },
+        }
+      : {},
   build: { target: 'es2022', emptyOutDir: true },
 }));

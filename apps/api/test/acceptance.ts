@@ -69,6 +69,7 @@ const ackLoss = isAckLossFixture(fixture) ? fixture : undefined;
 const settingsRace = fixture === 'settings-cas-race';
 const editorUi = fixture === 'editor-ui';
 const migrationChapters = fixture === 'migration-chapters';
+const runtimeControl = fixture === 'runtime-control';
 const progressRace = fixture === 'progress-cas-race';
 const progressD1Error = fixture === 'progress-d1-error';
 const bridgeError =
@@ -89,6 +90,7 @@ const options = (
         ...(settingsRace ? { ACCEPTANCE_SETTINGS_CAS_RACE: '1' } : {}),
         ...(editorUi ? { ACCEPTANCE_EDITOR_UI: '1' } : {}),
         ...(migrationChapters ? { ACCEPTANCE_MIGRATION_CHAPTERS: '1' } : {}),
+        ...(runtimeControl ? { ACCEPTANCE_RUNTIME_CONTROL: '1' } : {}),
         ...(progressRace ? { ACCEPTANCE_PROGRESS_CAS_RACE: '1' } : {}),
         ...(progressD1Error ? { ACCEPTANCE_PROGRESS_D1_ERROR: '1' } : {}),
         ...(bridgeError ? { ACCEPTANCE_BRIDGE_ERROR_URL: bridgeError } : {}),
@@ -132,12 +134,13 @@ try {
     !settingsRace &&
     !editorUi &&
     !migrationChapters &&
+    !runtimeControl &&
     !progressRace &&
     !progressD1Error &&
     !bridgeError
   ) {
     throw new Error(
-      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, bookmark-ack-loss, settings-cas-race, editor-ui, migration-chapters, progress-cas-race, progress-d1-error, bridge-once-error or empty',
+      'ACCEPTANCE_FIXTURE must be categories, settings-ack-loss, progress-ack-loss, bookmark-ack-loss, settings-cas-race, editor-ui, migration-chapters, runtime-control, progress-cas-race, progress-d1-error, bridge-once-error or empty',
     );
   }
   const { url } = await server.listen();
