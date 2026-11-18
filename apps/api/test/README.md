@@ -61,3 +61,5 @@ ACCEPTANCE_FIXTURE=runtime-control pnpm acceptance:serve
 `?acceptance-runtime=filters` 在正式 Source 枚举筛选说明或执行带筛选条件的搜索时，最多将相同请求的结果暂扣八秒。打开长筛选表单，滚到底后点重置，再明确应用，核对进度、禁用语义与实际恢复。新文档还可加上 `filter-outcome=read-error` 或 `reset-error`，分别把第一次或第二次筛选说明结果替换为 `SOURCE_ERROR`，再用界面重试。加上 `filter-outcome=retire` 会在第二次读取完成后通过正式 host 重建运行时，并向原请求返回 `RUNTIME_LOST`。核对旧草稿退出、重连、重新打开筛选，按审计中的 requestId、generation、snapshotId 以及前后账户读回确认隔离。
 
 `?acceptance-runtime=migration` 要求提供精确的 `migration-reject-build`（构建 ID）和 `migration-listing-source`（读取列表的 Source ID）。先选择可用的目标并读取，切换到指定构建时，首次打开向客户端返回 `SOURCE_ERROR`。核对原目标及候选保留、可继续读取原目标、显式重试打开原失败构建。指定 Source 的热门和搜索在首次取得真实的第二页非空结果时分别丢弃该响应，其余响应照常交付。修改输入框但不提交，再重试失败的分页，与 `ACCEPTANCE_RUNTIME_CONTROL` 中的 sourceId、query、page 和 generation 核对。用隔离账户的前后读回确认向导零业务写入。
+
+`?acceptance-runtime=preference-groups` 将真实 Komiic 的两个设置放进受控的启用、禁用和空分组。先在普通文档保存可用镜像，再在夹具文档打开漫画源设置。验证子组仍显示、镜像继承禁用、可编辑的章节选项能完成实际保存。夹具保留 snapshotId 与 generation，将客户端提交的嵌套路径还原到同一真实设置的原始路径，再交付原监听器结果。核对 `ACCEPTANCE_RUNTIME_CONTROL` 的两条路径、确认值和同一隔离账户的读回。

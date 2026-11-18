@@ -27,6 +27,18 @@ class const ChoiceField<T>({
     }
 
     final enabled = onChanged != null && options.isNotEmpty;
+    final valueLabel = options[value] ?? '选择';
+    final disabledStyle = enabled
+        ? null
+        : TextStyle(color: CupertinoColors.tertiaryLabel.resolveFrom(context));
+    // Keep the tile style while allowing Source identities to wrap in full.
+    Widget tileLabel(String text) => Builder(
+      builder: (context) => DefaultTextStyle(
+        style: DefaultTextStyle.of(context).style,
+        child: Text(text, style: disabledStyle),
+      ),
+    );
+
     Widget button(VoidCallback open) => Semantics(
       enabled: enabled,
       child: CupertinoButton(
@@ -39,30 +51,25 @@ class const ChoiceField<T>({
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('$label：'),
+                  Text('$label：', style: disabledStyle),
                   Flexible(
                     child: Text(
-                      options[value] ?? '选择',
+                      valueLabel,
+                      style: disabledStyle,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(CupertinoIcons.chevron_down, size: 14),
+                  Icon(
+                    CupertinoIcons.chevron_down,
+                    size: 14,
+                    color: disabledStyle?.color,
+                  ),
                 ],
               )
             : CupertinoListTile(
-                title: Builder(
-                  builder: (context) => DefaultTextStyle(
-                    style: DefaultTextStyle.of(context).style,
-                    child: Text(label),
-                  ),
-                ),
-                subtitle: Builder(
-                  builder: (context) => DefaultTextStyle(
-                    style: DefaultTextStyle.of(context).style,
-                    child: Text(options[value] ?? '选择'),
-                  ),
-                ),
+                title: tileLabel(label),
+                subtitle: tileLabel(valueLabel),
                 trailing: const CupertinoListTileChevron(),
               ),
       ),

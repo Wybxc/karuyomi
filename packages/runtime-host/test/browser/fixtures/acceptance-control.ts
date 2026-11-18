@@ -15,6 +15,7 @@ import {
 
 import { filterAcceptanceControl } from './acceptance-filters.js';
 import { migrationAcceptanceControl } from './acceptance-migration.js';
+import { preferenceGroupAcceptanceControl } from './acceptance-preference-groups.js';
 
 interface BrowserRuntime {
   control(input: unknown): Promise<ControlResponseJson>;
@@ -53,6 +54,13 @@ if (profile === 'migration') {
       rejectBuild,
       listingSource,
     ),
+  };
+}
+
+if (profile === 'preference-groups') {
+  browser.karuyomiRuntime = {
+    ...host,
+    control: preferenceGroupAcceptanceControl((input) => host.control(input)),
   };
 }
 

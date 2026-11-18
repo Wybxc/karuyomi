@@ -39,6 +39,28 @@ void main() {
   );
 
   for (final brightness in Brightness.values) {
+    testWidgets(
+      'disabled choice labels use the Cupertino disabled color in $brightness',
+      (tester) async {
+        for (final inline in [true, false]) {
+          await show(
+            tester,
+            options: short,
+            onChanged: null,
+            inline: inline,
+            brightness: brightness,
+          );
+          for (final label in [inline ? '选择：' : '选择', '单页']) {
+            final text = find.text(label);
+            expect(
+              tester.widget<Text>(text).style?.color,
+              CupertinoColors.tertiaryLabel.resolveFrom(tester.element(text)),
+            );
+          }
+        }
+      },
+    );
+
     for (final scale in [1.0, 2.0]) {
       for (final searchable in [false, true]) {
         testWidgets(
