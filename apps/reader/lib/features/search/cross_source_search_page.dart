@@ -256,6 +256,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
         group.hasNextPage ||
         group.status == SourceSearchStatus.error ||
         group.status == SourceSearchStatus.cancelled;
+    final canCancel = controller.canCancel(group);
     return Semantics(
       container: true,
       explicitChildNodes: true,
@@ -428,26 +429,28 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                 children: [
                   if (group.status == SourceSearchStatus.queued ||
                       group.status == SourceSearchStatus.loading)
-                    MergeSemantics(
+                    Semantics(
+                      enabled: canCancel,
                       child: CupertinoButton(
                         key: ValueKey((
                           'cross-search-cancel',
                           group.target.key,
                         )),
-                        onPressed: controller.canChange
+                        onPressed: canCancel
                             ? () => unawaited(controller.cancel(group))
                             : null,
                         child: const Text('停止此源'),
                       ),
                     ),
                   if (group.status == SourceSearchStatus.cancellationFailed)
-                    MergeSemantics(
+                    Semantics(
+                      enabled: canCancel,
                       child: CupertinoButton(
                         key: ValueKey((
                           'cross-search-cancel-retry',
                           group.target.key,
                         )),
-                        onPressed: controller.canChange
+                        onPressed: canCancel
                             ? () => unawaited(controller.cancel(group))
                             : null,
                         child: const Text('重试停止'),
@@ -544,7 +547,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (!controller.available && _closeDestination == null)
+                        if (controller.retired && _closeDestination == null)
                           Padding(
                             padding: const EdgeInsets.all(16),
                             child: Text(
@@ -563,7 +566,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                               ),
                             ),
                           ),
-                        if (controller.cleanupError != null)
+                        if (controller.cleanupNotice case final notice?)
                           CupertinoFormSection.insetGrouped(
                             margin: EdgeInsets.zero,
                             header: Semantics(
@@ -579,7 +582,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                               Padding(
                                 padding: const EdgeInsets.all(16),
                                 child: Text(
-                                  controller.cleanupError!,
+                                  notice,
                                   key: const ValueKey(
                                     'cross-search-cleanup-error',
                                   ),

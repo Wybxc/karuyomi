@@ -48,7 +48,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
     bool Function()? isCurrent,
   }) : isCurrent = isCurrent ?? (() => true) {
     service.addListener(_serviceChanged);
-    if (!service.available) _retired = true;
+    _retired = service.retired;
   }
 
   final CatalogSourceSearch service;
@@ -69,10 +69,22 @@ final class CrossSourceSearchController extends ChangeNotifier {
   bool _closed = false;
   int _epoch = 0;
 
-  bool get available =>
-      !_disposed && !_retired && !_closed && service.available;
+  bool get _ownsSearch =>
+      !_disposed && !_retired && !_closed && !service.retired;
+  bool get retired => !_ownsSearch;
+  bool get available => _ownsSearch && service.available;
   String? get unavailableReason =>
       available ? null : service.unavailableReason ?? '身份或服务已改变，请关闭后重新开始搜索。';
+  String? get cleanupNotice =>
+      cleanupError ??
+      (_ownsSearch && !service.available && !_stopPending
+          ? service.unavailableReason
+          : null);
+  bool get _stopPending => groups.any(
+    (group) =>
+        group.status == SourceSearchStatus.cancelling ||
+        group.status == SourceSearchStatus.cancellationFailed,
+  );
   bool get hasActive => groups.any((group) => group.active);
   bool get opening => _openingTarget != null;
   ({String title, String sourceName})? get openingTarget =>
@@ -81,14 +93,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       groups.fold(0, (count, group) => count + group.mangas.length);
   bool get canChange =>
       available && !loadingTargets && !transitioning && !opening;
-  bool get canSearch =>
-      canChange &&
-      cleanupError == null &&
-      !groups.any(
-        (group) =>
-            group.status == SourceSearchStatus.cancelling ||
-            group.status == SourceSearchStatus.cancellationFailed,
-      );
+  bool get canSearch => canChange && cleanupError == null && !_stopPending;
   bool get canStart => canSearch && targets.isNotEmpty;
   bool get canSelect => canSearch && !hasActive;
   List<String> get languages =>
@@ -99,11 +104,11 @@ final class CrossSourceSearchController extends ChangeNotifier {
     ),
   );
 
-  bool _current(int epoch) => available && isCurrent() && epoch == _epoch;
+  bool _current(int epoch) => _ownsSearch && isCurrent() && epoch == _epoch;
 
   void _serviceChanged() {
     if (_disposed) return;
-    if (!service.available) {
+    if (service.retired && !_retired) {
       _retired = true;
       ++_epoch;
     }
@@ -264,15 +269,21 @@ final class CrossSourceSearchController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool canCancel(SourceSearchGroup group) =>
+      _ownsSearch &&
+      !transitioning &&
+      !opening &&
+      group._task != null &&
+      (group.status == SourceSearchStatus.cancellationFailed ||
+          service.available &&
+              {
+                SourceSearchStatus.queued,
+                SourceSearchStatus.loading,
+              }.contains(group.status));
+
   Future<void> cancel(SourceSearchGroup group) async {
-    final task = group._task;
-    if (!available ||
-        transitioning ||
-        task == null ||
-        !groups.contains(group) ||
-        group.status == SourceSearchStatus.cancelling) {
-      return;
-    }
+    if (!canCancel(group) || !groups.contains(group)) return;
+    final task = group._task!;
     final request = ++group._request;
     final epoch = _epoch;
     group.status = SourceSearchStatus.cancelling;

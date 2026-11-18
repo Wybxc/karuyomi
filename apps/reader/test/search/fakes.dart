@@ -84,6 +84,8 @@ final class FakeSourceSearch extends CatalogSourceSearch {
   @override
   bool get available => alive;
   @override
+  bool get retired => !alive;
+  @override
   String? get unavailableReason => alive ? null : '原账户已失效';
 
   void changeAvailability(bool value) {

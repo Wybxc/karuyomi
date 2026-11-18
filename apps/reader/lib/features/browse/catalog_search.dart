@@ -37,6 +37,7 @@ abstract interface class SourceSearchTask {
 /// Closing an operation never closes a reader or borrows its execution slot.
 abstract class CatalogSourceSearch extends ChangeNotifier {
   bool get available;
+  bool get retired;
   String? get unavailableReason;
   Future<List<SourceSearchTarget>> loadTargets();
   SourceSearchTask search(
@@ -89,14 +90,19 @@ final class _SearchJob implements SourceSearchTask {
   bool opening = false;
   bool finished = false;
   Future<void>? cancelling;
+  SourceRuntime? _unconfirmedReset;
   @override
   Future<SourceSearchPage> get result => _result.future;
   bool get isCancelled => cancelled.isCompleted;
   @override
-  Future<void> cancel() {
+  Future<void> cancel({bool retryCleanup = true}) {
+    if (cancelling case final pending?) return pending;
+    if (_unconfirmedReset case final runtime?) {
+      return retryCleanup ? _retryReset(runtime) : Future.value();
+    }
     if (finished) return Future.value();
     if (!cancelled.isCompleted) cancelled.complete();
-    return cancelling ??= _cancel().whenComplete(() {
+    return cancelling = _cancel().whenComplete(() {
       cancelling = null;
     });
   }
@@ -128,14 +134,22 @@ final class _SearchJob implements SourceSearchTask {
 
   Future<void> _reset(SourceRuntime runtime, _SearchPackage running) async {
     try {
-      await runtime.rebuildHost();
-    } catch (failure) {
+      await owner._resetPackage(runtime, running);
+    } catch (_) {
       // A rejected open is only a logical epoch change. Without a reset ACK,
       // startup may still own a physical Worker even before session exists.
-      owner._dirty[runtime] = running.session;
-      owner._cleanupError(failure);
+      _unconfirmedReset = runtime;
       rethrow;
     }
+  }
+
+  Future<void> _retryReset(SourceRuntime runtime) async {
+    final running = package!;
+    await running.running;
+    if (identical(owner._dirty[runtime], running)) {
+      await owner._retryRelease(runtime);
+    }
+    _unconfirmedReset = null;
   }
 
   void fail(Object error, [StackTrace? stack]) {
@@ -177,7 +191,8 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
   final _packages = <String, _SearchPackage>{};
   final _jobs = <_SearchJob>{};
   final _targets = <String, SourceSearchTarget>{};
-  final _dirty = <SourceRuntime, RuntimeSession?>{};
+  final _dirty = <SourceRuntime, _SearchPackage?>{};
+  final _releaseRetries = <SourceRuntime, Future<void>>{};
   late final List<StreamSubscription<RuntimeEvent>> _events;
   Future<void>? _claiming;
   Future<void>? _stopping;
@@ -190,16 +205,17 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
   int _requestSequence = 0;
 
   @override
-  bool get available =>
-      !_retired &&
-      !_disposed &&
-      !_closed &&
-      !catalog._closed &&
-      identical(catalog._confirmedBusinessClient, client) &&
-      {ServiceStatus.ready, ServiceStatus.failed}.contains(catalog.status) &&
-      _cleanupFailure == null;
+  bool get retired =>
+      _retired ||
+      _disposed ||
+      _closed ||
+      catalog._closed ||
+      !identical(catalog._confirmedBusinessClient, client) ||
+      !{ServiceStatus.ready, ServiceStatus.failed}.contains(catalog.status);
   @override
-  String? get unavailableReason => _cleanupFailure ?? _reason;
+  bool get available => !retired && _cleanupFailure == null;
+  @override
+  String? get unavailableReason => _reason ?? _cleanupFailure;
 
   void _notify() {
     if (!_disposed) notifyListeners();
@@ -236,7 +252,7 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
           sha256: job.target.bundleSha256,
         )) {
           unawaited(
-            job.cancel().catchError((Object failure) {
+            job.cancel(retryCleanup: false).catchError((Object failure) {
               _cleanupError(failure);
             }),
           );
@@ -341,7 +357,7 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
       catalog._notify();
     } catch (_) {
       if (catalog.session != null && identical(catalog._searchOwner, this)) {
-        _dirty[catalog.runtime] = catalog.session;
+        _dirty[catalog.runtime] = null;
         _cleanupError(StateError('前台运行槽尚未关闭。'));
       } else if (identical(catalog._searchOwner, this)) {
         catalog._searchOwner = null;
@@ -437,13 +453,16 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
           }
         } finally {
           await _closePackage(package);
-          package.runtime = null;
-          _free.add(runtime);
+          if (!_dirty.containsKey(runtime)) {
+            package.runtime = null;
+            _free.add(runtime);
+          }
         }
       });
     } catch (failure, stack) {
-      if (package.runtime != null) {
-        _dirty[package.runtime!] = package.session;
+      if (package.runtime case final runtime?
+          when !_dirty.containsKey(runtime)) {
+        _dirty[runtime] = package;
         _cleanupError(failure);
       }
       for (final job in package.jobs) {
@@ -584,18 +603,13 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
     try {
       await package.active?.cancelling;
     } catch (_) {
-      // A failed cancellation reset is tracked in _dirty and retried below.
+      // The original slot remains reserved until its release is confirmed.
     }
     final runtime = package.runtime;
     final session = package.session;
-    if (runtime == null) return;
-    if (_dirty.containsKey(runtime)) {
-      await runtime.rebuildHost();
-      _dirty.remove(runtime);
-      package.session = null;
+    if (runtime == null || session == null || _dirty.containsKey(runtime)) {
       return;
     }
-    if (session == null) return;
     try {
       await runtime.closeBuild(
         buildId: session.buildId,
@@ -604,9 +618,53 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
     } catch (_) {
       // Search exclusively owns this slot; a reset ACK is a safe physical
       // fallback for cleanup, never a replay of the Source operation.
-      await runtime.rebuildHost();
+      await _resetPackage(runtime, package);
     }
     package.session = null;
+  }
+
+  Future<void> _resetPackage(
+    SourceRuntime runtime,
+    _SearchPackage package,
+  ) async {
+    try {
+      await runtime.rebuildHost();
+      package.session = null;
+    } catch (failure) {
+      _dirty[runtime] = package;
+      _cleanupError(failure);
+      rethrow;
+    }
+  }
+
+  Future<void> _retryRelease(SourceRuntime runtime) {
+    if (!_dirty.containsKey(runtime)) return Future.value();
+    return _releaseRetries[runtime] ??= _releaseSlot(runtime).whenComplete(() {
+      _releaseRetries.remove(runtime);
+    });
+  }
+
+  Future<void> _releaseSlot(SourceRuntime runtime) async {
+    await runtime.rebuildHost();
+    final package = _dirty.remove(runtime);
+    if (package != null) {
+      package.session = null;
+      package.runtime = null;
+      if (identical(catalog._searchOwner, this) && _packages.isNotEmpty) {
+        _free.add(runtime);
+      }
+    }
+    if (identical(runtime, catalog.runtime)) catalog._dropSession();
+    if (_dirty.isEmpty) {
+      final failure = _cleanupFailure;
+      _cleanupFailure = null;
+      if (!catalog._closed && failure != null && catalog.error == failure) {
+        catalog.error = null;
+        catalog._notify();
+      }
+      if (_packages.isEmpty) _release();
+      _notify();
+    }
   }
 
   void _release() {
@@ -626,10 +684,9 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
     await Future.wait(
       jobs.map((job) async {
         try {
-          await job.cancel();
-          return null;
-        } catch (failure) {
-          return failure;
+          await job.cancel(retryCleanup: false);
+        } catch (_) {
+          // This stop waits for packages, then attempts unreleased slots below.
         }
       }),
     );
@@ -640,9 +697,7 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
           .toList(),
     );
     for (final runtime in _dirty.keys.toList()) {
-      await runtime.rebuildHost();
-      _dirty.remove(runtime);
-      if (identical(runtime, catalog.runtime)) catalog._dropSession();
+      await _retryRelease(runtime);
     }
     _cleanupFailure = null;
     _release();

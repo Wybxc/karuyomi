@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-19，跨源搜索控制器和执行槽回归复现丢失停止确认时的不可恢复等待。修正后只重试原资源释放，保持旧查询，拦截迟到结果。正式 Web 双主题待验。[复现与修正](verification/mihon-cupertino-fidelity.md#跨源停止确认丢失的复现与修正)
+
 2026-11-19，`78f4c4b` 正式 Web 双主题确认 257／256 条映射时禁用，减去一条后能进入二次确认，退出后权威状态一致。20.K18 补齐，主图累计 148/169（87.6%）。[实拍与读回](verification/mihon-cupertino-fidelity.md#章节映射超限的正式-web-双主题验收)
 
 2026-11-19，`5f5d287` 正式 Web 通过真实英语 Commit Strip 的设置空态双主题，重读及关闭无额外写入，主图累计 147/169（87.0%）。[实拍与读回](verification/mihon-cupertino-fidelity.md#漫画源设置空态的正式-web-双主题验收)
