@@ -6,11 +6,13 @@ Static Assets 是所有客户端扩展分发的最终权威来源。每包只部
 
 Web/API 按[原型自动上线流程](../DEPLOYMENT.md)在主线 CI 成功后发布，复用同轮构建与现网扩展快照；[浏览 UI 已上线](../verification/browse-ui-flow.md#生产发布)。扩展操作入口见 [EXTENSIONS](../EXTENSIONS.md)，材料契约见 [RUNTIME-MATERIALS](../RUNTIME-MATERIALS.md)，包体方案见 [AOT-SIZE](../AOT-SIZE.md)。扩展 Release/R2 发布实现已删除。实际证据见 [VERIFICATION](../VERIFICATION.md)。
 
-2026-11-05 功能收尾将 host ABI 升至 v4：Java entry 和 HTTP 传输加入每次调用的 owner token，后台 enqueue 有界排空后才交付主结果。固定 `1f599cd` 的 xkcd、Arknights、CuuTruyen 已本地重编并通过限定 Web 运行/图片分项，见[v4 运行证据](../verification/v4-source-runtime.md)。随后部署的 [v4 三包快照](../verification/v4-production.md)通过匿名 26 路径及旧网络政策核对；它是 0.1.0 的父快照。下文 v1/v3 记录是历史冻结批次，保留原检查点和输入身份。
+本机已清理 v1、v3 和六材料时期的独立构建树、旧 SDK 与一次性验收工程。这些批次的输入和验收边界见下文。七材料首批已确认的发布状态与交接记录继续用于核对后续发布。
+
+2026-11-05 功能收尾将 host ABI 升至 v4：Java entry 和 HTTP 传输加入每次调用的 owner token，后台 enqueue 有界排空后才交付主结果。固定 `1f599cd` 的 xkcd、Arknights、CuuTruyen 已本地重编并通过限定 Web 运行/图片分项，见[v4 运行证据](../verification/v4-source-runtime.md)。随后部署的 [v4 三包快照](../verification/v4-production.md)通过匿名 26 路径及旧网络政策核对；它是 0.1.0 的父快照。下文 v1/v3 记录是历史冻结批次，下文记录原输入身份。
 
 2026-11-07，固定 v6 完成全量发现与 3 包本地串行试编，试编候选未部署。试编发现同一输入可能生成不同 canonical JS，旧的仅输入派生 ID 会隐藏实际更新。见[试编与身份对照](../verification/aot-current-pilot.md)。绑定摘要的公开 ID 已通过固定三包真编译和静态装配。内置浏览器在同一 D1 验证旧路由下架、xkcd 正式确认更新、本机旧副本清理及原书架首次续读。同日用固定 `952bbab` 的完整计划启动本地单并发 baseline，复用三个精确匹配的试编检查点，开始处理其余 1,445 包。见[本地启动记录](../verification/aot-current-pilot.md#首次本地全量启动)。
 
-2026-11-08，实测冻结 `952bbab` 和当前主分支虽然同为 ABI v6 / protocol 2，`graphics-bridge.js` 摘要及宿主指纹已经不同。所有冻结清单都引用旧材料；正式静态组装拒绝混用，Native 同样须配套材料。旧队列已通过正式取消退出，结果保留为该提交的构建证据；固定 `c04d436` 与已确认的生产 parent 已另行启动本地全量，见[当前宿主全量启动](../verification/aot-current-pilot.md#当前宿主全量启动)。待全量结束并验证候选后，才进行生产发布与增量 CI 验收。
+2026-11-08，实测冻结 `952bbab` 和当前主分支虽然同为 ABI v6 / protocol 2，`graphics-bridge.js` 摘要及宿主指纹已经不同。所有冻结清单都引用旧材料；正式静态组装拒绝混用，Native 同样须配套材料。旧队列已通过正式取消退出，该批次已结束，旧材料不能进入当前快照；固定 `c04d436` 与已确认的生产 parent 已另行启动本地全量，见[当前宿主全量启动](../verification/aot-current-pilot.md#当前宿主全量启动)。待全量结束并验证候选后，才进行生产发布与增量 CI 验收。
 
 扩展网络登记已移除。[隔离 D1 切换演练](../verification/d1-relay-cutover.md)确认：`0009` 是新版 Source 设置前置条件，也会停止旧中继；需要短维护窗口先应用 `0009`、再切换 Worker/Static Assets，最后应用 `0010`。生产已按该顺序切换，`0010` 后的 xkcd 读图与保存通过。
 
@@ -59,9 +61,9 @@ clab 冻结全量与三个定向补编已结束；[六材料完整候选](../ver
 
 2026-11-04，当时 hostFingerprint `46e63625a0e1920d284c1077de8aca939f8948d1e50694259834f0846844e0db` 的三包候选已通过正式交付校验。重连 / 布局修复后的客户端从固定 `be5c3ed6d254c6ebd21048f801e49c0f60b5d3c6` 成功完成正式 build、API Worker dry-run 与静态组装一致性检查；`main.dart.js` SHA-256 为 `a20e6595ed2a299ac227402e9a5ab475b503205b9c6ddb8058e34aeca350d6fa`。host 输入、三包 AOT、共享材料 `63a061a…7a9d` 和 Native 内置 runtime 字节与原 b4 候选一致，静态索引 / 清单精确匹配，仅包含索引引用产物，MIME 规则正确。固定树跟踪输入干净，未改 checkpoint。
 
-该历史 v3 本地候选 revision 为 `e8d72f7ca646483bb98a7e83b0a26334`，parent 为 `22378bbcb89d40f5a0397c5098310072`；当时 `bootstrapComplete=false`、未部署、未启用定时 CI，不是当前生产 revision。完整摘要留在固定树 `/Users/wybxc/.codex/worktrees/reconnect-reader-validation/karuyomi` 的 ignored `.local/reconnect-client-build/client-build-summary.json`。三包及客户端实际分项分别见 [Source Cache](../verification/source-network-cache.md)、[Native Cache](../verification/source-cache-native.md)与[完整章阅读](../verification/full-chapter-web.md)，不将本地构建等同生产或完整 baseline 验收。
+该历史 v3 本地候选 revision 为 `e8d72f7ca646483bb98a7e83b0a26334`，parent 为 `22378bbcb89d40f5a0397c5098310072`；当时 `bootstrapComplete=false`、未部署、未启用定时 CI，不是当前生产 revision。三包及客户端实际分项分别见 [Source Cache](../verification/source-network-cache.md)、[Native Cache](../verification/source-cache-native.md)与[完整章阅读](../verification/full-chapter-web.md)，不将本地构建等同生产或完整 baseline 验收。
 
-历史 v3 首次全量在 main ignored `.local/aot-static-abi3-b4/` 独立 clone 固定 `b4f72f7`，三 submodule 与工具链均锁定、跟踪输入干净；独立 state 来自当时最后已部署 revision，不复制在途 v1 checkpoint。完整冻结计划覆盖 1448 包，并发 1，曾通过正式校验导入三个真实交付供恢复复用。官方 `bootstrap --jobs 1 --limit 10000 --finalize` 曾启动，仅构建和准备本地快照，不自动部署或提交已部署 state，之后已中断。完整 baseline 尚未完成；当时的进程与本地恢复说明保留在 ignored `.local/v3-baseline-plan/` 和独立队列目录，仅供追溯。当前生产已前进到 v4，不能恢复该旧计划后直接发布，也不能修改 parent 绕过前置检查；后续产品 baseline 应基于当前协议、固定输入及已确认的生产 checkpoint 另建计划。
+历史 v3 首次全量在独立 clone 固定 `b4f72f7`，三 submodule 与工具链均锁定、跟踪输入干净；独立 state 来自当时最后已部署 revision，不复制在途 v1 checkpoint。完整冻结计划覆盖 1448 包，并发 1，曾通过正式校验导入三个真实交付供恢复复用。官方 `bootstrap --jobs 1 --limit 10000 --finalize` 曾启动，仅构建和准备本地快照，不自动部署或提交已部署 state，之后已中断。该批次未完成全量基线。生产随后前进到 v4，不能恢复该旧计划后直接发布，也不能修改 parent 绕过前置检查；后续产品 baseline 应基于当前协议、固定输入及已确认的生产 checkpoint 另建计划。
 
 已亲读新 v3 队列的首个实际新构建样本 `all.ahottie`：buildId `ext-all.ahottie-b92d36ca170dd2e6ef9dccdeb92c82d0`，正式 builder 204.91 秒完成，canonical 3791303 B、gzip 793431 B；pipeline 结果为 `built` / `compiled_unverified`，不代表 Source 已可运行。记录位于该独立队列 `builds/b92d36ca170dd2e6ef9dccdeb92c82d0673b49a9d7ae71baa45241bfc1518600/` 的 `build-result.json` 与 `pipeline-result.json`。这是固定样本证据，不维护变化中的完成计数；该记录仅证明当时执行的固定样本，当前队列是否活动以本节末尾复核为准；旧 v1 冻结输入未改。另已核对 `bookorbit` 的正式 AOT 日志：缺少 `OkHttpClient.Builder.dns(Dns)`，属于按包隔离的宿主 ABI 失败，不是环境下载或工具链失败，不将其标为可运行。
 

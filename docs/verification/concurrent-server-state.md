@@ -36,16 +36,7 @@ ProtoJSON 省略的零值按协议解码。前两组逐字节比对证明刷新�
 
 只读业务 API 同时携带 `X-App-Request: 1` 和与受验签身份匹配的 `X-App-Subject: probe-owner`，通过 library/state 取得作品与章节键；该 header 仅校验会话绑定，不能选择账户。请求缺少或不匹配 subject 时不能作为有效状态证据。
 
-原始状态、网络和临时日志留在忽略的 `.local/sync-conflicts/`，不提交。必要状态比对命令：
-
-```sh
-cmp .local/sync-conflicts/b-page-two.json \
-  .local/sync-conflicts/a-conflicted-reading.json
-cmp .local/sync-conflicts/b-reset.json \
-  .local/sync-conflicts/a-stale-epoch-reading.json
-cmp .local/sync-conflicts/a-reopened-reset.json \
-  .local/sync-conflicts/b-stale-revision.json
-```
+当轮将写端确认后的状态与另一标签遇到旧 epoch、旧 revision 后的读回分别做了逐字节比较。
 
 两页已关闭，测试服务收到中断后退出；独立进程复核未见该测试代理或 workerd，`8897` 无监听。Miniflare 退出后遗留的本轮临时 D1 与静态快照目录已精确删除，必要 API 状态与网络证据保留在上述忽略目录。
 
@@ -249,7 +240,7 @@ A / B 的 Flutter 集成测试各 1/1 通过，分别为进程 `93889` 和 `9555
 
 iOS（进程 `76166`）与 Android（进程 `4334`）的 Flutter 集成测试各 1/1 通过。两条实际业务 POST 使用不同 UUID、相同预期作品 revision 3；请求到达相差 21 ms，Worker 处理窗重叠 3 ms，双方都进入原 D1 批次入口 2 ms 后才有首个响应。回环协调器只同步正式按钮和只读取样；验证同时到达事务入口、单次提交及冲突恢复，不表示 D1 并行执行写入。
 
-复验沿用[双 Reader HTTPS 驱动](../../apps/reader/integration_test/README.md#阅读进度同时写)与 `ACCEPTANCE_FIXTURE=progress-cas-race`。本机忽略目录 `.local/native-mixed-cas-426536d/` 保存驱动补丁、阶段快照、两端日志及 D1 审计。此轮覆盖 iOS 完成获胜、Android 拒绝重置的分支；相反分支见下节。
+复验沿用[双 Reader HTTPS 驱动](../../apps/reader/integration_test/README.md#阅读进度同时写)与 `ACCEPTANCE_FIXTURE=progress-cas-race`。此轮覆盖 iOS 完成获胜、Android 拒绝重置的分支；相反分支见下节。
 
 ### iOS 重置获胜与 Android 旧完成冲突
 
@@ -259,7 +250,7 @@ iOS（进程 `76166`）与 Android（进程 `4334`）的 Flutter 集成测试各
 
 iOS「重新阅读本章」返回 200 并留下唯一回执；Android「读完本章」返回 409 / `REVISION_CONFLICT`，无回执。两条响应指向同一权威状态：revision `5/4`、epoch 1、未完成、当前第 1 页、无最远位置。iOS 解码第 1 页后的正常观察另行保存，revision 变为 `6/5`，当前及最远均为第 1 页。Android 保持原阅读页并往返 `2 → 1 → 2`，显式重开后显示真实第 1 页。从胜端观察保存后，到 Android 翻页、显式重开及双端退出，六路 GET 逐字节一致。
 
-复验步骤、驱动和夹具补丁、独立 D1 审计及阶段快照见本机忽略目录 `.local/native-mixed-reset-426536d/REPRODUCE.md` 与 `evidence/verified.json`。这是隔离模拟器的指定竞争顺序；Web 配对、真机与生产另验。
+这是隔离模拟器的指定竞争顺序；Web 配对、真机与生产另验。
 
 ## Worker 更新保留 D1 状态与原回执
 
@@ -279,7 +270,7 @@ Wrangler harness 3/3、API 严格类型与依赖检查通过。本分项验证 W
 - 点「读完本章」后，夹具的 SQLite trigger 在正式 D1 原子批次最后一次回执更新时拒绝写入。正式 API 返回 503 `UNAVAILABLE`；账户/作品 revision 保持 `4/3`，没有该 mutation 的持久回执，读回仍是第 2 页、未完成。界面保留同一阅读器和图片，显示「进度尚未获服务器确认」及「重试保存」。
 - 点击「重试保存」后，审计确认请求 UUID、正文 SHA-256 和预期作品 revision 均一致。正式 API 返回 200 并留下唯一持久回执；账户/作品 revision 各增加一次至 `5/4`。未确认提示消失，同一画面显示本章读完。退出测试客户端后，由另一个进程经正常 HTTPS 读回，确认当前位置和最远仍为第 2 页，`completed=true`。
 
-复验使用[正式 Native 驱动](../../apps/reader/integration_test/README.md#d1-拒绝阅读进度写入)的 `ACCEPTANCE_FIXTURE=progress-d1-error` / `SYNC_PHASE=d1-error`。正式安装/收藏和阅读驱动分别通过，Workers 定向测试 3/3。原始日志、正常停服后的 `ACCEPTANCE_PROGRESS_D1_ERROR_AUDIT` 和独立读回保留在忽略目录 `.local/progress-d1-error.LSvAOc/`。该分项覆盖真实本地 D1 批次回滚与 iOS 显式重试；丢确认和其它平台分别验收。
+复验使用[正式 Native 驱动](../../apps/reader/integration_test/README.md#d1-拒绝阅读进度写入)的 `ACCEPTANCE_FIXTURE=progress-d1-error` / `SYNC_PHASE=d1-error`。正式安装/收藏和阅读驱动分别通过，Workers 定向测试 3/3。该分项覆盖真实本地 D1 批次回滚与 iOS 显式重试；丢确认和其它平台分别验收。
 
 ## Android 模拟器阅读进度写入被 D1 拒绝
 
@@ -288,7 +279,7 @@ Wrangler harness 3/3、API 严格类型与依赖检查通过。本分项验证 W
 - 正式界面安装、收藏并显示真实第 2 页。点「读完本章」后，原阅读器和图片继续显示，进度提示未确认，作品和账户状态保持，章未完成。显式重试后未确认提示消失，显示已读完。停服审计证明 503 `UNAVAILABLE` 无持久回执，200 有唯一回执；两次 UUID、原始正文摘要、预期作品 revision 3 一致，账户/作品 revision 从 `4/3` 只增加一次至 `5/4`。
 - 退出后从独立进程经正式书架入口继续阅读；首个真实解码画面为第 2 页，显示已读完。六路业务 GET 在续读前后逐字节一致。续读单独使用隔离驱动差异以期待已完成状态，未修改产品；第一次使用原驱动时在点击前因预期未完成而停止，独立状态未变化。
 
-复验沿用上节与[正式 Android HTTPS 说明](../../apps/reader/integration_test/README.md#d1-拒绝阅读进度写入)。日志、六路独立读回、隔离续读驱动差异和精确参数保存在 `.local/progress-d1-error-android-cc5f4d2/`。此分项仅覆盖 Android 模拟器和隔离 D1 的写入拒绝与重试，生产、真机和 Web 单独验收。
+复验沿用上节与[正式 Android HTTPS 说明](../../apps/reader/integration_test/README.md#d1-拒绝阅读进度写入)。此分项仅覆盖 Android 模拟器和隔离 D1 的写入拒绝与重试，生产、真机和 Web 单独验收。
 
 ## Web 阅读进度写入被 D1 拒绝
 
@@ -296,4 +287,4 @@ Wrangler harness 3/3、API 严格类型与依赖检查通过。本分项验证 W
 
 点「读完本章」后，阅读器保持第 2 页，显示进度尚未获服务器确认，草稿仅保留在当前会话。设置、书架、作品、书签、全部进度和当前章节进度六路独立 API 响应与拒绝前逐字节一致。点击「重试保存」后，提示改为已保存到服务端，账户／作品 revision 只各推进一次至 `7/5`，正式读回 `completed=true`。关闭原文档，在新文档从书架「继续阅读」首次恢复第 2 页且本章已读完；六路响应与重试后逐字节一致。
 
-原始阶段快照和读取脚本保存在本机忽略目录 `.local/progress-d1-error-web.cpvM86/`。此次停服未导出逐请求回执，因此只以独立快照确认回滚和一次状态提交；实际重试的 UUID／正文及失败无回执由上述 Native 审计和正式夹具回归单独核对。生产与真机另验。
+此次停服未导出逐请求回执，因此只以独立快照确认回滚和一次状态提交；实际重试的 UUID／正文及失败无回执由上述 Native 审计和正式夹具回归单独核对。生产与真机另验。

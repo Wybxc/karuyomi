@@ -31,7 +31,7 @@ HTTP smoke 已实际通过：签名 bootstrap 为 200；业务缺失或错误 su
 - A 保留打开时的关联编辑并取消选中“工作日”；B 先将该分类改名“通勤”。A 保存明确显示“分类或漫画已在其他设备修改，请重新读取后重开编辑”，没有覆盖另一端目录或旧关系。显式重新读取并关闭后恢复当前确认视图。
 - B 删除临时“通勤”分类；A 刷新后目录与两部漫画只剩“休闲”，收藏仍为两部。B 整页重载后从 D1 恢复同一目录与关系。
 
-最后 API 读回 account revision 为 10、catalog revision 为 6；甲 revision 为 3、乙为 2，两者关联同一保留分类。初轮服务 exit=0，监听端口 61987 已释放。构建日志与截图保留在忽略的 `.local/category-acceptance/`。
+最后 API 读回 account revision 为 10、catalog revision 为 6；甲 revision 为 3、乙为 2，两者关联同一保留分类。初轮服务 exit=0，监听端口 61987 已释放。
 
 初轮之后仅补了同身份重连期间原命令完成的界面状态：恢复中的管理器接纳确认快照，关联弹窗给出已确认提示与手动完成按钮，不新增自动导航。最终产物的实际回归如下，初轮身份保持原样。
 
@@ -57,13 +57,13 @@ HTTP smoke 已实际通过：签名 bootstrap 为 200；业务缺失或错误 su
 | B delete         | 删除目录，两部收藏保留且关系清空                 | 3             | 3 / 3            |
 | A verify-deleted | 新进程读回两部未分类，实际选择未分类筛选         | 3             | 3 / 3            |
 
-最终独立 API 读回 account revision 7、空分类目录和两部 favorite=true，与 UI/驱动结果相符。五份原始日志保留在忽略的 `.local/category-native/{a-create,b-update,a-verify,b-delete,a-verify-deleted}.log`。官方 harness 已 exit=0，端口 56341 已释放。这是两台 iOS 模拟器的顺序读写与新进程恢复，不是同时写竞争、真实断网、生产 Access、物理触控、Source 阅读或真机性能验收；其它平台组合另列。
+最终独立 API 读回 account revision 7、空分类目录和两部 favorite=true，与 UI/驱动结果相符。官方 harness 已 exit=0，端口 56341 已释放。这是两台 iOS 模拟器的顺序读写与新进程恢复，不是同时写竞争、真实断网、生产 Access、物理触控、Source 阅读或真机性能验收；其它平台组合另列。
 
 ## iOS 与 Android 顺序闭环
 
 2026-11-06，重新构建 `pnpm acceptance:build:native` 并启动新隔离 HTTPS harness（端口 59252），可选分类 fixture 经生成 ProtoJSON 与正式 mutation API 自动初始化两部收藏。正式 Web 产物 SHA 与上一节双 Web 最终产物一致；Native 驱动 SHA-256 为 `056e45089e0f7fca60b2294d8bdd5bd4396ec8188f442a541232b1cd9ede88c4`。Android 为本轮专用 API 36 / Android 16 ARM64 模拟器，WebView 133.0.6943.137；iOS 使用上一节 A。Android 的忽略 debug 副本逐文件核对产品 Dart、驱动与内置材料，只调整测试 applicationId、debug CA 配置和构建运行参数；CA 仅对精确 `127.0.0.1` 生效，保留系统 CA、hostname/TLS 校验，禁止明文，未改变主树 release。
 
-Android create、iOS update、Android verify、iOS delete 四阶段各 1/1 通过：Android 创建并关联甲，iOS 读回后改名并关联乙，Android 新进程读回共享分类及两关系，iOS 删除后两部收藏保留且均未分类。分类 ID 始终为同一 ID，目录 revision 依次 1→2→3；独立 API 最终读回 account revision 7、空目录。原始结果保留在 `.local/category-native/{android-create,ios-update,android-verify,ios-delete}.log`。
+Android create、iOS update、Android verify、iOS delete 四阶段各 1/1 通过：Android 创建并关联甲，iOS 读回后改名并关联乙，Android 新进程读回共享分类及两关系，iOS 删除后两部收藏保留且均未分类。分类 ID 始终为同一 ID，目录 revision 依次 1→2→3；独立 API 最终读回 account revision 7、空目录。
 
 Android 最后 verify-deleted 首次在测试体加载前 DDS 启动失败；详细日志重试时 DDS 成功，但实际 WebView renderer 在初始化阶段中断，UI 报告“运行容器已中断，请重新连接”，测试失败。失败原始日志分别为 `android-verify-deleted.log` 和 `android-verify-deleted-retry.log`。保留的诊断没有确定更早的网络/JS 错误、OOM、GPU 或原生崩溃；renderer 的 code -1 也可能是加载/握手失败后 dispose 的结果，不能据此认定根因。Android 首轮工具末尾按旧包名卸载失败；第二轮调整本轮 SDK 用户目录导致 debug 签名不同，Flutter 正常卸载再安装后测试通过；这些打包/驱动记录与运行时中断分开保留。
 
@@ -81,7 +81,7 @@ Android 最后 verify-deleted 首次在测试体加载前 DDS 启动失败；详
 
 ## 初始化生命周期修复与复现边界
 
-2026-11-06，另一台专用 API 36 模拟器在同一新 HTTPS harness / D1 上，以忽略副本记录原始 JS 错误和代次。两次独立进程的只读 `verify-deleted` 启动均通过，握手、业务读取与 dispose 正常；该 D1 初始即为空目录，因此不计为新的删除同步证据。日志在 `.local/native-startup/diagnostic-{1,2}.log`。两次成功没有确定原间歇失败根因。
+2026-11-06，另一台专用 API 36 模拟器在同一新 HTTPS harness / D1 上，以忽略副本记录原始 JS 错误和代次。两次独立进程的只读 `verify-deleted` 启动均通过，握手、业务读取与 dispose 正常；该 D1 初始即为空目录，因此不计为新的删除同步证据。两次成功没有确定原间歇失败根因。
 
 正式 Native 适配补齐已确认的生命周期缺口：初始化同时监听本代加载与终止；旧终止回调、握手和控制失败不能改变新容器；重建摘除旧容器后等待插件 run ACK 再释放，只有摘除方清理；关闭开始拒绝新操作，已就绪宿主保留正常 dispose ACK。传输异常保留 JS 原错误，界面仍给出可恢复提示。现有官方插件平台接口测试共 13 项通过，覆盖 run ACK 前重建、初始化取消、旧事件/结果、正常关闭及错误原文。
 

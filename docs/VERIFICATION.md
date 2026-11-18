@@ -1,5 +1,7 @@
 # 实施验证记录
 
+记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
+
 2026-11-18，扩展准备显示目标与版本，独立核对了准备结果先到时仍等待取消确认，以及本机副本清理在重新读取后按原 SHA-256 重试。155 项定向回归和四文件分析通过。内置浏览器控制超时，正式双主题覆盖为 132/169（78.1%）。[准备与清理记录](verification/mihon-cupertino-fidelity.md#扩展准备与本机副本清理)
 
 2026-11-18，跨源搜索无可选源可进入扩展管理。360×800 浅深组件验证搜索关闭后导航、零账户写入及零 Source 打开，相关 110 项回归和三文件分析通过，15.K2 正式画面继续待验。[状态记录](verification/mihon-cupertino-fidelity.md#跨源搜索空态直达扩展管理)
@@ -406,7 +408,7 @@ Access 本人策略覆盖 `/api` 和 `/api/*`。匿名 `/api`、`/api/bootstrap`
 
 同一 `1bfc97f` Arknights Comics 原版扩展已在 Codex 内置浏览器 Chromium 156 经产品 Worker、隔离 D1、真实 workerd 和 HTTP v2 完成在线元数据检查：热门 17 项，搜索首个标题返回同名 1 项，详情成功，章节 3 项，真实章节 pages 返回 51 页；latest 按 `supportsLatest=false` 明确跳过。网络使用显式 `arknights.global` 白名单及真实 RS256 测试身份，不是生产 Access。未请求图片字节，未修改 Source/JAR，也未据此判定图片、Cache/JVM 等价或完整阅读通过。
 
-真实 Flutter + flutter_inappwebview 6.1.5 + iOS 26.4 Simulator 已在本地受信 HTTPS 通过内置运行时验证：控制页真实 307 从 `/runtime/host.html` 到 `/runtime/host`；document-start 内置 host 与 Blob Worker 完成 Arknights Comics 的 `hostInit` / `hostLoad`，返回 Source `5973713386239249589`，IndexedDB 可用，API 携带同源 HttpOnly cookie。服务器故意将远端 host.js、worker.js 和材料路径设为 503，这些路径请求数仍为 0。旧 cache/file 构建明确拒绝并提示升级扩展；同长度篡改 AOT 被 `integrity_error` 拦截，重建容器后正常恢复。实测同时修复 WK 返回 HTTP status `200.0` 的有限整数转换边界，并加入负例回归。临时入口、HTTPS 服务、证书与原始记录均留在 ignored `.local`，正式 app 代码、资源校验及 iOS CocoaPods 集成入库。
+真实 Flutter + flutter_inappwebview 6.1.5 + iOS 26.4 Simulator 已在本地受信 HTTPS 通过内置运行时验证：控制页真实 307 从 `/runtime/host.html` 到 `/runtime/host`；document-start 内置 host 与 Blob Worker 完成 Arknights Comics 的 `hostInit` / `hostLoad`，返回 Source `5973713386239249589`，IndexedDB 可用，API 携带同源 HttpOnly cookie。服务器故意将远端 host.js、worker.js 和材料路径设为 503，这些路径请求数仍为 0。旧 cache/file 构建明确拒绝并提示升级扩展；同长度篡改 AOT 被 `integrity_error` 拦截，重建容器后正常恢复。实测同时修复 WK 返回 HTTP status `200.0` 的有限整数转换边界，并加入负例回归。正式 app 代码、资源校验及 iOS CocoaPods 集成入库。
 
 这项验证覆盖真实 Flutter 原生控制容器和本地 cookie 恢复，不是 Cloudflare Access 正向会话、物理 iPhone、图片通道或 Source 在线语义验收。
 
@@ -438,13 +440,13 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 [Zstd 错误摘要](verification/runtime-evidence.md) 对照实际编译的原版和产品 `Bridge.zstd`。两者对真实 WASM 无效压缩流都返回 `Truncated Zstd frame`；显式注入 rejected host Promise 时，原版生成代码因局部变量名碰撞抛出 `TypeError` 并等待超时，产品实现改用 `failureReason` 后恢复 Java RuntimeException。历史原版对照保留在本地研究归档。
 
-临时独立研究工程和脚本已移入本机被忽略的 `runtime/teavm/.local/research/`，保留原始本地资料，不进入源码仓库。上面的精简文档记录历史机制证据；正式产品与发布回归需要独立测试，不能依赖临时工程存在。
+上面的精简文档记录历史机制证据；正式产品与发布回归需要独立测试，不能依赖临时工程存在。
 
 产品代码现已加入 [HTTP v2](HTTP-BRIDGE.md)：严格帧、Worker 按需响应、JS operation/generation handle、Java Okio Source 与有界上传 Sink。新增协议 38 项及 JS transport 9 项测试；完整 TypeScript 套件 192 项通过。Java 完整 javac 与 `tools/teavm/HttpBodyTest.java` 的 1,051 项断言通过，包括 64 MiB 分块读取与 8 MiB 上传上限（`pnpm teavm:check` 同时运行 DTO 与 body oracle）。真实 TeaVM 0.16 编译 JS 在 Node 的模拟六函数 supplier 下，验证 131,079 字节 GET/POST（00/ff、64 KiB 分块）、空 POST、pending-read 取消、超时、超请求块与 EOF 长度错共七例，handle 最终归零；这仍不是实际 HTTP、浏览器或 Access 验收。
 
 当前构建、注册清单、Java、Worker 和 API 只维护 HTTP v2，旧 v1 传输分支已删除。Java 重新经过真实 TeaVM 编译后的 18 例模拟 supplier 回归，覆盖 GET/POST、空正文、取消/超时、受控重试及错误分类；这些仍是模拟环境证据。
 
-`pnpm test:http-bridge` 已通过真实 workerd 与受控 HTTP origin 的 24 项检查：夹具真正发送 gzip（3,164 字节）与 Brotli（657 字节），解码后均为 131,089 字节且 SHA-256 一致；覆盖 200/206/403、HEAD、重复 Cookie、手动重定向、流式 POST、早响应仍验证上传 END，以及消费取消、请求取消和超时关闭 origin。分项实际验证 204/205/304 无正文与 304 表示元数据、显式 Range 的精确 19 字节返回、Unicode/重复 urlencoded 字段及跨 64 KiB 的 multipart 文件。表单由标准 Request/FormData codec 生成和解析；origin 在消费者已读到正确前缀后真实截断，bridge 返回 `upstream_body_error` 而非成功 END。入口通过固定 Undici 直连用户 Worker socket，origin 经明确启用 signal flag 的辅助 Worker 和原生 external HTTP proxy；没有修改生产入口。四个主动取消场景均使用 30 秒请求期限、1 秒取消窗口，本次本地取消及 origin 关闭用时约 12–22 毫秒；持续发送时使用普通 body cancel / AbortSignal，首块后 idle 的场景明确使用 TCP reset，不能把本地 destroy 当成远端已取消。该门已纳入 `pnpm check`，完整输出留在忽略目录 `.local/probes/http-bridge-v2.json`，合同见 [HTTP bridge](HTTP-BRIDGE.md)。提交 `7e57a74` 的[项目 CI](https://github.com/Wybxc/karuyomi/actions/runs/41760712045) 已全部通过，包括通用检查、Flutter、构建与本地 D1。它不涉及实际 Source、生产 Access 或 CacheInterceptor；原 Source/cache 同版对照和图片/移动内存链路仍需验收，P0-B 尚未通过。上面的部署版本属于旧版本历史记录，当前代码尚不能据此声称已部署或通过生产 Access 正向会话。
+`pnpm test:http-bridge` 已通过真实 workerd 与受控 HTTP origin 的 24 项检查：夹具真正发送 gzip（3,164 字节）与 Brotli（657 字节），解码后均为 131,089 字节且 SHA-256 一致；覆盖 200/206/403、HEAD、重复 Cookie、手动重定向、流式 POST、早响应仍验证上传 END，以及消费取消、请求取消和超时关闭 origin。分项实际验证 204/205/304 无正文与 304 表示元数据、显式 Range 的精确 19 字节返回、Unicode/重复 urlencoded 字段及跨 64 KiB 的 multipart 文件。表单由标准 Request/FormData codec 生成和解析；origin 在消费者已读到正确前缀后真实截断，bridge 返回 `upstream_body_error` 而非成功 END。入口通过固定 Undici 直连用户 Worker socket，origin 经明确启用 signal flag 的辅助 Worker 和原生 external HTTP proxy；没有修改生产入口。四个主动取消场景均使用 30 秒请求期限、1 秒取消窗口，本次本地取消及 origin 关闭用时约 12–22 毫秒；持续发送时使用普通 body cancel / AbortSignal，首块后 idle 的场景明确使用 TCP reset，不能把本地 destroy 当成远端已取消。该门已纳入 `pnpm check`，合同见 [HTTP bridge](HTTP-BRIDGE.md)。提交 `7e57a74` 的[项目 CI](https://github.com/Wybxc/karuyomi/actions/runs/41760712045) 已全部通过，包括通用检查、Flutter、构建与本地 D1。它不涉及实际 Source、生产 Access 或 CacheInterceptor；原 Source/cache 同版对照和图片/移动内存链路仍需验收，P0-B 尚未通过。上面的部署版本属于旧版本历史记录，当前代码尚不能据此声称已部署或通过生产 Access 正向会话。
 
 共享 CacheInterceptor 的截断/半途取消另有[实际 TeaVM 与原 JVM 对照](verification/cache-http-failures.md)，与上述模拟 supplier、独立 HTTP bridge 门分别计证据；生产网络取消仍未通过。
 
@@ -464,7 +466,7 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 实际 Flutter Web release 构建在同一边界经“浏览→扩展→Source→漫画详情→DREAM”进入 ReaderScreen，真实首图、单双页翻页、缩放/重置、连续阅读模式切换与放大层打开/关闭通过交互检查；模式切换保留逻辑页，连续下一页可前进至第 3 页。它是本地产品链路，不是 Cloudflare Access 正向会话、完整章逐页验收、下一章/进度持久化或手机性能。
 
-正式回归还覆盖：保留原始/子类 Page、cacheless/progress 与本地 XOR 拦截器的 JVM 对照；双完成后才公开资源；单块 ACK；取消与迟到发布、解码预算 tombstone、Java 退出后解锁；资源公开后迟到 cancel/close 不撤销已返回 Blob；详情退出动画期间迟到 pages 不重开 Reader。真实 Flutter 退出还暴露了两端 mock 掩盖的应答漂移，现关闭会话统一为 `{closed:true}`，取消/释放为 `{released:true}`，公开 API→Worker 延迟确认与浏览器 Source 门均明确检查相应 ACK。原始日志与截图留在 ignored `.local/image-session-review/`，复验入口见 [Source 门](../apps/api/test/source-metadata-probe.md)。
+正式回归还覆盖：保留原始/子类 Page、cacheless/progress 与本地 XOR 拦截器的 JVM 对照；双完成后才公开资源；单块 ACK；取消与迟到发布、解码预算 tombstone、Java 退出后解锁；资源公开后迟到 cancel/close 不撤销已返回 Blob；详情退出动画期间迟到 pages 不重开 Reader。真实 Flutter 退出还暴露了两端 mock 掩盖的应答漂移，现关闭会话统一为 `{closed:true}`，取消/释放为 `{released:true}`，公开 API→Worker 延迟确认与浏览器 Source 门均明确检查相应 ACK。历史测试方法见 [Source 门](../apps/api/test/source-metadata-probe.md)。
 
 `pnpm check`、`pnpm flutter:check` 与产品 Web/API dry-run 构建通过；Java 图片 oracle 对 seed 和正式 HttpSource 两套签名均通过。该历史输入的 Web 终端有 encoded/pixel/resource 总预算、头部预检与实际 decode；随后内部 Bitmap/ImageDecoder 的二进制与合计账本进展见下节。不能据此声称图片解密/重排、动画/超长图、进程/GPU 合计峰值、Native 受管文件或 P0 已通过。
 

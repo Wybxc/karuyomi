@@ -13,7 +13,7 @@
 | [sqlite3.wasm](https://github.com/simolus3/drift/releases/download/drift-2.35.3/sqlite3.wasm)       | 758,619 | `efd308be92a34f3aa15f289a37f213b0230fd80888a1364326ee29579d892d37` |
 | [drift_worker.js](https://github.com/simolus3/drift/releases/download/drift-2.35.3/drift_worker.js) | 361,829 | `a54b81412d4c4ab56653bb9e4c02912b0820bb37e2bba00722ddef4d78083d4a` |
 
-两文件均已通过正常 TLS 从以上官方 URL 实际下载并核对大小与摘要。默认下载缓存是忽略的 `.local/database-assets/drift-2.35.3/`，验证后生成到忽略的 `apps/reader/web/database/`。`ReaderDatabase.open()` 使用 `/database/sqlite3.wasm` 与 `/database/drift_worker.js`。
+两文件均已通过正常 TLS 从以上官方 URL 实际下载并核对大小与摘要。生成的 Web 资源位于构建输出的 `database/` 子目录。`ReaderDatabase.open()` 使用 `/database/sqlite3.wasm` 与 `/database/drift_worker.js`。
 
 ```sh
 pnpm test:reader-assets
@@ -28,7 +28,7 @@ node scripts/assemble-assets.ts
 
 Node 24.15.0 下四项正式回归和严格工具类型检查通过：缺失或同大小错误摘要的文件被拒绝；坏缓存下载不能覆盖现有 served 文件；下载非零退出会清理 partial / 临时目录；非普通缓存文件在下载前失败。测试用本地可执行 fixture 模拟错误下载，不访问网络；官方下载验证单独执行。
 
-Flutter 3.47.5 / Dart 3.13.4 的正式 Web release 构建成功，随后正式组装输出 57 个文件，Native runtime 正文排除检查通过。`dist/public/database/` 的两文件大小与摘要均匹配上表，实际 `_headers` 包含上述 MIME 与缓存规则。日志保留在忽略的 `.local/reader-database-assets/{flutter-web-build,assemble-assets}.log`。
+Flutter 3.47.5 / Dart 3.13.4 的正式 Web release 构建成功，随后正式组装输出 57 个文件，Native runtime 正文排除检查通过。`dist/public/database/` 的两文件大小与摘要均匹配上表，实际 `_headers` 包含上述 MIME 与缓存规则。
 
 此次组装使用空扩展索引和既有 materials `fba63bcd9b2a194131eb76a500c2e8f046d987b4650d510d6b6f5205bf32a9e8`，只证明资源组装；没有将正在修改的 host 与旧 AOT 混合验证。最终 Flutter 输出包含服务切换时的待保存进度交接修复，`apps/reader/build/web/main.dart.js` 为 3,604,355 B，SHA-256 为 `80841b2a969e053ee0cf7c75a99ec1f9f278285a93a34b9a5e0e60029198eae7`。正式 Source / 产品运行需绑定各自固定构建另验。
 

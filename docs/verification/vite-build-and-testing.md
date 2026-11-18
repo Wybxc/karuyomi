@@ -4,7 +4,7 @@
 
 `runtime/image-codec`、`tools/images`、专属脚本与 Vite 配置已删除，同时移除 libspng/libjpeg-turbo submodule、sharp 与无调用的 undici 直接依赖。Dart、Native 与正式控制协议不依赖该候选；默认图片路径继续由 UI 直接解码。Source 主动执行的 Android 图片处理仍保留。
 
-最终默认 `pnpm build` 已通过，正式 catalog 只描述五桥与 zstd WASM；闲置候选字段已移除。新 materialVersion 为 `6175132a0e80c94491ab708894dac63d08c4e02b4507b9686b111de84339a839`，六材料实际大小和 SHA 匹配。版本变化来自清单元数据简化，不能沿用前一阶段的 materialVersion。忽略缓存移到 `.local/retired-image-codec-cache`，源码目录已不存在。
+最终默认 `pnpm build` 已通过，正式 catalog 只描述五桥与 zstd WASM；闲置候选字段已移除。新 materialVersion 为 `6175132a0e80c94491ab708894dac63d08c4e02b4507b9686b111de84339a839`，六材料实际大小和 SHA 匹配。版本变化来自清单元数据简化，不能沿用前一阶段的 materialVersion。退役 codec 的源码和专属构建缓存均已移除。
 
 以下 `a2251a6` 阶段的集中工程检查和 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42045547601) 已通过；它的独立候选构建记录是删除前的历史证据。当前清理后的 `pnpm check` 完整通过（359 项 Vitest；依赖检查覆盖 151 模块、490 条依赖），包含跨语言 golden、AOT 流水线/runner/完整性、上游补丁和 Cloudflare 工具回归。完整 `pnpm format` → `pnpm format:check`、默认 `pnpm build`、Wrangler 本地部署预演及 peer 检查通过。不将历史候选结果当作产品能力。
 
@@ -15,7 +15,7 @@
 - `pnpm test:build` 使用官方 Vite CLI，依次生成共享材料、Web/Native runtime、API 静态夹具；候选 codec JS 保留独立声明式构建入口。无测试内调用 Vite build。
 - `pnpm exec vitest run --project workers`：HTTP 21 项与状态 15 项，共 36/36。官方 Workers 插件、正式 D1 migrations、RS256 JWT 与 `@msw/cloudflare`；gzip 为真实压缩字节，Brotli 仅为已解码边界。消费者取消与 deadline 中止模拟 upstream 已验证，不宣称真实 TCP reset 或 incoming socket abort。
 - 官方 `createTestHarness`：声明式生成配置的两项测试通过，覆盖静态字节、headers、Worker 绕过、307、401、JWT 与 D1。
-- 官方 Vitest Browser：Codex 内置浏览器实际打开官方生成的 session URL，7/7 通过，覆盖 IndexedDB、Web Locks、真实 Worker 生命周期、文件句柄和 OffscreenCanvas。`BROWSER=none` 固定在配置；之前误由默认浏览器执行的结果不计入本轮 IAB 证据。runner 已结束，临时日志在忽略目录 `.local/verification/vitest-browser-2026-11-05.log`。
+- 官方 Vitest Browser：Codex 内置浏览器实际打开官方生成的 session URL，7/7 通过，覆盖 IndexedDB、Web Locks、真实 Worker 生命周期、文件句柄和 OffscreenCanvas。`BROWSER=none` 固定在配置；之前误由默认浏览器执行的结果不计入本轮 IAB 证据。runner 已正常结束。
 
 - `pnpm check` 完整通过：386 项 Vitest、跨语言 golden、扩展发现/runner/完整性、上游补丁、Cloudflare 权限工具与候选 codec 回归；严格类型及依赖检查覆盖 179 模块、595 条依赖。冻结 builder 新回归确认材料先准备且同 checkout 只准备一次。
 - `pnpm flutter:check` 三项目静态分析和测试通过（21/42/220）；完整 `pnpm format` → `pnpm format:check` 通过，包含原生语言。peer 依赖检查无冲突。
@@ -50,6 +50,6 @@ HTTP v2 专项使用同一 Cloudflare Vite 配置构建测试 API，24 项受控
 
 Web host 保持 ESM，独立 Worker 保持 classic IIFE；Native host/Worker 内嵌全部 6 份共享材料，manifest 的大小与哈希匹配。Vite 资产转换前替换桥的 `import.meta.url`，避免将 zstd WASM 再次内联到桥中。仓库根与包目录执行得到相同材料身份；新 `materialVersion` 为 `97334724ed5cfd0b688d10c82f219893442260986c77b6ea1a4ce4a4e959a4ff`。
 
-Codex 内置浏览器 Chrome 156 实际运行 Vite 构建的 Cache bridge/Worker/suite，39 项检查全部通过，覆盖真实 IndexedDB、Web Locks、owner 死亡、并发/CAS、限额、事务失败和二进制 reader 生命周期。报告保留在忽略目录 `.local/vite/cache-browser.json`，测试服务正常退出。
+Codex 内置浏览器 Chrome 156 实际运行 Vite 构建的 Cache bridge/Worker/suite，39 项检查全部通过，覆盖真实 IndexedDB、Web Locks、owner 死亡、并发/CAS、限额、事务失败和二进制 reader 生命周期。测试服务正常退出。
 
 图片 Worker/Owners prepare-only、TeaVM enqueue build-only、扩展动态 runner 构建/HTTP 交付已通过；这些分项未重跑完整浏览器断言。构建工具与材料变化已进入 AOT host/input 身份，旧材料产物不能混入新快照。未重启全量 AOT、未启用扩展 CI，也未将历史 Source、生产 Access 或 Native/真机证据提升为新工具链下的完整验收。

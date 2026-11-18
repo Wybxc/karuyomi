@@ -26,7 +26,7 @@ pnpm build
 
 `pnpm flutter:check` 三项目静态分析通过，测试分别为 21 / 42 / 269 项；新增 11 项书签数据回归和 11 项控制器/控件/正式导航回归。正式导航覆盖详情标记→仅书签筛选→进入阅读→移除当前章书签→返回详情自动刷新为空。该用例由官方 Flutter widget 测试和受控 Source/API supplier 驱动，不是独立客户端或真实 Source 验收。
 
-全库 `pnpm format`、`pnpm format:check` 和最终 `pnpm build` 通过；正式输出包含宿主、Native 内置材料、Flutter Web release 与 API。运行日志留在忽略的 `.local/bookmarks/`，不提交临时服务或机器输出。
+全库 `pnpm format`、`pnpm format:check` 和最终 `pnpm build` 通过；正式输出包含宿主、Native 内置材料、Flutter Web release 与 API。
 
 ## 2026-11-07：真实 Web 标记与独立文档读取阻断
 
@@ -64,7 +64,7 @@ A 随后关闭，B 是同 origin 的全新 Web 文档。B 从正式书架打开�
 
 新增正式 `integration_test/bookmarks_sync_test.dart` 复用 `app.main()`、`NativePlatformRuntime`、真实书架点击与 Source 详情，按 exact Source / manga / chapter URL 定位。阶段为 `verify` / `set` / `remove`，输入同服务 subject 与完整 Settings / MangaState / BookmarkPage 快照；读阶段要求零 revision 变化，写阶段要求 ACK、完整重读、pending 清空且只有一次 revision 递增，同时核对其它设置和章节进度不变。关闭等待正式运行时释放 ACK，不注入测试 PlatformRuntime 或手动推送详情路由。入口和配置见[集成测试说明](../../apps/reader/integration_test/README.md)。
 
-该驱动严格分析无问题，但未在设备执行。最终完整 `pnpm flutter:check` 通过：Reader Core 22、Source Runtime 86、Reader 597 项，三项目分析无问题，173 份 Dart 格式零变化。独立读取 `.local/bookmarks-driver-analyze.log` 与 `.local/bookmarks-flutter-check.log` 核对分析及通过标志；旧逻辑红日志为 `.local/metadata-noop-before.log`。本节工程与受控回归不替代尚未通过的独立文档、Native、故障恢复或生产 Access 门。
+该驱动严格分析无问题，但未在设备执行。最终完整 `pnpm flutter:check` 通过：Reader Core 22、Source Runtime 86、Reader 597 项，三项目分析无问题，173 份 Dart 格式零变化。旧逻辑的红测试与修复后的分析和 Flutter 检查分别核对。旧逻辑的红测试与修复后的分析和 Flutter 检查分别核对。本节工程与受控回归不替代尚未通过的独立文档、Native、故障恢复或生产 Access 门。
 
 ## 2026-11-07：新文档章节超时的精确诊断
 
@@ -98,7 +98,7 @@ A 随后关闭，B 是同 origin 的全新 Web 文档。B 从正式书架打开�
 
 Codex 内置浏览器经 HTTP Vite 别名 `http://127.0.0.1:55217` 成功读回同一书架。打开 xkcd 时提示「这个扩展的仓库已移除」：安装记录中的默认仓库索引是 HTTPS harness 的目录 URL，Web 当前默认仓库是 HTTP 别名的目录 URL，两者即使提供相同静态字节也不是同一仓库。打开前后八路独立 API 响应逐字节一致。Web 未进入详情、未操作书签；Android 未启动。本轮只验证了跨端书架读回。
 
-两项本地服务、专用模拟器和 ADB 已清理。构建输入、准备日志与前后快照保存在本机忽略目录 `.local/prototype-web-native-bookmarks.YSZYX1/evidence/`。
+两项本地服务、专用模拟器和 ADB 已清理。
 
 ## 2026-11-10：Native 在线阅读书签丢确认与跨端读回
 
@@ -108,7 +108,7 @@ Codex 内置浏览器经 HTTP Vite 别名 `http://127.0.0.1:55217` 成功读回�
 2. 在 Android 尚未重试时，重新安装的 iOS App 从新进程经正式书架进入详情，用「仅书签」筛选读回该章并显示移除按钮。六路独立 API 响应与刚提交后逐字节相同，未产生额外业务变更。
 3. 回到原 Android 进程点「刷新书签」，已确认的视图读到该标记，原操作仍显示未确认且可重试。再点「重试原书签操作」，待确认提示消失，原图和第 2 页保留。两次操作后六路读回仍相同；停服审计恰有两次匹配的书签请求，UUID、正文、CAS、成功响应与持久回执摘要均相同，只有首个响应中断，D1 只提交一次。
 
-iOS 首轮已完成安装和收藏，但外部驱动未可靠收起键盘及打开章节，未提交进度或书签；成功链路使用 Android 阅读写入和 iOS 冷启动读回。复验步骤、控件树、截图、`xcresult` 和独立核对保留在 `.local/prototype-reader-bookmark-ack.D2qnuv/REPRODUCE.md`，用固定 Node 执行同目录 `verify.ts` 重核。官方 Workers 的四项确认及 D1 故障回归通过。此分项未覆盖 Web、其它阅读模式、自动前台刷新、生产 Access 或物理设备。
+iOS 首轮已完成安装和收藏，但外部驱动未可靠收起键盘及打开章节，未提交进度或书签；成功链路使用 Android 阅读写入和 iOS 冷启动读回。官方 Workers 的四项确认及 D1 故障回归通过。此分项未覆盖 Web、其它阅读模式、自动前台刷新、生产 Access 或物理设备。
 
 ## 尚待验收
 

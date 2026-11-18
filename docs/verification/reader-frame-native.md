@@ -49,7 +49,7 @@ iOS 为 iPhone 17 Pro Simulator / iOS 26.4；Android 为 Android 16 / API 36 Goo
 
 ## 复验与本地记录
 
-夹具、服务编排与大产物只保留在新树 `.local/native-reader-frame/`。正式构建命令在其 `app/apps/reader` 执行，移除 `GH_TOKEN`、`GITHUB_TOKEN`、`CLOUDFLARE_API_TOKEN`，使用仓库固定 SDK 和 PUB_CACHE：
+正式构建命令在其 `app/apps/reader` 执行，移除 `GH_TOKEN`、`GITHUB_TOKEN`、`CLOUDFLARE_API_TOKEN`，使用仓库固定 SDK 和 PUB_CACHE：
 
 ```sh
 flutter pub get --enforce-lockfile
@@ -77,4 +77,4 @@ xcrun simctl launch <SIMULATOR_ID> \
 - `{android,ios}-reader-final-relaunch-{system,flutter}.png`：最终系统与 Flutter 原图，未通过裁切或隐藏状态文字修正。
 - `main.unsettled.dart` 与 `app/apps/reader/lib/fixture/main.dart`：截图同步前后驱动；`xkcd-network.json`、`native-resource-network.json` 为脱敏网络记录。
 
-旧 `31555e8` 失败和单次补帧诊断仍在 `native-cache-v3-validation/karuyomi/.local/source-cache-v3/`；旧 `80c9…` App / 证据保持独立。
+旧提交 `31555e8` 的首次失败与单次补帧诊断均属历史分项。旧 `80c9…` App / 证据保持独立。

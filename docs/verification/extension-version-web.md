@@ -25,7 +25,7 @@
 
 ## 证据与复验
 
-正式临时夹具位于 main 的 ignored `.local/version-upgrade-ark-b4/.local/ark-version-upgrade/product-version-8929/`，本轮归档在 `product-ui-policy-fixed/`。原报告保持 `passed=false`，人工 UI 及独立数据审查另存，不改称自动 UI 测试。
+原报告保持 `passed=false`，人工 UI 及独立数据审查另存，不改称自动 UI 测试。
 
 | 证据                                                     | SHA-256                                                            |
 | -------------------------------------------------------- | ------------------------------------------------------------------ |
@@ -33,6 +33,6 @@
 | `evidence-sha256.json`（截图、AX、静态索引与控制台摘要） | `efe8594043be6a2de770307ae3ef12269c2334d2c3118b0a2b0af8fbc447b17b` |
 | `acceptance-human-and-observation.json`                  | `1e9148f650aeda24497a83ace18e09a2c5271f5af55acea7c27b73cf331ad501` |
 
-在固定 clone `.local/version-upgrade-ark-b4/` 下，对 `.local/ark-version-upgrade/product-version-8929/tsconfig.{server,client,worker}.json` 分别运行 `pnpm exec tsc -p`。再以新的 loopback 端口运行 `SOURCE_PROBE_PORT=<端口> SOURCE_PROBE_READER_DIR=<冻结的 be5 Flutter build/web 绝对目录> SOURCE_PROBE_EVIDENCE=<新轮次 result.json 绝对路径> node .local/ark-version-upgrade/product-version-8929/server.ts`，先核实控制页列出的两个 registeredBuildId 和 bootstrap，再从产品 UI 复验上述步骤。原始输入、两版 JAR/清单摘要与服务源码摘要均在归档中。
+该轮分别检查 server、client、worker 三份 TypeScript 配置，并核对两个 registeredBuildId 和 bootstrap 后操作产品 UI。
 
 更早的浏览器标签丢失轮次和授权夹具失败轮次均保留。后者先注册两版，再复制同一数据库，导致“每包仅保留当前版本”删除旧版授权，旧版目录请求在 bridge 返回 404、未访问上游。最终夹具先独立注册并复制每个版本的 D1，启动时断言每个后端恰好只有对应 buildId；正式 Worker 和官方 Source 未改。最终 UI 通过后，已关闭两个临时标签，停止所属服务并确认端口无监听；不据此宣称浏览器或 GPU 内存峰值通过。

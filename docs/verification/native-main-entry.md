@@ -2,7 +2,7 @@
 
 2026-11-10，匹配冻结 v6 发布候选的 [iOS 真机目标构建](#v6-ios-arm64-发布构建)通过；[Android arm64 发布构建与离线模拟器冷启动](#v6-android-arm64-发布构建与离线模拟器冷启动)也通过。以下 v4 以前的记录保留历史输入。
 
-> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；旧命令仅适用于记录中的历史 checkout，不能在当前源码直接复验。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
+> 入口状态（2026-11-05）：本文保留原日期、固定输入与实际结果。涉及的旧自定义探针、浏览器 runner 和构建入口已退役；命令描述对应提交下的操作。当前入口及覆盖见 [Vite 计划](../plan/vite-build-and-testing.md)。新官方 fixture 的结果单独验收，不把本文历史证据算作当前 Source 在线、生产 Access 或 Native 完整门通过。
 
 2026-11-04，对固定 `be5c3ed6d254c6ebd21048f801e49c0f60b5d3c6` 的 Native 成品和本地 HTTPS 服务做独立预验。**正式 App UI 未运行，验收未通过**；本记录不替代既有受控 ReaderScreen 或 Source Cache 分项，也不代表生产 Access。
 
@@ -20,7 +20,7 @@
 
 CUA 分别通过 Simulator 名称、完整应用路径和 bundle ID 连接，均返回应用不可用；可用 surface 未列出 Simulator。Xcode 的工具入口也未能完成连接。因此未安装、启动或操作 App，报告明确保留 `nativeUi=not_run`、`passed=false`。后续在可控制的 Simulator 或真机上，使用同一正式入口完成可见登录、选源、详情、真实图片阅读、退出/后台恢复和身份切换后，再记录产品通过。
 
-可复用的成品、服务、输入摘要和启动记录位于 main 的 ignored `.local/native-main-be5/`，本轮证据在 `ui-run-20261103T2347/`。在 main 运行 `pnpm exec tsc -p .local/native-main-be5/tsconfig.json` 检查服务，再按输入记录运行 `node .local/native-main-be5/service.ts`，另开终端运行 `node .local/native-main-be5/preflight.ts`。正常 HTTP 预验只能证明服务边界，不能补作 App UI 证据；证书失效时先按准备步骤重建。
+当时以独立服务进行 HTTP 预验。HTTP 预验只覆盖服务边界；App UI 和真实 Access 登录分别验收。
 
 | 证据                 | SHA-256                                                            |
 | -------------------- | ------------------------------------------------------------------ |
@@ -40,7 +40,7 @@ flutter build ios --release --no-codesign --no-pub --target=lib/main.dart \
   --dart-define=APP_ORIGIN=https://karuyomi.wybxc.cc
 ```
 
-官方构建 exit 0。实际 `build/ios/iphoneos/Runner.app` 的 Runner 和 Dart AOT framework 均为 arm64、Mach-O 平台 iOS；应用 ID 为 `dev.karuyomi.karuyomi`，编译的 Dart AOT 包含指定 origin。成品中的 `host.js`、`worker.js`、`manifest.json` 与正式 Vite Native 输出逐字节一致；六份共享材料目录与冻结 v6 xkcd 验收输入相同，目录文件 SHA-256 为 `eec7701e311b37ac3c03005a128d98b8f54f65d8a873c549ccf860f8fbb765ae`。未混入后续七材料的 WebP 改动。原始日志、成品和核对输出保存在本机忽略目录 `.local/ios-device-release-2c012db.xwGgAa/`。
+官方构建 exit 0。实际 `build/ios/iphoneos/Runner.app` 的 Runner 和 Dart AOT framework 均为 arm64、Mach-O 平台 iOS；应用 ID 为 `dev.karuyomi.karuyomi`，编译的 Dart AOT 包含指定 origin。成品中的 `host.js`、`worker.js`、`manifest.json` 与正式 Vite Native 输出逐字节一致；六份共享材料目录与冻结 v6 xkcd 验收输入相同，目录文件 SHA-256 为 `eec7701e311b37ac3c03005a128d98b8f54f65d8a873c549ccf860f8fbb765ae`。未混入后续七材料的 WebP 改动。
 
 成品确认为未签名，检查时本机无有效签名身份。未安装、启动或访问生产；当前生产仍是 v4。真机验收需要有效签名、可达的匹配 v6 部署与用户 Access 登录，之后再记录真实阅读、跨端恢复及移动性能。
 
@@ -58,7 +58,7 @@ flutter build apk --release --no-pub --target-platform=android-arm64 \
 - APK 内 `host.js`、`worker.js`、`manifest.json` 与固定 Native 构建逐字节一致；内置清单的材料版本为 `5d1260e5d20b2f2f05fd378a6e8b697338e5fdfd4feca2c5a8c361e756bb92e4`，引用的六份冻结材料均按实际文件核对。APK 没有 `libsqlite3.so`，`NativeAssetsManifest.json` 的映射为空；固定产品无 Drift/SQLite 业务依赖，业务状态由 Worker API + D1 确认。历史 APK 的 SQLite 证据属于旧实现。
 - 专用 Pixel 7 / Android 16 API 36 ARM64 模拟器在飞行模式下通过 `adb install` 安装；设备上 `base.apk` 的 SHA-256 与本机 APK 相同。`adb shell am start -W -n dev.karuyomi.karuyomi/.MainActivity` 报告冷启动成功，正式 Activity 位于前台（PID `4184`），UI 树和截图显示空书架及书架、浏览、设置三个标签。
 
-APK 保留在本机忽略目录 `.local/android-arm64-release-2c012db/artifacts/karuyomi-2c012db-arm64-v8a-release-local.apk`。`evidence/split/` 保留签名、ELF、实际安装摘要、启动日志及截图；可用 `node verify-apk.ts` 重核。专用模拟器和私有 ADB 已清理。本次只验证该 release 包能启动；未连接隔离或生产服务，未验证此 APK 的 Source 初始化、真实 xkcd 续读、生产 Access 或真机。
+当次核对了 APK 签名、ELF 架构、实际安装摘要及启动画面。专用模拟器和私有 ADB 已清理。本次只验证该 release 包能启动；未连接隔离或生产服务，未验证此 APK 的 Source 初始化、真实 xkcd 续读、生产 Access 或真机。
 
 ## Android 发行签名配置
 
@@ -73,7 +73,7 @@ flutter build apk --release --target-platform=android-arm64 \
 - 无 `android/key.properties` 时，构建成功，`apksigner verify` 拒绝未签名 APK。提供本轮临时 PKCS#12 密钥库及发行配置后重建，`apksigner verify --verbose --print-certs` 确认 v2 签名通过，唯一签名证书的 SHA-256 与构建前从密钥库导出的证书一致。
 - 两个 APK 内的 `host.js`、`worker.js` 和 `manifest.json` 均与首发归档逐字节一致，`pubspec.lock` 不变。首轮 `--no-pub` 复用了过时的集成测试插件注册表，未通过 Java 编译；上面的正常构建刷新注册表后，两次均成功。
 
-日志、证书摘要和成品保存在本机忽略目录 `.local/prototype-android-signing.vZ5Qg7/`，临时密钥和签名配置已清理。两份 APK 均未安装；正式发行证书、签名真机和生产登录仍待验收。
+验收后已清理临时密钥和签名配置。两份 APK 均未安装；正式发行证书、签名真机和生产登录仍待验收。
 
 ## Native 本机服务地址恢复
 
@@ -81,7 +81,7 @@ flutter build apk --release --target-platform=android-arm64 \
 
 正式 AppShell 组件回归从空配置进入设置、确认带端口的 HTTPS 地址、尝试无效 HTTP 地址，然后销毁并启动新的 AppShell。新实例选回之前的 HTTPS 地址，两个实例均未写业务 API。完整 `pnpm flutter:check` 通过（三项目 22、87、612 项），正式 Web/Worker 的 `pnpm build` 通过。
 
-在固定 `2c012db` 的副本应用相同 Flutter 变更，用专用 iPhone 17 Pro / iOS 26.4 模拟器和空扩展目录的官方 Wrangler HTTPS / workerd / D1 验收实际系统偏好。两次 Flutter 集成验收均不传 `APP_ORIGIN`：PID 41163 在正式设置手动连接，写入本机 UserDefaults；PID 42525 启动自动连回同一测试身份，无手动连接。第二次 Flutter 启动覆盖安装并保留偏好。独立 HTTPS 书架、设置读回不变，三次独立 D1 核对均为账户 revision 0、无业务写或回执。原始日志在 `.local/native-ios-origin-2c012db/evidence/`。Android 真实系统偏好、签名真机及生产 Access 另验。
+在固定 `2c012db` 的副本应用相同 Flutter 变更，用专用 iPhone 17 Pro / iOS 26.4 模拟器和空扩展目录的官方 Wrangler HTTPS / workerd / D1 验收实际系统偏好。两次 Flutter 集成验收均不传 `APP_ORIGIN`：PID 41163 在正式设置手动连接，写入本机 UserDefaults；PID 42525 启动自动连回同一测试身份，无手动连接。第二次 Flutter 启动覆盖安装并保留偏好。独立 HTTPS 书架、设置读回不变，三次独立 D1 核对均为账户 revision 0、无业务写或回执。Android 真实系统偏好、签名真机及生产 Access 另验。
 
 ## Native 可见 Access 回跳
 
@@ -95,7 +95,7 @@ iPhone 17 Pro／iOS 26.4 用未插桩的正式 Flutter App 和外部 XCTest 操�
 
 Android 用正式 Flutter 构建的调试 APK 启动正式 App，由系统 UIAutomator 点击可见 IdP 按钮。首次登录、新进程直接沿用 Cookie、失效后新进程明确需要登录、再点击并恢复同一账号四项均通过（PID 依次为 `3239`、`3632`、`3781`、`3936`）。阶段间覆盖安装保留同一 App 数据。两次可见登录各只触发一次带有效 Cookie 的 Native bootstrap，Cookie 有效时新进程不挑战，失效时不显示旧身份。独立 D1 查询确认业务表无新增行或回执。测试 CA 只用于独立的回环 WebView 与 Dart 网络信任，未关闭证书校验。
 
-iOS 本机证据在忽略目录 `.local/native-cookie-access-afcbd11.ONsdHk/evidence/`，包括三轮 `xcresult` 和独立 audit JSON；Android 的验收及源文件比对在 `.local/native-android-access-afcbd11/evidence/`。iOS 首轮用 Flutter 测试驱动时外部点击未提交，改用未插桩 App；一次修复候选的本地材料装配错误也保留在原始记录，正式复验使用逐字节匹配的内置材料。本节只覆盖隔离设置页登录和身份确认；生产 Access、阅读中断后恢复、跨身份与真机门独立验收。
+iOS 首轮用 Flutter 测试驱动时外部点击未提交，改用未插桩 App；一次修复候选的本地材料装配错误也保留在原始记录，正式复验使用逐字节匹配的内置材料。本节只覆盖隔离设置页登录和身份确认；生产 Access、阅读中断后恢复、跨身份与真机门独立验收。
 
 ### Android 阅读中 Access 失效与原位恢复
 
@@ -105,9 +105,9 @@ iOS 本机证据在忽略目录 `.local/native-cookie-access-afcbd11.ONsdHk/evid
 
 独立 D1 查询确认已保存、失效前、暂停、可见登录和恢复五个阶段的业务状态及回执完全相同（账户 revision 5、作品 revision 4、5 笔回执）。Android 系统返回退出时释放恢复后的会话，观察到恰好一笔进度写：仍是同章、同页和同一最远进度，仅 `current.viewportY` 从默认 0 变为约 0.394，账户 revision 6、作品 revision 5。驱动让阅读控件滚动至可点击范围，本轮不能单独归因这笔视口变化；无写入结论仅覆盖退出前的恢复阶段。
 
-本机忽略目录 `.local/native-android-reader-access-2c012db/` 保留 `REPRODUCE.md`、Android 系统控件树和截图、分阶段审计与 D1 快照。可用仓库固定 Node 执行 `node .local/native-android-reader-access-2c012db/verify.ts` 独立重核。专用模拟器、ADB、隔离服务及临时私钥已清理。本项覆盖隔离 Android 模拟器中的同身份恢复；生产 Cloudflare Access、其他身份、未确认草稿和真机需分别验收。
+专用模拟器、ADB、隔离服务及临时私钥已清理。本项覆盖隔离 Android 模拟器中的同身份恢复；生产 Cloudflare Access、其他身份、未确认草稿和真机需分别验收。
 
-2026-11-10，用带 `676f424` 和 `63c2cab` 阅读恢复修复的首发六材料源码，在另一台专用 Pixel 7 / Android 16 API 36 模拟器上重跑同一系统操作。正式入口和冻结 xkcd 的静态索引已逐字节核对。刷新进度收到 401 后保留原图，系统点击完成可见重登，读回同章第 2 页并重新解码；系统返回释放恢复后的资源。独立读取临时 D1 确认保存基线、401 前、暂停、登录、原位恢复、退出的业务数据完全相同（账户/作品 revision 4/3，四笔回执）；退出没有附带请求。保留旧轮次的同页写证据；本轮结论覆盖同一测试身份的读请求失效与退出。原始记录与独立核对脚本见 `.local/prototype-reader-recovery.mw5OJU/android-recovery/`。
+2026-11-10，用带 `676f424` 和 `63c2cab` 阅读恢复修复的首发六材料源码，在另一台专用 Pixel 7 / Android 16 API 36 模拟器上重跑同一系统操作。正式入口和冻结 xkcd 的静态索引已逐字节核对。刷新进度收到 401 后保留原图，系统点击完成可见重登，读回同章第 2 页并重新解码；系统返回释放恢复后的资源。独立读取临时 D1 确认保存基线、401 前、暂停、登录、原位恢复、退出的业务数据完全相同（账户/作品 revision 4/3，四笔回执）；退出没有附带请求。保留旧轮次的同页写证据；本轮结论覆盖同一测试身份的读请求失效与退出。
 
 ### iOS 阅读中 Access 失效与待确认进度
 
@@ -117,9 +117,9 @@ iOS 本机证据在忽略目录 `.local/native-cookie-access-afcbd11.ONsdHk/evid
 
 同一归档加入 `676f424` 的显式重试修复后，用新隔离 D1 复验。一次真实 401、可见重登和原位恢复都在 PID `72755`：失效期间保留第 2 页，回跳只触发一次有效 bootstrap，重新打开同章并显示第 2 页。重登后的作品读回没有业务 POST；基线、401 后和恢复后的账户、作品、章节与回执快照完全相同（revision 5/4，五笔回执，未读完）。点击「重试保存」后先读取作品，再用原 UUID、正文 SHA-256 和 CAS 4 发送一次，D1 收到对应回执，本章变为已读完。该中间版本随后还有一笔新 UUID、CAS 5 的同页视口写，最终 revision 7/6，页码、清单、epoch、最远页未改变。
 
-最终修复在同章、同清单且原页仍存在时保留原视口锚点，避免图片重新解码或收起恢复控件被当作用户移动；清单改变仍走常规位置解析。用加入两次修复的同一六材料源码、专用 iOS 模拟器及新隔离 D1 复验：401 和原位恢复不改变业务状态；显式重试用原 UUID、正文及 CAS 只提交一次，账户/作品 revision 从 5/4 到 6/5，页位与最远进度均不变；控件收起后无新增 POST。主动翻到第 1 页才新增一条回执（7/6），第 2 页仍为最远进度，已读完成标记保留。42 项阅读器定向回归通过，包含恢复时清单变化、迟到解码和控件收起后再主动定位。复核可用固定 Node 执行 `node .local/ios-reader-access-v6.7gSLAq/placement.G2ta1m/verify.ts`，同目录保留实际补丁、`xcresult` 与分阶段审计。
+最终修复在同章、同清单且原页仍存在时保留原视口锚点，避免图片重新解码或收起恢复控件被当作用户移动；清单改变仍走常规位置解析。用加入两次修复的同一六材料源码、专用 iOS 模拟器及新隔离 D1 复验：401 和原位恢复不改变业务状态；显式重试用原 UUID、正文及 CAS 只提交一次，账户/作品 revision 从 5/4 到 6/5，页位与最远进度均不变；控件收起后无新增 POST。主动翻到第 1 页才新增一条回执（7/6），第 2 页仍为最远进度，已读完成标记保留。42 项阅读器定向回归通过，包含恢复时清单变化、迟到解码和控件收起后再主动定位。
 
-回归测试另覆盖更换身份时不发送旧草稿、远端已重置时不重放旧写。本段实测使用同一身份和本地 IdP；生产 Access 和签名真机仍未验收。不同身份的隔离实测见下节。本机忽略目录 `.local/ios-reader-access-v6.7gSLAq/` 保留固定补丁、XCTest、原始 `xcresult`、分阶段审计和独立核对脚本。
+回归测试另覆盖更换身份时不发送旧草稿、远端已重置时不重放旧写。本段实测使用同一身份和本地 IdP；生产 Access 和签名真机仍未验收。不同身份的隔离实测见下节。
 
 ### iOS 阅读中切换身份
 
@@ -129,7 +129,7 @@ iOS 本机证据在忽略目录 `.local/native-cookie-access-afcbd11.ONsdHk/evid
 2. 保持同一 App 进程，通过 Reader 的可见登录切到 B。原 Reader 退出，B 看到空书架，无旧「重试保存」入口。独立审计确认 B 的 bootstrap 和书架读回，未出现原作品查询或 Source 中继请求，未重发 A 的章节 mutation，D1 业务快照与切换前完全一致。
 3. B 从正式扩展管理明确安装 xkcd。D1 只新增 B 自己的一条全局设置回执，B 账户/设置 revision 均为 1，A 的账号、作品、进度、设置和回执逐项不变。终止并重启 App 后，B 仍能读回自己的扩展安装，书架保持空白，业务快照无变化。
 
-首次 XCTest 已完成 B 登录，但等待空书架的静态标题超时；该标题未出现在当轮控件树中。驱动改用空状态专属的「去浏览」按钮，在原进程只读复验。设置接口审计未区分请求方法，唯一设置提交以 D1 revision 和回执为准。原始 `xcresult`、前后快照、进程核对及复验命令见本机忽略目录 `.local/prototype-ios-identity.vBZnAl/REPRODUCE.md`，可用固定 Node 执行同目录 `verify.ts`。测试服务、专用模拟器与 TLS 私钥已清理。本项仅覆盖 iOS 模拟器的本地签名身份切换，Android 对照见下节。
+首次 XCTest 已完成 B 登录，但等待空书架的静态标题超时；该标题未出现在当轮控件树中。驱动改用空状态专属的「去浏览」按钮，在原进程只读复验。设置接口审计未区分请求方法，唯一设置提交以 D1 revision 和回执为准。测试服务、专用模拟器与 TLS 私钥已清理。本项仅覆盖 iOS 模拟器的本地签名身份切换，Android 对照见下节。
 
 ### Android 阅读中切换身份
 
@@ -139,4 +139,4 @@ iOS 本机证据在忽略目录 `.local/native-cookie-access-afcbd11.ONsdHk/evid
 2. 在同一 App PID `3856` 通过可见登录切到 B，原 Reader 退出，B 的空书架无旧「重试保存」入口。有效 Cookie 的 B bootstrap 后读回自己的书架；期间无业务 POST、原作品 GET 或 Source 中继请求，D1 业务快照不变。
 3. B 的扩展列表显示零个安装，手动安装 xkcd 后只有一条由 B 发起的 `POST /api/settings/mutations`，请求 ID 与新 D1 回执一致。B 账户/设置 revision 为 1，A 的所有行不变，401 请求从未持久化。终止 App 后以 PID `5691` 冷启动，B 的 Cookie、空书架和安装记录可读回，全程无业务 POST，D1 快照不变。
 
-控件树、截图、APK 资源核对、独立审计和复验步骤保留在本机忽略目录 `.local/prototype-android-identity.pEmIby/REPRODUCE.md`；用固定 Node 执行同目录 `verify.ts` 重核五阶段快照。专用服务、模拟器、私用 ADB 和临时 TLS 私钥已清理。本分项覆盖隔离模拟器的单向身份切换；生产 Access、更多 Source 下往返换身份和签名真机另验。
+当轮以独立脚本核对了五阶段快照。专用服务、模拟器、私用 ADB 和临时 TLS 私钥已清理。本分项覆盖隔离模拟器的单向身份切换；生产 Access、更多 Source 下往返换身份和签名真机另验。

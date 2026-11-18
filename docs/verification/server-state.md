@@ -77,7 +77,7 @@ pnpm format
 pnpm format:check
 pnpm check
 pnpm flutter:check
-EXTENSION_ASSETS_DIR="$PWD/.local/v4-production/snapshot" pnpm build
+EXTENSION_ASSETS_DIR="${EXTENSION_ASSETS_DIR:?请指定匹配的扩展快照}" pnpm build
 ```
 
 - 通用检查通过，包括 23 个 Vitest 文件的 358 项测试、跨语言协议 golden、严格类型、依赖层级与工具/真实 workerd 回归；其中 API 集成范围按上文单独说明。
@@ -103,17 +103,6 @@ EXTENSION_ASSETS_DIR="$PWD/.local/v4-production/snapshot" pnpm build
 ## 真实 Web 独立会话闭环
 
 同日以 `d1e280e` 的正式 Flutter Web 构建、原生产 xkcd v4 包和 Codex 内置浏览器完成同 origin 的 A→B→新 A 会话验收。入口为 `apps/api/test/source-metadata-probe.ts` 的正式 Flutter 模式，所有业务与 Source HTTP API 均进入真实 workerd 和同一隔离 D1，使用真实 RS256 测试身份 `probe-owner`；没有使用组件测试服务或改变原扩展代码。
-
-```sh
-SOURCE_PROBE_READER_DIR=apps/reader/build/web \
-SOURCE_PROBE_SOURCE_ID=1538249443376436084 \
-SOURCE_PROBE_ALLOWED_HOSTS=xkcd.com,imgs.xkcd.com \
-SOURCE_PROBE_IMAGES=1 SOURCE_PROBE_PORT=8897 \
-SOURCE_PROBE_EVIDENCE=.local/server-state-web/xkcd-network.json \
-node apps/api/test/source-metadata-probe.ts \
-  .local/v4-source-validation/xkcd/manifest.json \
-  .local/v4-source-validation/xkcd/artifacts
-```
 
 | 操作                                                                 | 实际 UI 与权威读取结果                                                                                                                                                                      |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

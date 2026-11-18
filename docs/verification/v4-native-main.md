@@ -23,23 +23,7 @@ manifest 为 host ABI v4 / protocolVersion 2，materialVersion 为 `629d6e30fe3a
 
 ## 构建与 SQLite
 
-在 `apps/reader` 执行以下正式入口命令；SDK 路径按当前环境设置，依赖仍以锁文件为准：
-
-```sh
-/private/tmp/karuyomi-flutter-sdk/bin/flutter build ios \
-  --simulator --debug --no-pub --no-codesign --target=lib/main.dart \
-  --dart-define=APP_ORIGIN=https://karuyomi.wybxc.cc
-env \
-  JAVA_HOME=/Users/wybxc/karuyomi/runtime/teavm/.local/jdks/jdk-25.0.5+8/Contents/Home \
-  ANDROID_HOME=/Users/wybxc/karuyomi/runtime/teavm/.local/android-sdk \
-  ANDROID_SDK_ROOT=/Users/wybxc/karuyomi/runtime/teavm/.local/android-sdk \
-  GRADLE_USER_HOME=/Users/wybxc/karuyomi/runtime/teavm/.local/gradle \
-  /private/tmp/karuyomi-flutter-sdk/bin/flutter build apk \
-  --debug --no-pub --target=lib/main.dart --target-platform=android-arm64 \
-  --dart-define=APP_ORIGIN=https://karuyomi.wybxc.cc \
-  --no-android-gradle-daemon \
-  --android-project-arg=android.builder.sdkDownload=false
-```
+当次使用锁文件中的依赖，从 Flutter 正式入口分别构建模拟器应用和 Android APK。
 
 iOS 首次构建失败于 sqlite3 3.5.2 官方 GitHub 文件的下载连接。复用本地同版本官方 native-assets 文件前，逐项核对包内固定 SHA-256，再放入当前构建的标准 shared download 缓存。未修改 pub-cache 源码、编译 hook 或输入/输出记录；未关闭 TLS 或校验。原 hook 随重试重新校验缓存，iOS 最终构建成功。原始失败日志保留，不能写成首次成功。
 
@@ -53,4 +37,4 @@ iOS 首次构建失败于 sqlite3 3.5.2 官方 GitHub 文件的下载连接。�
 
 后续须在可控制设备上安装当前成品，从正式主入口完成 Native WebView 自己的 Access 登录，再验证选源、真实图片阅读、进度、退出/后台恢复和会话失效/重新认证。IAB 会话不与 Native 共享；当前构建与内置资源一致性不替代这些门。真机、当前 v4 Native Source 运行和完整 P0 均仍待验收。
 
-构建日志、缓存来源与完整摘要、临时 TypeScript 成品核对工具及报告留在 ignored `.local/v4-native-main/`；机器 JSON 和成品不提交源码。历史 be5 的主入口准备失败继续保留在[原记录](native-main-entry.md)，历史受控双端 Reader 证据仍按各自输入维护。
+机器 JSON 和成品不提交源码。历史 be5 的主入口准备失败继续保留在[原记录](native-main-entry.md)，历史受控双端 Reader 证据仍按各自输入维护。

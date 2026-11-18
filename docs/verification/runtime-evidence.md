@@ -36,7 +36,7 @@
 ## 正式复验入口
 
 - [API 验证](../../apps/api/test/README.md)：真实签名、workerd、D1/R2、注册与 HTTP 桥回归。
-- [Source 浏览器集成](../../apps/api/test/source-metadata-probe.md)：真实 bundle / Worker / Source 网络，默认输出 ignored `.local/probes`。
+- [Source 浏览器集成](../../apps/api/test/source-metadata-probe.md)记录了真实 bundle、Worker 与 Source 的网络验证。
 - `node tools/teavm/check-dto.ts`：完整 DTO、显式引用、分页和长列表的 JVM 边界回归。
 - `pnpm check`、`pnpm flutter:check`：协议、类型、界面与资源调度回归；夹具通过不替代在线或真机验收。
 

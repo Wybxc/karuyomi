@@ -12,7 +12,7 @@
 
 真实 IDB 重复主键请求触发 `ConstraintError`，验证跨块写入的正文、长度、cursor 和 usage 一起回滚。system close 的真实事务 abort 保留原 owner 锁、未链接 inode 计费及兄弟/外来句柄，第二次显式重试成功后才释放。Worker terminate 在提交前只留下旧完整事务；提交后 ACK 前死亡则保留新完整事务。新 Worker 回收死亡 owner，不等待旧时间租约。
 
-报告位于忽略的 `.local/files-stage3/report.json`；这组不执行 Java。
+这组不执行 Java。
 
 ## 原 JVM、Accessor 与实际 TeaVM
 
@@ -26,7 +26,7 @@
 
 首次实际 TeaVM 场景在 append 后 EOF 断言失败。定位到项目 Accessor 返回 `-1`，而锁定 TeaVM 的内部 accessor 使用 `0`；此外上游 `FileInputStream.read()` 直接返回 signed byte。修正项目 Accessor 和自有 JCL IR 适配后，以新增 `0x80`/`0xff`、重复 EOF、RAF 零长度/range 和 close 重试回归重跑通过；没有改 vendor 或放宽断言。
 
-实际 TeaVM 报告为忽略的 `.local/files-stage3/java-browser-report.json`。产物使用本次维护工作区的独立 Java fixture，仅把 mainClass 改为 `FileProbe`；没有改官方扩展源码或原 JAR。
+产物使用本次维护工作区的独立 Java fixture，仅把 mainClass 改为 `FileProbe`；没有改官方扩展源码或原 JAR。
 
 ## 复验与边界
 
@@ -39,14 +39,6 @@ pnpm exec tsc -p tsconfig.tools.json
 pnpm exec vitest run packages/runtime-host/test/bridge.test.ts
 ```
 
-本次本地浏览器编排保留在忽略目录，不随干净检出交付；维护的测试主体是上述 Java fixture 与 browser suite。当前 checkout 可运行以下临时驱动，实际端口以 stdout 为准：
+本次本地当轮独立编排负责构建 Java fixture 并启动浏览器套件。
 
-```sh
-node .local/files-stage3/server.ts
-# 内置浏览器打开打印的 loopback URL，自动执行 14 组机制门。
-node .local/files-stage3/build-java.ts
-node .local/files-stage3/java-server.ts
-# 内置浏览器打开打印的 loopback URL，自动执行实际 TeaVM 共享场景。
-```
-
-改 Java 后须重建测试 bundle；改桥后须重启编排，不能复用旧内存产物。浏览器编排尚未接入自动 CI。正式 Source 读写、版本/身份 namespace 切换、Native、Cache 与 files 合计配额、真实取消和设备资源测量仍待验收；普通文件 allocated 不等于实际磁盘占用。
+浏览器编排尚未接入自动 CI。正式 Source 读写、版本/身份 namespace 切换、Native、Cache 与 files 合计配额、真实取消和设备资源测量仍待验收；普通文件 allocated 不等于实际磁盘占用。

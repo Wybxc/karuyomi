@@ -102,7 +102,7 @@ gate 1 的 HTTP 从 `01:16:33.273` 开始，`43.277` 才断开，Java 为 `Socke
 
 后续仅修改 ignored 夹具：在已登记的原 HTTPS 目标与 PROXY 请求精确匹配后，只在缺失 Host 时补入原目标 authority；已有 Host、重复头、method、pathname、query 与正文保留。未改原 Source、JAR、AOT 或正式产品 HTTP bridge，TLS 的证书链及主机名校验继续启用。新的 preparation 摘要为 `f0f5e7ccc4cb0cae8ff74d73cee58615030a7ebf14d579e34fc420f458af19f6`；下节真实 UI 复验使用这份准备输入。
 
-`.local/source-cancel-be5/upstream-regression-result.json` 记录固定 Node 24.15.0 下 8 项回归均通过：
+固定 Node 24.15.0 的八项回归全部通过：
 
 | 回归范围                                    | 实际证据                                                                                                              |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -138,7 +138,7 @@ gate 3 关联 HTTP 请求 `43bd42b5-1f10-4a6f-a8cc-8a000e494bf3`、图片请求 
 
 ## 证据与复验
 
-ignored 材料在正式 main 的 `.local/source-cancel-be5/`。8932 / 8933 的两次阅读 UI 旧轮保留 `fixture-source/README.md`、冻结源码、`preparation.json`、静态清单、原报告及截图/AX；8934 的 `run-xA4VNW` / `run-9rzZD1` / `run-MUmONL` 也各冻结 16 个夹具文件到 `fixture-source/`，其中 preparation 摘要均与各自报告一致，不依赖后来重建的根目录准备记录。独立 socket 比较的源码与报告在 `.local/idle-cancel-socket-probe/`。详细机器输出不入库。
+8932 / 8933 的两次阅读 UI 旧轮保留 `fixture-source/README.md`、冻结源码、`preparation.json`、静态清单、原报告及截图/AX；8934 的 `run-xA4VNW` / `run-9rzZD1` / `run-MUmONL` 也各冻结 16 个夹具文件到 `fixture-source/`，其中 preparation 摘要均与各自报告一致，不依赖后来重建的根目录准备记录。详细机器输出不入库。
 
 | 证据                                         | SHA-256                                                            |
 | -------------------------------------------- | ------------------------------------------------------------------ |

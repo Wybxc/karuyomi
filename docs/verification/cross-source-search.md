@@ -96,7 +96,7 @@
 
 ### 本次工程检查
 
-主代理在冻结修复后完整运行 `pnpm format` → macOS `pnpm format:check`、`pnpm flutter:check`、`pnpm build` 和官方 acceptance Vite 构建，均退出 0。独立读取最终日志核对三个项目分析无问题、Reader Core 22 / Source Runtime 86 / Reader 591 项通过、172 份 Dart 格式零变化，依赖检查为 179 模块 / 590 依赖无违规。日志为 `.local/search-slot-claim-{format,format-check,flutter-check-final,dependencies,build,acceptance-build}.log`。本轮本地没有重复完整 `pnpm check` 的记录。独立一次查询确认精确客户端提交 `637d322494b2465fda4864091b7bf7d7c59a5aba` 的 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42301547558) 为 completed / success，`pnpm check`、`pnpm flutter:check`、`pnpm build`、`pnpm db:migrate:local` 各步成功；不将旧 `9b98d006` 的 CI 当作此修复结果。这些工程结果不替代上述真实 Source 分项。
+主代理在冻结修复后完整运行 `pnpm format` → macOS `pnpm format:check`、`pnpm flutter:check`、`pnpm build` 和官方 acceptance Vite 构建，均退出 0。独立读取最终日志核对三个项目分析无问题、Reader Core 22 / Source Runtime 86 / Reader 591 项通过、172 份 Dart 格式零变化，依赖检查为 179 模块 / 590 依赖无违规。本轮本地没有重复完整 `pnpm check` 的记录。独立一次查询确认精确客户端提交 `637d322494b2465fda4864091b7bf7d7c59a5aba` 的 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42301547558) 为 completed / success，`pnpm check`、`pnpm flutter:check`、`pnpm build`、`pnpm db:migrate:local` 各步成功；不将旧 `9b98d006` 的 CI 当作此修复结果。这些工程结果不替代上述真实 Source 分项。
 
 本轮官方 harness 以 stdin 换行正常关闭、退出 0；`56104` 无监听，原 workerd PID `32636` 已退出，旧 `52409` 也已关闭。四包 AOT controller / JVM 与唯一 CI watch 均已正常退出，没有遗留本轮验收服务。
 

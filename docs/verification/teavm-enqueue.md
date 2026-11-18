@@ -35,9 +35,9 @@ node tools/teavm/check-enqueue.ts --build-only
 node tools/teavm/check-enqueue.ts --serve-only --timeout-ms 180000
 ```
 
-在 Codex 内置浏览器打开输出的 loopback URL，页面自动执行并 POST 小报告；Node 写入 ignored `.local/v4-enqueue/browser-report.json` 后清理连接并退出，不需要下载文件。必须同时核对退出码、报告 `passed/networkVerified` 和 identity；`--serve-only` 不证明维护源码在构建后未变化，源码变化须重新 build。runner/driver 分别纳入 tools/bridges 严格类型检查与依赖检查，实际浏览器门保持手动执行。
+在 Codex 内置浏览器打开输出的 loopback URL，页面自动执行并 POST 小报告；Node 写出报告后关闭连接并退出。必须同时核对退出码、报告 `passed/networkVerified` 和 identity；`--serve-only` 不证明维护源码在构建后未变化，源码变化须重新 build。runner/driver 分别纳入 tools/bridges 严格类型检查与依赖检查，实际浏览器门保持手动执行。
 
-该次不可变通过报告保留为 `.local/v4-enqueue/browser-report-passed.json`，构建与检查日志同目录；不将机器输出提交源码。实际服务已退出、无监听或本次编译进程。该次未覆盖 30 秒 fatal drain 超时、并发上限与 manager 回收组合；后续实际组合验收见下节，不能从原 JVM/TS 回归推导。
+不将机器输出提交源码。实际服务已退出、无监听或本次编译进程。该次未覆盖 30 秒 fatal drain 超时、并发上限与 manager 回收组合；后续实际组合验收见下节，不能从原 JVM/TS 回归推导。
 
 验收后修正了夹具报告自身的失败路径：参数解析、构建和身份校验前复位为未通过，错误写入 `cliError`；页面无论报告 POST 成功与否均终止 Worker。随后注入非法参数与错误 Worker 摘要，两次 CLI 均退出 1、报告 `passed=false`，未残留旧通过结果；恢复原 identity 后确认实际 Worker 字节未变。负向报告也留在 ignored 目录，因此读取本次浏览器证据时应使用上述单独保存的通过报告，不能把最后一次负向命令的报告当作浏览器结果。报告 POST 失败的浏览器分支未做故障注入。
 
@@ -62,4 +62,4 @@ Node 另核对九个预期网络路径各只有一次 POST，其中原取消正�
 
 首次组合运行因夹具使用 sirv 直接交付 `.gz`，被自动添加 HTTP Content-Encoding，产品加载器正确拒绝，未进入 manager 业务场景。正式工具现参照既有存储验收入口，对该已验证的 gzip 路径单独返回原始字节与 `application/gzip`，其他资源继续使用 sirv。失败报告 `browser-report-manager-initial-failed.json` 保留，不改写为 Source 或产品故障。修正后重新加载页面才取得上述完整通过。
 
-不可变最终报告为 ignored `.local/v4-enqueue/browser-report-manager-passed.json`，另保留 `manager-passed.png`、`build-manager-final.log` 与 `serve-manager-retry.log`；旧通过报告不覆盖。复验仍使用前文 build-only/serve-only 命令，页面自动上报，不需浏览器下载报告。该门仍为受控 Source 和本地 HTTP-v2 端点，不包含 workerd、真实上游、生产 Access、官方 Source 或 Native；不能据此提升扩展兼容标记或认定 P0 完成。
+旧通过报告不覆盖。复验仍使用前文 build-only/serve-only 命令，页面自动上报，不需浏览器下载报告。该门仍为受控 Source 和本地 HTTP-v2 端点，不包含 workerd、真实上游、生产 Access、官方 Source 或 Native；不能据此提升扩展兼容标记或认定 P0 完成。

@@ -52,21 +52,13 @@ Codex 内置 Chromium 156 在 `http://127.0.0.1:8954` 实际运行正式 `ImageS
 
 十个真实 codec Worker 均有对应 terminate，最大同时活动数为 1；十份执行材料均释放。各场景最终 Source resource / bytes / pixels、tile cache / leases / pixels / active decode / page 以及显示 URL 均为 0；编码接收的完整 bitmap 调用数为 0。账本和 terminate 调用不证明 OS / GPU 或物理 heap 回收峰值。
 
-本轮 runId 为 `95bf4439-1e0a-4c4f-a2f4-a6c8b84187f1`；报告在 ignored `.local/image-owners/final-20261104/result.json`，SHA-256 `c0502a6f9d99c8eeddb9d1c8e7bc29ddb5cf9ba4eca3febb22ae1fec68c86643`。材料版本为 `5421945805ad29d489990bcf9836af697e3f6f65ad934da17fe939421af73b6f`，C build identity 仍为 `8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854`。无 cross-origin isolation，不使用 SAB。页面确认报告保存后正常关闭服务，CLI exit 0，8954 端口随后释放。
+本轮 runId 为 `95bf4439-1e0a-4c4f-a2f4-a6c8b84187f1`；原报告 SHA-256 `c0502a6f9d99c8eeddb9d1c8e7bc29ddb5cf9ba4eca3febb22ae1fec68c86643`。材料版本为 `5421945805ad29d489990bcf9836af697e3f6f65ad934da17fe939421af73b6f`，C build identity 仍为 `8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854`。无 cross-origin isolation，不使用 SAB。页面确认报告保存后正常关闭服务，CLI exit 0，8954 端口随后释放。
 
-可复验入口：
-
-```sh
-# 先准备同一固定 codec 的合成输入和 Node 逐片 oracle。
-pnpm image-codecs:check-worker --prepare-only
-pnpm image-codecs:check-owners --output .local/image-owners/recheck --port 8954
-```
-
-在 Codex 内置浏览器打开打印的本地地址，运行六项并通过页面按钮正常关闭；详细配置、scope、trace 和报告保留于指定 ignored 输出目录。`--fixtures` 可明确指定首条命令产生的 `public` 目录。CLI 在首次准备前用 proper-lockfile 独占锁定输出目录，持有至服务结束；仅收到通过报告才成功退出，无报告、拒收或取消均退出 1。
+当时在 Codex 内置浏览器运行六项并通过页面按钮正常关闭。CLI 在首次准备前用 proper-lockfile 独占锁定输出目录，持有至服务结束；仅收到通过报告才成功退出，无报告、拒收或取消均退出 1。
 
 ### 首轮报告身份失败与修复
 
-首轮服务期待 `2029cb34…`，并行 prepare-only 却将共享目录配置覆写为 `0536061b…`。UI 六项显示通过，报告 POST 因 runId 不一致被 400 拒收，不能计作已通过验收；失败配置、必要记录和截图保留在 ignored `.local/image-owners/report-id-mismatch-2029cb34/`。旧 CLI 无报告仍 exit 0 的错误也已修复。三个短回归证明持锁的第二入口不能覆写 sentinel、准备失败释放锁、无报告服务保持未通过；修复后使用独立目录取得上述有效报告。
+首轮服务期待 `2029cb34…`，并行 prepare-only 却将共享目录配置覆写为 `0536061b…`。UI 六项显示通过，报告 POST 因 runId 不一致被 400 拒收，不能计作已通过验收；旧 CLI 无报告仍 exit 0 的错误也已修复。三个短回归证明持锁的第二入口不能覆写 sentinel、准备失败释放锁、无报告服务保持未通过；修复后使用独立目录取得上述有效报告。
 
 ## 最终工程检查
 

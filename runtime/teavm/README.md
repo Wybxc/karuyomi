@@ -7,7 +7,7 @@
 - `bridge/`：严格 TypeScript 产品浏览器桥。Zstd 只读取已校验的共享材料映射，Web 使用静态字节，Native 使用应用内字节。
 - `toolchain-lock.json`、`toolchain/`：工具版本、下载摘要、runtime seed 材料与 Android SDK 元数据。`toolchain/android-sdk-license` 是复制到 SDK `licenses/` 的协议接受摘要记录；协议正文在相邻 XML 元数据中。
 - [来源与许可](NOTICE.md)、`licenses/`：ABI 适配、上游来源与必须保留的许可说明。
-- `.local/`：被忽略的依赖材料、工具链、缓存、隔离构建副本、交付和历史研究归档。不能整体复制到 Static Assets；正式快照只选取当前清单与 gzip bundle。
+- 工具链与 seed 由准备命令按锁文件安装。正式扩展快照只选取当前清单与 gzip bundle。
 
 ## 正式构建
 
@@ -48,4 +48,4 @@ BROWSER=none pnpm test:browser
 
 历史 v4 三源分项见 [v4 运行记录](../../docs/verification/v4-source-runtime.md)；退役入口、上游挑战及搜索行为见 [历史集成说明](../../apps/api/test/source-metadata-probe.md)与[实测摘要](../../docs/verification/runtime-evidence.md)。原日期、材料与结果保留，测试签名仍不替代生产 Access，浏览器分项不替代 Native、真机或完整阅读验收。
 
-独立字节、回调与 iOS 研究工程和旧导入/构建脚本只保留在被忽略的 `.local/research/`。必要基线摘要、关键门槛与已知失败已归并到 [验证要点](../../docs/verification/runtime-evidence.md)，其中 R2/v1 记录属于历史机制证据。当前 Java、Worker 和 API 只维护 HTTP v2，已有分帧、Okio 按需消费及历史受控 workerd 网络取消证据；当前官方 Workers 回归的取消覆盖使用模拟 upstream，不证明真实 TCP reset；真实 Source/Cache 同版对照、图片资源、移动端内存和产品实测仍按 [HTTP 桥](../../docs/HTTP-BRIDGE.md) 与 [VERIFICATION](../../docs/VERIFICATION.md) 单独验收，不能据机制测试宣称 P0-B 完成。
+必要基线摘要、关键门槛与已知失败已归并到 [验证要点](../../docs/verification/runtime-evidence.md)，其中 R2/v1 记录属于历史机制证据。当前 Java、Worker 和 API 只维护 HTTP v2，已有分帧、Okio 按需消费及历史受控 workerd 网络取消证据；当前官方 Workers 回归的取消覆盖使用模拟 upstream，不证明真实 TCP reset；真实 Source/Cache 同版对照、图片资源、移动端内存和产品实测仍按 [HTTP 桥](../../docs/HTTP-BRIDGE.md) 与 [VERIFICATION](../../docs/VERIFICATION.md) 单独验收，不能据机制测试宣称 P0-B 完成。

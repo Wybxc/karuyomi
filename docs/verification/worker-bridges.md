@@ -41,4 +41,4 @@ pnpm exec vitest run packages/runtime-host/test/bridge.test.ts
 
 新增故障门使用真实重复 IDB `add` 触发 `ConstraintError` 与事务回滚。产品等 `onabort` 后，独立事务按 editor、owner/handle 和 generation 清理；原错误仍返回，旧完整正文/版本不变，替代 editor、另一个活 Worker 和新 generation 均不被误解锁。另将 begin 停在事务外 Web Lock 恢复等待处，先完成同 handle 的 close，再恢复 begin，确认不会重新创建 editor。`delete()` 在 Java 先标记关闭，桥以同 handle 的 begin fence 和原子清空推进 generation；`evictAll()` 仍允许原 handle 后续正常 begin。只追踪正在执行的 begin，不保存无限增长的关闭 handle 历史。
 
-复验源码为 `cache-lifecycle-browser-suite.ts` 和 `cache-lifecycle-worker.ts`，由正式 `compileBridge('cache')` 输出驱动；执行上述 strict tsc 与桥单测，再用本地静态页加载 suite、产品桥和测试 Worker。服务与原始 JSON 留在 ignored `.local/cache-lifecycle/`。单次重开约 1 ms 只用于确认无需 TTL 等待，不是设备性能分布。正文当前仍有整段 Base64 与全目录扫描；本门未验证 Java CacheInterceptor、原 Source、正文内存上界或原 JVM 等价。后续范围见[存储计划](../plan/runtime-storage.md)。
+复验源码为 `cache-lifecycle-browser-suite.ts` 和 `cache-lifecycle-worker.ts`，由正式 `compileBridge('cache')` 输出驱动；执行上述 strict tsc 与桥单测，再用本地静态页加载 suite、产品桥和测试 Worker。单次重开约 1 ms 只用于确认无需 TTL 等待，不是设备性能分布。正文当前仍有整段 Base64 与全目录扫描；本门未验证 Java CacheInterceptor、原 Source、正文内存上界或原 JVM 等价。后续范围见[存储计划](../plan/runtime-storage.md)。

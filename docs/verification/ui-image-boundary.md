@@ -22,7 +22,7 @@
 
 完整 `pnpm flutter:check` 已通过：Reader core 20 项、SourceRuntime 37 项、Flutter 应用 124 项；所有分析和官方 Drift 生成一致性检查通过。实际 PNG provider 回归确认观察者与 Image 共用一次 load/decode，覆盖同步缓存、坏编码、卸载后迟到和暂停。它们是工程测试；后续诊断性真实 Source 产品阅读分项单列如下。
 
-Native Dart 定向 30 项通过，覆盖迟到原响应的正常/错 requestId/错 generation 与 host/本地释放失败组合、挂起控制随 close 结束、clear ACK 前保留文件及并发 release。Xcode 27.2（27B52）/ iOS 26.4（23E244）Simulator 的正式 `NativeImageFilesTests` 11/11 通过，xcodebuild exit=0；测试新启动的 iPhone 17 Pro 已关闭，Booted devices 为空。日志与 xcresult 位于忽略目录 `.local/ui-image-boundary/native-image-files-20261104.*`。这不等于真实 Source/Native Reader 或物理设备验收。
+Native Dart 定向 30 项通过，覆盖迟到原响应的正常/错 requestId/错 generation 与 host/本地释放失败组合、挂起控制随 close 结束、clear ACK 前保留文件及并发 release。Xcode 27.2（27B52）/ iOS 26.4（23E244）Simulator 的正式 `NativeImageFilesTests` 11/11 通过，xcodebuild exit=0；测试新启动的 iPhone 17 Pro 已关闭，Booted devices 为空。这不等于真实 Source/Native Reader 或物理设备验收。
 
 ### TS Source 与协议证据
 
@@ -55,7 +55,7 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 准备过程中发现旧 `hostSubmodules()` 会从未初始化的候选 codec 目录向上找到父仓库，导致本树 host 指纹错误包含父提交。诊断 buildId `ext-all.xkcd-ce8b19debe9b65d53c82fa75c08fdf40` 的指纹为 `832ae9f93415090979c2c2aa6a7adc39311f36f0f898a4bfebfda5a2237411bd`，只保留其固定输入下的功能观察，不作为修复后的发布身份或性能基线。当前构建器的 Source 必需依赖收敛为 TeaVM/Suwayomi，后续须重新计划和构建。
 
-原始构建与网络报告保存在该树 ignored `.local/ui-image-baseline/`。页面已关闭，服务会话退出 130 后另行确认端口 8930、Node 与 workerd 子进程均消失，并仅删除匹配本 buildId 的临时静态快照和 D1；退出码本身不作为清理证明。UI 成功不等于内部 Blob/缓存账本或进程/GPU 峰值归零。
+页面已关闭，服务会话退出 130 后另行确认端口 8930、Node 与 workerd 子进程均消失，并仅删除匹配本 buildId 的临时静态快照和 D1；退出码本身不作为清理证明。UI 成功不等于内部 Blob/缓存账本或进程/GPU 峰值归零。
 
 ## 默认关闭的采集入口工程验收
 
@@ -63,7 +63,7 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 完整 `pnpm check`、`pnpm flutter:check`、默认 `pnpm build` 与提交前完整格式检查通过。Flutter 三包分别为 20、37、130 项测试；新增回归覆盖真实 provider 仍只 decode 一次、离屏图片不冒充当前可见页、raw 帧号关联、限额/收尾、迟到 acquire/release 跨采集隔离，以及默认/显式启用的 app shell。
 
-完整套件首轮暴露 raw timing 测试依赖尚未初始化的 engine frameNumber；该失败日志保留。锁定 SDK 没有对应 testValue setter，测试现通过明确标记的实例级测试 reader 固定帧号，生产默认仍读真实 PlatformDispatcher，未知帧号仍拒绝，未放宽匹配。之后完整 Flutter 检查 130 项通过。详细日志在 main ignored `.local/ui-image-boundary/baseline-*.log`，不作为性能数据。
+完整套件首轮暴露 raw timing 测试依赖尚未初始化的 engine frameNumber；该失败日志保留。锁定 SDK 没有对应 testValue setter，测试现通过明确标记的实例级测试 reader 固定帧号，生产默认仍读真实 PlatformDispatcher，未知帧号仍拒绝，未放宽匹配。之后完整 Flutter 检查 130 项通过。
 
 本项工程验收之后执行了下述真实采集，但首次报告导出失败；不能报告首图/跳转分布或帧性能通过。CPU、RSS、GPU 与物理呈现均未采集。P0 保持先用最简单直接的实现完成真实流程，再按实测瓶颈优化。
 
@@ -75,7 +75,7 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 60 秒自动停止后，面板显示 30 个事件和 406 个帧样本；这些只是 UI 显示计数，没有可用的原始报告。点击“查看 JSON”产生真实 Web `Bad state: RenderBox was not laid out`，复制后读取剪贴板为空，空 JSON 文件无法解析。因此本次采集完整性门失败，不能根据这些计数计算或声称首图、帧分布通过。修复方向为有界摘要与成熟库的文件下载，随后必须复验实际下载正文。
 
-截图、网络记录、空导出和 `capture-1-failed.json` 保存在验证树 ignored `.local/ui-image-baseline/confirmed/`；失败记录保留。测试标签页已关闭，服务退出后确认端口 50188 无监听，且无本次 Node/workerd/Java/Gradle 子进程；仅删除匹配本 buildId 的临时快照/D1。
+失败记录保留。测试标签页已关闭，服务退出后确认端口 50188 无监听，且无本次 Node/workerd/Java/Gradle 子进程；仅删除匹配本 buildId 的临时快照/D1。
 
 ## Web 报告下载完整性复验
 
@@ -89,7 +89,7 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 同页控制台在 `2026-11-04T15:26:01.945Z` 曾记录一次 `Bad state: RenderBox was not laid out`，早于上述采集开始。固定 release 栈与锁定 SDK 源码比对定位到视图焦点变化后的 ReadingOrderTraversalPolicy 排序：FocusNode.rect 读取尚未布局的 RenderSemanticsAnnotations.size。该路径不经过 JSON 或图片交付，具体焦点节点与触发时序仍待复验，现有证据不足以认定 SDK 缺陷。最终摘要和下载文件实际可用，但不能声称全程零错误，也未将该错误归因于大报告。旧 `8494757` 的导出失败与空文件继续保留，不由本次下载成功改写。
 
-原始报告 `xkcd-export-capture.json`、完整性复核 `export-integrity.json`、网络记录 `xkcd-export-network.json`、漫画/文字/下载结果截图 `export-*.jpg` 保存在固定验证树 ignored `.local/ui-image-baseline/confirmed/`。测试标签页已关闭，服务会话退出 130 后另行确认端口 53920 无监听，且无本次 Source probe/workerd/Gradle 进程；仅删除唯一匹配本 buildId 的 `karuyomi-source-probe-kur9sp` 临时快照/D1，没有只依赖退出码判断清理完成。下一步在当前不透明图片合同下复验 Arknights 正式完整章、下一章与首次续读，再按固定条件补齐多次 baseline 和目标设备指标。
+测试标签页已关闭，服务会话退出 130 后另行确认端口 53920 无监听，且无本次 Source probe/workerd/Gradle 进程；仅删除唯一匹配本 buildId 的 `karuyomi-source-probe-kur9sp` 临时快照/D1，没有只依赖退出码判断清理完成。下一步在当前不透明图片合同下复验 Arknights 正式完整章、下一章与首次续读，再按固定条件补齐多次 baseline 和目标设备指标。
 
 ## 当前合同的 Arknights 完整章与首次续读
 
@@ -128,13 +128,13 @@ TS↔Dart 黄金矩阵 9 项通过，实际运行双端生成 codec 的 ProtoJSO
 
 采集记录第 16→23 页的七次推进及切到 141 章；第 17–23 页和下一章首图有实际 ImageInfo、image frame 与 decoded viewport。9 次 acquire 均返回且 generation 匹配：142 章第 18–23 页的 6 份资源在窗口内释放，另 3 份是 141 章第 1–3 页的取得，后两页仅属预取，不能由取得推定显示。9 份 release 请求、发送与 ACK 的资源/generation 集合相同，其中 3 份属于采集前已持有资源。**只有一个 `reader_exit_ack`，对应 142→141 切章；这份报告不覆盖之后返回详情、首次续读及其退出。** 下一章 3 份资源未在窗口内释放不能据此判泄漏，也不能声称整轮所有资源已由此报告证明释放；同样不能推广为浏览器 Blob/Flutter cache、RSS/GPU 或进程峰值归零。
 
-`cuutruyen-console-errors.json` 为 `[]`，只证明本轮记录范围内没有 error。原始材料保存在固定验证树 `/Users/wybxc/.codex/worktrees/ui-image-baseline-validation/karuyomi/.local/ui-image-baseline/confirmed/`：`cuutruyen-pages/01.jpg`–`23.jpg`、`cuutruyen-current-ui-steps.json`、`cuutruyen-completed-ui.txt`、`cuutruyen-next-ui.json`、`cuutruyen-resume-initial-ui.txt` 与截图、`cuutruyen-current-network.json`、`cuutruyen-lifecycle-capture.json`。独立复核摘要为 `cuutruyen-evidence-integrity.json` 与 `cuutruyen-lifecycle-integrity.json`，完整构建身份在 `cuutruyen/provenance.json`。`cuutruyen-current-cleanup.json` 记录测试标签页已关闭、视口已恢复，服务退出 130 后端口 51065 无监听、无本次 probe/workerd 进程，仅删除核对后的 `karuyomi-source-probe-wDK87y` 临时快照/D1。
+`cuutruyen-console-errors.json` 为 `[]`，只证明本轮记录范围内没有 error。独立复核摘要为 `cuutruyen-evidence-integrity.json` 与 `cuutruyen-lifecycle-integrity.json`，完整构建身份在 `cuutruyen/provenance.json`。`cuutruyen-current-cleanup.json` 记录测试标签页已关闭、视口已恢复，服务退出 130 后端口 51065 无监听、无本次 probe/workerd 进程，仅删除核对后的 `karuyomi-source-probe-wDK87y` 临时快照/D1。
 
 本轮不更新发布兼容标记，产物仍未发布，构建记录仍为 `compiled_unverified` / `runtimeReady=false`。加上原 xkcd 与 Arknights，当前不透明合同已有三源限定 Web 阅读与恢复分项；没有完成生产 Access、Native 主入口、真实长图/EXIF/LOD、真机性能或 P0 总验收。
 
 ## 初始焦点对照与诊断层收敛
 
-在同一固定 `5e1e014` 源码、相同材料下，另行构建默认未启用 `READER_BASELINE` 的正式 Web release，独立输出到 ignored `.local/ui-image-baseline/default-web`，保留原采集版。Codex 内置浏览器临时固定为 1280×720；三次新文档加载均执行启用无障碍、Tab/Shift+Tab 和进入浏览，操作前后的控制台 error 数均为零，且界面不含性能采集按钮。这是三个新文档的默认构建对照，不是三个浏览器进程，也不能证明所有条件下不会发生焦点问题。
+同一固定提交 `5e1e014` 和相同材料另行构建了默认关闭 `READER_BASELINE` 的正式 Web release，用于与采集版对照。Codex 内置浏览器临时固定为 1280×720；三次新文档加载均执行启用无障碍、Tab/Shift+Tab 和进入浏览，操作前后的控制台 error 数均为零，且界面不含性能采集按钮。这是三个新文档的默认构建对照，不是三个浏览器进程，也不能证明所有条件下不会发生焦点问题。
 
 官方 [Flutter #193287](https://github.com/flutter/flutter/issues/193287) 记录同一稳定 SDK 中 builder 外层 Overlay 的同类焦点遍历栈，但其示例同时含 SelectionArea，不能直接认定与本项目完全同因。首轮候选用锁定 SDK 的 `Overlay.wrap` 接管诊断 entry 生命周期，移除手写 entry 创建、更新和释放，保持 Source、图片链和 recorder 不变。五项诊断测试、静态分析与对应 CI 通过；随后固定 `235f2dff2e7b83c4f4c7a905fd6572384acc71bb` 的三次同条件新文档复验均在启用无障碍前记录同一焦点异常，因此该候选未修复问题。原始记录为 `overlay-wrap-focus-runs.json`。
 

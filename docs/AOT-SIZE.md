@@ -1,6 +1,6 @@
 # 扩展 AOT 包体分析
 
-2026-11-03，当前交付方案已确定：共享桥/WASM 在 Web 静态交付、Native 随应用打包；所有客户端从 Static Assets 获取每包最新可用的 gzip AOT，保留 TeaVM `ADVANCED` 与现有宿主服务。扩展不再使用 GitHub Release 或 R2 分发，具体合同见[扩展静态分发](EXTENSIONS.md)。以下保留交付决策前的产物测量和少量真实 A/B 编译，原始中间报告留在 ignored `.local`。
+2026-11-03，当前交付方案已确定：共享桥/WASM 在 Web 静态交付、Native 随应用打包；所有客户端从 Static Assets 获取每包最新可用的 gzip AOT，保留 TeaVM `ADVANCED` 与现有宿主服务。扩展不再使用 GitHub Release 或 R2 分发，具体合同见[扩展静态分发](EXTENSIONS.md)。以下保留交付决策前的产物测量和少量真实 A/B 编译。
 
 优先做共享材料单独交付和传输压缩，再测宿主初始化是否引入无用依赖。TeaVM 当前已开启代码裁剪、混淆和均衡优化；把生成文件中的一段直接抽成共享 JavaScript 不能保证正确性。
 

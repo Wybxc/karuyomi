@@ -129,7 +129,7 @@ ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.zh.ko
 4. Komiic 默认 `.com` 热门仍失败；通过原镜像设置改为 `.cc`，界面确认设置，Source 重开后热门成功。重新打开原设置可见 `komiic.cc`。
 5. 原动态分类树返回，选择“搞笑”并应用后显示“筛选（已应用）”，出现雅尼貓、敗犬女主太多了等新结果；“加载更多”追加被俘者的嘆息等条目。重新打开筛选，“搞笑”仍已选，关闭编辑后原查询保持。这里是可见分页与保留证据，未抓取上游 GraphQL 变量。
 
-本轮限测试身份的 Web 分项，不覆盖 preference veto / 回调次数 / 丢 ACK、单个 Job 到 HTTP 的取消、迟到竞争、Native、生产 Access 或真机。正式验收服务已正常退出，61010 端口拒绝连接，所有本轮构建器已结束。详细固定输入、原 provenance 和构建日志在独立目录 `.local/official-core-harness/summary.json` 及同目录日志；截图为 `/private/tmp/karuyomi-official-core-bh3-reading.jpg`、`/private/tmp/karuyomi-official-core-komiic-filter.jpg`。这些临时产物不提交源码库。
+本轮限测试身份的 Web 分项，不覆盖 preference veto / 回调次数 / 丢 ACK、单个 Job 到 HTTP 的取消、迟到竞争、Native、生产 Access 或真机。正式验收服务已正常退出，61010 端口拒绝连接，所有本轮构建器已结束。截图为 `/private/tmp/karuyomi-official-core-bh3-reading.jpg`、`/private/tmp/karuyomi-official-core-komiic-filter.jpg`。这些临时产物不提交源码库。
 
 ## 复用上游 HTTP suspend adapter
 

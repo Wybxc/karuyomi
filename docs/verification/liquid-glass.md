@@ -16,7 +16,7 @@ Web 默认使用标准质量，支持 shader filter 的引擎选择完整效果�
 
 实色设置回归覆盖草稿不提前应用、错误 ACK 拒绝、保留原操作重试与独立会话读回。Cloudflare 官方 Vitest 插件下 `state-workerd.test.ts` 的 46 项 Worker/D1 回归通过，覆盖跨会话读回、相同回执重放、旧写 CAS 冲突及切回玻璃。状态文字变化曾触发画布重排，已改为稳定状态槽位，恢复内容叠在其上；完整最终回归已包含阅读保存、Access 恢复及应用壳路径。
 
-原始输出留在 ignored `.local/liquid-glass-evaluation/`。当前未运行本机完整 Flutter 编译、AOT、模拟器或真机；完整 Web 构建交给既有 CI。
+当前未运行本机完整 Flutter 编译、AOT、模拟器或真机；完整 Web 构建交给既有 CI。
 
 ## 代码量
 
@@ -44,4 +44,4 @@ Codex 内置浏览器恢复真实测试账号 Access 登录后，已打开漫画
 
 同一 release / CanvasKit、1280×720、DPR 2、60Hz 环境取得旧基线 `d7416f0` 和最终候选 `fa32475` 的可解析原始报告。候选首份报告只有打开章节及静止阶段，没有录入随后翻页；补采面板显示 53 个事件和 335 帧，但第二份 JSON 自动下载多次超时，终止时尚未落盘。不能据第一份报告给出完整跳页/滚动性能或能耗结论。
 
-CPU、RSS、GPU 内存、后台耗电及原生真机仍未采集；框架 FrameTiming 不等于物理呈现或 GPU 执行时间。原始文件和截图保留在 ignored `.local/liquid-glass-evaluation/`。恢复 Cupertino 是用户对视觉与成本的明确取舍，不把该决定包装为已证明的性能回归。
+CPU、RSS、GPU 内存、后台耗电及原生真机仍未采集；框架 FrameTiming 不等于物理呈现或 GPU 执行时间。恢复 Cupertino 是用户对视觉与成本的明确取舍，不把该决定包装为已证明的性能回归。

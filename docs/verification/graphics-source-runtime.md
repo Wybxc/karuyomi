@@ -32,17 +32,9 @@ Codex 内置浏览器 Chromium 156，正式 host、产品 Worker、隔离 D1、�
 
 ## 复验
 
-冻结 checkout 后安装锁定依赖、准备锁定运行时，从完整输入计划逐包构建，不复用其它 host 身份的产物。正式入口：
+冻结 checkout 后安装锁定依赖、准备锁定运行时，从完整输入计划逐包构建，不复用其它 host 身份的产物。
 
-```sh
-pnpm --filter @karuyomi/runtime-host build
-SOURCE_PROBE_ALLOWED_HOSTS=cuutruyen.net,hetcuutruyen.net,storage-bravo.cuutruyen.net,storage-charlie.cuutruyen.net \
-SOURCE_PROBE_IMAGES=1 \
-SOURCE_PROBE_EVIDENCE=.local/cuutruyen-online.json \
-node apps/api/test/source-metadata-probe.ts BUILD/manifest.json BUILD/artifacts
-```
-
-多 Source 包通过 `SOURCE_PROBE_SOURCE_ID` 指定清单内的准确 ID；本次 MangaDex 使用英文 ID。用内置浏览器点击 `Run real metadata operations`。探针只记录 header/Cookie 名称、图片 host 和处理 fragment 的计数，不保存 token、Cookie 值或 DRM key。原始报告、构建日志与本次扩展观测入口留在冻结工作树 ignored `.local/p0c/`，文档只保留可复验身份、必要结果与未通过门。
+多 Source 包通过 `SOURCE_PROBE_SOURCE_ID` 指定清单内的准确 ID；本次 MangaDex 使用英文 ID。用内置浏览器点击 `Run real metadata operations`。探针只记录 header/Cookie 名称、图片 host 和处理 fragment 的计数，不保存 token、Cookie 值或 DRM key。
 
 ## 新 Cache 材料复验
 
@@ -55,7 +47,7 @@ node apps/api/test/source-metadata-probe.ts BUILD/manifest.json BUILD/artifacts
 
 Codex 内置浏览器 Chromium 156 使用该固定 checkout 的正式 `source-metadata-probe.ts`，产品 Cache/Worker/HTTP v2、隔离 D1 与测试签名；两个 Source 均重新通过原元数据链和首中末图片。Arknights 仍为 17 项/3 章/51 页，三图字节与尺寸同上；CuuTruyen 仍从真实 Spy x Family 第 142 章取得 23 个 DRM 页，三图处理后的字节/尺寸同上，Blob 释放与撤销通过。正式 probe 的 header/Cookie 名称和 fragment 计数已接入，未保存凭据值。
 
-这证明新 Cache 材料下的两源在线图片链。没有测量这些 Source 的冷/热 Cache 命中计数，不能代替共享 Java 的同版语义对照，也没有新增生产 Access、Native、连续阅读或峰值证据。独立产物/报告位于该 checkout 的忽略目录 `.local/p0c/`；发布状态不自动提升。
+这证明新 Cache 材料下的两源在线图片链。没有测量这些 Source 的冷/热 Cache 命中计数，不能代替共享 Java 的同版语义对照，也没有新增生产 Access、Native、连续阅读或峰值证据。发布状态不自动提升。
 
 ## 新文字材料与 xkcd
 
@@ -71,17 +63,7 @@ Codex 内置浏览器 Chrome 156 经正式 `source-metadata-probe.ts`、产品 h
 
 随后以相同 AOT/材料配合固定 `80841b` 的真实 Flutter Web 构建，在正式产品界面选择英文 Source → xkcd → 3319。直图正常显示；切换到 2/2 可清楚看到原 TextInterceptor 生成的标题和完整 alt 文字，阅读进度已保存；下一章进入 3318 正常。本地可见文字截图为 `/tmp/karuyomi-xkcd-text-page.jpg`。此 UI 检查补齐该章实际显示证据，不把 Blob 撤销等同于内部 graphics ledger 归零，也不代表生产 Access 或长期连续阅读已通过。
 
-复验在同一固定树构建 runtime-host 后执行：
-
-```sh
-SOURCE_PROBE_ALLOWED_HOSTS=xkcd.com,imgs.xkcd.com \
-SOURCE_PROBE_SOURCE_ID=1538249443376436084 \
-SOURCE_PROBE_IMAGES=1 \
-SOURCE_PROBE_EVIDENCE=.local/xkcd-online.json \
-node apps/api/test/source-metadata-probe.ts BUILD/manifest.json BUILD/artifacts
-```
-
-原始 descriptor、provenance、构建日志和报告保留在该树忽略的 `.local/text-source/`，严格原 JAR 构建使用 `xkcd-original/`。先前 fresh debug keystore 的试构建仅签名 `META-INF/CERT.RSA` 不同，未作为严格对照使用。
+先前 fresh debug keystore 的试构建仅签名 `META-INF/CERT.RSA` 不同，未作为严格对照使用。
 
 该 `926b93d` 身份的内部图形生命周期仍有确定缺口：官方 TextInterceptor 没有 recycle 它创建的 Bitmap；owned Bitmap 无自动回收注册，bridge `teaGraphicsEnd` 只清 byte handles/scratch，surface Map 仍持有画布。因此上述 release/revoke 不能冒称内部 ledger 归零，重复文字页处理、取消和存活 Worker 的内存/64-surface 预算仍待验收。独立 Java/Canvas 场景显式 recycle 后归零的结果见[文字布局记录](text-layout-runtime.md)，不能替代这项实际 Source 门。后续 typed lease 的活 owner、编码pin及真实Java自然回收已通过[独立验证](bitmap-lifetime-runtime.md)，须再固定新材料重建原 Source 复验。
 
@@ -103,4 +85,4 @@ Codex 内置浏览器 Chrome156 先用未经扩展的正式 `source-metadata-pro
 
 上述字节为bridge内部reservation，并非进程或GPU实测峰值；所有GC延时仅为单次机制观察。取消覆盖受控的真实PNG编码等待阶段，不推广为所有HTTP/解码阶段、所有Source或任意引擎环境。生产Access、长期连续阅读、Native生命周期与真机性能仍须另验。
 
-正式两页复验命令沿用上一节。此次descriptor、provenance、构建日志及原始报告保留在固定树 `.local/bitmap-source/`：`xkcd-online.json`、`xkcd-lifecycle-idle.json`、`xkcd-lifecycle-pressure.json`，诊断服务源为 `lifecycle-probe.ts`。该ignored入口基于同树正式Source服务；观测代码和原生PNG结果gate不进入产品分发。
+正式两页复验命令沿用上一节。该ignored入口基于同树正式Source服务；观测代码和原生PNG结果gate不进入产品分发。

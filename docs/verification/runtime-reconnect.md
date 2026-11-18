@@ -37,7 +37,7 @@
 
 新 App 进程（PID 21527）从正式书架直接续读，第 2 页显示真实 `RawImage`，随后返回书架并确认章节资源关闭。只通过「设置 → 连接服务」重连原地址，Catalog 状态实测为 `ready → failed → connecting → ready`，收到两条正式的 `Native runtime container was rebuilt` 事件；事件条数不代表启动了两个新 WebView。该进程回到书架直接续读同章第 2 页，无需翻页。两轮页键和 manifest 一致，均实际解码 1000×213 的图片（36,912 B），Source generation 从 `2186a808…` 变为 `6030ca36…`，Native 图片绑定目录从 `01E43D2E…` 变为 `C1AAE5DC…`；两轮均确认关闭章节，Flutter 集成测试 1/1 通过。
 
-独立 HTTPS 对照的书架、设置、作品、带精确章键的章节状态、章节进度列表和书签六路响应均逐字节一致，账户/作品/全局设置 revision 保持 `4/3/1`。这证明该流程未产生可见业务写入。复验使用正式验收 harness、同一静态候选和测试身份；用正式 `server_sync_test.dart` 准备页码后，运行忽略目录 `.local/ios-xkcd-reconnect-2c012db.qSHavJ/` 中的 `run-reconnect.sh`（固定 Flutter 3.47.5、指定专用模拟器和隔离源站），前后分别用 `snapshot.sh` 采样。更换验收端口时需同步修改驱动与采样脚本的回环地址限制。原始日志、快照、包内 runtime 摘要与清理记录在同目录；服务和专用模拟器已清理，临时 TLS 私钥已删除。该分项未覆盖 Source 自动触发的恢复、丢失启动确认、换身份、生产 Access 或物理设备。
+独立 HTTPS 对照的书架、设置、作品、带精确章键的章节状态、章节进度列表和书签六路响应均逐字节一致，账户/作品/全局设置 revision 保持 `4/3/1`。这证明该流程未产生可见业务写入。复验使用正式验收 harness、同一静态候选和测试身份；本轮使用正式 `server_sync_test.dart` 准备页码，在 Flutter 3.47.5、专用模拟器和隔离源站上断开并恢复连接，比较前后读回。服务和专用模拟器已清理，临时 TLS 私钥已删除。该分项未覆盖 Source 自动触发的恢复、丢失启动确认、换身份、生产 Access 或物理设备。
 
 ## 正式 Web 主入口的 A→B→A
 
@@ -53,9 +53,9 @@
 
 正常退出和最终返回浏览后重连，三 Worker 均 terminate，实际章节会话关闭数为 2/1/2；第四次 bootstrap 仅用于清理，未创建第四个 Source Worker。最终检查点 `sequence=acknowledgedSequence=113`，事件连续，队列字节/条目均为 0，持久化失败为空；console、夹具及 Cache 观察错误均为 0。主代理随后关闭两临时标签，本地所属 server 已 Ctrl-C 停止且端口无监听；不据此声称图形账本或浏览器内存归零。
 
-首轮 8924 的 UI 成功但 keepalive 遥测触及 [Fetch 64 KiB 合计限额](https://fetch.spec.whatwg.org/#http-network-or-cache-fetch)，返 A 观察不完整；原报告、console、截图均保留在固定 b4 树 `.local/network-cache-source/product-identity/first-round/`，不将该轮记为完整 Cache 门。新 8928 仅修 ignored 观测器：普通 fetch、消费响应正文、单请求有界队列，切换前确认快照与队列排空。
+首轮 8924 的 UI 成功但 keepalive 遥测触及 [Fetch 64 KiB 合计限额](https://fetch.spec.whatwg.org/#http-network-or-cache-fetch)，返 A 观察不完整；首轮保留失败判定，未通过完整 Cache 门。新 8928 仅修 ignored 观测器：普通 fetch、消费响应正文、单请求有界队列，切换前确认快照与队列排空。
 
-第二轮完整输入、启动命令与证据保留在该树 `.local/network-cache-source/product-identity-8928/`，归档位于 `evidence/`：
+第二轮核对了以下输入与观察结果：
 
 | 文件                                                    | SHA-256                                                            |
 | ------------------------------------------------------- | ------------------------------------------------------------------ |

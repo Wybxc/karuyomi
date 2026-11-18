@@ -62,7 +62,7 @@ Android 当前实现使用 `path_provider` 的应用缓存目录下专属 `karuy
 - 实际 `NativeImageControl` 仅发布匹配 resource/generation/file 的所有权；stale generation 无权使用文件，release 撤销所有权。
 - late cancel 保留已交付文件，release 幂等删除，在途取消等待实际清理，clear 删除绑定目录。
 
-夹具使用当次 main 构建的内置材料 `fba63bcd9b2a194131eb76a500c2e8f046d987b4650d510d6b6f5205bf32a9e8`，原始报告与临时 HTTPS 工程保存在忽略的 `apps/reader/.local/native-image-probe/`，未作为产品假 Source 入口提交。这是容器和文件交接的证据，尚非原版 Source→Native Reader、生产 Access 或真机验收；冻结版本的 Web Source 证据不能与另一材料版本混装。
+夹具使用当次 main 构建的内置材料 `fba63bcd9b2a194131eb76a500c2e8f046d987b4650d510d6b6f5205bf32a9e8`。这是容器和文件交接的证据，尚非原版 Source→Native Reader、生产 Access 或真机验收；冻结版本的 Web Source 证据不能与另一材料版本混装。
 
 本轮 Flutter analyze 与 SourceRuntime analyze 均无问题；Flutter 全部 45 项、SourceRuntime 全部 23 项测试通过，iOS 模拟器 XCTest 11 项通过。正式回归包括 Dart 资源所有权、取消 ACK、timeout 分类、迟到结果、配额、目录边界；Android 头部解析与实际嵌入脚本的 Node MessagePort 背压/复用/旧 ACK/取消；iOS XCTest 的路径、描述、共享预算、目录与绑定/pending-start/cancel deadline。Node MessagePort 测试不代表 Android WebView 已通过。
 
@@ -93,7 +93,7 @@ xcodebuild -workspace Runner.xcworkspace -scheme Runner \
 | 第 26 页   | 719,916 B，PNG | 1200 × 1691      | 同上                                    |
 | 第 51 页   | 718,931 B，PNG | 1200 × 1691      | 同上                                    |
 
-三份文件的 SHA-256 均机器核对为对应 workerd 上游流的摘要。`ChapterPageProvider.close()` 在获取中取消并关闭原 Page 会话；保留一张未释放图片后调用真实 `NativePlatformRuntime.rebuild()`，文件和 binding 目录消失、旧所有权失效，新 Source 在不同 generation 下重开。原始小报告留在冻结工作树忽略的 `.local/native-source/`；测试服务、隔离 D1、静态快照和 App 已清理。仅合法的空 process 根目录残留，不将其误报为未清理 binding。
+三份文件的 SHA-256 均机器核对为对应 workerd 上游流的摘要。`ChapterPageProvider.close()` 在获取中取消并关闭原 Page 会话；保留一张未释放图片后调用真实 `NativePlatformRuntime.rebuild()`，文件和 binding 目录消失、旧所有权失效，新 Source 在不同 generation 下重开。测试服务、隔离 D1、静态快照和 App 已清理。仅合法的空 process 根目录残留，不将其误报为未清理 binding。
 
 这是实际 Dart 产品控制器与 Source/文件通道的分项证据，尚非 Native ReaderScreen 的完整交互、3–5 个处理源、整章/下一章、后台恢复、物理设备、生产 Access 或峰值验收。公开 API 没有直接暴露原 Blob URL 或 Swift reservation 计数，文件消失不能单独证明内存或全部账本归零。
 

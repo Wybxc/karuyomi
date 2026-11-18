@@ -35,29 +35,11 @@ Native 驱动只加载正式页面，读取其原始结果，并在 finally 中�
 
 ## 复验与本地材料
 
-正式 [runner](https://github.com/Wybxc/karuyomi/blob/f623a8263c87ac198ff3882fd3eade1072e6abfc/tools/teavm/check-cache-storage.ts) 可从干净检出使用；Native 夹具与 HTTPS 编排仅保留在上述固定树 ignored 的 `.local/cache-native/`，不是新产品入口：
-
-```sh
-# 固定树根目录；按仓库固定版本安装依赖
-git rev-parse HEAD
-pnpm install --frozen-lockfile
-node .local/cache-native/compile-identity.ts
-node tools/teavm/check-cache-storage.ts --port 0 --timeout-ms 300000 \
-  --report .local/cache-native/ios-suite.json
-
-# 另一个终端；53823 是本轮实际端口，复验须使用 runner 新输出的端口
-CACHE_GATE_UPSTREAM=53823 node .local/cache-native/https.ts
-
-# .local/cache-native/app/apps/reader；使用锁定 SDK、PUB_CACHE，移除发布凭据
-flutter pub get --enforce-lockfile
-flutter build apk --debug --no-pub --target lib/fixture/cache_main.dart
-flutter build ios --simulator --debug --no-codesign --no-pub \
-  --target lib/fixture/cache_main.dart
-```
+正式 [runner](https://github.com/Wybxc/karuyomi/blob/f623a8263c87ac198ff3882fd3eade1072e6abfc/tools/teavm/check-cache-storage.ts) 可从干净检出使用；当次 Native 验收使用独立的 HTTPS 夹具。
 
 两端分别启动 runner、安装并启动独立 App，不复用上一轮成功结果。Android 使用 `adb reverse tcp:9448 tcp:9448`；iOS 使用 `simctl install` / `launch`。App 从 Application Support 输出 `native-cache-<platform>.json`，最终报告只在 dispose 后生成。过期证书须正常更新并重新建立测试信任，不能跳过验证。
 
-`.local/cache-native/` 中保留 `input.json`、`compiled-identity.json`、`https.ts`、`app/`、正式 runner 的 `{android,ios}-suite.json`、原 App 的 `{android,ios}-native.json` 和核对后的小报告 `{android,ios}-result.json`。Android 最终报告 SHA-256 为 `6a9c0ebfe65c10b88eaaa5291b5e631de37d1863ff0bed45ebff4ea754be3204`，iOS 为 `c9f52ea1339778a68850f869c3b1dc043ea414d35ba28526e9f42016c622b6aa`；完整日志未复制入库。
+Android 最终报告 SHA-256 为 `6a9c0ebfe65c10b88eaaa5291b5e631de37d1863ff0bed45ebff4ea754be3204`，iOS 为 `c9f52ea1339778a68850f869c3b1dc043ea414d35ba28526e9f42016c622b6aa`；完整日志未复制入库。
 
 保留的早期失败不计入套件成功：
 

@@ -12,7 +12,7 @@
 
 ## 固定输入与构建
 
-实验保留在忽略的 `.local/long-image-codec/`，不将临时工程、下载或产物提交源码。第三方上游保持原样；正式采用时应以 submodule 固定库源码，并锁定构建器与工具链。
+第三方上游保持原样；正式采用时应以 submodule 固定库源码，并锁定构建器与工具链。
 
 | 项目            | 本轮输入                                                                                             |
 | --------------- | ---------------------------------------------------------------------------------------------------- |
@@ -57,7 +57,7 @@
 
 ### 保存身份与本地复验
 
-本轮自有 C/TypeScript、HTML、三套 strict TS 配置、构建参数、版本与 Node 结果已冻结在 `.local/long-image-codec/runs/2026-11-04-libspng-rgba8/`；上游仅保留固定提交与校验来源，不将 vendor/缓存搬入源码。浏览器报告、截图、AX 与关闭证据补充到同一目录，各自 SHA 单列在 `web-evidence-sha256.json`。
+下表记录当次运行的报告和截图摘要。
 
 | 证据                     | SHA-256                                                            |
 | ------------------------ | ------------------------------------------------------------------ |
@@ -65,18 +65,9 @@
 | Web `web-result-1.json`  | `1ebd3e3d6c05e57bb8a52064ee4bcae579e3c419af2c82e43969117074c76f64` |
 | 首中末截图 `regions.jpg` | `e0442501a911e27b8bfbafb4eabda11ab18c7b0d8dd9fded640b128c2ad2baef` |
 
-已保留实验输入的这台机器可在主仓库复验；首次环境仍需固定上游、完整 bootstrap、zlib archive 校验与构建，不能将以下 replay 命令当作干净 checkout 的正式产品构建入口。
-
-```sh
-env PATH="$PWD/.local/node24/bin:$PATH" node .local/long-image-codec/run.ts
-env PATH="$PWD/.local/node24/bin:$PATH" PORT=8951 node .local/long-image-codec/server.ts
-```
-
-浏览器访问 `http://127.0.0.1:8951`，点击“运行全部五项”，报告自动保存为新的 `web-result-N.json`；完成后点击“关闭服务”，再核对 shell exit 与端口释放。重跑前保留冻结原报告，不把重复结果覆盖成旧轮证据。
-
 ## 官方 macOS SDK 的第二轮
 
-为消除首轮本机组合工具链偏差，另建 `.local/long-image-official-sdk/`，仅下载 emsdk 5.0.7 的官方 Darwin arm64 归档。SDK 来源由 emsdk 固定提交 `41190c21c662e9cc1962aea94e71cbae9fd2fc87` 映射到 release `6cd98e86d7749ff98b82b7f2ae78eb4f01942788`；GCS 对象 generation 为 `1777481187423024`，大小 282,468,276 B。下载第一段触发 600 秒上限，确认退出后对同一 generation 断点续传；完整文件的官方 MD5、CRC32C 均匹配，SHA-256 为 `37554ed4c36abb1c802aa280f2c1ef9702e19e832a66c2fe6d940b65a2049b2c`。
+为对照首轮组合工具链，第二轮单独下载 emsdk 5.0.7 官方 Darwin arm64 归档。SDK 来源由 emsdk 固定提交 `41190c21c662e9cc1962aea94e71cbae9fd2fc87` 映射到 release `6cd98e86d7749ff98b82b7f2ae78eb4f01942788`；GCS 对象 generation 为 `1777481187423024`，大小 282,468,276 B。下载第一段触发 600 秒上限，确认退出后对同一 generation 断点续传；完整文件的官方 MD5、CRC32C 均匹配，SHA-256 为 `37554ed4c36abb1c802aa280f2c1ef9702e19e832a66c2fe6d940b65a2049b2c`。
 
 实际工具是 emcc 5.0.7 / `263db4c…`、LLVM 23.0.0git / `7b58716d96c3ae4c0c4e6f72e29b16137bb6224b`、Binaryen 129 / `version_125-430-gc6a5e65b7`。Emscripten 的版本检查接受 128 或 129；本轮保留 `-Werror=version-check`，没有把“源码预期 128”误称归档实际版本，也没有复用 Homebrew 二进制或第一轮编译缓存。
 
@@ -86,7 +77,7 @@ env PATH="$PWD/.local/node24/bin:$PATH" PORT=8951 node .local/long-image-codec/s
 
 08:02:22.635–08:02:23.643 UTC，主代理在 Codex 内置 Chromium 156 点击官方新页面的全部五项；首/中/末六区可见且摘要匹配，两个完整输出、首块取消、IEND 尾部拒绝及额外强制 terminate 观察窗均通过。`crossOriginIsolated=false`、无 SAB，四个协作终态的实际 heap 16 MiB、C 请求账本为 0。强制 terminate 仍未声称观测到 heap 释放。页面关闭服务后 session 99171 输出 `server closed`、exit=0，8952 无监听。
 
-第二轮冻结在 `.local/long-image-official-sdk/runs/2026-11-04-official-darwin-arm64-rgba8/`，与首轮分别保存；`official-lock.json` 的 Web 待验状态反映其生成时点，后补的浏览器报告记录上述实际完成结果，不改写旧清单或日志。
+`official-lock.json` 的 Web 待验状态反映其生成时点，后补的浏览器报告记录上述实际完成结果，不改写旧清单或日志。
 
 | 第二轮证据               | SHA-256                                                            |
 | ------------------------ | ------------------------------------------------------------------ |
@@ -100,7 +91,7 @@ env PATH="$PWD/.local/node24/bin:$PATH" PORT=8951 node .local/long-image-codec/s
 
 ### 固定输入与适配
 
-实验位于忽略的 `.local/long-image-jpeg/`。官方 [libjpeg-turbo 3.2.1](https://github.com/libjpeg-turbo/libjpeg-turbo/releases/tag/3.2.1) 独立 checkout 固定为 `7b4993786d856cbccabfc0ed2f923ba000e326cc`，上游工作区保持干净。使用上一节同一官方 Emscripten 5.0.7 SDK、Node 24.15.0 与项目 TS 6.0.3，但使用 JPEG 自己的 `EM_CONFIG` 和缓存，保留 `-Werror=version-check`。CMake 构建无 SIMD 的 `jpeg-static`，关闭 shared、TurboJPEG API、tools 和 tests，再链接项目自有最薄 C 适配；未使用实际指向 IJG jpeg 9f 的 Emscripten 内置 `USE_LIBJPEG` port。
+官方 [libjpeg-turbo 3.2.1](https://github.com/libjpeg-turbo/libjpeg-turbo/releases/tag/3.2.1) 独立 checkout 固定为 `7b4993786d856cbccabfc0ed2f923ba000e326cc`，上游工作区保持干净。使用上一节同一官方 Emscripten 5.0.7 SDK、Node 24.15.0 与项目 TS 6.0.3，但使用 JPEG 自己的 `EM_CONFIG` 和缓存，保留 `-Werror=version-check`。CMake 构建无 SIMD 的 `jpeg-static`，关闭 shared、TurboJPEG API、tools 和 tests，再链接项目自有最薄 C 适配；未使用实际指向 IJG jpeg 9f 的 Emscripten 内置 `USE_LIBJPEG` port。
 
 适配按官方 [libjpeg API](https://github.com/libjpeg-turbo/libjpeg-turbo/blob/7b4993786d856cbccabfc0ed2f923ba000e326cc/doc/libjpeg.txt) 执行 `read_header → start_decompress → read_scanlines → finish_decompress → destroy`。头部后先以 `jpeg_has_multiple_scans()` 拒绝多 scan，另限定 8-bit、Huffman、灰度/RGB/YCbCr 和顺序 DCT 的 SOS 参数；实际素材是 SOF0 baseline。`JCS_EXT_RGBA` 保证 opaque alpha，缩放设置为 1/1、1/2 或 1/4，再从库计算的输出尺寸分配至多 256 行条带；每次累积 `read_scanlines()` 实际返回的行数。
 
@@ -150,7 +141,7 @@ WASM 模块以 `unknown` 导入，再由 Zod 的具名函数 schema 校验导出
 
 ### JPEG 保存身份与复验
 
-最终源码、素材与 oracle 清单、工具链、构建参数、运行日志和校验已冻结在 `.local/long-image-jpeg/runs/2026-11-04-libjpeg-turbo-3.2.1-official-sdk/`，详细临时输出不入库。后补 Web 证据的 SHA 另存于 `web-evidence-sha256.json`。
+后补 Web 证据的 SHA 另存于 `web-evidence-sha256.json`。
 
 | JPEG 证据                   | 身份                                                                                  |
 | --------------------------- | ------------------------------------------------------------------------------------- |
@@ -160,23 +151,6 @@ WASM 模块以 `unknown` 导入，再由 Zod 的具名函数 schema 校验导出
 | Web `web-result-1.json`     | SHA-256 `857150ddfe03c145813cc5e51e737661e631ed91ddb6968ed11134c1d002400a`            |
 | Web 截图 `jpeg-regions.png` | SHA-256 `c702cb691aa960f9629e915404296cd130df4f65a92b27e3778922a57c1200cf`            |
 | Web AX `jpeg-ax.txt`        | SHA-256 `759516393053f7ea6f2d0be38b63115dfd617e31bcff50043e1bbe02a589d496`            |
-
-已保存输入及官方 SDK 的这台机器可在主仓库复验；以下不是干净 checkout 的正式产品构建入口。先保留冻结报告，再在工作实验目录重跑，不覆盖旧轮证据。
-
-```sh
-env PATH="$PWD/.local/node24/bin:$PWD/node_modules/.bin:$PATH" \
-  EM_CONFIG="$PWD/.local/long-image-jpeg/.emscripten" \
-  JPEG_EMCC="$PWD/.local/long-image-official-sdk/sdk/emscripten/emcc" \
-  JPEG_EMCMAKE="$PWD/.local/long-image-official-sdk/sdk/emscripten/emcmake" \
-  JPEG_TOOLCHAIN_ID=emscripten-5.0.7-official-37554ed4c36abb1c802aa280f2c1ef9702e19e832a66c2fe6d940b65a2049b2c \
-  node .local/long-image-jpeg/build.ts
-env PATH="$PWD/.local/node24/bin:$PATH" node .local/long-image-jpeg/native-oracles.ts
-env PATH="$PWD/.local/node24/bin:$PATH" node .local/long-image-jpeg/run.ts
-pnpm exec tsc --project .local/long-image-jpeg/tsconfig.json
-pnpm exec tsc --project .local/long-image-jpeg/tsconfig.web.json
-```
-
-Web 复验另运行 `node .local/long-image-jpeg/build-web.ts`，再以 `PORT=8952 node .local/long-image-jpeg/server.ts` 启动本地页；在 Codex 内置浏览器点击“运行全部六项”，完成后点击“关闭服务”，核对 shell exit 与端口释放。重跑会在工作实验目录写报告，须先保留冻结原报告。
 
 JPEG 当前尚未覆盖 Web 缩放、Native、真实 Source、EXIF 方向、ICC/色彩管理、CMYK/YCCK、高位深、随机区域或 tile 编码。严格 warning 与 finish 证明本轮缺 EOI 被拒绝，不证明校验真实 EOI 之后的额外字节。计量不含 allocation header、libc 元数据/碎片、栈、静态数据、JS 副本或 RSS；WASM 最大 heap 也不是浏览器/进程总内存上限。前述离线 Sharp/native oracle 生成中的完整图像分配不计入被测解码器证据。
 
@@ -197,7 +171,7 @@ JPEG 当前尚未覆盖 Web 缩放、Native、真实 Source、EXIF 方向、ICC/
 
 实际工具为 Node 24.15.0、Python 3.15.2、CMake 4.4.5、官方 Emscripten 5.0.7-git / `263db4cffa6f9fc2ec514a70abac81362ea41849`、Clang 23.0.0git / `7b58716d96c3ae4c0c4e6f72e29b16137bb6224b`、Binaryen 129 / `version_125-430-gc6a5e65b7`。SDK 归档仍为本页已记录的官方 Darwin arm64 SHA-256 `37554ed4c36abb1c802aa280f2c1ef9702e19e832a66c2fe6d940b65a2049b2c`；上游提交分别为 libspng `bab9f94a1186f8fda234b4e1cb65e1b9a77049cc`、libjpeg-turbo `7b4993786d856cbccabfc0ed2f923ba000e326cc`，zlib 1.3.1 来自固定官方 SDK port。参考图工具为锁定的 Sharp 0.35.5 / libvips 8.18.7 / mozjpeg `0826579`。
 
-最终构建身份为 `0c00a221dbc8df36bddb2baf4393fb2cc492a8f288a0a0daf088dfe900dc4a8d`。正式 CLI 先验证 manifest 身份与输入自洽，再核对真实四份 JS/WASM 的大小和 SHA。最终19项全部通过、进程 exit=0；报告保存在忽略的 `runtime/image-codec/.local/verification/formal-final/result.json`，SHA-256 为 `c516f2982013c0e163279d039c845a924d5bfef75ddfb2700f017309de26eab5`。
+最终构建身份为 `0c00a221dbc8df36bddb2baf4393fb2cc492a8f288a0a0daf088dfe900dc4a8d`。正式 CLI 先验证 manifest 身份与输入自洽，再核对真实四份 JS/WASM 的大小和 SHA。最终19项全部通过、进程 exit=0；原报告 SHA-256 为 `c516f2982013c0e163279d039c845a924d5bfef75ddfb2700f017309de26eab5`。
 
 ### 四幅合成长图与资源终态
 
@@ -232,19 +206,9 @@ JPEG 当前尚未覆盖 Web 缩放、Native、真实 Source、EXIF 方向、ICC/
 | `jpeg.mjs`  |  37,316 | `48acf0712120301e105513078dd477f4fb557dae6e8ef282c83502ef54ac35ad` |
 | `jpeg.wasm` | 250,162 | `b5f81ab31746b0cc11970885b94fa5f213b1b2f8be7650593994e2affb092b63` |
 
-同一主机、同一固定SDK下，另设独立构建缓存和输出目录，并在外部注入无效 `CFLAGS`、`LDFLAGS`、`EMCC_CFLAGS`、`CMAKE_TOOLCHAIN_FILE` 后重新构建，exit=0；构建身份及上表四份资产字节均一致，四份JS/WASM中未发现本机绝对路径字符串。摘要保存在忽略的 `.local/image-codec-repro-result.json`。这证明本轮同机、独立缓存与环境过滤下的重建一致性；没有验证Linux构建或跨主机字节一致性。
+同一主机、同一固定SDK下，另设独立构建缓存和输出目录，并在外部注入无效 `CFLAGS`、`LDFLAGS`、`EMCC_CFLAGS`、`CMAKE_TOOLCHAIN_FILE` 后重新构建，exit=0；构建身份及上表四份资产字节均一致，四份JS/WASM中未发现本机绝对路径字符串。这证明本轮同机、独立缓存与环境过滤下的重建一致性；没有验证Linux构建或跨主机字节一致性。
 
-使用仓库固定Node/pnpm版本，在根目录通过正式入口复验；新报告写入另一个忽略目录，保留原报告：
-
-```sh
-git submodule update --init --depth 1 vendor/libspng vendor/libjpeg-turbo
-pnpm image-codecs:build
-pnpm image-codecs:check \
-  --build runtime/image-codec/.local/build/0c00a221dbc8df36bddb2baf4393fb2cc492a8f288a0a0daf088dfe900dc4a8d \
-  --report runtime/image-codec/.local/verification/formal-rerun/result.json
-```
-
-输入或工具链变化时，使用构建命令返回的新身份目录；已有SDK/zlib归档可按 [README](https://github.com/Wybxc/karuyomi/blob/a2251a6/runtime/image-codec/README.md) 的正式选项传入。普通 `pnpm test:image-codecs` 是不编译SDK的小夹具工程回归，不能替代这里的真实WASM命令。
+历史实现的构建目录按输入和工具链身份生成；已有SDK/zlib归档可按 [README](https://github.com/Wybxc/karuyomi/blob/a2251a6/runtime/image-codec/README.md) 的正式选项传入。普通 `pnpm test:image-codecs` 是不编译SDK的小夹具工程回归，不能替代这里的真实WASM命令。
 
 本节只证明正式源码在Node中的顺序解码与生命周期，以及上述同机重建。新产物尚未据此取得浏览器、Source图片链、Flutter、Native内置执行、tile/LOD/位置恢复或真实设备性能验收；也不代表全项目检查、P0或长图产品门通过。历史浏览器的Worker/ACK与原生缩放结果仍按各自输入和旧产物身份单独解释，正式16 Mi像素准入不因这份报告自动改变。
 
@@ -252,7 +216,7 @@ pnpm image-codecs:check \
 
 2026-11-04，同一 macOS arm64 与上一节固定官方 SDK、Node 24.15.0、Sharp 0.35.5 环境，正式源码增加 `runtime/image-codec/encoder.{c,h}`，使用固定 libspng 编码 straight RGBA8 条带，ABI 为 `karuyomi-png-tiles-v1`。宽度1至4096、高度1至256，输入必须精确等于 `width * height * 4` 且不超过4 MiB，编码输出上限8 MiB；C 请求 payload 上限16 MiB，WASM heap 初始16 MiB、最大32 MiB。接口和构建说明见 [image-codec README](https://github.com/Wybxc/karuyomi/blob/a2251a6/runtime/image-codec/README.md)。
 
-新构建身份为 `8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854`。正式 CLI 在原19项之外增加5项编码器检查，本轮24项全部通过、进程 exit=0；原19项范围保留，PNG/JPEG 四份 JS/WASM 的大小和 SHA 与上一节完全相同。报告为忽略的 `runtime/image-codec/.local/verification/encoder-final/result.json`，SHA-256 `99a8f995914be55a59d266ba23ba90de2f9b26f332c8a0498a8bca14bb17d0d3`。
+新构建身份为 `8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854`。正式 CLI 在原19项之外增加5项编码器检查，本轮24项全部通过、进程 exit=0；原19项范围保留，PNG/JPEG 四份 JS/WASM 的大小和 SHA 与上一节完全相同。原报告 SHA-256 `99a8f995914be55a59d266ba23ba90de2f9b26f332c8a0498a8bca14bb17d0d3`。
 
 三项像素检查使用真实 encoder WASM，将返回的 PNG 复制出 WASM，在 C close 后由 Sharp 完整解码；解码后 RGBA 的 SHA 均与编码输入精确匹配。高熵素材由固定 AES-CTR 测试字节流确定性生成，用于触及最大输入和低压缩率路径。
 
@@ -274,22 +238,13 @@ pnpm image-codecs:check \
 | `encoder.mjs`  | 29,659 | `0fef62f2e378400634c5a3b118bab6549822a4900a60f604b5d10dea57496cbf` |
 | `encoder.wasm` | 86,421 | `8d835c0aafc2ef49a7e0bea05e257f480b1d8ac22408ace19623f704a6f79a92` |
 
-在仓库根目录按 README 准备固定工具链后构建，并使用构建命令返回的身份目录复验；以下已有身份的报告写到新目录以保留本轮证据：
-
-```sh
-pnpm image-codecs:build
-pnpm image-codecs:check \
-  --build runtime/image-codec/.local/build/8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854 \
-  --report runtime/image-codec/.local/verification/encoder-rerun/result.json
-```
-
 本轮是 Node 中独立解码器/编码器的真实 WASM 验收，没有执行新管线的真实 Worker、ACK、重组、浏览器显示或跨线程取消；上一节同线程 pull 也不能代替 Worker ACK。JPEG 新轮缩放仍只验证尺寸和字节。夹具生成及 Sharp 完整参考解码的内存不计入 WASM payload/heap，表中数值不是 RSS、图形内存或解码器与编码器同时运行的总峰值。本轮不证明真实 Source、Flutter、Native 或新产物浏览器行为，不更新全项目、P0或长图产品完成状态。
 
 ## 正式独立 Worker 与 PNG tiles 浏览器验收
 
 2026-11-04，主代理在 Codex 内置 Chromium 156 实际点击正式工具页面的“运行验收”，11项全部通过；`crossOriginIsolated=false`，未使用 SharedArrayBuffer。入口为 `scripts/check-image-codec-worker.ts` / `tools/images/verify-worker-browser.ts`。浏览器执行 catalog 的 `client.js`，经 `createImageCodecAssetProvider().prepare()` 校验静态材料传输，再以已验证 JS Blob URL、WASM bytes 和真实独立 module Worker 完成解码、条带重组与 PNG 编码；消息观察器转调真实 Worker，不模拟 codec 结果。
 
-构建身份沿用上一节的 `8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854`，材料版本为 `c1745a37a9f2affd364544829d608d25772b29082f24db12600aa736cad22f8c`。报告位于忽略的 `.local/image-codec-worker/acceptance/result.json`，SHA-256 为 `75db7461445289a3b49e9664a3bb1f31008d2734e5c512e8593b6c0d33b364b4`，runId 为 `e48a9445-0429-4a8e-ac85-93fa61840574`；对应输入与逐片 expected 摘要在 `public/config.json`。
+构建身份沿用上一节的 `8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854`，材料版本为 `c1745a37a9f2affd364544829d608d25772b29082f24db12600aa736cad22f8c`。原报告 SHA-256 为 `75db7461445289a3b49e9664a3bb1f31008d2734e5c512e8593b6c0d33b364b4`，runId 为 `e48a9445-0429-4a8e-ac85-93fa61840574`。对应输入与逐片 expected 摘要在 `public/config.json`。
 
 五项完整案例共590片，全部 denominator=1、每片最多256行。四幅长图均超过16 Mi像素，PNG 为非交错 RGBA8，JPEG 为顺序 baseline、4:4:4。每片索引、尺寸、源坐标、PNG长度和 SHA 均匹配，完整消费继续至真实 IEND/EOI 验证后的 `complete`。
 
@@ -313,15 +268,7 @@ Node 基准使用同一最终材料的正式 `decodeImage()` 按 chunk 全流 of
 
 每项真实 trace 都记录一次 `terminal → terminate → release`，Worker创建、`terminate()`、模块release回调各一次，`forced=false`。已取得 C 实例的关闭账本均为0，start取消保留空账本；每项终态后25 ms观察窗迟到消息为0。报告最终 `activeWorkers=0`、最大活动 Worker 数为1。这是协作终态、调用次序和短时消息观察，不是物理 WASM heap、浏览器线程或 RSS 回收的测量，也没有把一次release回调写成逐个 Blob URL 撤销计数。
 
-主代理随后点击“关闭服务”，服务 exec session 47165 exit=0，8953无 LISTEN。使用固定 Node/pnpm 和正式材料缓存，写入新忽略目录复验并保留原报告：
-
-```sh
-pnpm image-codecs:check-worker \
-  --output .local/image-codec-worker/rerun \
-  --port 8953
-```
-
-在 Codex 内置浏览器打开输出地址，点击“运行验收”，完成后点击“关闭服务”并核对进程和端口；仅准备素材、Node基准与页面时追加 `--prepare-only`。`--build` 可指定含 `build-manifest.json` 的本地正式构建。
+主代理随后点击“关闭服务”，服务 exec session 47165 exit=0，8953无 LISTEN。
 
 本轮覆盖合成输入、静态材料风格装配、真实独立 Worker 与有界顺序 PNG tiles；没有经过 Source 请求头、Cookie、拦截器或图片处理链，也未进入 Flutter Reader、视口调度、随机区域、LOD、位置恢复或 Native内置执行。没有测量 JS GC、GPU、RSS、物理heap释放或真机性能；25 ms无迟到不保证任意时间范围无迟到，协作取消不代替强杀超时路径的真实浏览器验收。旧证据保留各自时间点和产物身份，本节不宣布长图产品门通过。
 
@@ -329,13 +276,9 @@ pnpm image-codecs:check-worker \
 
 2026-11-04，`image-codecs-v1` tag 实际指向包含 decoder/encoder/Worker 源码的 `3d2c628f4436f8c6576fb20afcb73d36fd062801`。[固定构建依赖 Release](https://github.com/Wybxc/karuyomi/releases/tag/image-codecs-v1) 已发布，唯一资产 `image-codecs.tar.gz` 为 198,511 B，GitHub 返回的 SHA-256 为 `362ea417572014def148038492262345f6a40b47da71b643726a0e911de6331a`，与 `artifacts-lock.json` 一致。它只用于工程构建；客户端仍消费 Static Assets / Native 内置字节，扩展不恢复 Release 分发。
 
-随后不传本地 `--archive`，以新空缓存执行：
+随后在空缓存中验证匿名下载，不传入本地归档。
 
-```sh
-pnpm image-codecs:prepare-artifacts --cache-root .local/image-codec-public-download
-```
-
-正式 CLI 从锁定公开 URL 匿名下载，exit=0、`reused=false`；归档传输校验、11个成员及构建身份校验全部通过，返回身份为 `8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854`。原始摘要保存在忽略的 `.local/image-codec-artifacts-public-prepare.json`，SHA-256 为 `968a4e2719ca0ded31a282fdf144238215913f59411d5607551e7ac46e3b032d`。这不同于之前的离线归档导入或默认缓存复用。
+正式 CLI 从锁定公开 URL 匿名下载，exit=0、`reused=false`；归档传输校验、11个成员及构建身份校验全部通过，返回身份为 `8b006f9bd99fa115394c48fd22ecbf929659be8ed9152c25701bbfbc822f8854`。原报告 SHA-256 为 `968a4e2719ca0ded31a282fdf144238215913f59411d5607551e7ac46e3b032d`。这不同于之前的离线归档导入或默认缓存复用。
 
 推送该 tag 后、main push 前，按源码提交查询 Actions 为零条；main push 才触发正常 CI。未启用或重启旧扩展全量发布器，也未改两套冻结 AOT checkpoint。
 

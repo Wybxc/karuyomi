@@ -20,7 +20,7 @@
 
 首轮完整 Flutter 检查发现一处 Dart 括号样式和旧测试第二包的非法身份；修正样式与真实包身份夹具后完整复验通过，未放宽产品校验。格式首轮还遇到并行文档草稿移出导致文件列表失效，冻结文件集后完整重跑通过。原失败日志保留。
 
-详细临时日志位于 main 忽略目录 `.local/source-preferences-*.log`；Java oracle 和全源编译的临时日志在 `/private/tmp/karuyomi-source-preferences-*.log`。不提交机器输出或临时工程。
+Java oracle 和全源编译的临时日志在 `/private/tmp/karuyomi-source-preferences-*.log`。不提交机器输出或临时工程。
 
 ## 文本设置绑定与输入校验
 
@@ -79,14 +79,7 @@
 
 界面还发现成功后提示一直写“正在重新打开”，已改为准确的确认完成提示；原控制器与正式组件回归 10 项通过，该文案修正不扩展上述运行证据。工程提交 `384627e` 与文档提交 `54594de` 的[通用 CI](https://github.com/Wybxc/karuyomi/actions/runs/42154045691)均已通过，含完整检查、Flutter、构建和本地迁移。
 
-复验入口：
-
-```sh
-EXTENSION_ASSETS_DIR=/private/tmp/karuyomi-source-preferences-384627e/.local/source-preferences-validation/snapshot pnpm acceptance:build
-ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.zh.komiic","allowedHosts":["komiic.com","komiic.cc"]}]' pnpm acceptance:serve
-```
-
-固定输入、独立 state 与本机路径见该 clone 的忽略目录 `.local/source-preferences-validation/`。临时 clone 清理后需按上述固定输入重新构建，不将产物或详细日志入库。
+当前验收使用[正式构建和隔离 harness](../../apps/api/test/README.md)。
 
 ## 尚未通过的运行门
 

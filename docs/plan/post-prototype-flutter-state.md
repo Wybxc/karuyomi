@@ -18,7 +18,7 @@ Riverpod 负责跨页面共享的读取、派生状态与依赖装配；flutter_
 
 ## 当前进度
 
-- 已通过改动前的书架、设置、续读和导航组件基线，原始日志在 `.local/flutter-state-refactor/baseline.log`。
+- 已通过改动前的书架、设置、续读和导航组件基线。
 - 已完成 generator、analyzer 版 riverpod_lint、共享读状态、账户作用域的设置 Notifier；旧的设置控制器装配已删除。按最新范围完成全库 Widget 审计，控制器和普通监听已交给 hooks，图片解码及资源 pin 等特殊所有权继续显式管理。
 - 正式 `flutter:check --concurrency=1 --reporter=expanded` 已通过三个项目的严格分析、生成一致性、22 + 87 + 625 项回归及 Dart 格式检查；lint 另以临时违规样例确认实际执行。
 - 生产手写 Dart 累计净减少 463 行，其中扩大 Hooks 范围进一步净减 133 行；生成代码另计 423 行。

@@ -52,7 +52,7 @@
 - 参考模拟器补齐全局阅读设置六段滚动、默认阅读模式/取消、高级首屏、应用/设备诊断及 Android 后台任务诊断的浅深主图；`settings-reference-pairs-0.jpg` 至 `settings-reference-pairs-5.jpg` 均实看。首屏、末段、诊断与选择弹层两主题 XML 布局一致，中间阅读设置段约有 3–15 物理像素滚动差。Worker info 的横向正文滚动已有双主题图；复制浅色只截到空容器，深色为含测试任务 ID 开头的系统预览，完整内容仍待独立校验。状态机拆分 28.02/28.03/28.04，未将 Mihon 的 WorkManager 当作 Cloudflare Worker。模拟器保持暂停。
 - 参考后续补齐未加载/信任/取消、来源关闭/排序/恢复、系统卸载确认/取消、存储首屏/占用/清理后及高级三段的双主题图，`extension-storage-pairs-0.jpg` 至 `extension-storage-pairs-6.jpg` 均实看。关闭来源实际排到末尾，重新启用回首行；清理前两侧均 165 kB、稳定清理后均 1.37 kB。系统卸载框两侧都是 Android English 浅色，且调用点底层不同；深色取消后首次 PNG 仍为旧帧，已排除并重拍稳定返回图。中段高级设置约有 14 物理像素滚动差，末段相同。未改变安装权限、网络/日志保护或执行卸载，原信任和来源启用均恢复。其它未加载原因、加载失败诊断、下载/安装/更新、确认卸载及清理失败继续待采；两端都没有独立清理确认，已按实际调用点删除假设节点。细分证据与文件名见状态机；模拟器暂停在深色 MangaDex 详情。
 
-原始 XML、PNG、下载及临时日志位于忽略目录 `.local/mihon-reference/`；参考采集命令使用固定模拟器 `adb -s emulator-5574 shell uiautomator dump` 与 `exec-out screencap -p`。终端访问 GitHub 发布附件需使用本机已配置的网络代理；最初的部分下载均未通过完整性门槛，不作为参考安装输入。
+参考采集命令使用固定模拟器 `adb -s emulator-5574 shell uiautomator dump` 与 `exec-out screencap -p`。终端访问 GitHub 发布附件需使用本机已配置的网络代理；最初的部分下载均未通过完整性门槛，不作为参考安装输入。
 
 ## 导航、混合分类与阅读的后续分项
 
@@ -406,7 +406,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 独立脚本使用生成的ProtoJSON模型读取global/manga settings、library/categories、manga state/progress/bookmarks七路。最终解析完整harness日志中的43条设置审计，漫画POST六次，包含三条不同成功原命令、一次同UUID/CAS/精确正文重试、一次409与一次派发前400。七阶段账户revision为5→6→7→7→8→8→8，漫画设置revision为0→1→2→2→3→3→3，全局revision保持3。确认门阻塞时D1已提交；未知→精确重试的七路对象完全相同，远端获胜→冲突重读→拒绝后的七路对象也完全相同。其余业务快照除账户revision外全程不变，没有因读取、拒绝或重试增加附带提交。
 
-原始材料前缀为`.local/mihon-reference/karuyomi-42bc9bb-settings-`：`{baseline,waiting,unknown,retried,remote-won,conflict-reloaded,rejected}-light.json`、`audit.json`和`evidence-receipt.json`记录独立审计；`states-light-{0,1}.jpg`两张联系表已实看。`initial-reading-light`是尚未完成呈现的过渡画面，首次hold-read门后来超过30秒，sequence13没有完成响应状态；该次不算释放成功，后续`initial-read-error-light`记录实际失败。`draft-light`的AX选值与JPEG旧字段不一致，保留且排除主图；`draft-status-light`只证明滚到底可见未保存提示。不得根据AX或文件名替代稳定画面验收。
+`states-light-{0,1}.jpg`两张联系表已实看。`initial-reading-light`是尚未完成呈现的过渡画面，首次hold-read门后来超过30秒，sequence13没有完成响应状态；该次不算释放成功，后续`initial-read-error-light`记录实际失败。`draft-light`的AX选值与JPEG旧字段不一致，保留且排除主图；`draft-status-light`只证明滚到底可见未保存提示。不得根据AX或文件名替代稳定画面验收。
 
 实拍和组件共同确认两个缺口：读取时`busy`错误地禁止返回；长表单的反馈位于滚动末端，却有独立固定保存按钮，导致用户在首屏保存时看不到确认状态。新增浅/深×1x/2x八项流程在旧实现均失败：四项读取关闭检查失败，另四项已确认反馈在视口外。修复仅在保存活动时禁止关闭，漫画表单继续独立滚动，原共享反馈固定在操作区上方；全局设置继续复用同一反馈，不复制状态分支或新增保存通道。八项流程修复后通过，另检查草稿/等待/未知/重读反馈实际可命中，读取中关闭后迟到结果不跳回编辑面且零写入，保存等待仍禁止返回，精确重试和冲突规则保持。
 
@@ -505,7 +505,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 两主题分别执行首次读取失败→挂起重读→关闭→迟到响应、草稿→关闭、保存等待→确认、实际写入后丢确认→失败重读→挂起重读关闭→重开原命令→精确重试、独立第二客户端修改→真实409→只读恢复、合法ProtoJSON明确拒绝及401 HTML失效。深色等待确认时另实际点按关闭，编辑器保持打开；关闭读取后迟到响应均未重新导航。401、503及提交交付502为隔离故障注入，不是生产Access或生产故障证据。
 
-`karuyomi-bcac704-settings-harness.log`保存81条请求审计，18组API快照各核对global/manga settings、library、categories、state、progress与bookmarks；复验脚本为`node .local/mihon-reference/verify-bcac704-settings-evidence.ts`。结果：
+当轮记录了 81 条请求审计，18组API快照各核对global/manga settings、library、categories、state、progress与bookmarks；结果：
 
 - 浅色账户revision为3→4→5→6，漫画0→1→2→3；深色账户8→9→10→11，漫画3→4→5→6。各主题内global设置及其它五路业务数据保持不变，只有明确漫画命令推进版本。
 - 共12次漫画设置POST，其中4次UI明确成功写入、2次第二客户端写入、2次原命令精确重试、2次409和2次400；两次重试的请求正文/UUID与各自丢确认原命令完全相同，全部七路快照不变。冲突及拒绝后的快照与远端获胜快照完全相同，草稿取消前后也完全相同。
@@ -530,7 +530,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 正常状态图/JPG与AX共同前缀为`karuyomi-bcac704-editors-`；27对集中联系表为`bcac704-editors-category-pairs-{1..7}.png`和`bcac704-editors-other-pairs-{1..7}.png`，已逐图实看，必要时回看原始360×800图核对导航。深色分类删除及批量移出初次残帧另存`dark-incomplete.jpg`，稳定重拍完整后才计该分项；首次Source processing图实际已完成，未填14.K4，改用两主题真实0→1后的`source-preference-writing-on`图。JPEG不作为Mihon原始PNG或精确颜色采样。
 
-独立快照为31组七路global/manga settings、library、categories、state、progress、bookmarks，以及21组三路categories/library/settings。`node .local/mihon-reference/verify-bcac704-editors-evidence.ts`使用生成的Protobuf模型严格解析并比较，严格TypeScript检查通过，receipt为`bcac704-editors-evidence-receipt.json`：
+独立快照为31组七路global/manga settings、library、categories、state、progress、bookmarks，以及21组三路categories/library/settings。本轮使用生成的 Protobuf 模型严格解析并比较，TypeScript 严格检查通过。
 
 - 最终accountRevision30、globalRevision7、xkcd业务mangaRevision11；独立漫画阅读设置revision仍0，不与业务作品revision混用。
 - 版本算术为2次初始fixture应用、2次独立复位、26次已确认UI账户应用；UI应用包括创建/删除分类、两次各两作品的批量、4扩展安装、xkcd收藏、4封面、6章节标记及3次主题。该结果不是HTTP请求尝试次数，本轮无请求审计。
@@ -548,7 +548,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 官方Wrangler harness的`categories`夹具、临时D1、`acceptance-owner`与内置浏览器360×800完成双主题复验：无分类指引左右边距正确；无封面、已确认封面和清除草稿始终从导航下方开始排列，未再出现随内容高度变化的大段顶部留白。浅色执行选图草稿→保存确认→清除草稿→关闭取消，深色读回该封面→清除草稿→保存确认。正常主图/JPG与AX前缀为`karuyomi-0e605c5-editors-`，均已实看；浅色另有选图处理中图，深色选图、首次/替换图片草稿与手动系统取消未补验，不新增成对状态计数。
 
-`node .local/mihon-reference/verify-0e605c5-editors-evidence.ts`以生成的Protobuf模型严格解析16组六路API快照，脚本严格TypeScript检查通过，receipt为`0e605c5-editors-evidence-receipt.json`。两次初始fixture写入及两次独立API安装/收藏预置后accountRevision为4；三次已确认UI应用仅为浅色封面保存、主题保存和深色清除，最终accountRevision7、globalRevision2、作品revision3。分类查看/取消、选图/清除草稿、取消清除及关闭浏览器均无额外写入，其他作品、分类、章节进度及书签保持不变。此夹具没有请求审计，不能据版本算术外推POST尝试次数；API预置不计UI安装验收。
+本轮使用生成的 Protobuf 模型解析 16 组六路 API 快照，TypeScript 严格检查通过。两次初始fixture写入及两次独立API安装/收藏预置后accountRevision为4；三次已确认UI应用仅为浅色封面保存、主题保存和深色清除，最终accountRevision7、globalRevision2、作品revision3。分类查看/取消、选图/清除草稿、取消清除及关闭浏览器均无额外写入，其他作品、分类、章节进度及书签保持不变。此夹具没有请求审计，不能据版本算术外推POST尝试次数；API预置不计UI安装验收。
 
 06.K1、19.K3/K4/K7主图更新到本次正式产物，旧图保留作历史；19.K5仅补浅色候选，覆盖保持92/169。遵照新增的文件传输指引，深色复用已保存的测试封面，未再次通过浏览器传文件。临时标签已关闭、视口恢复，harness正常退出0。其余编辑面状态、全部变体及真实生产闭环仍待。
 
@@ -670,7 +670,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 四项长选项流程随后复现另一缺口：点击选项文字没有切换勾选，实际提交只含原英文值。改为官方CupertinoListTile整行切换、勾选框共用同一草稿，长名称解除单行省略后通过。测试核对实际RenderParagraph没有截断、取消及重开保留原值、明确应用仅执行一次并移除不可用旧值；应用后两个退出转场时刻没有误报身份变化。正常秘密/会话字段不上传、丢确认精确重试及依赖禁用等既有回归同时通过。
 
-`source_preferences_widget_test.dart`29项、`source_preferences_controller_test.dart`10项及`edit_sheet_test.dart`4项共43项单并发通过，两份改动Dart文件`dart analyze --fatal-infos`无问题。Flutter首次沙箱运行未能创建回环端口，不计产品失败；获准使用本机端口后才执行上述红绿回归。原始输出保留于`.local/mihon-reference/preference-subeditors-{red,green,regressions,analyze}.log`。这是组件/控制器证据，未填正式Web主图或声称MangaDex运行通过，覆盖保持108/169。
+`source_preferences_widget_test.dart`29项、`source_preferences_controller_test.dart`10项及`edit_sheet_test.dart`4项共43项单并发通过，两份改动Dart文件`dart analyze --fatal-infos`无问题。Flutter首次沙箱运行未能创建回环端口，不计产品失败；获准使用本机端口后才执行上述红绿回归。这是组件/控制器证据，未填正式Web主图或声称MangaDex运行通过，覆盖保持108/169。
 
 审计夹具已提交为`88433e1`：补齐editor-ui进度与收藏等有界JSON命令的审计，仅原样转发这些命令，不注入编辑器故障；multipart仍沿真实通道且不记录图片。24项官方Workers/D1/R2回归、API/test严格类型及依赖分层通过，包括四种故障模式下进度重复请求的真实200、同一回执与原正文审计。全范围`pnpm format`、`pnpm format:check`及该提交的标准prek hook通过；新提交CI及正式Web另行记录。旧`19c2260`审计不含进度POST的范围限制保持不变。
 
@@ -682,7 +682,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 选源现分成官方控制分组与选项分组，语言和名称查询分别采用完整选择行及官方表单输入行，上限说明与分页计数采用官方13px次级页脚。完整源名/扩展说明解除默认单行省略，整行点击和勾选框共用原选择，Tab定位勾选框后Space切换。回归核对真实RenderParagraph未截断、查询隐藏已选项后清空仍保留选择、选项语义不混入组标题或页脚、准备和筛选不启动Source任务。查询校验及清理失败采用系统错误色，清理反馈改用官方表单分组，失败后恢复入口可达，第二次明确返回才在清理确认后退出。
 
-`cross_source_search_page_test.dart`23项，连同控制器和正式Catalog搜索服务共49项单并发回归通过；两份改动文件`dart analyze --fatal-infos`无问题。原有32源/查询/结果限额、两个独立槽、按包串行、迟到结果、单源分页/重试、停止/清理失败恢复及身份退役回归保持通过。正式业务与服务层未改，原始输出保留于`.local/mihon-reference/cross-scope-native-{red,green,regressions,analyze}.log`。
+`cross_source_search_page_test.dart`23项，连同控制器和正式Catalog搜索服务共49项单并发回归通过；两份改动文件`dart analyze --fatal-infos`无问题。原有32源/查询/结果限额、两个独立槽、按包串行、迟到结果、单源分页/重试、停止/清理失败恢复及身份退役回归保持通过。正式业务与服务层未改。
 
 核对同类选择行时，单作品及批量分类的现有业务回归改用实际文字点击，两项均先在权威分类关联不等于预期处失败：旧行只响应勾选框，名称点击没有修改草稿。两处改为官方CupertinoListTile完整行，整行与勾选框分别调用同一份选择动作；动作再次检查当前身份/窗口和原清单是否已冻结，长名称保留完整内容。分类和批量29项回归通过，仍先预览零写入、明确保存/开始才提交，未选关联、原命令重试、冲突和身份变化的边界保持通过。测试定位同时支持正式完整行，相关五个Dart文件严格分析无问题；日志为`category-selection-row-{red,green,analyze}.log`。
 
@@ -692,7 +692,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 ## 结果区字号角色与复制参考补图
 
-2026-11-17，复核最终源码的Cupertino文字角色：跨源结果的源名取消16px硬编码，直接继承官方正文主题（默认17px）并保留半粗；状态由14px改为13px次级说明。复用既有`cross_source_search_page_test.dart`的23项页面回归，窄屏、浅/深、线性/非线性文字缩放、源名和状态自然增高、重试入口及清理路径均通过；单文件`dart analyze --fatal-infos`无问题，没有为这一低影响字号调整新增重复测试。原始输出为`.local/mihon-reference/cross-typography-{regressions,analyze}.log`。这是源码与组件证据，新提交完整CI和正式Web另行验收。
+2026-11-17，复核最终源码的Cupertino文字角色：跨源结果的源名取消16px硬编码，直接继承官方正文主题（默认17px）并保留半粗；状态由14px改为13px次级说明。复用既有`cross_source_search_page_test.dart`的23项页面回归，窄屏、浅/深、线性/非线性文字缩放、源名和状态自然增高、重试入口及清理路径均通过；单文件`dart analyze --fatal-infos`无问题，没有为这一低影响字号调整新增重复测试。这是源码与组件证据，新提交完整CI和正式Web另行验收。
 
 同日复用既有官方Android SDK/AVD及Mihon 0.21.3（versionCode39），单实例AVD配置2核/2048MB、720×1600像素、320dpi，补齐[参考状态表](mihon-state-coverage.md)的28.04应用浅/深主图`s2804-worker-copy-readable-{light,dark}.png`。后续核对`20261117-emulator.log`发现启动器将RAM上调至2560MB，配置值不是实际内存证据，Guest内存和宿主RSS仍未测量。两张已逐图实看，系统复制预览实际显示可读任务ID/Tags开头；底层WorkManager诊断XML正文一致，只能确认可见片段，没有验证完整剪贴板内容。系统夜间模式始终为`no`，应用浅/深不等于系统复制容器浅/深。PNG在复制后先采，XML稍后采，不把它们称为同一瞬时；较早帧和旧的空浅色预览保留，空容器不计通过。
 
@@ -728,7 +728,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 主题草稿分别选择DARK和LIGHT时，当前画面仍保持此前主题，独立API状态不变；各一次明确保存后才分别成为DARK和LIGHT。十组六路快照共60条响应按七个相等区间核对，主题区间之间仅accountRevision 2→3→4、全局revision 1→2→3及LIGHT→DARK→LIGHT变化；收藏、分类、书签、漫画设置和阅读进度等其余内容不变。三条独立MangaDex偏好响应经生成ProtoJSON模型核对精确包/目录身份、sources为空及对应账户revision。87条连续审计均完成且透传200，仅前两次独立准备POST和两次明确UI主题保存POST；原正文与独立收据/快照完全一致，没有其它业务写入。审计不包含Source运行时调用与偏好API，后者由独立状态及单调账户revision核对，不称为完整网络日志。
 
-忽略目录`.local/mihon-reference/`保存38张360×800 JPEG及各自完整AX、十组快照、三条偏好响应、`karuyomi-a12c779-ui-source-audit-final.json`、`karuyomi-a12c779-ui-evidence-receipt.json`与`a12c779-ui-evidence-check.log`。校验入口`verify-a12c779-source-scope-evidence.ts`复算上述响应、相等区间、四条写入边界及图像尺寸。截图和AX逐项实看后离开客户端、恢复视口，harness正常退出0。
+本轮核对了 38 张 360×800 JPEG 及对应 AX、十组快照和三条偏好响应。校验入口`verify-a12c779-source-scope-evidence.ts`复算上述响应、相等区间、四条写入边界及图像尺寸。截图和AX逐项实看后离开客户端、恢复视口，harness正常退出0。
 
 后续新临时D1的进度复验误用同一准备文件名，覆盖了本轮原始准备收据；新收据已另存`migration-reopen-setup.json`。本轮两条准备命令从保留的完整审计恢复，`ui-setup.json`和复算回执明确标记`recoveredCommandsOnly`/`setupCommandsRecoveredFromAudit`，不重建原始响应，也不把恢复的命令记录当作独立证据。原始审计、60条独立API快照、三条偏好响应和38张截图未变；这些证据仍独立支持实际版本与四条写入边界。准备脚本改为必填运行系列，防止后续再次覆盖。
 
@@ -748,7 +748,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 `verify-a12c779-progress-reopen-evidence.ts`使用生成Protobuf模型核对30组九路快照（270条响应）、20个完全相等区间与172条连续完成审计。12条POST为两次准备、两次真实迁移及各一次精确重试、两次明确进度保存、两次恢复后的自动保存及两次UI主题保存；账户最终revision 10、原作品5、法文目标2。除两次受控丢确认的客户端502外，审计透传均200；进度命令始终pass，不注入迁移故障。四条进度原文与各次独立权威进度相同，epoch为0、最远保持第2页，分类/书签/目标阅读位置不变。新审计已包含有界进度JSON，不追溯补全旧121条审计，也不覆盖Source运行时调用或全部网络请求。
 
-33张360×800实拍及完整AX、`migration-reopen-{fr-*,audit-final,verification}.json`和`a12c779-progress-reopen-evidence-check.log`保存在忽略目录`.local/mihon-reference/`。`reader-reopened-still-unsaved-{light,dark}`、`before-explicit-save-{light,dark}`、`explicitly-saved-{light,dark}`、`auto-save-restored-{light,dark}`与`fresh-document-{library,resume}-{light,dark}`均逐图实看，截图前缀为`karuyomi-a12c779-reopen-`。`target-loading-candidate-dark`已经是结果，不登记20.K10；中文中断图不替代恢复通过。离开客户端并恢复视口后harness正常退出0。
+本轮核对了 33 张 360×800 实拍及完整 AX。`reader-reopened-still-unsaved-{light,dark}`、`before-explicit-save-{light,dark}`、`explicitly-saved-{light,dark}`、`auto-save-restored-{light,dark}`与`fresh-document-{library,resume}-{light,dark}`均逐图实看，截图前缀为`karuyomi-a12c779-reopen-`。`target-loading-candidate-dark`已经是结果，不登记20.K10；中文中断图不替代恢复通过。离开客户端并恢复视口后harness正常退出0。
 
 同名书架卡片、更多/分类/续读辅助名称已双主题确认，但分类编辑面内仍只有“xkcd”，缺少源身份；深色从书架重开并确认迁移后，原作品页脚仍要求先读取章节或选择范围。两处失败实拍均保留。分类对象现使用官方Cupertino表单分组，完整标题与语言/源名次级页脚自然换行；迁移页脚按待确认与完成阶段显示固定范围/确认说明。八项既有浅/深×1x/2x流程先在缺少身份或阶段说明处失败，再通过；迁移用例从不携带章节快照的书架入口重开原命令，继续核对精确重试只应用一次。书架、分类与迁移相关51项回归及四文件严格分析通过，日志为`editor-object-context-{red-visible,regressions,analyze}.log`。新说明完整CI及修复后正式Web仍待。
 
@@ -768,7 +768,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 `verify-25be6f5-object-evidence.ts`经生成ProtoJSON模型核对21组九路快照（189条响应）、13个完全相等区间及107条连续完成审计。普通UI包括两次单作品分类、四条批量分类命令、两次迁移及两次精确重试、一次明确主题保存，没有其它业务POST。审计内另外三条POST为上述独立准备；第四条目录准备由原始收据及独立快照核对。除两次丢确认的客户端502外均透传200，审计无未完成项；精确重试不增加版本。账户最终revision 13、英文4、法文6、全局2；主题草稿不提前应用，明确保存才LIGHT→DARK。其余书架/元数据/分类目录/书签/进度/续读状态逐组保持，只有每个明确操作对应的版本、分类或主题改变。审计不含分类准备接口及Source运行时请求，不称为完整网络日志。
 
-忽略目录`.local/mihon-reference/`保留25张实际新版本360×800 JPEG及完整AX、上述快照、`karuyomi-25be6f5-object-ui-{audit-final,evidence-receipt}.json`和`25be6f5-object-evidence-check.log`。新版本图片统一前缀`karuyomi-25be6f5-object-`，排除含`stale-`的旧版本图。`migration-opening-candidate-light`虽有实际旋转指示但仍处转场，不登记20.K8；`migration-preview-loading-candidate-light`已是内容，不补加载格。`migration-listing-candidate-light`确有热门加载指示，但说明仍泛称“正在查找目标作品”，查询框还保留原文，未完整说明当前热门操作，不登记20.K10通过。观察确认按钮的短等待曾超时，实际预览已成功且按钮在视口下方，滚动后明确确认正常；不据此认定Source或浏览器连接失败。完成后离开客户端、恢复视口，harness正常退出0。
+本轮记录了 25 张新版本的 360×800 JPEG、完整 AX 和对应审计快照。新版本图片统一前缀`karuyomi-25be6f5-object-`，排除含`stale-`的旧版本图。`migration-opening-candidate-light`虽有实际旋转指示但仍处转场，不登记20.K8；`migration-preview-loading-candidate-light`已是内容，不补加载格。`migration-listing-candidate-light`确有热门加载指示，但说明仍泛称“正在查找目标作品”，查询框还保留原文，未完整说明当前热门操作，不登记20.K10通过。观察确认按钮的短等待曾超时，实际预览已成功且按钮在视口下方，滚动后明确确认正常；不据此认定Source或浏览器连接失败。完成后离开客户端、恢复视口，harness正常退出0。
 
 此次还保留两个实际呈现缺口：书架卡片辅助名称已含身份，独立勾选框却无名称；目标热门/搜索及追加提示缺少具体操作和原查询。四项既有浅/深×1x/2x书架流程与两个既有迁移流程共六项先复现，再直接给官方CupertinoCheckbox补完整标题/语言/源名，并按真实请求区分热门、搜索、追加及原查询。未提交的新输入不改变追加请求的说明。相关51项单并发回归和四文件严格分析通过，日志为`selection-listing-context-{red,regressions,analyze}.log`；新完整CI及修复后的正式Web仍待，不以组件结果替代浏览器证据。
 
@@ -784,7 +784,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 `verify-ef5f3dd-selection-evidence.ts`使用生成ProtoJSON模型核对九组九路快照（81条响应）、七个完全相等区间及43条连续完成审计。全部审计为pass/200，仅三次独立准备POST与一次明确UI主题保存；普通选择、取消、目标Source浏览、查询和分页没有其它业务POST。五组浅色状态完全相等、账户revision 3；主题草稿仍浅色且零附写，明确保存后账户4、全局2和DARK是唯一变化，四组深色状态相等。两部作品revision始终1，分类目录/元数据/收藏/书签/进度/续读均保持；独立最终MangaDex偏好响应的sources为空、accountRevision为4。审计不包含Source运行时请求或偏好API，不称为完整网络日志。
 
-忽略目录`.local/mihon-reference/`保留23张360×800 JPEG与完整AX，统一前缀`karuyomi-ef5f3dd-selection-`，以及九组快照、偏好响应、`selection-ui-{audit-final,evidence-receipt}.json`和`ef5f3dd-selection-evidence-check.log`。上述八张实际加载图补20.K10一对主图及首次/追加、热门/搜索分项，跨版本成对主图111→112/169（66.3%），仅单侧8、双侧均缺49，剩余57个主状态。其余图为已存在节点的转换与空分类变体，不增加分子。静态扫描未发现正式客户端的Material导入或常见Material控件，仍不代替实际配色/导航/转场验收。完成后离开客户端、恢复视口，harness正常退出0；其余状态/变体、生产与已停止的Karuyomi原生门保持原记录，PR #8仍草稿、未合并、未部署。
+本轮记录了 23 张 360×800 JPEG、完整 AX、九组快照和偏好响应。上述八张实际加载图补20.K10一对主图及首次/追加、热门/搜索分项，跨版本成对主图111→112/169（66.3%），仅单侧8、双侧均缺49，剩余57个主状态。其余图为已存在节点的转换与空分类变体，不增加分子。静态扫描未发现正式客户端的Material导入或常见Material控件，仍不代替实际配色/导航/转场验收。完成后离开客户端、恢复视口，harness正常退出0；其余状态/变体、生产与已停止的Karuyomi原生门保持原记录，PR #8仍草稿、未合并、未部署。
 
 ## 分类目录与批量操作的故障验收入口
 
@@ -804,7 +804,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 `verify-94b7b82-category-evidence.ts`使用生成ProtoJSON模型核对13组九路快照（117条响应）、五个完全相等区间和94条连续审计，其中93条完成、仅sequence 17无终态且明确单列。14条POST为五次独立准备、两条分类原命令及一次原文精确重试、五条作品分类命令和一次明确UI主题保存；只有上述八个普通UI原操作各应用一次，精确重试零重复。分类目录最终revision 4、名称与顺序恢复；账户最终13、英文4/含待读、法文3/未分类、全局2/DARK，书签、阅读进度、续读和元数据保持。三个后续确认挂起均正常释放200，不把首次未完成交付改记正常释放；审计不代表Source运行时等全部网络请求。
 
-忽略目录`.local/mihon-reference/`保存13张360×800 JPEG及完整AX，统一前缀`karuyomi-94b7b82-category-`，以及13组快照、`category-{initial-hold-audit,ui-audit-final,ui-evidence-receipt}.json`和`94b7b82-category-evidence-check.log`。四张实际批量等待/暂停图新增04.K3/K5两对主图，跨版本112→114/169（67.5%），仅单侧8、双侧均缺47，剩余55个主状态；其它图不重复计数。客户端已离开、视口恢复，harness正常退出0；未完成交付记录保留，不外推其请求生命周期全部通过。
+本轮记录了 13 张 360×800 JPEG、完整 AX 和 13 组快照。四张实际批量等待/暂停图新增04.K3/K5两对主图，跨版本112→114/169（67.5%），仅单侧8、双侧均缺47，剩余55个主状态；其它图不重复计数。客户端已离开、视口恢复，harness正常退出0；未完成交付记录保留，不外推其请求生命周期全部通过。
 
 分类保存阶段的缺口已在四项既有浅/深×1x/2x流程复现；初轮用例的异步释放与父页查找范围已修正，最终四项均在缺少等待说明处失败。现按原busy/blocked/confirmed推导保存、重读及已确认后的读取说明，等待期间隐藏未确认后的会话指引，动作显示“保存中”/“读取中”并保持冻结；说明与官方旋转指示共同呈现，辅助通知可读取。原请求、CAS、失效和迟到结果规则未改。四项流程继续核对名称和排序等待、实际关闭受阻、确认后无额外POST；分类和批量相关35项回归通过，日志为`category-confirmation-label-{red,regressions,analyze}.log`。新提示完整CI及新正式Web仍待，不把本轮旧提示图当作修复后通过；其它状态/变体与生产门保持原记录。
 
@@ -818,7 +818,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 针对上述两个真实缺口，分类目录客户端仅在既有完整ACK校验后冻结本会话确认，读取失败时明确继续只重读；未知、无效和丢失ACK仍保留原命令精确重试，最新目录冲突仍阻止旧ACK恢复远端删除。编辑面、管理面及书架重开均保持已确认读取阶段，覆盖目录读取、首个书架读取和已发布书架读取三个失败点；排序增加冻结的完整名称与目标位置。八项最初失败、追加书架入口失败及后续已发布读取入口失败均先复现再修复。分类组件/仓库、书架、批量与迁移相关83项回归通过，同时覆盖旧ACK、身份关闭和原命令边界；日志`category-confirmed-readback-{red,shelf-red,published-red,regressions}.log`。新修复的完整CI和正式Web双主题仍待，不把旧失败图或组件结果当作新产物通过。
 
-忽略目录`.local/mihon-reference/`保留八张实际浅色JPEG和完整AX，统一前缀`karuyomi-61608c5-category-`，以及七组快照、`category-{readback-audit,ui-audit-final,ui-evidence-receipt}.json`和`61608c5-category-confirmation-evidence-check.log`。本轮新增成对主图为0，仍114/169（67.5%），仅单侧8、双侧均缺47，剩余55个主状态及全部变体/最终产物；不外推分类全流程通过或PR整体完成。已离开客户端、恢复视口，harness正常退出0，原生停止及生产待验状态不变。
+本轮记录了八张浅色 JPEG、完整 AX 和七组快照。本轮新增成对主图为0，仍114/169（67.5%），仅单侧8、双侧均缺47，剩余55个主状态及全部变体/最终产物；不外推分类全流程通过或PR整体完成。已离开客户端、恢复视口，harness正常退出0，原生停止及生产待验状态不变。
 
 ## 分类确认后读取阶段的即时反馈
 
@@ -842,7 +842,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 `verify-49f3482-initial-category-probe.ts`以生成ProtoJSON模型核对四组九路快照（36条响应）、两个完全相等区间及36条连续审计，35条完成、仅sequence17未完成。七条POST为五次独立准备、一条UI原命令及一次精确重试；UI原命令只应用一次。账户5→6、目录2→3，最终“已读”/“稍后”；两作品始终revision1且已收藏，分类关联、书签、阅读进度、续读、资料与其它设置不变，全局1/LIGHT。没有UI主题或其它业务写入，审计仍不含Source运行时请求。
 
-忽略目录`.local/mihon-reference/`保存前缀`karuyomi-49f3482-category-recovery-`的四张完整DOM/JPEG：`rename-waiting-light`、`initial-gate-unknown-light`、`initial-gate-retried-list-light`及`initial-probe-library-final-light`；辅助`library-baseline-light`为AX图，未当作新主状态。快照、初始及最终原审计、`initial-probe-evidence-receipt.json`与`49f3482-initial-category-probe-evidence-check.log`均保留。读取关闭/重开、排序、已确认读取失败、冲突、身份失效及深色尚未在本轮完成；不补05.K8/K9，仍114/169（67.5%）、仅单侧8、双侧均缺47。客户端已离开并恢复默认视口，harness正常退出0。
+本轮取得四组 DOM 与 JPEG。辅助`library-baseline-light`为AX图，未当作新主状态。快照、初始及最终原审计、`initial-probe-evidence-receipt.json`与`49f3482-initial-category-probe-evidence-check.log`均保留。读取关闭/重开、排序、已确认读取失败、冲突、身份失效及深色尚未在本轮完成；不补05.K8/K9，仍114/169（67.5%）、仅单侧8、双侧均缺47。客户端已离开并恢复默认视口，harness正常退出0。
 
 为避免瞬时确认状态依赖人工释放往返，既有官方夹具新增`delay-confirm`（2秒）、`delay-read`（5秒）和`confirm-read-failure`（真实提交与2秒后正常ACK，再令后续读取503）。等待仍逐秒检查取消和control generation，显式改模式优先；人工挂起仍30秒失败，不能静默当作成功。仅测试夹具生效，产品超时、生产入口、绑定和协议不变，256条审计上限保留。57项Workers/D1/R2回归及API/test严格类型通过，覆盖真实事务先完成、自动交付、原响应不变、取消、显式模式覆盖和无关进度透传，日志`editor-ui-automatic-delay-{workers,typecheck}.log`。新夹具完整CI与正式Web尚待，组件/夹具通过不算主状态完成。
 
@@ -860,7 +860,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 `verify-49f3482-category-auto-evidence.ts`以生成ProtoJSON模型核对28组九路快照（252条响应）、九个完全相等区间及247条连续完成审计；没有无终态记录，审计仍低于原256上限。33条POST分为五次独立准备、四次独立远端、16条UI分类原命令、两次原文重试、两次400、两次真实409、一次401及一次明确UI主题保存。16条UI原命令各应用一次，两次原文重试零重复，已知ACK读取重试零额外POST，400/409/401不应用。账户最终26、目录22、全局2/DARK；两作品始终revision1且已收藏，无分类关联/书签/阅读进度/续读，资料及其余设置不变。该审计不包含Source运行时等所有网络请求。此前人工挂起系列的sequence17无终态继续保留，不能用新自动系列的完成行追溯补全。
 
-忽略目录`.local/mihon-reference/`保存31张完整DOM/JPEG，前缀`karuyomi-49f3482-category-auto-`；其中`unknown-reopened-light`、两主题`confirmed-reading-reopened`及`conflict-reading-reopened`五张仍是可见转场帧，排除主图，稳定结果图另外保留。`category-auto-ui-{audit-final,evidence-receipt}.json`与`49f3482-category-auto-evidence-check.log`记录完整核对。辅助脚本最初少算一次自动确认、图片元数据遗漏`type`，原失败日志保留并按真实原审计/图像纠正，不计产品缺陷。输入/排序等待及未知/已确认读取失败新增05.K8/K9两对主图；05.K11只增加深色。跨版本114→116/169（68.6%），仅单侧9、双侧均缺44，剩余53个主状态及全部相关变体、转换和最终产物；31张图不等于31个新增状态，覆盖率仍不代表PR整体完成。客户端已离开、默认视口已恢复，harness正常退出0。
+本轮取得 31 组 DOM 与 JPEG。其中`unknown-reopened-light`、两主题`confirmed-reading-reopened`及`conflict-reading-reopened`五张仍是可见转场帧，排除主图，稳定结果图另外保留。`category-auto-ui-{audit-final,evidence-receipt}.json`与`49f3482-category-auto-evidence-check.log`记录完整核对。辅助脚本最初少算一次自动确认、图片元数据遗漏`type`，原失败日志保留并按真实原审计/图像纠正，不计产品缺陷。输入/排序等待及未知/已确认读取失败新增05.K8/K9两对主图；05.K11只增加深色。跨版本114→116/169（68.6%），仅单侧9、双侧均缺44，剩余53个主状态及全部相关变体、转换和最终产物；31张图不等于31个新增状态，覆盖率仍不代表PR整体完成。客户端已离开、默认视口已恢复，harness正常退出0。
 
 上述拒绝辅助说明在四项既有浅/深×1x/2x流程先复现，日志`category-rejected-caption-red.log`均在缺少重新读取指引处失败；现按既有blocked阶段说明“原草稿不会自动提交”，引导重读关闭后按最新内容编辑。子面与管理面共用该反馈，未知原请求和已确认读取仍保持各自说明；未改命令、协议或生命周期。四项流程核对400零应用、关闭后说明保留、明确重读再开及零自动提交，既有真实CAS流程同样核对专用说明；分类组件/仓库、书架和批量五文件69项回归全部通过，日志`category-rejected-caption-regressions-corrected.log`。首轮测试命令另含不存在的批量路径，该次不计完整通过；纠正为真实文件后重跑通过。新提示完整CI与正式Web双主题仍待，不能用旧失败图填05.K10；PR #8仍草稿、未合并、未部署。
 
@@ -1016,7 +1016,7 @@ Codex内置浏览器以360×800操作官方Wrangler临时D1/R2、空fixture和`a
 
 `verify-source-preferences-formal.ts` 使用生成的 ProtoJSON 模型核对 17 组七路完整快照、10 个完全相等区间及 137 条连续终态审计。11 条 POST 包括三次准备、六次界面原操作（四次 Source 保存和两次显式主题保存）及两次精确重试。最终账户版本 9、全局设置版本 3 且为浅色、Source 设置版本 5。收藏源、书架作品、分类、进度、书签及其余设置保持原值。证据与严格类型校验通过，收据为 `karuyomi-92d4f93-source-preferences-formal-evidence-receipt.json`。
 
-31 张 JPEG 及对应 DOM 保存在 `.local/mihon-reference/`。浅色三张进入转场，以及独立文档首张 1280×720 图只作辅助。双主题稳定读取及展开原保存请求补齐 14.K1/K5，跨版本主图从 129 增至 131/169（77.5%）。14.K4 另保留双主题账户保存等待的补图。最终控制台错误与警告为空，临时标签已关闭、视口恢复，隔离服务正常退出。
+本轮取得 31 张 JPEG 及对应 DOM。浅色三张进入转场，以及独立文档首张 1280×720 图只作辅助。双主题稳定读取及展开原保存请求补齐 14.K1/K5，跨版本主图从 129 增至 131/169（77.5%）。14.K4 另保留双主题账户保存等待的补图。最终控制台错误与警告为空，临时标签已关闭、视口恢复，隔离服务正常退出。
 
 同字段的历史布局测量见 `source-text-dialog-layout-reference.json`。Mihon 的 `s1404-source-text-empty-{light,dark}` 与 Web `a12c779` 均为 MangaDex 的「Block groups by UUID」空输入。Mihon 面板为约 310×174.5 逻辑像素，历史 Web 的 Cupertino 面板约 270×156。Mihon 有 Android 输入法，Web 使用桌面输入，纵向位置和 JPEG 色值仅作环境内对照。
 

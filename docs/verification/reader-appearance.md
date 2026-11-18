@@ -41,6 +41,6 @@ cd apps/reader
 flutter test test/data/settings_repository_test.dart test/settings/ test/reader/reader_screen_test.dart
 ```
 
-完整工程入口：`pnpm format`、`pnpm format:check`、`pnpm check`、`pnpm flutter:check`、`pnpm build`。使用仓库固定工具链；临时日志保留在忽略的 `.local/appearance-*.log`。
+完整工程入口：`pnpm format`、`pnpm format:check`、`pnpm check`、`pnpm flutter:check`、`pnpm build`。使用仓库固定工具链；
 
 尚待两个独立客户端经真实 D1 验收四字段双向读回、继承/清空、并发、丢响应恢复与进程重启；Web/iOS/Android、生产 Access 和真机分别记录。本轮没有新增实际浏览器或 Native 运行证据。适宽/适高与裁白继续按 [P1](../plan/p1-library-and-progress.md) 推进，完整 P1/P2 保持未验收。

@@ -22,7 +22,7 @@
 - 阅读后的跨源搜索只忽略已收到关闭确认的预备章节；关闭确认仍在途的章节继续阻止搜索获取执行槽。内置浏览器发现旧集合误计已关闭预备章节后补此修正，服务层 13 项定向回归通过。
 - 原书架、分类、书签、设置、自定义封面、章节已读、阅读进度和身份退休回归。原生 integration test 的新导航调用已更新并参与分析，但未运行原生验收。
 
-原始本机日志保存在忽略目录 `.local/ui-flow-{flutter-check-final,format-final,format-check-final,build-final,source-final,search-final,navigation-final}.log`。完整提交使用仓库真实 prek hook，没有跳过检查；用户原有的 `pnpm-lock.yaml` 未纳入任务提交。
+完整提交使用仓库真实 prek hook，没有跳过检查；用户原有的 `pnpm-lock.yaml` 未纳入任务提交。
 
 ## Web 验收输入与边界
 
@@ -30,17 +30,17 @@ Web 使用正式 `pnpm build`、Vite acceptance 配置和 Cloudflare `createTest
 
 首轮内置浏览器已通过：安装、停用、阻断源跳回管理、重新启用、本机清理、自动下载精确构建、语言筛选、收藏源、源内搜索空态、清除查询、真实 xkcd 详情与阅读、两页服务端保存，以及返回原列表的书架标记。
 
-本机清理前与清理后、自动准备并打开源后的独立 `/api/settings` 响应逐字节相同，确认这些操作没有提交账户安装或更改所选构建。原始响应分别是 `.local/ui-flow-settings-{before-cleanup,after-auto-download,after-open}.json`。
+本机清理前与清理后、自动准备并打开源后的独立 `/api/settings` 响应逐字节相同，确认这些操作没有提交账户安装或更改所选构建。
 
 首轮发现的阅读后跨源搜索误报已修复。基于 `a0b9cfa` 的正式 Web 产物通过内置浏览器复验：安装 xkcd、从源列表进入详情、加入书架、读取两页并保存、返回原列表、再从目录执行跨源搜索。搜索显示“1 / 1 源完成”，目标源“已返回 · 0 项”，退出时完成清理。之后关闭旧标签，在新标签的书架点“继续阅读”，首次显示第 2 页真实图片、`2 / 2` 与服务端已保存提示。
 
-独立 API 读回 `current.pageIndexHint=1`、`furthest.pageIndexHint=1`，对应第 2 页。权威响应为 `.local/ui-flow-evidence/resume-{library,progress}.json`。源目录、真实读图、书架标记和阅读后搜索的截图/AX 在同一忽略目录；新标签续读的截图见[本轮验收聊天](codex://threads/01a1c5f6-bbbd-7582-9e11-2c01c6a5bb3b)。
+独立 API 读回 `current.pageIndexHint=1`、`furthest.pageIndexHint=1`，对应第 2 页。新标签续读的截图见[本轮验收聊天](codex://threads/01a1c5f6-bbbd-7582-9e11-2c01c6a5bb3b)。
 
 浏览器复验后，将详情的等待范围收束到详情请求，避免把已打开页面的导航寿命当作待完成请求。对应三份导航测试 17 项及最终完整 621 项客户端回归、严格分析和正式 Web/Worker 构建均通过；这处等待范围修正未单独重复浏览器整条阅读链路。
 
 ## 复验入口与限制
 
-使用固定工具链，设置 `FLUTTER_ROOT`、`XDG_CONFIG_HOME` 和可写的 `WRANGLER_LOG_PATH`；本机产物输入为 `EXTENSION_ASSETS_DIR=.local/ui-flow-acceptance-assets`，包含归档提取的 `extensions/`。可复验入口：
+使用固定工具链，设置 `FLUTTER_ROOT`、`XDG_CONFIG_HOME` 和可写的 `WRANGLER_LOG_PATH`；构建通过 `EXTENSION_ASSETS_DIR` 指定了从当次发布归档提取的扩展快照。可复验入口：
 
 ```sh
 pnpm format
@@ -68,4 +68,4 @@ pnpm acceptance:serve
 
 Codex 内置浏览器在真实生产 Access 会话中读回原书架，显示新“漫画源 / 扩展”分栏，从目录直接打开已安装 Komiic，自动准备账户所选构建并返回真实热门作品；返回时完成关闭收尾，扩展列表显示“已安装 / 可安装”和本机就绪。此次采用针对新入口的最小生产检查，没有重复此前完整的阅读/保存/新标签矩阵，没有更改书架或阅读进度。
 
-原始上线证据保存在 `.local/ui-flow-production-13138c1/`，含上传/切流日志、前后部署身份、`pre.json`、`post.json` 和 `production-source.png`。原生验证继续停止，普通 Source 缩略图及全目录运行兼容仍按原限制记录。随后用户选择[主线 CI 后自动发布](../DEPLOYMENT.md)，后续自动发布以相同 SHA 的 CI job 日志及 `web-release-<sha>` artifact 为执行证据。
+原生验证继续停止，普通 Source 缩略图及全目录运行兼容仍按原限制记录。随后用户选择[主线 CI 后自动发布](../DEPLOYMENT.md)，后续自动发布以相同 SHA 的 CI job 日志及 `web-release-<sha>` artifact 为执行证据。

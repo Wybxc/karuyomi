@@ -75,5 +75,3 @@ flutter test test/sources/source_filters_controller_test.dart test/sources/sourc
 新能力要求 `hostAbi=karuyomi-source-host-v5`，protocolVersion / bridgeVersion 仍为 2；旧 v4 AOT 不兼容，必须以固定提交重新规划和构建，不把旧三包的浏览/图片结果当成筛选通过。Komiic 仅在空关键词搜索中应用其 Select/Group；原 Header 保留。CuuTruyen 动态标签可能先返回重置提示，须按原后台链路完成后再显式重置确认。
 
 修复后的两包 v5 AOT 与上述 CuuTruyen Web 分项已通过，尚未部署。其它 Source/筛选类型、Native、独立客户端、生产 Access 和目标设备须另外记录。编译/完整性仍只能记 compiled_unverified/runtimeReady=false；首次全量 baseline 与增量 CI 状态不因新增筛选而提升。
-
-临时完整日志留在忽略的 `.local/typed-filters-*.log` 和 `/private/tmp/karuyomi-source-filters-*.log`，不将机器输出提交入库。
