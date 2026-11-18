@@ -323,6 +323,43 @@ void main() {
     );
   });
 
+  test(
+    'confirmed uninstall retains the removed copy after runtime close fails',
+    () async {
+      await manager.install(catalog.builds.single);
+      await catalog.openBuild(catalog.builds.single);
+      final installed = manager.installed.single;
+      platform.closeAcknowledged = false;
+
+      await manager.uninstall(installed);
+
+      expect(manager.installed, isEmpty);
+      expect(manager.cleanupTarget, (
+        sha256: installed.bundleSha256,
+        name: testCatalogSource.name,
+      ));
+      expect(manager.cleanupError, contains('扩展资源尚未关闭'));
+      expect(platform.cachedArtifacts.keys, [installed.bundleSha256]);
+      final writes = platform.businessServer.requests
+          .where((request) => request.method == 'POST')
+          .length;
+
+      platform.closeAcknowledged = true;
+      await manager.retryCleanup();
+
+      expect(manager.cleanupTarget, isNull);
+      expect(manager.cleanupError, isNull);
+      expect(catalog.session, isNull);
+      expect(platform.cachedArtifacts, isEmpty);
+      expect(
+        platform.businessServer.requests
+            .where((request) => request.method == 'POST')
+            .length,
+        writes,
+      );
+    },
+  );
+
   for (final enabled in [null, false]) {
     for (final path in ['direct', 'favorite', 'library', 'recovery']) {
       test(
@@ -442,6 +479,184 @@ void main() {
   }
 
   for (final appearance in Brightness.values) {
+    testWidgets(
+      'preparation names its build and remains visible until cancellation is acknowledged in $appearance',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final releasePreparation = Completer<void>();
+        final releaseCancellation = Completer<void>();
+        String? cancelledId;
+        platform.beforePrepare = (_) => releasePreparation.future;
+        platform.beforeCancelPreparation = (id) {
+          cancelledId = id;
+          return releaseCancellation.future;
+        };
+        try {
+          await tester.pumpApp(
+            CupertinoApp(
+              theme: readerAppTheme(appearance),
+              home: ExtensionsPage(
+                catalog: catalog,
+                repository: manager.repository,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final install = find.widgetWithText(CupertinoButton, '安装');
+          await tester.ensureVisible(install);
+          await tester.tap(install);
+          await tester.pump();
+
+          final preparation = find.byKey(
+            const ValueKey('extension-preparation-status'),
+          );
+          expect(preparation, findsOneWidget);
+          expect(
+            find.ancestor(of: preparation, matching: find.byType(Scrollable)),
+            findsNothing,
+          );
+          expect(
+            find.descendant(
+              of: preparation,
+              matching: find.text(testCatalogSource.name),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: preparation, matching: find.text('1.0')),
+            findsOneWidget,
+          );
+          final cancel = find.byKey(
+            const ValueKey('extensions-cancel-prepare'),
+          );
+          await tester.tap(cancel);
+          await tester.pump();
+          releasePreparation.complete();
+          await tester.pump();
+
+          expect(cancelledId, platform.preparations.single.preparationId);
+          expect(find.text('正在取消准备'), findsOneWidget);
+          expect(tester.widget<CupertinoButton>(install).enabled, isFalse);
+          expect(manager.installed, isEmpty);
+
+          releaseCancellation.complete();
+          await tester.pumpAndSettle();
+          expect(preparation, findsNothing);
+          expect(find.textContaining('已取消准备'), findsOneWidget);
+          expect(tester.widget<CupertinoButton>(install).enabled, isTrue);
+          expect(
+            platform.businessServer.requests.where(
+              (request) => request.method == 'POST',
+            ),
+            isEmpty,
+          );
+        } finally {
+          if (!releasePreparation.isCompleted) releasePreparation.complete();
+          if (!releaseCancellation.isCompleted) releaseCancellation.complete();
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        }
+      },
+    );
+
+    testWidgets(
+      'storage retains the exact failed copy and retries it without an account write in $appearance',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final original = 'a' * 64;
+        final other = 'b' * 64;
+        await manager.install(catalog.builds.single);
+        final confirmed = manager.installed.single.deepCopy();
+        final writes = platform.businessServer.requests
+            .where((request) => request.method == 'POST')
+            .length;
+        platform.cachedArtifacts[other] = wire.CachedExtensionArtifact(
+          sha256: other,
+          byteLength: 128,
+          contentType: 'application/javascript',
+        );
+        await manager.refresh();
+        final release = Completer<wire.RuntimeError?>();
+        final attempts = <String>[];
+        platform.beforeForgetArtifact = (sha256) async {
+          attempts.add(sha256);
+          if (attempts.length == 1) return release.future;
+          return null;
+        };
+
+        try {
+          await tester.pumpApp(
+            CupertinoApp(
+              theme: readerAppTheme(appearance),
+              home: ExtensionStoragePage(controller: manager),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final status = find.byKey(const ValueKey('extension-cleanup-status'));
+          final originalAction = find.byKey(
+            ValueKey(('extension-forget', original)),
+          );
+          final otherAction = find.byKey(ValueKey(('extension-forget', other)));
+          await tester.ensureVisible(originalAction);
+          await tester.tap(originalAction);
+          await tester.pump();
+
+          expect(attempts, [original]);
+          expect(find.text('正在清理本机副本'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: status,
+              matching: find.text(testCatalogSource.name),
+            ),
+            findsOneWidget,
+          );
+          expect(tester.widget<CupertinoButton>(otherAction).enabled, isFalse);
+          expect(manager.installed.single, confirmed);
+
+          release.complete(
+            wire.RuntimeError(
+              code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_STORAGE_BUSY,
+              message: 'An active runtime has the artifact in use',
+            ),
+          );
+          await tester.pumpAndSettle();
+          final reason = find.textContaining('关闭正在使用此扩展的标签页或窗口');
+          expect(find.text('清理未完成'), findsOneWidget);
+          expect(find.descendant(of: status, matching: reason), findsOneWidget);
+          expect(
+            find.descendant(of: status, matching: find.text(original)),
+            findsOneWidget,
+          );
+          final refresh = find.text('重新读取本机副本');
+          await tester.ensureVisible(refresh);
+          await tester.tap(refresh);
+          await tester.pumpAndSettle();
+          final retry = find.text('重试资源清理');
+          await tester.ensureVisible(retry);
+          expect(reason, findsOneWidget);
+          await tester.tap(retry);
+          await tester.pumpAndSettle();
+
+          expect(attempts, [original, original]);
+          expect(status, findsNothing);
+          expect(platform.cachedArtifacts.keys, [other]);
+          expect(manager.installed.single, confirmed);
+          expect(
+            platform.businessServer.requests
+                .where((request) => request.method == 'POST')
+                .length,
+            writes,
+          );
+        } finally {
+          if (!release.isCompleted) release.complete(null);
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        }
+      },
+    );
+
     testWidgets(
       'confirmed extension read recovery survives reentry and only reads in $appearance',
       (tester) async {

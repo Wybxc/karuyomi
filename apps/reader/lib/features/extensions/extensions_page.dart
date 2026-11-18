@@ -201,7 +201,7 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
       ),
       ('可安装', visible.where((item) => item.installed == null).toList()),
     ];
-    final content = ListView(
+    final list = ListView(
       key: const PageStorageKey('extensions-scroll'),
       padding: const EdgeInsets.symmetric(vertical: 16),
       children: [
@@ -295,7 +295,10 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
                     ),
                 ],
               ),
-              ExtensionOperationStatus(controller: _controller),
+              ExtensionOperationStatus(
+                controller: _controller,
+                showPreparation: false,
+              ),
               if (_controller.settings.snapshot == null && !_controller.busy)
                 const Text('尚未读取账户扩展，请重试。'),
               if (_controller.settings.snapshot != null &&
@@ -332,6 +335,20 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
               textAlign: TextAlign.center,
             ),
           ),
+      ],
+    );
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_controller.preparationBuild case final build?)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _ExtensionPreparationStatus(
+              controller: _controller,
+              target: build,
+            ),
+          ),
+        Expanded(child: list),
       ],
     );
     return widget.embedded
@@ -398,6 +415,7 @@ class const ExtensionOperationStatus({
   required final ExtensionsController controller,
   final bool showStorageAction = true,
   final bool showProgress = true,
+  final bool showPreparation = true,
 }) extends HookWidget {
   @override
   Widget build(BuildContext context) {
@@ -407,10 +425,19 @@ class const ExtensionOperationStatus({
     final repositoryTarget = controller.repositoryTarget;
     final failure = controller.settings.failure;
     final errorStyle = TextStyle(color: AppColors.error.resolveFrom(context));
+    final preparation = controller.preparationBuild;
+    final copy = controller.cleanupTarget;
+    final cleaning =
+        copy != null && controller.activity == ExtensionActivity.cleaning;
+    final cleanupError =
+        controller.cleanupError ?? controller.catalog.extensionCleanupError;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (showProgress && controller.busy) ...[
+        if (showProgress &&
+            controller.busy &&
+            preparation == null &&
+            !cleaning) ...[
           const CupertinoActivityIndicator(),
           Text(
             controller.settings.pending?.acknowledged == true &&
@@ -421,9 +448,7 @@ class const ExtensionOperationStatus({
                 ? '原账户操作已确认，正在读取最新设置'
                 : switch (controller.activity) {
                     ExtensionActivity.previewing => '正在预览仓库',
-                    ExtensionActivity.preparing => '正在准备扩展',
                     ExtensionActivity.saving => '正在保存账户选择，等待确认',
-                    ExtensionActivity.cleaning => '账户已确认，正在清理本机副本',
                     _ => '正在读取账户、目录与本机副本',
                   },
           ),
@@ -452,11 +477,10 @@ class const ExtensionOperationStatus({
               ),
             ],
           ),
-        if (controller.preparing)
-          CupertinoButton(
-            key: const ValueKey('extensions-cancel-prepare'),
-            onPressed: () => unawaited(controller.cancelPreparation()),
-            child: const Text('取消准备'),
+        if (showPreparation && preparation != null)
+          _ExtensionPreparationStatus(
+            controller: controller,
+            target: preparation,
           ),
         if (controller.message case final message?)
           Text(message, key: const ValueKey('extensions-message')),
@@ -555,28 +579,13 @@ class const ExtensionOperationStatus({
             },
           ),
         ],
-        if (controller.cleanupError != null ||
-            controller.catalog.extensionCleanupError != null) ...[
-          Text(
-            controller.cleanupError ??
-                controller.catalog.extensionCleanupError!,
-            style: errorStyle,
+        if (cleaning || cleanupError != null)
+          _ExtensionCleanupStatus(
+            controller: controller,
+            copy: copy,
+            cleaning: cleaning,
+            error: cleanupError,
           ),
-          CupertinoButton(
-            onPressed: controller.busy
-                ? null
-                : () => unawaited(controller.retryCleanup()),
-            child: const Text('重试资源清理'),
-          ),
-          if (controller.catalog.canRebuildUnavailableExtension)
-            CupertinoButton(
-              key: const ValueKey('extensions-rebuild-cleanup'),
-              onPressed: controller.busy
-                  ? null
-                  : () => unawaited(controller.rebuildForCleanup()),
-              child: const Text('重建运行时并恢复清理'),
-            ),
-        ],
         if (pending != null ||
             failure != null ||
             controller.settings.snapshot == null ||
@@ -589,6 +598,106 @@ class const ExtensionOperationStatus({
             child: const Text('重新读取账户和缓存'),
           ),
       ],
+    );
+  }
+}
+
+class const _ExtensionPreparationStatus({
+  required final ExtensionsController controller,
+  required final CatalogBuild target,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Semantics(
+    key: const ValueKey('extension-preparation-status'),
+    container: true,
+    explicitChildNodes: true,
+    child: CupertinoFormSection.insetGrouped(
+      margin: EdgeInsets.zero,
+      header: Semantics(
+        liveRegion: true,
+        child: Text(controller.preparing ? '正在准备扩展' : '正在取消准备'),
+      ),
+      children: [
+        CupertinoListTile(
+          title: Text(
+            extensionName(target.packageName, target.sources),
+            maxLines: 2,
+          ),
+          subtitle: Text(target.version),
+          trailing: const CupertinoActivityIndicator(),
+        ),
+        if (controller.preparing)
+          CupertinoButton(
+            key: const ValueKey('extensions-cancel-prepare'),
+            alignment: AlignmentDirectional.centerStart,
+            onPressed: () => unawaited(controller.cancelPreparation()),
+            child: const Text('取消准备'),
+          ),
+      ],
+    ),
+  );
+}
+
+class const _ExtensionCleanupStatus({
+  required final ExtensionsController controller,
+  required final ExtensionLocalCopy? copy,
+  required final bool cleaning,
+  required final String? error,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final canRetry =
+        controller.available && !controller.busy && !controller.catalog.busy;
+    return Semantics(
+      key: const ValueKey('extension-cleanup-status'),
+      container: true,
+      explicitChildNodes: true,
+      child: CupertinoFormSection.insetGrouped(
+        margin: EdgeInsets.zero,
+        header: Semantics(
+          liveRegion: true,
+          child: Text(cleaning ? '正在清理本机副本' : '清理未完成'),
+        ),
+        children: [
+          if (copy case final target?)
+            CupertinoListTile(
+              title: Text(target.name, maxLines: 2),
+              subtitle: Text(
+                target.sha256,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: cleaning ? const CupertinoActivityIndicator() : null,
+            ),
+          if (error case final failure? when !cleaning) ...[
+            CupertinoFormRow(
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  failure,
+                  style: TextStyle(color: AppColors.error.resolveFrom(context)),
+                ),
+              ),
+            ),
+            CupertinoButton(
+              alignment: AlignmentDirectional.centerStart,
+              onPressed: canRetry
+                  ? () => unawaited(controller.retryCleanup())
+                  : null,
+              child: const Text('重试资源清理'),
+            ),
+            if (controller.catalog.canRebuildUnavailableExtension)
+              CupertinoButton(
+                key: const ValueKey('extensions-rebuild-cleanup'),
+                alignment: AlignmentDirectional.centerStart,
+                onPressed: canRetry
+                    ? () => unawaited(controller.rebuildForCleanup())
+                    : null,
+                child: const Text('重建运行时并恢复清理'),
+              ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -1157,18 +1266,6 @@ class const ExtensionStoragePage({
   super.key,
   required final ExtensionsController controller,
 }) extends HookWidget {
-  String _name(String sha256) {
-    final installed = controller.installed
-        .where((item) => item.bundleSha256 == sha256)
-        .firstOrNull;
-    return installed == null
-        ? '未使用的扩展副本'
-        : ExtensionListing(
-            catalog: controller.catalog,
-            installed: installed,
-          ).name;
-  }
-
   @override
   Widget build(BuildContext context) {
     useListenable(controller);
@@ -1226,7 +1323,10 @@ class const ExtensionStoragePage({
                   children: [
                     for (final artifact in cache.artifacts)
                       CupertinoListTile(
-                        title: Text(_name(artifact.sha256), maxLines: 2),
+                        title: Text(
+                          controller.artifactName(artifact.sha256),
+                          maxLines: 2,
+                        ),
                         subtitle: Text(_bytes(artifact.byteLength)),
                         trailing: Semantics(
                           container: true,
@@ -1245,7 +1345,8 @@ class const ExtensionStoragePage({
                                   ),
                             child: Text(
                               '清理副本',
-                              semanticsLabel: '清理副本：${_name(artifact.sha256)}',
+                              semanticsLabel:
+                                  '清理副本：${controller.artifactName(artifact.sha256)}',
                             ),
                           ),
                         ),
@@ -1299,7 +1400,7 @@ class const ExtensionStoragePage({
                           [
                             '${cache.artifacts.length} / ${cache.maxArtifacts} 个产物 · ${_bytes(cache.totalBytes)} / ${_bytes(cache.maxBytes)}',
                             for (final artifact in cache.artifacts)
-                              '${_name(artifact.sha256)} · ${artifact.sha256}',
+                              '${controller.artifactName(artifact.sha256)} · ${artifact.sha256}',
                           ].join('\n'),
                         ),
                       ),
