@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-19，Karuyomi 跨版本双主题主图现为 159/169（94.1%），余下 10 个主状态均缺两侧。新增 20.K13 的目标打开和分页失败、14.K11 的设置分组与继承禁用。共享编辑状态、身份或 Source 失效后的资源释放、未连接及最终像素与转场继续验收。[迁移失败](mihon-cupertino-fidelity.md#迁移目标与分页失败的正式-web-双主题验收) · [设置分组](mihon-cupertino-fidelity.md#漫画源设置分组与禁用色的正式-web-双主题验收)
+2026-11-19，Karuyomi 跨版本双主题主图现为 161/169（95.3%），新增跨源搜索失效后的资源释放等待与失败（28.K1/K2）。余下 8 个主状态均缺两侧，包括未连接（27.K1）和共享编辑（30.K1–K7）。最终像素、各触发变体与完整转场继续验收。[释放与恢复](mihon-cupertino-fidelity.md#失效后释放搜索资源的正式-web-双主题验收)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -861,7 +861,7 @@ stateDiagram-v2
     Q0 --> K5: 取消并返回原值
     Q1 --> K5: 取消并返回原值
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class K1,K2,K3,K4,Q0,Q1 paired
+    class K1,K2,K3,K4,K12,K13,Q0,Q1 paired
 ```
 
 | 状态 ID | 最小必要信息与操作边界                                                | 浅色                                                                            | 深色                                                                           |
@@ -878,12 +878,12 @@ stateDiagram-v2
 | 30.K5   | 服务端值已变化、受影响草稿与显式重新读取入口                          | 待                                                                              | 待                                                                             |
 | 30.K6   | 已确认/失败/未知的对象及数量、剩余操作和精确重试                      | 待                                                                              | 待                                                                             |
 | 30.K7   | 原身份或来源已失效、受影响草稿、旧操作不可继续及恢复入口              | 待                                                                              | 待                                                                             |
-| 28.K1   | 正在关闭的页面/资源、等待确认及受阻操作                               | 待                                                                              | 待                                                                             |
-| 28.K2   | 尚未释放的资源、失败原因和同一清理重试入口                            | 待                                                                              | 待                                                                             |
+| 28.K1   | 正在关闭的页面/资源、等待确认及受阻操作                               | `karuyomi-704d148-retired-search-releasing-light.jpg`                           | `karuyomi-704d148-retired-search-releasing-dark.jpg`                           |
+| 28.K2   | 尚未释放的资源、失败原因和同一清理重试入口                            | `karuyomi-704d148-retired-search-failed-light.jpg`                              | `karuyomi-704d148-retired-search-failed-dark.jpg`                              |
 | 29.K1   | 当前项、完整长名称/来源序号、查询/清空/取消与键盘；本轮为xkcd范围草稿 | `karuyomi-0c4da11-range-{current-choice,search-match,search-cleared}-light.jpg` | `karuyomi-0c4da11-range-{current-choice,search-match,search-cleared}-dark.jpg` |
 | 29.K2   | 当前查询、无匹配、清空或修改查询及取消；保留调用方原值                | `karuyomi-0c4da11-range-search-empty-light.jpg`                                 | `karuyomi-0c4da11-range-search-empty-dark.jpg`                                 |
 
-各业务页需要分别覆盖：书架/分类与批量（02–06）、账户扩展/仓库（08–11）、Source偏好（14）、停止/取消/分页/资源清理（12/15）、作品元数据/章节读态/书签/封面（16–19）、只读迁移映射与提交（20–21）、阅读进度/Access恢复/设置覆盖（22–24）、全局设置和连接/诊断（26–28）。共享状态机仅归纳语义，表中目标画面仍分别待验，不能用一张设置错误截图代替全部业务上下文。
+验收覆盖书架/分类与批量（02–06）、账户扩展/仓库（08–11）、Source 偏好（14）、停止/取消/分页/资源清理（12/15）、作品元数据/章节读态/书签/封面（16–19）、只读迁移映射与提交（20–21）、阅读进度/Access 恢复/设置覆盖（22–24）、全局设置和连接/诊断（26–28）。28.K1/K2 的主图取自跨源搜索失效。各业务页的触发变体、转换和 30.K7 的草稿恢复继续验收。
 
 ### 04–06：Karuyomi 分类与批量确认的目标状态
 
