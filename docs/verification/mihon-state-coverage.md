@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-19，Karuyomi 跨版本双主题主图现为 150/169（88.8%），余下 19 个主状态均缺两侧。`392273b` 补齐 15.K10 跨源正在停止与 15.K12 停止尚未确认。页面资源清理、选择器手动关闭、各触发变体及转场继续验收。[单源停止](mihon-cupertino-fidelity.md#跨源单源停止的正式-web-双主题验收) · [迁移超限](mihon-cupertino-fidelity.md#章节映射超限的正式-web-双主题验收)
+2026-11-19，Karuyomi 跨版本双主题主图现为 152/169（89.9%），余下 17 个主状态均缺两侧。新增 15.K10 跨源正在停止、15.K12 停止尚未确认、15.K13 退出清理失败、11.K3 正在清理本机副本。身份或 Source 失效后的资源释放、选择器手动关闭、其他变体及转场继续验收。[单源停止](mihon-cupertino-fidelity.md#跨源单源停止的正式-web-双主题验收) · [整页退出](mihon-cupertino-fidelity.md#跨源退出清理的正式-web-双主题验收) · [本机清理](mihon-cupertino-fidelity.md#本机副本清理的正式-web-双主题验收)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -1536,14 +1536,14 @@ stateDiagram-v2
     CacheDiagnostics --> NoCopies: 收起且无副本
     NoCopies --> ReadingCache: 重新读取
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class ReadingCache,CachedCopies,NoCopies,CleaningFailed,CacheDiagnostics paired
+    class ReadingCache,CachedCopies,CleaningCopy,NoCopies,CleaningFailed,CacheDiagnostics paired
 ```
 
 | 状态 ID | 最小必要信息                                               | 浅色正式Web                                              | 深色正式Web                                             |
 | ------- | ---------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
 | 11.K1   | 正在检查、读取指示及账户/缓存作用范围                      | `karuyomi-a8997fa-extension-flow-storage-checking-light` | `karuyomi-a8997fa-extension-flow-storage-checking-dark` |
 | 11.K2   | 数量/总占用、每副本名称/大小、含对象名的独立清理与作用范围 | `karuyomi-1e50a82-storage-copies-light.jpg`              | `karuyomi-1e50a82-storage-copies-dark.jpg`              |
-| 11.K3   | 正在清理、重复操作受阻、账户安装保持                       | 待                                                       | 待                                                      |
+| 11.K3   | 正在清理、重复操作受阻、账户安装保持                       | `karuyomi-ad41606-cache-removing-light.jpg`              | `karuyomi-ad41606-cache-removing-dark.jpg`              |
 | 11.K4   | 零副本/占用、可重新下载与重新读取入口                      | `karuyomi-1e50a82-storage-empty-light.jpg`               | `karuyomi-1e50a82-storage-empty-dark.jpg`               |
 | 11.K5   | 失败原因、未完成资源、精确重试/必要重建                    | `karuyomi-0a28f6a-storage-spacing-light`                 | `karuyomi-0a28f6a-storage-spacing-dark`                 |
 | 11.K6   | 容量/数量限额、完整副本哈希、滚动与收起                    | `karuyomi-76309ed-storage-diagnostics-light.jpg`         | `karuyomi-76309ed-storage-diagnostics-dark.jpg`         |
@@ -1815,7 +1815,7 @@ stateDiagram-v2
     Q12 --> [*]: 重试原退出后返回上一页或打开扩展管理
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class Q0,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10,Q11,Q13,Q14 paired
+    class Q0,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10,Q11,Q12,Q13,Q14 paired
 ```
 
 | 状态 ID | 最小必要信息与实际边界                                                      | 浅色                                                                                              | 深色                                                                                            |
@@ -1832,7 +1832,7 @@ stateDiagram-v2
 | 15.K10  | 正在停止、当前源及禁止重复开始；不能用加载图代替                            | `karuyomi-392273b-search-stop-waiting-light.jpg`                                                  | `karuyomi-392273b-search-stop-waiting-dark.jpg`                                                 |
 | 15.K11  | 两源均已停止、原查询与显式重试；本轮为零结果，非空保留/旧停止失败恢复待补   | `karuyomi-07342fb-cross-stopped-light.jpg`                                                        | `karuyomi-07342fb-cross-stopped-dark.jpg`                                                       |
 | 15.K12  | 未确认的停止、同一停止重试、继续搜索受阻                                    | `karuyomi-392273b-search-stop-unconfirmed-light.jpg`                                              | `karuyomi-392273b-search-stop-unconfirmed-dark.jpg`                                             |
-| 15.K13  | 页面资源尚未释放、精确清理重试、退出受阻                                    | 待                                                                                                | 待                                                                                              |
+| 15.K13  | 页面资源尚未释放、精确清理重试、退出受阻                                    | `karuyomi-a251191-search-release-failed-light.jpg`                                                | `karuyomi-a251191-search-release-failed-dark.jpg`                                               |
 | 15.K14  | 正在打开、目标作品与源、原分源结果与冻结操作                                | `karuyomi-0a28f6a-cross-opening-light`                                                            | `karuyomi-0a28f6a-cross-opening-dark`                                                           |
 | 15.K15  | 《ONE PIECE航海王》、尾田榮一郎、238 章；返回保留原查询与三项结果           | `karuyomi-0a28f6a-cross-detail-resumed-light`、`karuyomi-0a28f6a-cross-return-resumed-light`      | `karuyomi-0a28f6a-cross-detail-resumed-dark`、`karuyomi-0a28f6a-cross-return-resumed-dark`      |
 
