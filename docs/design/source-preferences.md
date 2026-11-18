@@ -10,6 +10,8 @@
 
 `getPreferences` 返回有界 `PreferenceSnapshot`，包含当前 `snapshotId`、递归 nodes，以及实际 SharedPreferences 的两个完整分区 `syncValues` / `sessionValues`。描述支持开关、文本、单选、多选、分组、动作和明确不支持的项；保留标题、summary、enabled、visible、默认值及同步范围。
 
+设置页以 Cupertino 分区呈现原树，保留分组、子组与空分组的标题。组的禁用状态传到子控件，选择行的标签、当前值和辅助功能状态一起反映可用性。显示分区和筛选可见项目均保留叶节点在原描述中的索引路径。
+
 `editPreference(snapshotId,path,change|click)` 一次只修改一个原控件或执行一次原点击 listener，返回 `accepted`、`clickHandled` 和更新后的快照。路径绑定原 Source 实例、Source ID 和 generation；旧快照、非法路径、类型错误、不可用项与非法选项在回调之前拒绝。单选和多选使用真实 entryValues，不能用标签或选项索引代替。当前值暂时不在动态选项中时明确显示不可用值，不自动改变存储；空选项可描述，但禁止编辑。
 
 存储使用 typed `PreferenceValue`，区分 boolean、text、sint32、sint64、float 和唯一字符串集合。缺键是默认/未存储状态，false、0、空字符串与空集合都是存在的值。sint64 采用 ProtoJSON 十进制字符串，Java 分别通过 `putInt` / `putLong` 保存，不能把两者都转换成 Number；Dart 在生成 codec 解码之前额外拒绝会被 fixnum 环绕的越界长整数。float 必须有限。没有通用的“重置单项”操作；原 Source 提供的 action 仍可调用。

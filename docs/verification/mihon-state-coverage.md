@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-19，Karuyomi 跨版本双主题主图现为 157/169（92.9%），余下 12 个主状态均缺两侧。新增 13.K1、13.K5–K7、13.K9，覆盖漫画源筛选的读取、重置、应用、描述失败和会话失效。共享编辑状态、身份或 Source 失效后的资源释放、最终像素复核与其余变体继续验收。[筛选双主题](mihon-cupertino-fidelity.md#漫画源筛选过程与恢复的正式-web-双主题验收)
+2026-11-19，Karuyomi 跨版本双主题主图现为 159/169（94.1%），余下 10 个主状态均缺两侧。新增 20.K13 的目标打开和分页失败、14.K11 的设置分组与继承禁用。共享编辑状态、身份或 Source 失效后的资源释放、未连接及最终像素与转场继续验收。[迁移失败](mihon-cupertino-fidelity.md#迁移目标与分页失败的正式-web-双主题验收) · [设置分组](mihon-cupertino-fidelity.md#漫画源设置分组与禁用色的正式-web-双主题验收)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -1184,7 +1184,7 @@ stateDiagram-v2
     state "21.K5 服务端已确认" as MigrationDone
     state "21.K6 身份或服务已失效" as MigrationExpired
     classDef captured fill:#e7f1ff,stroke:#2471c8,color:#112b4a
-    class MigrationInputs,MigrationInputError,MigrationScope,MigrationOriginalLoad,MigrationCategories,MigrationOriginalReady,MigrationNoSources,MigrationSearch,MigrationListing,MigrationEmpty,MigrationResults,MigrationPreviewLoad,MigrationPreviewError,MigrationPreview,MigrationChapterChoice,MigrationLimit,MigrationConfirm,MigrationSending,MigrationUnknown,MigrationRejected,MigrationDone,MigrationExpired captured
+    class MigrationInputs,MigrationInputError,MigrationScope,MigrationOriginalLoad,MigrationCategories,MigrationOriginalReady,MigrationNoSources,MigrationOpenSource,MigrationSearch,MigrationListing,MigrationEmpty,MigrationResults,MigrationTargetError,MigrationPreviewLoad,MigrationPreviewError,MigrationPreview,MigrationChapterChoice,MigrationLimit,MigrationConfirm,MigrationSending,MigrationUnknown,MigrationRejected,MigrationDone,MigrationExpired captured
     note left of MigrationInputs
       浅/深 × 1x/2x 组件流程已过
       蓝色仅表示主图已成对核对
@@ -1258,7 +1258,7 @@ stateDiagram-v2
 | 20.K10 | 当前目标源、查询或热门、首次/追加进度；追加时保留已有结果                                                                      | `karuyomi-ef5f3dd-selection-migration-popular-loading-candidate-light.jpg`                               | `karuyomi-ef5f3dd-selection-migration-popular-loading-candidate-dark.jpg`                              |
 | 20.K11 | 当前源和查询或热门、成功为空、修改查询或改浏览热门；两种空态分别验                                                             | `karuyomi-86d27e7-migration-search-empty-light.jpg`，仅搜索                                              | `karuyomi-86d27e7-migration-search-empty-dark.jpg`，仅搜索                                             |
 | 20.K12 | 精确目标作品名称、源/URL区分、打开与有界分页；不因同名打开其它条目                                                             | `karuyomi-9228c11-migration-target-list-light.jpg`                                                       | `karuyomi-9228c11-migration-target-list-dark.jpg`                                                      |
-| 20.K13 | 失败源/操作、可恢复原因、重试；开源失败保留原选择，追加失败保留结果和分页上下文，分别验                                        | 待                                                                                                       | 待                                                                                                     |
+| 20.K13 | 失败源/操作、可恢复原因、重试；开源失败保留原选择，追加失败保留结果和分页上下文，分别验                                        | `karuyomi-517a73e-migration-{open,page}-failure-light.jpg`                                               | `karuyomi-517a73e-migration-{open,page}-failure-dark.jpg`                                              |
 | 20.K14 | 精确目标作品/源、读取详情/章节或权威预览的实际进度；取得预览前不能提交                                                         | `karuyomi-3a57cdf-migration-k14-light.jpg`                                                               | `karuyomi-3a57cdf-migration-k14-dark.jpg`                                                              |
 | 20.K15 | 失败的目标和阶段、明确重读、零迁移提交；初次失败/重取失败分别验                                                                | `karuyomi-3a57cdf-migration-{k15,k15-actions,k15-reread-failed}-light.jpg`                               | `karuyomi-3a57cdf-migration-{k15,k15-actions,k15-reread-failed}-dark.jpg`                              |
 | 20.K16 | 原/目标、原作品保留、目标已有数据保留、分类与章节复制选项、已选/上限及未复制标记数；仅分类、无标记、已占用目标和映射分页分别验 | `karuyomi-86d27e7-migration-{preview-summary,native-return,confirm-return}-light.jpg`                    | `karuyomi-86d27e7-migration-{preview-summary,native-return,confirm-return}-dark.jpg`                   |
@@ -1271,7 +1271,7 @@ stateDiagram-v2
 | 21.K5  | 明确服务端确认、确认的目标、实际新增已读/书签数、原作品保留及返回；新请求/原请求重试成功分别验                                 | `karuyomi-9228c11-migration-completed-light.jpg`，正常请求                                               | `karuyomi-9228c11-migration-completed-dark.jpg`，正常请求                                              |
 | 21.K6  | 身份或服务已变化、旧向导永久停用及返回；各读取/预览/提交/待确认阶段分别触发并丢弃迟到结果                                      | `karuyomi-138ccbd-migration-expired-confirmed-light-stable.jpg`，预览重读                                | `karuyomi-b29c3bb-migration-preview-expired-system-dark.jpg`，预览重读                                 |
 
-图中仅列主要失效入口，范围草稿、已加载列表、映射、拒绝及完成后同样检查身份变化；不能用一条箭头替代全部触发阶段。20.K13/K14的操作阶段、仅分类预览、21.K3/K4的重开和重读失败须独立取图。预览、筛选、映射、分页与取消均为只读；只有21.K1明确确认和21.K3明确原请求重试可触发写入。`8c398d3`的新增标记和保留已有标记证据继续保留；`9228c11`两主题均为英文3,323章→中文的无标记流程，明确提交均新增0/0且各推进一次版本，九路完整快照确认查询/分页/取消零附写。章节选择已核对当前项`aria-current=true`、占用项禁用、无匹配及清空；`86d27e7`实际点击取消后映射、页码、位置保持且焦点恢复，跨独立API后的延迟只读观测同样保持，四个九路快照比较确认零写入。`86d27e7`返回复验未提交迁移，未新增完成写入次数。语义定位动作后的滚动观察和旧问题图保留，不将实际点击结果外推全部输入与转换，详见[返回行为复验](mihon-cupertino-fidelity.md#迁移返回焦点与位置的正式-web-复验)。
+图中仅列主要失效入口，范围草稿、已加载列表、映射、拒绝及完成后同样检查身份变化；不能用一条箭头替代全部触发阶段。20.K13 的打开失败与热门追加已双主题复验；20.K14 的其余阶段、仅分类预览、21.K3/K4 的重开和重读失败须分别取图。预览、筛选、映射、分页与取消均为只读；只有21.K1明确确认和21.K3明确原请求重试可触发写入。`8c398d3`的新增标记和保留已有标记证据继续保留；`9228c11`两主题均为英文3,323章→中文的无标记流程，明确提交均新增0/0且各推进一次版本，九路完整快照确认查询/分页/取消零附写。章节选择已核对当前项`aria-current=true`、占用项禁用、无匹配及清空；`86d27e7`实际点击取消后映射、页码、位置保持且焦点恢复，跨独立API后的延迟只读观测同样保持，四个九路快照比较确认零写入。`86d27e7`返回复验未提交迁移，未新增完成写入次数。语义定位动作后的滚动观察和旧问题图保留，不将实际点击结果外推全部输入与转换，详见[返回行为复验](mihon-cupertino-fidelity.md#迁移返回焦点与位置的正式-web-复验)。
 
 `3a57cdf`新增20.K1/K2/K4/K7/K14/K15和21.K2/K3/K4九对双主题主图；19.K10改用修正拒绝说明后的当前正式图。33组九路快照与256条审计核对三条原迁移各应用一次、两次原正文精确重试无重复、两次真实409与四次迁移/封面400零覆盖。浅色挂起sequence49未完整释放，深色sequence149正常释放；深色502后重开和只读失败无新POST，精确重试只应用一次。21.K3/K4的读取失败提示存在实际缺口，已在组件先复现并修正，但新产物Web仍待；原问题图不记该变体最终通过。K8/K10没有截到加载指示，保持待验；最终有效快照之后夹具达到256条上限，额外封面读取失败排除。详情、原始图与五张联系表见[迁移故障正式Web复验](mihon-cupertino-fidelity.md#迁移加载与故障的正式-web-复验)。
 
@@ -1742,7 +1742,7 @@ stateDiagram-v2
     EmptyPreferences --> LoadingPreferences: 明确重新读取
     GroupedPreferences --> LoadingPreferences: 明确重新读取
     classDef paired fill:#dbeafe,color:#172554,stroke:#2563eb
-    class LoadingPreferences,ToggleOff,ToggleOn,ChangingPreference,PreferencePending,PreferenceFailed,UnsupportedPreference,NewDocument,EmptyPreferences paired
+    class LoadingPreferences,ToggleOff,ToggleOn,ChangingPreference,PreferencePending,PreferenceFailed,UnsupportedPreference,NewDocument,EmptyPreferences,GroupedPreferences paired
 ```
 
 | 状态 ID | 最小必要信息                                               | 浅色正式Web                                                                                                     | 深色正式Web                                                                                                          |
@@ -1757,7 +1757,7 @@ stateDiagram-v2
 | 14.K8   | 同一会话、已改值、范围说明                                 | `karuyomi-2df0551-source-preferences-reopened-light.jpg`                                                        | `karuyomi-2df0551-source-preferences-reopened-dark.jpg`                                                              |
 | 14.K9   | 独立新文档、默认值、会话范围                               | `karuyomi-bcac704-editors-source-preferences-fresh-document-light.jpg`                                          | `karuyomi-bcac704-editors-source-preferences-fresh-document-dark.jpg`                                                |
 | 14.K10  | 无额外设置说明、源上下文、重新读取/关闭；不创建空表单      | `karuyomi-5f5d287-preferences-empty-light.jpg`                                                                  | `karuyomi-5f5d287-preferences-empty-dark.jpg`                                                                        |
-| 14.K11  | 分组/子分组与空分组标题、继承的不可编辑状态、原始路径      | 待                                                                                                              | 待                                                                                                                   |
+| 14.K11  | 分组/子分组与空分组标题、继承的不可编辑状态、原始路径      | `karuyomi-0e432ce-source-preferences-groups-light.jpg`                                                          | `karuyomi-0e432ce-source-preferences-groups-dark.jpg`                                                                |
 
 `2df0551`完整CI含805项Dart/531项Vitest及Web/Wasm通过；以上最新表单已双主题实看，Source与诊断均实际Tab/Enter可达，各独立操作不再合并，诊断末端完整。动漫屋1.6.3的“章末吐槽页”两主题完成0→1和同会话重开仍1，深色恢复0；镜像菜单均Enter打开/Escape取消，未改镜像。浅色实际reload后确认会话值为0，安装与主题从服务端恢复；独立API确认这些操作不变更账户，Source entries为空。浅色独立卸载后revision从3到4。跨源范围仅浅色实际Tab/Enter展开/收起，深色继续待验；诊断首次深色缺项帧保留并排除主图。未执行unsupported Cookie或动漫屋图片阅读；新背景修复、其它偏好控件及全部转换仍待，不将这些主图称作全组通过。
 

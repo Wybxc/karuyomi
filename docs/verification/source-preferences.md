@@ -81,6 +81,10 @@ Java oracle 和全源编译的临时日志在 `/private/tmp/karuyomi-source-pref
 
 当前验收使用[正式构建和隔离 harness](../../apps/api/test/README.md)。
 
+## 分组与继承禁用的正式 Web 验收
+
+2026-11-19，`0e432ce` 正式 Web 两主题复验独立的分组与空标题、祖先禁用及 Cupertino 字色。分组夹具保留实际 Komiic 的两个设置，嵌套编辑转交同一个原监听器。两个主题均只提交章节字段，并从权威 API 和重开表单读回。[双主题实拍](mihon-cupertino-fidelity.md#漫画源设置分组与禁用色的正式-web-双主题验收)
+
 ## 尚未通过的运行门
 
 - [ ] 其它真实 Source 控件、原 click/veto、实际别名、动态依赖、密码/会话值与刷新；Komiic 仅通过本轮明确的原单选/镜像和新文档恢复分项。
