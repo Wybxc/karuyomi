@@ -358,7 +358,8 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                 separatorBuilder: (_, _) => const SizedBox(width: 4),
                 itemBuilder: (context, index) => SizedBox(
                   width: 96,
-                  child: MergeSemantics(
+                  child: Semantics(
+                    enabled: controller.canSearch,
                     child: CupertinoButton(
                       key: ValueKey((
                         'cross-search-result',
@@ -684,12 +685,20 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                         Wrap(
                           spacing: 8,
                           children: [
-                            CupertinoButton.filled(
-                              key: const ValueKey('cross-search-submit'),
-                              onPressed: controller.canStart
-                                  ? () => unawaited(_start(_query.text))
-                                  : null,
-                              child: const Text('搜索所选漫画源'),
+                            Semantics(
+                              enabled: controller.canStart,
+                              child: CupertinoButton.filled(
+                                key: const ValueKey('cross-search-submit'),
+                                foregroundColor: controller.canStart
+                                    ? null
+                                    : CupertinoColors.tertiaryLabel.resolveFrom(
+                                        context,
+                                      ),
+                                onPressed: controller.canStart
+                                    ? () => unawaited(_start(_query.text))
+                                    : null,
+                                child: const Text('搜索所选漫画源'),
+                              ),
                             ),
                             if (controller.hasActive)
                               CupertinoButton(

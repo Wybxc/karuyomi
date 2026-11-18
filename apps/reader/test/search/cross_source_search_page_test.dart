@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:karuyomi/widgets/app_page_route.dart';
 
@@ -127,7 +128,20 @@ void main() {
           expect(find.textContaining('没有可选漫画源'), findsOneWidget);
           final submit = find.byKey(const ValueKey('cross-search-submit'));
           final refresh = find.byKey(const ValueKey('cross-search-refresh'));
-          expect(tester.widget<CupertinoButton>(submit).enabled, isFalse);
+          final disabledSubmit = tester.widget<CupertinoButton>(submit);
+          expect(disabledSubmit.enabled, isFalse);
+          expect(
+            disabledSubmit.foregroundColor,
+            CupertinoColors.tertiaryLabel.resolveFrom(tester.element(submit)),
+          );
+          expect(
+            tester
+                .getSemantics(submit)
+                .getSemanticsData()
+                .flagsCollection
+                .isEnabled,
+            Tristate.isFalse,
+          );
           expect(tester.widget<CupertinoButton>(refresh).enabled, isTrue);
           final manage = find.widgetWithText(CupertinoButton, '打开扩展管理');
           expect(manage, findsOneWidget);
@@ -411,6 +425,9 @@ void main() {
             findsOneWidget,
           );
           expect(tester.widget<CupertinoButton>(result).enabled, isFalse);
+          final disabledResult = tester.getSemantics(result).getSemanticsData();
+          expect(disabledResult.flagsCollection.isEnabled, Tristate.isFalse);
+          expect(disabledResult.label, work.title);
           expect(opened, isNull);
 
           releaseStop.complete();
@@ -424,6 +441,14 @@ void main() {
           expect(status, findsNothing);
           expect(opened, same(work));
           expect(result, findsOneWidget);
+          expect(
+            tester
+                .getSemantics(result)
+                .getSemanticsData()
+                .flagsCollection
+                .isEnabled,
+            Tristate.isTrue,
+          );
           final heading = find.byKey(
             const ValueKey('cross-search-results-heading'),
           );

@@ -746,4 +746,38 @@ void main() {
       expect(catalog.isCurrentSource(details.source), true);
     },
   );
+
+  for (final failOpening in [true, false]) {
+    test(
+      'opening an exact result reports the catalog error at ${failOpening ? 'Source open' : 'details read'}',
+      () async {
+        final selected = target('11');
+        final page = await search.search(selected, 'query').result;
+        const failure = RuntimeException(
+          RuntimeErrorCode.runtimeLost,
+          'One Source operation failed',
+        );
+        if (failOpening) {
+          slots.beforeOpen = (_) async => throw failure;
+        } else {
+          slots.invoke = (call) async {
+            if (call.hasDetails()) throw failure;
+            return slots._defaultResult(call);
+          };
+        }
+        await expectLater(
+          search.openResult(selected, page.mangas.single),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'displayed reason',
+              predicate(
+                (message) => message == catalog.error && catalog.error != null,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

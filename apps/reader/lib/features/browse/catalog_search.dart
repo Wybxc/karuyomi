@@ -679,14 +679,21 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
       sourceId: target.source.id,
       shouldContinue: current,
     );
-    if (opened == null || !current()) return null;
+    if (!current()) return null;
+    if (opened == null) {
+      if (catalog.error case final message?) throw FormatException(message);
+      return null;
+    }
     if (catalog.activeBuild?.catalog != target.build.catalog ||
         catalog.activeBuild?.id != target.build.id ||
         catalog._activeBundleSha256 != target.bundleSha256) {
       throw const FormatException('账户所选来源或构建已改变，请重新搜索。');
     }
     final result = await catalog.details(manga, shouldContinue: current);
-    return current() ? result : null;
+    if (!current()) return null;
+    final message = catalog.error;
+    if (result == null && message != null) throw FormatException(message);
+    return result;
   }
 
   @override

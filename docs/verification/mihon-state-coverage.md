@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-18，Karuyomi 跨版本双主题主图现为 136/169（80.5%），剩余 33 个主状态，其中 8 个仅有单侧、25 个双侧均缺。扩展准备 08.K6、本机存储 11.K1/K5 和选源空态 15.K2 各补齐一对。[正式双主题验收](mihon-cupertino-fidelity.md#扩展与选源的正式-web-双主题验收)
+2026-11-19，Karuyomi 跨版本双主题主图现为 140/169（82.8%），剩余 29 个主状态，其中 5 个仅有单侧、24 个双侧均缺。连接等待、登录失效和拒绝访问 27.K2–K4 补齐浅色。跨源详情打开中 15.K14 新增一对。[本轮正式复验](mihon-cupertino-fidelity.md#连接状态与跨源详情的正式-web-复验)
 
 2026-11-14，进行中。用户要求截图触及每个 UI 状态，并同时考虑浅色、深色。此表细化[30 组界面矩阵](../design/mihon-cupertino-fidelity.md)，作为参考采集与后续 Cupertino 对照的工作清单。**目前尚无一组完成包含全部转换与变体的双主题验收；绿色只代表该节点的两张主状态参考图已核对。**
 
@@ -859,17 +859,15 @@ stateDiagram-v2
     Q0 --> K5: 取消并返回原值
     Q1 --> K5: 取消并返回原值
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class K4,Q0,Q1 paired
-    classDef partial fill:#fef3c7,stroke:#d97706,color:#78350f
-    class K1,K2,K3 partial
+    class K1,K2,K3,K4,Q0,Q1 paired
 ```
 
 | 状态 ID | 最小必要信息与操作边界                                                | 浅色                                                                            | 深色                                                                           |
 | ------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | 27.K1   | 当前服务地址、尚未连接、连接入口；地址非法时给出可修正原因            | 待                                                                              | 待                                                                             |
-| 27.K2   | 正在连接的服务、进度及当前可用操作；不显示旧身份的已保存状态          | 待：连接时回落真实系统深色                                                      | `karuyomi-19c2260-connection-pending-system`                                   |
-| 27.K3   | 登录已失效、受影响操作、显式登录/重试入口及未确认草稿提示             | 待：失效后回落真实系统深色                                                      | `karuyomi-19c2260-connection-expired-dark`（无进度草稿；带草稿变体待验）       |
-| 27.K4   | 当前服务、拒绝访问原因和切换账号/连接入口                             | 待：拒绝后回落真实系统深色                                                      | `karuyomi-19c2260-connection-denied-dark`                                      |
+| 27.K2   | 正在连接的服务、进度及当前可用操作；不显示旧身份的已保存状态          | `karuyomi-0a28f6a-connection-pending-light`                                     | `karuyomi-19c2260-connection-pending-system`                                   |
+| 27.K3   | 登录已失效、受影响操作、显式登录/重试入口及未确认草稿提示             | `karuyomi-0a28f6a-connection-expired-light`（带草稿变体待验）                   | `karuyomi-19c2260-connection-expired-dark`（带草稿变体待验）                   |
+| 27.K4   | 当前服务、拒绝访问原因和切换账号/连接入口                             | `karuyomi-0a28f6a-connection-denied-light`                                      | `karuyomi-19c2260-connection-denied-dark`                                      |
 | 27.K5   | 已确认的服务与身份、连接状态和后续可用入口                            | `karuyomi-19c2260-connection-ready-light`                                       | `karuyomi-19c2260-connection-ready-dark`                                       |
 | 30.K1   | 当前对象、服务端已确认值及适用的保存反馈                              | 待                                                                              | 待                                                                             |
 | 30.K2   | 当前对象与草稿、尚未保存提示、可提交/校验原因及取消                   | 待                                                                              | 待                                                                             |
@@ -1546,14 +1544,14 @@ stateDiagram-v2
     class ReadingCache,CachedCopies,NoCopies,CleaningFailed,CacheDiagnostics paired
 ```
 
-| 状态 ID | 最小必要信息                                               | 浅色正式Web                                                   | 深色正式Web                                                  |
-| ------- | ---------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
-| 11.K1   | 正在检查、读取指示及账户/缓存作用范围                      | `karuyomi-a8997fa-extension-flow-storage-checking-light`      | `karuyomi-a8997fa-extension-flow-storage-checking-dark`      |
-| 11.K2   | 数量/总占用、每副本名称/大小、含对象名的独立清理与作用范围 | `karuyomi-1e50a82-storage-copies-light.jpg`                   | `karuyomi-1e50a82-storage-copies-dark.jpg`                   |
-| 11.K3   | 正在清理、重复操作受阻、账户安装保持                       | 待                                                            | 待                                                           |
-| 11.K4   | 零副本/占用、可重新下载与重新读取入口                      | `karuyomi-1e50a82-storage-empty-light.jpg`                    | `karuyomi-1e50a82-storage-empty-dark.jpg`                    |
-| 11.K5   | 失败原因、未完成资源、精确重试/必要重建                    | `karuyomi-a8997fa-extension-flow-cleanup-failed-stable-light` | `karuyomi-a8997fa-extension-flow-cleanup-failed-stable-dark` |
-| 11.K6   | 容量/数量限额、完整副本哈希、滚动与收起                    | `karuyomi-76309ed-storage-diagnostics-light.jpg`              | `karuyomi-76309ed-storage-diagnostics-dark.jpg`              |
+| 状态 ID | 最小必要信息                                               | 浅色正式Web                                              | 深色正式Web                                             |
+| ------- | ---------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
+| 11.K1   | 正在检查、读取指示及账户/缓存作用范围                      | `karuyomi-a8997fa-extension-flow-storage-checking-light` | `karuyomi-a8997fa-extension-flow-storage-checking-dark` |
+| 11.K2   | 数量/总占用、每副本名称/大小、含对象名的独立清理与作用范围 | `karuyomi-1e50a82-storage-copies-light.jpg`              | `karuyomi-1e50a82-storage-copies-dark.jpg`              |
+| 11.K3   | 正在清理、重复操作受阻、账户安装保持                       | 待                                                       | 待                                                      |
+| 11.K4   | 零副本/占用、可重新下载与重新读取入口                      | `karuyomi-1e50a82-storage-empty-light.jpg`               | `karuyomi-1e50a82-storage-empty-dark.jpg`               |
+| 11.K5   | 失败原因、未完成资源、精确重试/必要重建                    | `karuyomi-0a28f6a-storage-spacing-light`                 | `karuyomi-0a28f6a-storage-spacing-dark`                 |
+| 11.K6   | 容量/数量限额、完整副本哈希、滚动与收起                    | `karuyomi-76309ed-storage-diagnostics-light.jpg`         | `karuyomi-76309ed-storage-diagnostics-dark.jpg`         |
 
 ### 08–09：Karuyomi 最终 Cupertino 扩展管理
 
@@ -1815,19 +1813,20 @@ stateDiagram-v2
     Q10 --> Q3: 显式重试
     Q5 --> Q13: 打开精确作品并停止旧任务
     Q13 --> Q14: 详情就绪
+    Q13 --> Q5: 打开失败并保留原结果
     Q14 --> Q5: 返回原查询与结果
     Q0 --> Q12: 退出时清理失败
     Q12 --> Q0: 页面内重试释放成功
     Q12 --> [*]: 重试原退出后返回上一页或打开扩展管理
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class Q0,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q10,Q14 paired
+    class Q0,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q10,Q13,Q14 paired
 ```
 
 | 状态 ID | 最小必要信息与实际边界                                                      | 浅色                                                                                              | 深色                                                                                            |
 | ------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | 15.K1   | 查询、源数/上限、语言及明确选择、刷新和开始；主图过滤xkcd且未选源           | `karuyomi-a12c779-cross-scope-light.jpg`                                                          | `karuyomi-a12c779-cross-scope-dark.jpg`                                                         |
-| 15.K2   | 无可选源原因及安装/刷新入口                                                 | `karuyomi-a8997fa-extension-flow-no-available-source-light`                                       | `karuyomi-a8997fa-extension-flow-no-available-source-stable-dark`                               |
+| 15.K2   | 无可选源原因及安装/刷新入口                                                 | `karuyomi-0a28f6a-no-sources-light`                                                               | `karuyomi-0a28f6a-no-sources-dark`                                                              |
 | 15.K3   | 原输入与校验原因、可修正入口，不创建搜索任务                                | `karuyomi-a12c779-cross-validation-empty-light.jpg`                                               | `karuyomi-a12c779-cross-validation-empty-dark.jpg`                                              |
 | 15.K4   | 源身份、等待执行及停止入口；同包五源的真实排队                              | `karuyomi-a12c779-cross-five-start-candidate-light.jpg`                                           | `karuyomi-a12c779-cross-five-start-candidate-dark.jpg`                                          |
 | 15.K5   | 源名、语言、真实旋转指示、停止此源/全部和总进度；旧独立重试保留 xkcd 空结果 | `karuyomi-a12c779-cross-five-start-candidate-light.jpg`、`karuyomi-07342fb-cross-retry-light.jpg` | `karuyomi-a12c779-cross-five-start-candidate-dark.jpg`、`karuyomi-07342fb-cross-retry-dark.jpg` |
@@ -1839,8 +1838,8 @@ stateDiagram-v2
 | 15.K11  | 两源均已停止、原查询与显式重试；本轮为零结果，非空保留/旧停止失败恢复待补   | `karuyomi-07342fb-cross-stopped-light.jpg`                                                        | `karuyomi-07342fb-cross-stopped-dark.jpg`                                                       |
 | 15.K12  | 未确认的停止、同一停止重试、继续搜索受阻                                    | 待                                                                                                | 待                                                                                              |
 | 15.K13  | 页面资源尚未释放、精确清理重试、退出受阻                                    | 待                                                                                                | 待                                                                                              |
-| 15.K14  | 正在打开、原分源结果与冻结操作；实际过渡图仍待                              | 待                                                                                                | 待                                                                                              |
-| 15.K15  | 《ONE PIECE航海王》、尾田榮一郎、238 章；返回保留原查询与三项结果           | `karuyomi-b826249-cross-open-light.jpg`、`karuyomi-b826249-cross-return-light.jpg`                | `karuyomi-b826249-cross-open-dark.jpg`、`karuyomi-b826249-cross-return-dark.jpg`                |
+| 15.K14  | 正在打开、目标作品与源、原分源结果与冻结操作                                | `karuyomi-0a28f6a-cross-opening-light`                                                            | `karuyomi-0a28f6a-cross-opening-dark`                                                           |
+| 15.K15  | 《ONE PIECE航海王》、尾田榮一郎、238 章；返回保留原查询与三项结果           | `karuyomi-0a28f6a-cross-detail-resumed-light`、`karuyomi-0a28f6a-cross-return-resumed-light`      | `karuyomi-0a28f6a-cross-detail-resumed-dark`、`karuyomi-0a28f6a-cross-return-resumed-dark`      |
 
 2026-11-17，内置浏览器恢复后使用`0a02ee6`正式CI Web补选源浅色分项及15.K3空查询浅色图，实际名称点击、Tab/Space、过滤隐藏选择仍保留通过；`cross-selection-hidden-light`保留完整AX。`cross-scope-stable-light`只展示67源目录的首段，不替代15.K1完整主图，初入场的`cross-scope-light`有转场残影，排除主图。真实xkcd查询`one piece`返回零项，`cross-xkcd-result-light`用于结果字号分项，不替代成功/空结果混合同屏或加载主图。新增15.K3只是一侧，成对覆盖仍108/169；单侧由8增至9，双侧均缺由53减至52。MangaDex多选/文本子面和输入拒绝的实际浅色过程见[本轮记录](mihon-cupertino-fidelity.md#内置浏览器恢复后的-source-实测与拒绝提示修复)，原普通正文拒绝提示保留为修复前失败，不计修复后通过。
 
