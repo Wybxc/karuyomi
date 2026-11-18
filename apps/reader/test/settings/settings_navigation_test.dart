@@ -460,6 +460,65 @@ void main() {
 
   for (final denied in [false, true]) {
     testWidgets(
+      'confirmed appearance survives Access ${denied ? 'denial' : 'expiry'} until the identity is rechecked',
+      (tester) async {
+        final platformBrightness = denied ? Brightness.light : Brightness.dark;
+        final confirmedBrightness = denied ? Brightness.dark : Brightness.light;
+        tester.platformDispatcher.platformBrightnessTestValue =
+            platformBrightness;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        final platform = TestPlatform(seedDefaultInstallation: false);
+        await _start(tester, platform, size: const Size(360, 800));
+        await _openSettings(tester);
+        final settings = find.byType(GlobalSettingsPanel);
+        Brightness appearance() =>
+            CupertinoTheme.brightnessOf(tester.element(settings));
+        expect(appearance(), platformBrightness);
+        await _choose<wire.AppTheme>(tester, denied ? '深色' : '浅色');
+        expect(appearance(), platformBrightness);
+        await _tap(tester, find.text('保存全局设置'));
+        expect(appearance(), confirmedBrightness);
+
+        platform.afterBusinessReply = (request, reply) {
+          if (request.method == 'GET' && request.uri.path == '/api/settings') {
+            throw RuntimeException.fromProto(
+              wire.RuntimeError(
+                code: denied
+                    ? wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_DENIED
+                    : wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED,
+                message: 'Settings identity is unavailable',
+              ),
+            );
+          }
+          return reply;
+        };
+        await _tap(tester, find.text('重新读取设置'));
+        expect(
+          find.text(denied ? '当前身份没有访问权限' : '访问验证已失效，请重新登录'),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('global-theme')), findsNothing);
+        expect(appearance(), confirmedBrightness);
+
+        platform.bootstrapSubject = 'other-subject';
+        await openSettingsSection(tester, 'connection');
+        await _tap(tester, find.text('连接服务'));
+        expect(find.text(denied ? '访问被拒绝' : '需要重新登录'), findsOneWidget);
+        expect(appearance(), platformBrightness);
+
+        platform.afterBusinessReply = null;
+        await _tap(tester, find.text('连接服务'));
+        expect(find.text('已连接，身份已确认'), findsOneWidget);
+        expect(appearance(), platformBrightness);
+        expect(platform.businessServer.appliedMutations, 1);
+        expect(platform.openedBuilds, isEmpty);
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+
+    testWidgets(
       'zero-Source settings Access ${denied ? 'denial' : 'expiry'} exposes login recovery and retains the exact pending command',
       (tester) async {
         final platform = TestPlatform(seedDefaultInstallation: false);

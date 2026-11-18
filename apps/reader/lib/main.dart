@@ -626,7 +626,13 @@ class _AppShellState extends ConsumerState<AppShell> {
           (state) => state.available ? state.snapshot?.global.theme : null,
         ),
       );
-      final desired = theme == null ? null : appBrightness(theme);
+      // Keep the paused document's appearance from its confirmed snapshot.
+      // A new account replaces the settings repository and clears that snapshot.
+      final pausedTheme = catalog.accessPaused && catalog.subject != null
+          ? catalog.installationSettings?.global.theme
+          : null;
+      final activeTheme = theme ?? pausedTheme;
+      final desired = activeTheme == null ? null : appBrightness(activeTheme);
       if (_confirmedTheme != desired) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && identical(catalog, _catalog)) _applyTheme(desired);
