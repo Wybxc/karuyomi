@@ -229,12 +229,15 @@ class _CoverEditorState extends State<_CoverEditor> {
       child: EditSheet(
         key: const ValueKey('cover-editor'),
         title: const Text('自定义封面'),
-        leading: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: _canClose ? _close : null,
-          child: Text(
-            pending != null ? '稍后' : '关闭',
-            semanticsLabel: pending != null ? '稍后处理' : null,
+        leading: Semantics(
+          enabled: _canClose,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _canClose ? _close : null,
+            child: Text(
+              pending != null ? '稍后' : '关闭',
+              semanticsLabel: pending != null ? '稍后处理' : null,
+            ),
           ),
         ),
         trailing: !_expired && !_blocked && pending?.retryable == true
@@ -336,27 +339,35 @@ class _CoverEditorState extends State<_CoverEditor> {
                           child: const CupertinoActivityIndicator(),
                         ),
                       ),
-                    CupertinoButton(
-                      key: const ValueKey('cover-select-image'),
-                      alignment: AlignmentDirectional.centerStart,
-                      onPressed: editable ? _select : null,
-                      child: Text(_confirmed?.cover == null ? '选择图片' : '替换图片'),
+                    Semantics(
+                      enabled: editable,
+                      child: CupertinoButton(
+                        key: const ValueKey('cover-select-image'),
+                        alignment: AlignmentDirectional.centerStart,
+                        onPressed: editable ? _select : null,
+                        child: Text(
+                          _confirmed?.cover == null ? '选择图片' : '替换图片',
+                        ),
+                      ),
                     ),
                     if (_confirmed?.cover != null)
-                      CupertinoButton(
-                        key: const ValueKey('cover-clear'),
-                        alignment: AlignmentDirectional.centerStart,
-                        foregroundColor: editable
-                            ? AppColors.error.resolveFrom(context)
-                            : null,
-                        onPressed: editable
-                            ? () => setState(() {
-                                _selected = null;
-                                _clearing = true;
-                                _attempted = false;
-                              })
-                            : null,
-                        child: const Text('清除封面'),
+                      Semantics(
+                        enabled: editable,
+                        child: CupertinoButton(
+                          key: const ValueKey('cover-clear'),
+                          alignment: AlignmentDirectional.centerStart,
+                          foregroundColor: editable
+                              ? AppColors.error.resolveFrom(context)
+                              : null,
+                          onPressed: editable
+                              ? () => setState(() {
+                                  _selected = null;
+                                  _clearing = true;
+                                  _attempted = false;
+                                })
+                              : null,
+                          child: const Text('清除封面'),
+                        ),
                       ),
                   ],
                 ),

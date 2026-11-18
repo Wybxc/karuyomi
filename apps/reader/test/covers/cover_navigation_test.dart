@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' show Tristate;
 
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -316,14 +317,17 @@ void main() {
           picker.waiting = pickGate;
           await _tap(tester, control('cover-select-image'), settle: false);
           expect(find.text('正在读取所选图片'), findsOneWidget);
-          expect(
-            tester
-                .widget<CupertinoButton>(
-                  find.widgetWithText(CupertinoButton, '关闭'),
-                )
-                .onPressed,
-            isNull,
-          );
+          final close = find.widgetWithText(CupertinoButton, '关闭');
+          final chooseImage = control('cover-select-image');
+          final clearCover = control('cover-clear');
+          Tristate enabled(Finder action) => tester
+              .getSemantics(action)
+              .getSemanticsData()
+              .flagsCollection
+              .isEnabled;
+          expect(tester.widget<CupertinoButton>(close).enabled, isFalse);
+          expect(enabled(close), Tristate.isFalse);
+          expect(enabled(chooseImage), Tristate.isFalse);
           expect(server.appliedMutations, writes);
           pickGate.complete(_imageFile());
           picker.waiting = null;
@@ -381,6 +385,29 @@ void main() {
           expect(find.text('服务端已确认'), findsOneWidget);
           expect(find.text('尚未确认的修改'), findsNothing);
           expect(control('cover-error'), findsNothing);
+          final replacementPicker = Completer<XFile?>();
+          addTearDown(() {
+            if (!replacementPicker.isCompleted) {
+              replacementPicker.complete(null);
+            }
+          });
+          picker.waiting = replacementPicker;
+          await _tap(tester, chooseImage, settle: false);
+          expect(find.text('正在读取所选图片'), findsOneWidget);
+          expect(find.text('当前自定义封面'), findsOneWidget);
+          expect(enabled(close), Tristate.isFalse);
+          expect(enabled(chooseImage), Tristate.isFalse);
+          expect(enabled(clearCover), Tristate.isFalse);
+          replacementPicker.complete(null);
+          picker.waiting = null;
+          await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+          await tester.pumpAndSettle();
+          expect(find.text('正在读取所选图片'), findsNothing);
+          expect(enabled(close), Tristate.isTrue);
+          expect(enabled(chooseImage), Tristate.isTrue);
+          expect(enabled(clearCover), Tristate.isTrue);
+          expect(server.manga(mangaKey)!.customCover.assetId, asset);
+          expect(server.appliedMutations, writes + 1);
           final clearText = find.descendant(
             of: control('cover-clear'),
             matching: find.text('清除封面'),

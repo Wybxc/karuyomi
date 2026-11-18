@@ -417,6 +417,7 @@ class _MigrationPageState extends State<MigrationPage> {
     _search = useTextEditingController(text: widget.seed.metadata.manga.title);
     _confirmFocus = useFocusNode();
     useListenable(controller);
+    final available = controller.available;
     final pending = controller.pending;
     final selectedKey = controller.selectedSource?.key;
     final target =
@@ -427,9 +428,11 @@ class _MigrationPageState extends State<MigrationPage> {
       navigationBar: CupertinoNavigationBar(middle: const Text('迁移到其他漫画源')),
       child: SafeArea(
         child: ListView(
+          // The retired view has its own scroll position from the first frame.
+          key: ValueKey(available),
           padding: const EdgeInsets.only(bottom: 20),
           children: [
-            if (!controller.available)
+            if (!available)
               CupertinoFormSection.insetGrouped(
                 header: const Text('迁移已停用'),
                 children: [

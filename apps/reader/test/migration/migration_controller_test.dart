@@ -1090,6 +1090,58 @@ void main() {
   }
 
   testWidgets(
+    'retiring a scrolled migration starts with the full warning visible',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpApp(
+        CupertinoApp(
+          home: MigrationPage(
+            catalog: catalog,
+            client: catalog.library!.client,
+            seed: seed,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final writes = posts().length;
+      final scrollable = find.byType(Scrollable).first;
+      Future<void> tap(Finder finder) async {
+        await tester.scrollUntilVisible(finder, 220, scrollable: scrollable);
+        await tester.tap(finder);
+        await tester.pumpAndSettle();
+      }
+
+      await tap(find.byKey(const ValueKey('migration-source')));
+      await tester.tap(find.text('目标源 · zh · eu.kanade.source.test').last);
+      await tester.pumpAndSettle();
+      await tap(find.byKey(const ValueKey('migration-search-submit')));
+      await tap(find.byKey(const ValueKey(('migration-result', 0))));
+      final reload = find.byKey(const ValueKey('migration-refresh-preview'));
+      await tester.scrollUntilVisible(reload, 220, scrollable: scrollable);
+      final previous = tester.state<ScrollableState>(scrollable);
+      expect(previous.position.pixels, greaterThan(0));
+
+      platform.loginHtml = true;
+      await tester.runAsync(catalog.connect);
+      expect(catalog.accessPaused, isTrue);
+      await tester.pump();
+      final warning = find.byKey(const ValueKey('migration-error'));
+      expect(warning, findsOneWidget);
+      expect(find.text('迁移已停用'), findsOneWidget);
+      final navigationBottom = tester
+          .getBottomLeft(find.byType(CupertinoNavigationBar))
+          .dy;
+      expect(tester.getTopLeft(warning).dy, greaterThan(navigationBottom));
+      expect(tester.state<ScrollableState>(scrollable).position.pixels, 0);
+      expect(posts(), hasLength(writes));
+      expect(tester.takeException(), isNull);
+      await tester.pumpApp(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'wizard browses a target without search results and filters marks before confirmation',
     (tester) async {
       final normal = platform.invokeHandler!;
