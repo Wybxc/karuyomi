@@ -118,6 +118,16 @@ void main() {
         final action = tester.getSemantics(retry).getSemanticsData();
         expect(action.label, '重试');
         expect(action.hasAction(SemanticsAction.tap), isTrue);
+        final section = find.ancestor(
+          of: retry,
+          matching: find.byType(CupertinoListSection),
+        );
+        expect(
+          tester.widget<CupertinoListSection>(section).clipBehavior,
+          Clip.none,
+          reason:
+              'The Cupertino action paints its focus outline outside the row.',
+        );
 
         platform.preparationFailure = null;
         final focus = Focus.of(tester.element(retry));

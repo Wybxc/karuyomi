@@ -122,6 +122,42 @@ const preferencePath = '/api/source-preferences/packages/' + preferencePackage;
 const preferenceRead =
   preferencePath + '?' + new URLSearchParams(preferenceCatalog);
 const preferenceWrite = '/api/source-preferences/mutations';
+const buildManifestPath = '/extensions/builds/test-build/manifest.json';
+
+test('an extension readiness gate delays only the canonical manifest read and then uses Static Assets', async () => {
+  await setEditorUiMode(env.DB, 'hold-read', 'extension-manifest');
+  const ordinary = await request(buildManifestPath, undefined, false);
+  expect(ordinary.status).toBe(404);
+  let delivered = false;
+  const pending = request(buildManifestPath).then((reply) => {
+    delivered = true;
+    return reply;
+  });
+  try {
+    expect((await entered())[0]).toMatchObject({
+      path: buildManifestPath,
+      mode: 'hold-read',
+      method: 'GET',
+      worker_status: null,
+      client_status: null,
+    });
+    expect(delivered).toBe(false);
+    const queried = await request(buildManifestPath + '?unused=1');
+    const unrelated = await request('/extensions/preference-rules.json');
+    expect(queried.status).toBe(ordinary.status);
+    expect(unrelated.status).toBe(200);
+    expect(await editorUiAttempts(env.DB)).toHaveLength(1);
+  } finally {
+    await setEditorUiMode(env.DB, 'pass', 'extension-manifest');
+  }
+  const response = await pending;
+  expect(response.status).toBe(ordinary.status);
+  expect(await response.text()).toBe(await ordinary.text());
+  expect((await editorUiAttempts(env.DB))[0]).toMatchObject({
+    worker_status: 404,
+    client_status: 404,
+  });
+});
 
 test('Source preferences confirm a real write before faulting only its canonical read', async () => {
   const mutation = create(SourcePreferencesMutationSchema, {
@@ -1044,6 +1080,7 @@ test.each([
   ['classification', coverPath],
   ['categories', '/api/library'],
   ['classification', '/api/library'],
+  ['extension-manifest', buildManifestPath],
 ])(
   'an aborted %s reader leaves the gate without dispatching a late request',
   async (scope, path) => {

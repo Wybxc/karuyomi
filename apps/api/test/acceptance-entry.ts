@@ -51,6 +51,12 @@ export default {
     context: ExecutionContext,
   ) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/extensions/builds/')) {
+      const dispatch = () => env.ASSETS.fetch(request);
+      return env.ACCEPTANCE_EDITOR_UI === '1'
+        ? withEditorUi(request, env.DB, env.APP_ORIGIN, requestJson, dispatch)
+        : dispatch();
+    }
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       const fixture = env.ACCEPTANCE_ACK_LOSS;
       const original =

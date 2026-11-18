@@ -39,8 +39,10 @@ Wrangler 只让 `/api`、`/api/*` 和 `/runtime/host.html` 优先经过 Worker�
 
 正常停服输出 `ACCEPTANCE_PROGRESS_RACE_AUDIT`。要求两个 Worker 处理时段重叠，两条都到达原子批次；一个 HTTP 200 有持久回执，另一个 HTTP 409 为 revision 冲突且无回执；两条返回同一权威状态，独立只读确认账户和作品 revision 只各增加 1。双 Reader 的保持画面、冲突提示和明确重开另由正式 UI 验收；Workers 回归只验证 API 和 D1。
 
-`ACCEPTANCE_FIXTURE=editor-ui pnpm acceptance:serve` 为设置、封面、迁移、分类与连接状态提供隔离故障控制。仅通过进程 stdin 输入 `editor <mode> [manga|global|cover|migration|categories|classification|connection|preferences]`，没有 HTTP 控制入口；`manga`、`global` 对应阅读设置，`cover` 对应作品快照、JSON 清除封面及私有图片读取，`migration` 对应作品快照和迁移命令，`categories` 对应分类目录读取与命令，`classification` 对应作品快照与分类关联命令，两种分类范围均包含首段书架读回；`connection` 仅对应 bootstrap GET。默认查询规则见下文的 preferences 范围。图片预置通过正式 multipart API，上传路径本身不注入故障，也不把图片字节存入审计。
+`ACCEPTANCE_FIXTURE=editor-ui pnpm acceptance:serve` 为设置、封面、迁移、分类与连接状态提供隔离故障控制。仅通过进程 stdin 输入 `editor <mode> [manga|global|cover|migration|categories|classification|connection|preferences|extension-manifest]`，没有 HTTP 控制入口；`manga`、`global` 对应阅读设置，`cover` 对应作品快照、JSON 清除封面及私有图片读取，`migration` 对应作品快照和迁移命令，`categories` 对应分类目录读取与命令，`classification` 对应作品快照与分类关联命令，两种分类范围均包含首段书架读回；`connection` 仅对应 bootstrap GET。默认查询规则见下文的 preferences 范围。图片预置通过正式 multipart API，上传路径本身不注入故障，也不把图片字节存入审计。
 
 模式为 `pass`、`hold-read`、`delay-read`、`fail-read`、`fail-image`、`hold-confirm`、`delay-confirm`、`confirm-read-failure`、`confirm-next-loss`、`lose-confirm`、`reject-save`、`login-required`和`access-denied`。`hold-confirm` 先等待真实 D1 提交，再暂停回执交付；`lose-confirm` 仅在成功提交后返回502。人工挂起最多30秒，以新的控制命令推进 generation 释放；取消会退出等待，未释放超时不记成功。`delay-read` 自动等待5秒，`delay-confirm` 在真实提交后自动等待2秒再交付原回执；`confirm-read-failure` 正常交付同样延迟的成功回执，同时把该 generation 的后续读取设为503。`confirm-next-loss` 同样正常交付首个成功命令的延迟回执，再把该 generation 切为`lose-confirm`，使后续成功提交只丢确认；用`editor pass <scope>`后才能明确重试原命令。自动等待也检查取消，显式改模式优先于预定故障；产品超时不变。`fail-image` 仅对私有图片字节返回503，作品记录保持真实。用 `audit` 查看最多256条请求正文/状态审计，`stop` 正常停服并输出 `ACCEPTANCE_EDITOR_UI_AUDIT`。有界JSON状态命令均进入审计；进度、收藏等其它命令始终原样执行，不受编辑器故障模式影响。此入口替代先前仅设置的夹具，生产入口与配置不包含测试控制。
 
 `editor <mode> preferences` 对应默认仓库的 Source 偏好。读取要求整包路径和标准的 `catalogUrl`、`repoId` 参数，写入使用正式 Source 偏好命令与 D1 事务。以 `delay-read` 验收打开表单，以 `lose-confirm` 验收未确认原请求，以 `confirm-read-failure` 验收已确认后的只读恢复。
+
+`editor delay-read extension-manifest` 延迟同源的标准构建清单 GET 五秒。打开扩展安装或本机准备时，可在等待界面取消，再用 `editor pass extension-manifest` 复验正常完成。清单仍由官方 Static Assets 提供，索引、压缩产物与运行时资源照常交付。取消观测以真实请求的终态和临时账户快照为准。

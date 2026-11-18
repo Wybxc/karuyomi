@@ -5,6 +5,7 @@ import {
   settingsMutationSchema,
   sourcePreferencesMutationSchema,
   stateMutationSchema,
+  staticManifestPathSchema,
 } from '@karuyomi/contracts';
 import {
   BusinessStateErrorCode,
@@ -39,6 +40,7 @@ export const editorUiScopes = [
   'categories',
   'classification',
   'preferences',
+  'extension-manifest',
 ] as const;
 type EditorUiScope = (typeof editorUiScopes)[number];
 interface Control {
@@ -157,6 +159,9 @@ export async function withEditorUi(
     return dispatch();
   const bootstrapReading =
     request.method === 'GET' && url.pathname === '/api/bootstrap';
+  const extensionManifestReading =
+    request.method === 'GET' &&
+    staticManifestPathSchema.safeParse(url.pathname).success;
   const settingsReading =
     request.method === 'GET' &&
     (url.pathname === '/api/settings' ||
@@ -181,6 +186,7 @@ export async function withEditorUi(
     request.method === 'POST' && url.pathname === '/api/state/mutations';
   if (
     !bootstrapReading &&
+    !extensionManifestReading &&
     !settingsReading &&
     !mangaReading &&
     !coverImage &&
@@ -223,9 +229,10 @@ export async function withEditorUi(
     settingsCommand ?? stateCommand ?? categoryCommand ?? preferencesCommand;
   const control = await readControl(db);
   if (
-    libraryReading &&
-    control.scope !== 'categories' &&
-    control.scope !== 'classification'
+    (libraryReading &&
+      control.scope !== 'categories' &&
+      control.scope !== 'classification') ||
+    (extensionManifestReading && control.scope !== 'extension-manifest')
   )
     return dispatch();
   let scope: EditorUiScope = 'manga';
@@ -241,6 +248,7 @@ export async function withEditorUi(
   )
     scope = 'classification';
   else if (bootstrapReading) scope = 'connection';
+  else if (extensionManifestReading) scope = 'extension-manifest';
   else if (preferencesReading || preferencesCommand) scope = 'preferences';
   else if (
     stateCommand?.operation.case === 'migrateFrom' ||
@@ -257,6 +265,7 @@ export async function withEditorUi(
     !forwardOnlyState && control.scope === scope ? control.mode : 'pass';
   const reading =
     bootstrapReading ||
+    extensionManifestReading ||
     settingsReading ||
     preferencesReading ||
     mangaReading ||

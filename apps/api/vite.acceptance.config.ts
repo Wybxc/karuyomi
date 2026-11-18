@@ -17,6 +17,8 @@ export default defineConfig(({ mode }) => ({
           local_protocol: mode === 'native-acceptance' ? 'https' : 'http',
           upstream_protocol: mode === 'native-acceptance' ? 'https' : 'http',
         },
+        // The plugin merges this route with the existing Worker-first routes.
+        assets: { run_worker_first: ['/extensions/builds/*'] },
         main: fileURLToPath(
           new URL('./test/acceptance-entry.ts', import.meta.url),
         ),

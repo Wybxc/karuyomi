@@ -20,6 +20,8 @@
 
 ## 推进与待办
 
+- [x] 修正 Source 重试外侧焦点轮廓裁切，三文件 63 项定向回归通过。扩展准备新增隔离清单时序控制，可通过真实静态交付复验取消和完成。焦点画面与 08.K6 双主题正式 Web 继续待验。[验收入口](../verification/mihon-cupertino-fidelity.md#扩展准备的正式验收入口)
+
 - [x] 迁移打开目标源 20.K8 补齐浅色和深色主图。Komiic 读取失败保留未选状态，明确重试后才出现查找入口。32 条终态审计核对迁移零业务写入。[正式验收](../verification/mihon-cupertino-fidelity.md#迁移打开目标源的正式-web-双主题验收)
 
 - [x] Source 单选去除重复值并保留同步说明，正式 Web 浅深色均通过。两标签实测 Tab 聚焦和 Enter 重试，恢复 Komiic 热门并读回两项设置。焦点轮廓局部裁切待优化。[修复及复验证据](../verification/mihon-cupertino-fidelity.md#source-单选值与运行槽重试)

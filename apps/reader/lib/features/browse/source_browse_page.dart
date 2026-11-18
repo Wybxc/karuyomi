@@ -308,6 +308,8 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
     container: true,
     explicitChildNodes: true,
     child: CupertinoListSection.insetGrouped(
+      // Cupertino paints keyboard focus outside the button's bounds.
+      clipBehavior: Clip.none,
       backgroundColor: AppColors.background.resolveFrom(context),
       separatorColor: AppColors.separator.resolveFrom(context),
       decoration: BoxDecoration(
