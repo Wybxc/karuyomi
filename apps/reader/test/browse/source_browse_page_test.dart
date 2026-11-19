@@ -180,6 +180,44 @@ void main() {
   );
 
   testWidgets(
+    'append progress appears below the existing covers without moving them',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      platform.invokeHandler = (_) async => page('第一页');
+      await show(tester);
+      final load = find.byKey(const ValueKey('source-load-more'));
+      await tester.ensureVisible(load);
+      await tester.pumpAndSettle();
+      final first = find.byKey(const ValueKey(('source-manga', '/第一页')));
+      final initial = tester.getRect(first);
+      final nextPage = Completer<wire.SourceResult>();
+      platform.invokeHandler = (call) {
+        expect(call.popular.page, 2);
+        return nextPage.future;
+      };
+      try {
+        await tester.tap(load);
+        await tester.pump();
+        final waiting = find.text('正在加载下一页');
+        expect(waiting, findsOneWidget);
+        expect(tester.getRect(first), initial);
+        expect(tester.getTopLeft(waiting).dy, greaterThan(initial.bottom));
+        expect(catalog.page, 1);
+      } finally {
+        nextPage.complete(page('第二页', more: false));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('正在加载下一页'), findsNothing);
+      expect(first, findsOneWidget);
+      expect(find.text('第二页'), findsOneWidget);
+      expect(catalog.page, 2);
+      expect(tester.takeException(), isNull);
+      await hide(tester);
+    },
+  );
+
+  testWidgets(
     'refresh and append failures preserve existing results and retry the correct page',
     (tester) async {
       platform.invokeHandler = (_) async => page('第一页');

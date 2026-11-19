@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-20，Karuyomi 跨版本双主题主图为 168/169（99.4%），未连接（27.K1）仍缺两侧。固定 Mihon 参考新增扩展目录空态、下载中、安装阶段、失败重试与仓库连接错误，已有 158/170 行（92.9%）双主题主图。最终像素、各触发变体与完整转场继续验收。[扩展目录参考](mihon-cupertino-fidelity.md#mihon-扩展目录与仓库错误) · [章节批量与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
+2026-11-20，Karuyomi 跨版本双主题主图为 168/169（99.4%），未连接（27.K1）仍缺两侧。固定 Mihon 补齐源浏览追加与迁移空书架，双主题主图达到 160/170（94.1%）。最终像素、各触发变体与完整转场继续验收。[源浏览追加](mihon-cupertino-fidelity.md#mihon-源浏览追加) · [迁移空书架](mihon-cupertino-fidelity.md#mihon-迁移空书架) · [宽封面复验](mihon-cupertino-fidelity.md#正式-web-宽封面双主题复验)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -404,7 +404,7 @@ stateDiagram-v2
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
     class B0,F0 partial
-    class B1,B2,B3,B4,B5,B6,B8,F1,F2,F3,F4,F5,F6,P0,P1,P2,P3,P4,P5,P6,G0,G1,G2,G3,G4,G5 paired
+    class B1,B2,B3,B4,B5,B6,B7,B8,F1,F2,F3,F4,F5,F6,P0,P1,P2,P3,P4,P5,P6,G0,G1,G2,G3,G4,G5 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                                          | 浅色                                                                                                                           | 深色                                                                                                                             |
@@ -416,7 +416,7 @@ stateDiagram-v2
 | 12.05   | 精确查询 `one piece`、匹配作品、清空与返回；键盘已收起                                         | `s1205-mangadex-search-loaded-light`                                                                                           | `s1205-mangadex-search-loaded-dark`                                                                                              |
 | 12.06   | 当前查询 `987654321`、无结果说明和恢复动作；主图含键盘                                         | `s1206-source-empty-light`；无键盘/恢复待补                                                                                    | `s1206-source-empty-dark`；无键盘/恢复待补                                                                                       |
 | 12.07   | 模拟器断网时首次失败，错误正文、重试/帮助/WebView；离线重试仍失败，联网重试恢复热门            | `s1207-source-network-error-light`、`s1207-source-offline-retry-light`、`s1207-source-recovered-light`                         | `s1207-source-network-error-dark`、`s1207-source-offline-retry-dark`、`s1207-source-recovered-dark`                              |
-| 12.08   | 已有作品、追加指示、滚动位置；只有实际可见旋转指示才通过                                       | 待（追加重试帧已为新内容，未截到指示）                                                                                         | 待（慢网/重试帧仍未截到指示）                                                                                                    |
+| 12.08   | 原封面、列表末尾追加指示与放行后的新作品                                                       | `s1208-source-append-loading-light`                                                                                            | `s1208-source-append-loading-dark`                                                                                               |
 | 12.09   | 追加失败保留已有作品，底部持久错误条、重试；恢复网络后加载更多                                 | `s1209-source-append-error-light`、`s1209-source-append-recovered-light`                                                       | `s1209-source-append-error-dark`、`s1209-source-append-recovered-dark`                                                           |
 | 13.01   | text/check/select/tri-state/sort/group 当前值、重置/应用；文本筛选仍需其他真实源               | `s1301-source-filters-light`、`s1301-source-filter-group-light`；text 待                                                       | `s1301-source-filters-dark`、`s1301-source-filter-group-dark`；text 待                                                           |
 | 13.02   | group/check/select 草稿，重置、收起重开和实际应用；下述转换另列文件                            | `s1302-source-filter-draft-light`、`s1302-source-filter-reset-light`、`s1304-source-filter-select-draft-light`                 | `s1302-source-filter-draft-dark`、`s1302-source-filter-reset-dark`、`s1304-source-filter-select-draft-dark`                      |
@@ -444,7 +444,7 @@ stateDiagram-v2
 - MangaDex 筛选勾选 `Has available chapters`，返回收起后热门结果不变，重开仍勾选。证据为 `s1302-source-filter-checkbox-draft-{light,dark}`、`s1302-source-filter-dismissed-{light,dark}`、`s1302-source-filter-dismissed-reopen-{light,dark}`。这是保留未应用草稿，不能写成“取消丢弃”。Karuyomi 的显式取消继续丢弃草稿，作为已确认业务合同的交互差异记录。
 - 点击筛选后截到实际加载指示，随后得到 Domino Kick 等真实结果，见 `s1302-source-filter-applying-{light,dark}` 与 `s1302-source-filter-applied-{light,dark}`。浅色瞬态同时截到面板淡出，不能当稳定面板像素基准；两侧等待与结果状态已取得。搜索 `one piece` 的匹配作品在加载完封面、收起键盘后另拍 12.05，不使用早期空封面帧作成对主图。
 - 偏好多选的取消/确认后分别重开，检查未选/已选，最后恢复未选。文本编辑用 `00000000-0000-4000-8000-000000000001` 验证，通过确认及重开后清空恢复。完整动作图见同前缀的 `cancel`、`applied`、`reset` 及 `reset-draft` 文件。空值合法且确定可用；错误节点仅由实际非法 UUID 触发。
-- 12.07/12.09 仅关闭专用模拟器 Wi-Fi/移动数据触发，真实错误是连接参考代理 `10.0.2.2:7890` 失败。首次失败使用整页错误与三个动作；追加失败保留列表并显示持久错误条，恢复网络重试后继续得到作品。两者均有双主题实际 PNG。错误页表情随机，封面缓存和追加后的滚动位置不同，排除同数据像素叠图；追加加载帧未明确出现旋转指示，12.08 仍待。曾尝试模拟器 2000ms/128kbit/s 网络配置，未据此推断其生效或性能；已恢复 delay none、speed full、Wi-Fi/移动数据启用并暂停模拟器。
+- 12.07/12.09 仅关闭专用模拟器 Wi-Fi/移动数据触发，真实错误是连接参考代理 `10.0.2.2:7890` 失败。首次失败使用整页错误与三个动作；追加失败保留列表并显示持久错误条，恢复网络重试后继续得到作品。两者均有双主题实际 PNG。错误页表情随机，封面缓存和追加后的滚动位置不同，排除同数据像素叠图；该轮未捕捉到追加指示，后续用同一热门列表和实际下一页连接补齐 12.08。曾尝试模拟器 2000ms/128kbit/s 网络配置，未据此推断其生效或性能；已恢复 delay none、speed full、Wi-Fi/移动数据启用并暂停模拟器。
 - 跨源搜索两主题实际选择“全部”并查询 `one piece`，MangaDex 多语言/English 成功，Local source/xkcd 无结果；有结果筛选开启/关闭已操作。首次进入默认“已置顶”且无可搜源时是空内容区，不误记为加载。浅色真实旋转帧另用 `Naruto` 新查询捕获；`s1502-global-loading-light` 实际无目标、`s1502-global-all-loading-light` 实际为成功布局动画，均排除加载证据。断网后换查询才触发错误，重复提交相同查询没有重发；Mihon 跨源错误没有独立重试按钮，Karuyomi 继续保留单源重试。深色已从全局搜索打开真实 English One Piece 详情，返回后保留查询与结果。成功/失败混合同屏、浅色打开作品、进入源及恢复后再次成功仍是转换缺口。网络已恢复、模拟器已暂停。
 - 旧 Android Preference/View 偏好弹层的浅色容器偏蓝，区别于 Mihon Compose 弹层；系统键盘仍按 Android 系统浅色，作为系统变体保留。筛选列表的滚动位置和打开/收起动画存在差异，当前只确认状态覆盖，未计为同位置叠图通过。最新目录两次请求间数据有变化，同样不能用于同数据像素叠图。
 
@@ -556,7 +556,7 @@ stateDiagram-v2
     Q7 --> M2: 返回英文原作
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class M1,M2,M3,M4,M5,M6,H0,H1,H2,H3,H4,H5,H6,H7,H8,V0,V1,V2,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10,Q11,Q12,Q13,Q14 paired
+    class M1,M2,M3,M4,M5,M6,H0,H1,H2,H3,H4,H5,H6,H7,H8,V0,V1,V2,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10,Q11,Q12,Q13,Q14 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                                          | 浅色                                                                                                                           | 深色                                                                                                                       |
@@ -581,8 +581,8 @@ stateDiagram-v2
 | 19.02   | 完整显示当前封面，底部编辑入口展开编辑与删除                                                   | `s1902-custom-cover-actions-light`                                                                                             | `s1902-custom-cover-actions-dark`                                                                                          |
 | 19.03   | 取消系统选图后保留原封面，删除后显示默认封面及更新反馈                                         | `s1903-cover-replace-cancel-light`、`s1903-cover-restored-light`                                                               | `s1903-cover-replace-cancel-dark`、`s1903-cover-restored-dark`                                                             |
 | 20.01   | 迁移标题和加载指示                                                                             | 待                                                                                                                             | 待                                                                                                                         |
-| 20.02   | 无作品说明及返回                                                                               | 待                                                                                                                             | 待                                                                                                                         |
-| 20.03   | 源名、语言、书架数量、排序入口及源内未选择作品列表；排序变更与空书架待                         | `s2003-migration-{sources,titles}-light`                                                                                       | `s2003-migration-{sources,titles}-dark`                                                                                    |
+| 20.02   | 浏览的迁移页签显示书架为空，切回图源后漫画源可见                                               | `s2002-migration-empty-light`                                                                                                  | `s2002-migration-empty-dark`                                                                                               |
+| 20.03   | 源名、语言、书架数量、排序入口及源内未选择作品列表；排序变更待验，空书架见 20.02               | `s2003-migration-{sources,titles}-light`                                                                                       | `s2003-migration-{sources,titles}-dark`                                                                                    |
 | 20.04   | 目标源已选分组、名称/语言、排序把手、全选/全不选与继续；更多菜单入口                           | `s2004-migration-config-light`、`migration-config-restored-light`                                                              | `s2004-migration-config-dark`、`migration-config-restored-dark`                                                            |
 | 20.05   | 实际迁移查询 one piece、分源结果与原源标记；主图带键盘，选首个结果后进入21.01                  | `s2005-migration-one-piece-light`                                                                                              | `s2005-migration-one-piece-dark`                                                                                           |
 | 20.06   | 待迁移作品的选中行、源名、继续与返回清除选择；继续转换待验                                     | `s2006-migration-selected-light`                                                                                               | `s2006-migration-selected-dark`                                                                                            |

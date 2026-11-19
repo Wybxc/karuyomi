@@ -2,6 +2,12 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-20，`e7523ea` 正式 Web 实拍显式浅深色的同一宽封面，360×800 与 844×390 首屏均见四边。短横屏滚动后两项封面操作可达，两色都返回原作品。内置浏览器完成上述验收后恢复视口。[正式 Web 宽封面复验](verification/mihon-cupertino-fidelity.md#正式-web-宽封面双主题复验)
+
+2026-11-20，Mihon 补齐源浏览追加与迁移空书架，双主题主图达到 160/170（94.1%）。Karuyomi 将追加指示移到封面列表末尾，50 项定向 Flutter 回归通过。[源浏览追加](verification/mihon-cupertino-fidelity.md#mihon-源浏览追加) · [迁移空书架](verification/mihon-cupertino-fidelity.md#mihon-迁移空书架)
+
+2026-11-20，`fd8bc04` 的分支检查在下载 Java 格式化器时收到 Maven Central HTTP 404。下载器增加同版本的 Google GitHub 发布地址。模拟空缓存和 404 后成功读取官方文件，3,781,805 字节的 SHA-256 与原锁定值相等。[分支检查](https://github.com/Wybxc/karuyomi/actions/runs/44631624888) · [Google 官方发布](https://github.com/google/google-java-format/releases/tag/v2.0.0)
+
 2026-11-20，Mihon 新增扩展空目录、下载中、安装阶段、失败重试和仓库连接错误五组双主题实拍，累计 158/170（92.9%）。Karuyomi 调整目录等待、空态和失败反馈，仓库只读预览失败后保留地址与名称。121 项 Flutter 定向回归通过，正式 Web 双主题继续验收。[扩展目录与仓库错误](verification/mihon-cupertino-fidelity.md#mihon-扩展目录与仓库错误)
 
 2026-11-20，Mihon 新增迁移搜索等待、失败、单源网格、共存等待与完成五组双主题实拍，累计 153/170（90.0%）。Karuyomi 迁移候选采用 Cupertino 封面网格，115 项 Flutter 定向回归通过，正式 Web 待验。[迁移搜索与共存](verification/mihon-cupertino-fidelity.md#mihon-迁移搜索与共存)

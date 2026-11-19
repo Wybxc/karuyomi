@@ -365,6 +365,19 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
     final busy =
         catalog.busy || _loading != null || _leaving || _openingDetails;
     final showOld = _loading != _ListingWork.query;
+    final appending = _loading == _ListingWork.more;
+    final activity = _leaving
+        ? '正在停止并收尾'
+        : _openingDetails
+        ? '正在打开作品详情'
+        : _preparation != null
+        ? '正在下载账户所选构建'
+        : switch (_loading) {
+            _ListingWork.initial => '正在打开漫画源',
+            _ListingWork.query => '正在加载新查询',
+            _ListingWork.refresh => '正在刷新，原作品仍可查看',
+            _ => null,
+          };
     final canBrowse =
         _sourceCurrent &&
         catalog.extensionUnavailableReason == null &&
@@ -510,24 +523,11 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                       ],
                     ),
                   ),
-                  if (_leaving || _loading != null || _openingDetails) ...[
+                  if (activity != null) ...[
                     const CupertinoActivityIndicator(),
                     Padding(
                       padding: const EdgeInsets.all(8),
-                      child: Text(
-                        _leaving
-                            ? '正在停止并收尾'
-                            : _openingDetails
-                            ? '正在打开作品详情'
-                            : _preparation != null
-                            ? '正在下载账户所选构建'
-                            : switch (_loading) {
-                                _ListingWork.initial => '正在打开漫画源',
-                                _ListingWork.query => '正在加载新查询',
-                                _ListingWork.refresh => '正在刷新，原作品仍可查看',
-                                _ => '正在加载下一页',
-                              },
-                      ),
+                      child: Text(activity),
                     ),
                   ],
                   Expanded(
@@ -668,7 +668,25 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                                 ),
                               if (_failed == _ListingWork.more)
                                 _failure('下一页加载失败'),
-                              if (showOld &&
+                              if (appending && !_leaving && canBrowse)
+                                Semantics(
+                                  liveRegion: true,
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    child: Wrap(
+                                      alignment: WrapAlignment.center,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      spacing: 8,
+                                      runSpacing: 4,
+                                      children: [
+                                        CupertinoActivityIndicator(),
+                                        Text('正在加载下一页'),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              else if (showOld &&
                                   canBrowse &&
                                   _results.isNotEmpty &&
                                   _hasNextPage)
