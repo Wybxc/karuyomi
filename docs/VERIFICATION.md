@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-19，`4026db3` 双主题正式 Web 核对章节批量暂停、结束与精确按钮范围，D1 确认每组只保存首章。第 3324 章第一页完成与 Mihon 的同页量测，边界实测后返回第 2 页。`21f23d6` 修正动作阶段复用及页、章边界禁用，106 项 Flutter 回归通过，修复版正式 Web 待复验。[键盘焦点](verification/mihon-cupertino-fidelity.md#章节批量动作名称与焦点范围) · [同页对照](verification/mihon-cupertino-fidelity.md#阅读器同页与边界的正式-web-双主题对照)
+
 2026-11-19，固定 Mihon 0.21.3 补齐空章反馈、相邻章过渡与失败、首章与末章边界五项双主题参考，累计 137/170（80.6%）。浅色缺页过渡通过原重试恢复并进入实际下一章。`b5998b0` 正式 Web 深色复现章节批量结束键盘失效，`4026db3` 调整辅助动作范围，59 项定向回归通过，正式 Web 复验待完成。[阅读参考及量测](verification/mihon-cupertino-fidelity.md#mihon-章节过渡与空页的双主题参考) · [章节焦点](verification/mihon-cupertino-fidelity.md#章节批量动作名称与焦点范围)
 
 2026-11-19，`f084467` 正式 Web 补齐 30.K6/K7。两种主题均实测逐章部分提交、丢回执后的原文重试、受控 401 后关闭旧窗口及同一身份恢复。16 组六路权威读回确认已生效的命令没有重复写入，第三章只在明确继续后提交。双主题主图累计 168/169（99.4%）。[章节批量与恢复](verification/mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
