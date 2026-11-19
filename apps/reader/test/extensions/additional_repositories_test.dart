@@ -136,6 +136,55 @@ void main() {
   }
 
   for (final appearance in Brightness.values) {
+    testWidgets(
+      'repository preview failure keeps its draft for retry in $appearance',
+      (tester) async {
+        const address = 'https://community.example';
+        const name = '测试仓库';
+        const error = '仓库暂时无法读取';
+        await showRepositoryPage(tester, appearance, 2);
+        platform.beforeApiFetch = (path) async {
+          if (path == '/extensions/index.json') throw StateError(error);
+        };
+        final urlField = find.byKey(const ValueKey('repository-url'));
+        final nameField = find.byKey(const ValueKey('repository-name'));
+        final submit = find.byKey(const ValueKey('repository-preview-submit'));
+        await tester.tap(find.byKey(const ValueKey('repositories-add')));
+        await tester.pumpAndSettle();
+        await tester.enterText(urlField, address);
+        await tester.enterText(nameField, name);
+        await tester.tap(submit);
+        await tester.pumpAndSettle();
+
+        final dialog = find.byType(CupertinoAlertDialog);
+        expect(
+          find.descendant(of: dialog, matching: find.text(error)),
+          findsOneWidget,
+        );
+        expect(
+          tester.widget<CupertinoTextField>(urlField).controller!.text,
+          address,
+        );
+        expect(
+          tester.widget<CupertinoTextField>(nameField).controller!.text,
+          name,
+        );
+        expect(posts(), isEmpty);
+        expect(platform.preparations, isEmpty);
+
+        platform.beforeApiFetch = null;
+        await tester.tap(submit);
+        await tester.pumpAndSettle();
+        expect(find.text('确认添加仓库'), findsOneWidget);
+        expect(find.textContaining(name), findsOneWidget);
+        await tester.tap(find.text('取消'));
+        await tester.pumpAndSettle();
+        expect(posts(), isEmpty);
+        expect(platform.preparations, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     for (final textScale in [1.0, 2.0]) {
       testWidgets(
         'public repository preview keeps its target and remains read only in $appearance at $textScale',
@@ -554,6 +603,40 @@ void main() {
       first.body,
     );
   });
+
+  test(
+    'removing a repository clears prior and late directory errors',
+    () async {
+      await addExtra();
+      final repo = catalog.repositories.singleWhere(
+        (r) => r.catalogUrl == extraUrl,
+      );
+      platform.publicDocuments[extraUrl] = const <String, Object?>{};
+      await catalog.refreshCatalog();
+      expect(catalog.repositoryErrors, hasLength(1));
+
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      final uri = Uri.parse(extraUrl);
+      platform.beforeApiFetch = (path) async {
+        if (path != uri.path || platform.publicReads.last != uri) return;
+        entered.complete();
+        await release.future;
+        throw StateError('Repository unavailable');
+      };
+      final refreshing = catalog.refreshCatalog();
+      try {
+        await entered.future.timeout(const Duration(seconds: 5));
+        await manager.removeRepository(repo);
+        expect(catalog.repositories, hasLength(1));
+        expect(catalog.repositoryErrors, isEmpty);
+      } finally {
+        release.complete();
+        await refreshing;
+      }
+      expect(catalog.repositoryErrors, isEmpty);
+    },
+  );
 
   test('invalid repository addresses explain the correction without reads or writes', () async {
     final reads = platform.publicReads.length;

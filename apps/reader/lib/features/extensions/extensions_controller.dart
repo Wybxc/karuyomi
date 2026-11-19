@@ -116,7 +116,13 @@ final class ExtensionsController extends ChangeNotifier {
       }
       if (!available) return;
       cache = await catalog.runtime.extensionCache();
-      if (available) message = catalogToo ? '已检查当前目录，账户构建选择未改变。' : null;
+      if (available &&
+          catalogToo &&
+          refreshed &&
+          catalog.repositoryErrors.isEmpty &&
+          (catalog.builds.isNotEmpty || installed.isNotEmpty)) {
+        message = '已检查当前目录，账户构建选择未改变。';
+      }
     });
   }
 

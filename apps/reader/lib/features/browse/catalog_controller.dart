@@ -382,6 +382,7 @@ final class CatalogController extends ChangeNotifier {
         )
         .toSet();
     _catalogBuilds.removeWhere((key, _) => !allowed.contains(key));
+    repositoryErrors.removeWhere((key, _) => !allowed.contains(key));
     builds = List.unmodifiable(
       _catalogBuilds.values.expand((values) => values),
     );
@@ -688,8 +689,10 @@ final class CatalogController extends ChangeNotifier {
         );
       } catch (_) {
         if (!current()) return;
-        repositoryErrors[catalogReferenceKey(reference)] =
-            '仓库读取失败；账户选择未改变，可单独重试。';
+        if (isRepositoryRegistered(reference)) {
+          repositoryErrors[catalogReferenceKey(reference)] =
+              '仓库读取失败；账户选择未改变，可单独重试。';
+        }
       }
       if (!current()) return;
     }
@@ -1048,6 +1051,7 @@ final class CatalogController extends ChangeNotifier {
       email = null;
       builds = const [];
       _catalogBuilds.clear();
+      repositoryErrors.clear();
       _notify();
       // Confirm the cookie's current identity before attempting old drafts.
       // An old subject's rejected POST must not interrupt the new bootstrap.
@@ -1117,8 +1121,10 @@ final class CatalogController extends ChangeNotifier {
           );
         } catch (_) {
           if (_closed || epoch != _epoch) return;
-          repositoryErrors[catalogReferenceKey(reference)] =
-              '仓库读取失败；安装与业务记录保留。';
+          if (isRepositoryRegistered(reference)) {
+            repositoryErrors[catalogReferenceKey(reference)] =
+                '仓库读取失败；安装与业务记录保留。';
+          }
         }
       }
     });

@@ -481,6 +481,92 @@ void main() {
 
   for (final appearance in Brightness.values) {
     testWidgets(
+      'extension directory distinguishes loading, empty and failed reads in $appearance',
+      (tester) async {
+        final populatedIndex = platform.inventory;
+        platform.inventory = wire.encodeProtoJson(
+          wire.ExtensionIndex(schemaVersion: 1, repoId: 'keiyoushi'),
+        );
+        await tester.runAsync(catalog.refreshCatalog);
+        final releaseCatalog = Completer<void>();
+        final catalogPath = Uri.parse(catalog.catalogUrl).path;
+        platform.beforeApiFetch = (path) async {
+          if (path == catalogPath) await releaseCatalog.future;
+        };
+        addTearDown(() {
+          if (!releaseCatalog.isCompleted) releaseCatalog.complete();
+        });
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpApp(
+          CupertinoApp(
+            theme: readerAppTheme(appearance),
+            home: ExtensionsPage(
+              catalog: catalog,
+              repository: catalog.settings!,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final refresh = find.byKey(const ValueKey('extensions-check-updates'));
+        final empty = find.text('当前目录没有扩展');
+        final unavailable = find.text('未能读取扩展目录');
+        final manage = find.widgetWithText(CupertinoButton, '管理仓库');
+        expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+        expect(tester.widget<CupertinoButton>(refresh).enabled, isFalse);
+        expect(empty, findsNothing);
+        expect(unavailable, findsNothing);
+
+        releaseCatalog.complete();
+        await tester.pumpAndSettle();
+        expect(empty, findsOneWidget);
+        expect(find.text('账户尚未安装扩展。'), findsNothing);
+        await tap(tester, manage);
+        expect(find.byType(ExtensionRepositoriesPage), findsOneWidget);
+        await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+        await tester.pumpAndSettle();
+
+        platform.beforeApiFetch = (path) async {
+          if (path == catalogPath) throw StateError('Repository unavailable');
+        };
+        await tap(tester, refresh);
+        expect(unavailable, findsOneWidget);
+        expect(manage, findsOneWidget);
+        expect(empty, findsNothing);
+        expect(find.byKey(const ValueKey('extensions-message')), findsNothing);
+
+        platform.beforeApiFetch = null;
+        platform.inventory = populatedIndex;
+        await tap(tester, refresh);
+        final install = find.byKey(
+          ValueKey((
+            'extension-install',
+            catalog.catalogUrl,
+            'eu.kanade.source.test',
+          )),
+        );
+        expect(install, findsOneWidget);
+        expect(unavailable, findsNothing);
+
+        platform.beforeApiFetch = (path) async {
+          if (path == catalogPath) throw StateError('Repository unavailable');
+        };
+        await tap(tester, refresh);
+        expect(install, findsOneWidget);
+        expect(unavailable, findsOneWidget);
+        expect(find.byKey(const ValueKey('extensions-message')), findsNothing);
+        expect(
+          platform.businessServer.requests.where((r) => r.method == 'POST'),
+          isEmpty,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final appearance in Brightness.values) {
+    testWidgets(
       'preparation names its build and remains visible until cancellation is acknowledged in $appearance',
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(360, 800));

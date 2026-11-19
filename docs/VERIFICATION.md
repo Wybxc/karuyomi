@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-20，Mihon 新增扩展空目录、下载中、安装阶段、失败重试和仓库连接错误五组双主题实拍，累计 158/170（92.9%）。Karuyomi 调整目录等待、空态和失败反馈，仓库只读预览失败后保留地址与名称。121 项 Flutter 定向回归通过，正式 Web 双主题继续验收。[扩展目录与仓库错误](verification/mihon-cupertino-fidelity.md#mihon-扩展目录与仓库错误)
+
 2026-11-20，Mihon 新增迁移搜索等待、失败、单源网格、共存等待与完成五组双主题实拍，累计 153/170（90.0%）。Karuyomi 迁移候选采用 Cupertino 封面网格，115 项 Flutter 定向回归通过，正式 Web 待验。[迁移搜索与共存](verification/mihon-cupertino-fidelity.md#mihon-迁移搜索与共存)
 
 2026-11-20，`8dd507a` 正式深色 Web 复验竖屏章间缺页与就绪、短横屏重试和第 3319 章第 1 页的新文档续读，进入前六路读回完全一致。`4332503` 的正式深色 Web 复现了宽封面固定占高、横屏裁掉下沿。修正后 138 项 Flutter 定向回归通过，最新版正式 Web 继续待验。[章间量测](verification/mihon-cupertino-fidelity.md#画布内等待的信息间距与按钮) · [封面预览](verification/mihon-cupertino-fidelity.md#karuyomi-封面预览)

@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-20，Karuyomi 跨版本双主题主图为 168/169（99.4%），未连接（27.K1）仍缺两侧。固定 Mihon 参考新增迁移搜索、单源结果与共存流程，已有 153/170 行（90.0%）双主题主图。最终像素、各触发变体与完整转场继续验收。[迁移参考](mihon-cupertino-fidelity.md#mihon-迁移搜索与共存) · [章节批量与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
+2026-11-20，Karuyomi 跨版本双主题主图为 168/169（99.4%），未连接（27.K1）仍缺两侧。固定 Mihon 参考新增扩展目录空态、下载中、安装阶段、失败重试与仓库连接错误，已有 158/170 行（92.9%）双主题主图。最终像素、各触发变体与完整转场继续验收。[扩展目录参考](mihon-cupertino-fidelity.md#mihon-扩展目录与仓库错误) · [章节批量与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -205,6 +205,7 @@ stateDiagram-v2
     S2 --> E0: 管理扩展
     E0 --> E1: 无扩展
     E0 --> E2: 有扩展
+    E1 --> R0: 点插件商店
     E2 --> E3: 搜索无匹配
     E3 --> E2: 清空
     E2 --> E4: 筛选
@@ -225,7 +226,8 @@ stateDiagram-v2
     E2 --> E6: 安装或更新
     E6 --> E7: 开始下载
     E7 --> E8: 下载完成
-    E8 --> E2: 安装完成
+    E7 --> E2: 取消下载
+    E8 --> E2: 安装完成或取消系统提示
     E7 --> E9: 失败
     E8 --> E9: 失败
     E9 --> E6: 重试
@@ -247,7 +249,7 @@ stateDiagram-v2
     R1 --> R3: 提交
     R3 --> R4: 成功
     R3 --> R6: 失败
-    R6 --> R1: 重试
+    R6 --> R3: 用原地址重试
     R4 --> R5: 移除
     R5 --> R4: 确认或取消
     R5 --> R0: 移除最后一个
@@ -257,8 +259,8 @@ stateDiagram-v2
     T3 --> T0: 反馈结束后可重试
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class E2 partial
-    class S1,S3,S4,S5,E3,E5,E10,E11,E14,D0,D1,D2,D3,R0,R1,R2,R3,R4,R5,T0,T2 paired
+    class E0,E2 partial
+    class S1,S3,S4,S5,E1,E3,E5,E7,E8,E9,E10,E11,E14,D0,D1,D2,D3,R0,R1,R2,R3,R4,R5,R6,T0,T2 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                                            | 浅色                                                                                                       | 深色                                                                                                    |
@@ -269,16 +271,16 @@ stateDiagram-v2
 | 07.04   | Mihon 置顶分组与普通分组、取消置顶入口；对照 Karuyomi 收藏分组                                   | `s0704-source-pinned-light`                                                                                | `s0704-source-pinned-dark`                                                                              |
 | 07.05   | 语言列表及当前启用项；两侧只启用多语言/English                                                   | `s0705-source-language-light`（上段）；下段待补                                                            | `s0705-source-language-dark`（上段）；下段待补                                                          |
 | 07.06   | 当前源及置顶/隐藏等可用动作                                                                      | `s0706-source-actions-light`                                                                               | `s0706-source-actions-dark`                                                                             |
-| 08.01   | 标题、加载状态及禁用刷新；重新读取目录                                                           | 待                                                                                                         | 待                                                                                                      |
-| 08.02   | 无扩展原因与仓库入口                                                                             | 待                                                                                                         | 待                                                                                                      |
+| 08.01   | 首次加载指示及禁用刷新，下拉刷新已成对记录                                                       | 待首次加载                                                                                                 | 待首次加载                                                                                              |
+| 08.02   | 无仓库、无已装扩展、无查询的空目录，插件商店入口及返回                                           | `s0802-extension-directory-empty-light`                                                                    | `s0802-extension-directory-empty-dark`                                                                  |
 | 08.03   | 未加载/已安装/可安装/更新分组、名称、语言、版本、主操作；更新仍待                                | `s0803-extensions-installed-light`、`s0803-extension-catalog-light`、`s0803-extensions-untrusted-light`    | `s0803-extensions-installed-dark`、`s0803-extension-catalog-dark`、`s0803-extensions-untrusted-dark`    |
 | 08.04   | 查询、无匹配说明、清空/返回；清空后恢复列表                                                      | `s0804-extension-empty-light`；恢复 `s0804-extension-clear-light`                                          | `s0804-extension-empty-dark`；恢复 `s0804-extension-clear-dark`                                         |
 | 08.05   | 语言和内容筛选当前值                                                                             | `s0805-extension-filter-light`；启用语言与深色不同，待对齐重拍                                             | `s0805-extension-filter-dark`；待同条件重拍                                                             |
 | 08.06   | 未信任风险、信任/卸载与返回取消；取消仍未加载，浅色已确认恢复原信任，深色确认转换待              | `s0806-extension-trust-light`、`s0806-extension-trust-cancel-light`、`s0806-extension-trusted-light`       | `s0806-extension-trust-dark`、`s0806-extension-trust-cancel-dark`                                       |
 | 08.07   | 对象、等待标记、取消                                                                             | 待                                                                                                         | 待                                                                                                      |
-| 08.08   | 对象、下载标记、进度/取消                                                                        | 待                                                                                                         | 待                                                                                                      |
-| 08.09   | 对象、安装中及系统权限/确认（若出现）                                                            | 待                                                                                                         | 待                                                                                                      |
-| 08.10   | 对象、失败与重试                                                                                 | 待                                                                                                         | 待                                                                                                      |
+| 08.08   | Komga 1.6.76 同一行的下载标记、进度和取消                                                        | `s0808-extension-downloading-light`                                                                        | `s0808-extension-downloading-dark`                                                                      |
+| 08.09   | Komga 「安装中」短帧与系统权限提示，取消后恢复原行，完成安装待验                                 | `s0809-extension-install-permission-light`，安装中短帧见下文                                               | `s0809-extension-install-permission-dark`，安装中短帧见下文                                             |
+| 08.10   | 请求失败后同一行显示重试，再次下载并取消                                                         | `s0810-extension-download-retry-light`                                                                     | `s0810-extension-download-retry-dark`                                                                   |
 | 08.11   | 筛选和仓库入口                                                                                   | `s0811-extension-menu-light`                                                                               | `s0811-extension-menu-dark`                                                                             |
 | 08.12   | 筛选页没有仓库语言目录时的独立空态、标题和返回                                                   | `s0812-extension-filter-empty-light`                                                                       | `s0812-extension-filter-empty-dark`                                                                     |
 | 08.13   | Filtered / Unsigned / UnsupportedLibVersion / Malformed 的具体原因、关闭与卸载；每种原因分别待采 | 待                                                                                                         | 待                                                                                                      |
@@ -294,7 +296,7 @@ stateDiagram-v2
 | 10.04   | 提交正式公开仓库地址后实际可见的“处理中…”                                                        | `s1004-repository-add-processing-light`                                                                    | `s1004-repository-add-processing-dark`                                                                  |
 | 10.05   | 仓库名、地址、移除/刷新；使用正式公开仓库                                                        | `s1005-repository-list-light`                                                                              | `s1005-repository-list-dark`                                                                            |
 | 10.06   | 待移除仓库、确认/取消；取消保留列表，确认移除最后一项回空态                                      | `s1006-repository-remove-confirm-light`、`s1006-repository-cancel-light`、`s1006-repository-removed-light` | `s1006-repository-remove-confirm-dark`、`s1006-repository-cancel-dark`、`s1006-repository-removed-dark` |
-| 10.07   | 失败原因和可用恢复入口；连接失败分支                                                             | 待                                                                                                         | 待                                                                                                      |
+| 10.07   | 同一仓库连接返回 502，表单保留地址和提交，原地址重试成功                                         | `s1007-repository-request-error-light`                                                                     | `s1007-repository-request-error-dark`                                                                   |
 | 11.01   | 占用、存储范围及清理入口；两主题清理前均 165 kB，主图上下两段                                    | `s1101-storage-top-light`、`s1101-storage-usage-light`                                                     | `s1101-storage-top-dark`、`s1101-storage-usage-dark`                                                    |
 | 11.03   | 清理后占用与实际反馈；两主题稳定状态均 1.37 kB；浅色删除3文件，深色再次清理删除0文件             | `s1103-storage-cleared-light`、`s1103-storage-clear-feedback-light`                                        | `s1103-storage-cleared-dark`、`s1103-storage-clear-feedback-dark`                                       |
 | 11.04   | 清理失败 toast 与保留占用，随后可再次点击清理；不能用成功反馈代替                                | 待                                                                                                         | 待                                                                                                      |
@@ -306,6 +308,8 @@ stateDiagram-v2
 09.04 的开关关闭后，`ExtensionDetailsViewModel.subscribeToSources()` 按 `!enabled` 排序，将 Afrikaans 移到末尾；两主题都已拍到真正关闭的行，再重新启用回到首行。`s0901-mangadex-disabled-sorted-top-*` 只记录原位置移走，不作为关闭开关主图。09.03 的系统弹层两次均为 Android English 浅色，应用主题不控制其颜色；浅色从未信任列表发起，取消返回列表，深色从详情发起，取消返回详情，底层不同不计同状态像素叠图。`s0903-extension-uninstall-cancel-stale-dark` 的 XML 已返回详情，但 PNG 与确认图完全相同，已排除；另拍并实看稳定 `s0903-extension-uninstall-return-dark`。
 
 11.01 清理前两主题均为 165 kB；浅色清理删除 3 个文件，稳定占用为 1.37 kB，深色再次清理删除 0 个文件，占用保持 1.37 kB。上游明确保留 cache journal，非零值不表示清理失败。反馈图截到 toast 淡入，只用于确认内容，不能作稳定合成色/字形基准；失败反馈仍待。备份/导出等未实现功能只作为本页背景，不扩大本轮产品范围。
+
+08.02 关闭查询后从真正空目录进入空插件商店，两主题都有落点。08.01 两种主题的下拉视频只记录已打开空目录上的刷新。08.08–08.10 用同一 Komga 1.6.76 样本，已核对就地重试、下载取消、实际「安装中」短帧及返回前的 Android 系统提示。08.07 排队和 08.09 完成安装继续待验。10.07 两主题用同一地址触发连接错误，保留输入并直接重试成功。[同条件量测](mihon-cupertino-fidelity.md#mihon-扩展目录与仓库错误)
 
 ## 12–15：源内浏览、筛选、偏好与跨源搜索
 

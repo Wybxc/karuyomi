@@ -78,6 +78,25 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
       ),
     ),
   );
+
+  Widget _directoryStatus(String label, {bool failed = false}) => Semantics(
+    liveRegion: true,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: (failed ? AppColors.error : AppColors.secondaryLabel)
+                .resolveFrom(context),
+          ),
+        ),
+        CupertinoButton(onPressed: _repositories, child: const Text('管理仓库')),
+      ],
+    ),
+  );
+
   Widget _row(ExtensionListing item, bool sameName) {
     final installed = item.installed;
     final version = (installed == null ? item.candidate : item.exact)?.version;
@@ -177,7 +196,9 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
       }
     });
     useListenable(_controller);
-    final all = extensionListings(widget.catalog, _controller.installed);
+    final catalog = widget.catalog;
+    final settings = _controller.settings;
+    final all = extensionListings(catalog, _controller.installed);
     final languages = all.expand((item) => item.languages).toSet().toList()
       ..sort();
     if (_language != null && !languages.contains(_language)) {
@@ -187,6 +208,35 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
     final visible = all
         .where((item) => item.matches(query, _language))
         .toList();
+    final filtered = query.isNotEmpty || _language != null;
+    final canCheck =
+        _controller.available && !_controller.busy && !catalog.busy;
+    final repositoryReadFailed = catalog.repositoryErrors.isNotEmpty;
+    final readingEmptyDirectory =
+        all.isEmpty &&
+        _controller.activity == ExtensionActivity.reading &&
+        settings.pending == null;
+    Widget? directoryState;
+    if (readingEmptyDirectory) {
+      directoryState = Semantics(
+        liveRegion: true,
+        label: '正在读取扩展目录',
+        child: const CupertinoActivityIndicator(),
+      );
+    } else if (visible.isEmpty && canCheck) {
+      if (all.isEmpty && repositoryReadFailed) {
+        directoryState = _directoryStatus('未能读取扩展目录', failed: true);
+      } else if (all.isNotEmpty) {
+        directoryState = const Text(
+          '没有匹配的扩展，请清除筛选。',
+          textAlign: TextAlign.center,
+        );
+      } else if (settings.snapshot != null &&
+          settings.error == null &&
+          _controller.error == null) {
+        directoryState = _directoryStatus('当前目录没有扩展');
+      }
+    }
     final nameCounts = <String, int>{};
     for (final item in all) {
       nameCounts.update(item.name, (count) => count + 1, ifAbsent: () => 1);
@@ -201,138 +251,157 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
       ),
       ('可安装', visible.where((item) => item.installed == null).toList()),
     ];
-    final list = ListView(
+    final list = CustomScrollView(
       key: const PageStorageKey('extensions-scroll'),
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: CupertinoTextField(
-                      autofillHints: null,
-                      key: const ValueKey('extensions-search'),
-                      controller: _search,
-                      placeholder: '查找扩展或漫画源名称',
-                      placeholderStyle: TextStyle(
-                        color: AppColors.secondaryLabel.resolveFrom(context),
-                      ),
-                      prefix: Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(
-                          CupertinoIcons.search,
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: CupertinoTextField(
+                        autofillHints: null,
+                        key: const ValueKey('extensions-search'),
+                        controller: _search,
+                        placeholder: '查找扩展或漫画源名称',
+                        placeholderStyle: TextStyle(
                           color: AppColors.secondaryLabel.resolveFrom(context),
                         ),
-                      ),
-                      clearButtonMode: OverlayVisibilityMode.editing,
-                      decoration: BoxDecoration(
-                        color: AppColors.groupedSurface.resolveFrom(context),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  CupertinoMenuAnchor(
-                    key: const ValueKey('extensions-more'),
-                    menuChildren: [
-                      CupertinoMenuItem(
-                        autofocus: true,
-                        onPressed: _repositories,
-                        child: Text('仓库管理'),
-                      ),
-                      CupertinoMenuItem(
-                        onPressed: _storage,
-                        child: Text('本机存储'),
-                      ),
-                    ],
-                    builder: (context, menu, child) => CupertinoButton(
-                      onPressed: () => menu.isOpen ? menu.close() : menu.open(),
-                      padding: const EdgeInsets.all(8),
-                      child: Icon(
-                        CupertinoIcons.ellipsis,
-                        semanticLabel: '扩展选项',
+                        prefix: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Icon(
+                            CupertinoIcons.search,
+                            color: AppColors.secondaryLabel.resolveFrom(
+                              context,
+                            ),
+                          ),
+                        ),
+                        clearButtonMode: OverlayVisibilityMode.editing,
+                        decoration: BoxDecoration(
+                          color: AppColors.groupedSurface.resolveFrom(context),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              Wrap(
-                spacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  ChoiceField<String>(
-                    key: const ValueKey('extensions-language'),
-                    label: '语言',
-                    value: _language,
-                    options: {
-                      null: '全部语言',
-                      for (final language in languages)
-                        language: sourceLanguage(language),
-                    },
-                    onChanged: (value) => setState(() => _language = value),
-                  ),
-                  CupertinoButton(
-                    key: const ValueKey('extensions-check-updates'),
-                    onPressed:
-                        !_controller.available ||
-                            _controller.busy ||
-                            widget.catalog.busy
-                        ? null
-                        : () =>
-                              unawaited(_controller.refresh(catalogToo: true)),
-                    child: const Text('检查更新'),
-                  ),
-                  if (query.isNotEmpty || _language != null)
-                    CupertinoButton(
-                      onPressed: () => setState(() {
-                        _search.clear();
-                        _language = null;
-                      }),
-                      child: const Text('清除筛选'),
+                    CupertinoMenuAnchor(
+                      key: const ValueKey('extensions-more'),
+                      menuChildren: [
+                        CupertinoMenuItem(
+                          autofocus: true,
+                          onPressed: _repositories,
+                          child: Text('仓库管理'),
+                        ),
+                        CupertinoMenuItem(
+                          onPressed: _storage,
+                          child: Text('本机存储'),
+                        ),
+                      ],
+                      builder: (context, menu, child) => CupertinoButton(
+                        onPressed: () =>
+                            menu.isOpen ? menu.close() : menu.open(),
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          CupertinoIcons.ellipsis,
+                          semanticLabel: '扩展选项',
+                        ),
+                      ),
                     ),
-                ],
-              ),
-              ExtensionOperationStatus(
-                controller: _controller,
-                showPreparation: false,
-              ),
-              if (_controller.settings.snapshot == null && !_controller.busy)
-                const Text('尚未读取账户扩展，请重试。'),
-              if (_controller.settings.snapshot != null &&
-                  _controller.installed.isEmpty)
-                const Text('账户尚未安装扩展。'),
-              if (widget.catalog.repositoryErrors.isNotEmpty)
-                CupertinoListTile(
-                  title: const Text('部分仓库未能读取'),
-                  subtitle: const Text('已有目录仍可查看'),
-                  trailing: CupertinoButton(
-                    onPressed: _repositories,
-                    child: const Text('管理仓库'),
-                  ),
+                  ],
                 ),
-            ],
-          ),
-        ),
-        for (final group in groups)
-          if (group.$2.isNotEmpty)
-            CupertinoListSection.insetGrouped(
-              header: Text('${group.$1} (${group.$2.length})'),
-              children: [
-                for (final item in group.$2)
-                  _row(item, (nameCounts[item.name] ?? 0) > 1),
+                Wrap(
+                  spacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    ChoiceField<String>(
+                      key: const ValueKey('extensions-language'),
+                      label: '语言',
+                      value: _language,
+                      options: {
+                        null: '全部语言',
+                        for (final language in languages)
+                          language: sourceLanguage(language),
+                      },
+                      onChanged: (value) => setState(() => _language = value),
+                    ),
+                    CupertinoButton(
+                      key: const ValueKey('extensions-check-updates'),
+                      onPressed: canCheck
+                          ? () =>
+                                unawaited(_controller.refresh(catalogToo: true))
+                          : null,
+                      child: const Text('检查更新'),
+                    ),
+                    if (filtered)
+                      CupertinoButton(
+                        onPressed: () => setState(() {
+                          _search.clear();
+                          _language = null;
+                        }),
+                        child: const Text('清除筛选'),
+                      ),
+                  ],
+                ),
+                ExtensionOperationStatus(
+                  controller: _controller,
+                  showPreparation: false,
+                  showProgress: !readingEmptyDirectory,
+                ),
+                if (settings.snapshot == null &&
+                    canCheck &&
+                    settings.error == null)
+                  const Text('尚未读取账户扩展，请重试。'),
+                if (all.isNotEmpty &&
+                    settings.snapshot != null &&
+                    settings.error == null &&
+                    _controller.installed.isEmpty)
+                  const Text('账户尚未安装扩展。'),
+                if (repositoryReadFailed && all.isNotEmpty)
+                  CupertinoListTile(
+                    title: Text(
+                      catalog.repositoryErrors.length <
+                              catalog.repositories.length
+                          ? '部分仓库未能读取'
+                          : '未能读取扩展目录',
+                      style: TextStyle(
+                        color: AppColors.error.resolveFrom(context),
+                      ),
+                    ),
+                    trailing: CupertinoButton(
+                      onPressed: _repositories,
+                      child: const Text('管理仓库'),
+                    ),
+                  ),
               ],
             ),
-        if (visible.isEmpty && !_controller.busy)
-          Padding(
-            padding: const EdgeInsets.all(32),
-            child: Text(
-              query.isNotEmpty || _language != null
-                  ? '没有匹配的扩展，请清除筛选。'
-                  : '当前目录没有扩展，请检查更新或管理仓库。',
-              textAlign: TextAlign.center,
+          ),
+        ),
+        if (visible.isNotEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.only(bottom: 16),
+            sliver: SliverList.list(
+              children: [
+                for (final group in groups)
+                  if (group.$2.isNotEmpty)
+                    CupertinoListSection.insetGrouped(
+                      header: Text('${group.$1} (${group.$2.length})'),
+                      children: [
+                        for (final item in group.$2)
+                          _row(item, (nameCounts[item.name] ?? 0) > 1),
+                      ],
+                    ),
+              ],
+            ),
+          ),
+        if (directoryState != null)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(child: directoryState),
             ),
           ),
       ],
@@ -996,64 +1065,98 @@ class const ExtensionRepositoriesPage({
   super.key,
   required final ExtensionsController controller,
 }) extends HookWidget {
-  Future<void> _addRepository(BuildContext context) async {
-    var address = '';
-    var label = '';
-    final accepted = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('预览额外仓库'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('仓库必须公开提供 HTTPS 静态目录及 CORS，应用凭据不会发送给仓库。'),
-              CupertinoTextField(
-                key: const ValueKey('repository-url'),
-                autofillHints: null,
-                autocorrect: false,
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.next,
-                onChanged: (value) => address = value,
-                placeholder: 'HTTPS 仓库地址',
-              ),
-              const SizedBox(height: 8),
-              CupertinoTextField(
-                key: const ValueKey('repository-name'),
-                autofillHints: null,
-                onChanged: (value) => label = value,
-                maxLength: 100,
-                placeholder: '名称（可选）',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          CupertinoButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          CupertinoButton(
-            key: const ValueKey('repository-preview-submit'),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              '只读预览',
-              style: TextStyle(fontWeight: FontWeight.w600),
+  Future<({String url, String name})?> _promptRepository(
+    BuildContext context,
+    ({String url, String name}) draft,
+    String? failure,
+  ) => showCupertinoDialog(
+    context: context,
+    builder: (context) => HookBuilder(
+      builder: (context) {
+        final address = useTextEditingController(text: draft.url);
+        final name = useTextEditingController(text: draft.name);
+        return CupertinoAlertDialog(
+          title: const Text('预览额外仓库'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('仓库必须公开提供 HTTPS 静态目录及 CORS，应用凭据不会发送给仓库。'),
+                CupertinoTextField(
+                  key: const ValueKey('repository-url'),
+                  controller: address,
+                  autofillHints: null,
+                  autocorrect: false,
+                  keyboardType: TextInputType.url,
+                  textInputAction: TextInputAction.next,
+                  placeholder: 'HTTPS 仓库地址',
+                ),
+                const SizedBox(height: 8),
+                CupertinoTextField(
+                  key: const ValueKey('repository-name'),
+                  controller: name,
+                  autofillHints: null,
+                  maxLength: 100,
+                  placeholder: '名称（可选）',
+                ),
+                if (failure != null)
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      failure,
+                      style: TextStyle(
+                        color: AppColors.error.resolveFrom(context),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
-        ],
-      ),
-    );
-    if (accepted != true || !context.mounted || !controller.canEdit) return;
-    final preview = await controller.previewRepository(address, label);
-    if (!context.mounted || !controller.available || preview == null) return;
+          actions: [
+            CupertinoButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            CupertinoButton(
+              key: const ValueKey('repository-preview-submit'),
+              onPressed: () =>
+                  Navigator.pop(context, (url: address.text, name: name.text)),
+              child: const Text(
+                '只读预览',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+
+  Future<void> _addRepository(BuildContext context) async {
+    var draft = (url: '', name: '');
+    String? failure;
+    RepositoryPreview? preview;
+    do {
+      final submitted = await _promptRepository(context, draft, failure);
+      if (submitted == null || !context.mounted || !controller.canEdit) return;
+      draft = submitted;
+      preview = await controller.previewRepository(draft.url, draft.name);
+      if (!context.mounted ||
+          !controller.available ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
+      failure = controller.error;
+      if (preview == null && failure == null) return;
+    } while (preview == null);
+    final candidate = preview;
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('确认添加仓库'),
         content: SingleChildScrollView(
           child: Text(
-            '${preview.repository.name}\n${Uri.parse(preview.repository.catalogUrl).host}\n${preview.builds.length} 个扩展。添加仓库不会安装扩展。',
+            '${candidate.repository.name}\n${Uri.parse(candidate.repository.catalogUrl).host}\n${candidate.builds.length} 个扩展。添加仓库不会安装扩展。',
           ),
         ),
         actions: [
@@ -1073,7 +1176,7 @@ class const ExtensionRepositoriesPage({
       ),
     );
     if (confirmed == true && context.mounted) {
-      await controller.addRepository(preview);
+      await controller.addRepository(candidate);
     }
   }
 
