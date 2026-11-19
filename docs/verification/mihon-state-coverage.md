@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-19，Karuyomi 跨版本双主题主图现为 166/169（98.2%），新增共享编辑的确认、草稿、等待、结果未知与版本冲突（30.K1–K5）。剩余 3 个主状态均缺两侧，分别为未连接（27.K1）、部分提交（30.K6）和编辑失效（30.K7）。最终像素、各触发变体与完整转场继续验收。[共享编辑](mihon-cupertino-fidelity.md#共享编辑对象与保存阶段的正式-web-双主题验收)
+2026-11-19，Karuyomi 跨版本双主题主图现为 168/169（99.4%），新增逐章部分提交（30.K6）和编辑失效（30.K7）。未连接（27.K1）仍缺两侧。固定 Mihon 参考有 132/170 行完成双主题核对。最终像素、各触发变体与完整转场继续验收。[章节批量与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -785,10 +785,12 @@ stateDiagram-v2
 | 28.03   | Worker info 的 Enqueued/Finished/Running、等宽正文、复制和返回；横向变体          | `s2803-worker-info-light`、`s2804-worker-horizontal-light`              | `s2803-worker-info-dark`、`s2804-worker-horizontal-dark`              |
 | 28.04   | 系统复制预览；只能确认已显示的内容，不能由点击推断完整剪贴板校验                  | `s2804-worker-copy-readable-light`                                      | `s2804-worker-copy-readable-dark`                                     |
 | 29.01   | 默认阅读模式标题、五个选项、当前右到左、取消；取消后原值不变                      | `s2901-reader-mode-choice-light`、`s2901-reader-mode-cancel-light`      | `s2901-reader-mode-choice-dark`、`s2901-reader-mode-cancel-dark`      |
-| 30.01   | 标题、必填/禁用提交、取消、键盘；关联05.03/10.02/14.04                            | 待                                                                      | `category-create-default-dark`（分类分项）                            |
-| 30.02   | 当前草稿、可用提交和取消；关联05.04/05.07/14.04                                   | 待                                                                      | `category-ime-default-dark`（分类分项）                               |
-| 30.03   | 原输入、具体校验错误、修正/取消；关联05.05/10.03                                  | 待                                                                      | 待                                                                    |
+| 30.01   | 标题、必填/禁用提交、取消、键盘；关联05.03/10.02/14.04                            | `s0503-category-create-keyboard-light`（分类分项）                      | `s0503-category-create-empty-dark`（分类分项）                        |
+| 30.02   | 当前草稿、可用提交和取消；关联05.04/05.07/14.04                                   | `s0504-category-create-keyboard-light`（分类分项）                      | `s0504-category-create-keyboard-dark`（分类分项）                     |
+| 30.03   | 原输入、具体校验错误、修正/取消；关联05.05/10.03                                  | `s0505-category-create-duplicate-light`（分类分项）                     | `s0505-category-create-duplicate-dark`（分类分项）                    |
 | 30.04   | 对象、影响、确认/取消；逐操作关联04.02/05.08/09.03/10.06/19.03/21.01/25.02        | 待                                                                      | 待                                                                    |
+
+2026-11-19，复核固定 Mihon 版本的六张分类原图和同名 XML，补登记 30.01–30.03 的空输入、可提交草稿和重名错误。两主题均实际显示键盘，应用输入框归一化边界均为 `[44,231,316,317]`，添加动作边界均为 `[258,341,316,389]`。XML 的可操作父节点分别报告禁用、启用、禁用。引用 05.03–05.05 的同一弹层原图，仓库、Source 输入及各确认动作继续分项复核。[分类参考基准](mihon-cupertino-fidelity.md#通用表单的分类参考复核)
 
 26.03 的 `*` 依次为 `top`、`display`、`paged`、`webtoon`、`navigation`、`actions`，已实看 `settings-reference-pairs-0.jpg` 至 `settings-reference-pairs-2.jpg`。首屏与末段两主题的应用 XML 边界一致；中间四段有约 3–15 物理像素的滚动差，部分首尾文字受裁切，只计状态覆盖，不能用于同位置叠图。六段覆盖默认模式/提示、显示/E-Ink、章节跳过、单页/条漫、输入和操作菜单；未实现的 Android 专属设置及 E-Ink 只作参考，不增加无效产品入口。
 
@@ -846,8 +848,7 @@ stateDiagram-v2
     K7 --> K9: revision不匹配
     K9 --> K5: 显式只读重取
     K7 --> K10: 批量部分成功
-    K10 --> K8: 有不确定项
-    K10 --> K6: 明确提交剩余项
+    K10 --> K7: 原样重试，确认后明确继续剩余项
     K6 --> K11: 身份或Source变化
     K7 --> K11: 身份或Source变化
     K11 --> K12: 关闭旧资源并丢弃迟到结果
@@ -861,7 +862,7 @@ stateDiagram-v2
     Q0 --> K5: 取消并返回原值
     Q1 --> K5: 取消并返回原值
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class K1,K2,K3,K4,K5,K6,K7,K8,K9,K12,K13,Q0,Q1 paired
+    class K1,K2,K3,K4,K5,K6,K7,K8,K9,K10,K11,K12,K13,Q0,Q1 paired
 ```
 
 | 状态 ID | 最小必要信息与操作边界                                                | 浅色                                                                            | 深色                                                                           |
@@ -876,14 +877,14 @@ stateDiagram-v2
 | 30.K3   | 保存中、操作对象和提交范围；禁止重复提交并保留草稿                    | `karuyomi-d0d963c-reader-settings-waiting-light.jpg`                            | `karuyomi-d0d963c-reader-settings-waiting-dark.jpg`                            |
 | 30.K4   | 结果尚未确认、保留的原操作及同一操作重试；不误报成功或失败            | `karuyomi-d0d963c-reader-settings-unknown-light.jpg`                            | `karuyomi-d0d963c-reader-settings-unknown-dark.jpg`                            |
 | 30.K5   | 服务端值已变化、受影响草稿与显式重新读取入口                          | `karuyomi-d0d963c-reader-settings-conflict-light.jpg`                           | `karuyomi-d0d963c-reader-settings-conflict-dark.jpg`                           |
-| 30.K6   | 已确认/失败/未知的对象及数量、剩余操作和精确重试                      | 待                                                                              | 待                                                                             |
-| 30.K7   | 原身份或来源已失效、受影响草稿、旧操作不可继续及恢复入口              | 待                                                                              | 待                                                                             |
+| 30.K6   | 已确认、未确认和未发送各一章，保留原作品、清单、稍后与原样重试        | `karuyomi-f084467-chapter-partial-light.jpg`                                    | `karuyomi-f084467-chapter-partial-dark.jpg`                                    |
+| 30.K7   | 原窗口失效、受影响清单和各章状态可读，关闭后另行重连                  | `karuyomi-f084467-chapter-expired-light.jpg`                                    | `karuyomi-f084467-chapter-expired-dark.jpg`                                    |
 | 28.K1   | 正在关闭的页面/资源、等待确认及受阻操作                               | `karuyomi-704d148-retired-search-releasing-light.jpg`                           | `karuyomi-704d148-retired-search-releasing-dark.jpg`                           |
 | 28.K2   | 尚未释放的资源、失败原因和同一清理重试入口                            | `karuyomi-704d148-retired-search-failed-light.jpg`                              | `karuyomi-704d148-retired-search-failed-dark.jpg`                              |
 | 29.K1   | 当前项、完整长名称/来源序号、查询/清空/取消与键盘；本轮为xkcd范围草稿 | `karuyomi-0c4da11-range-{current-choice,search-match,search-cleared}-light.jpg` | `karuyomi-0c4da11-range-{current-choice,search-match,search-cleared}-dark.jpg` |
 | 29.K2   | 当前查询、无匹配、清空或修改查询及取消；保留调用方原值                | `karuyomi-0c4da11-range-search-empty-light.jpg`                                 | `karuyomi-0c4da11-range-search-empty-dark.jpg`                                 |
 
-验收覆盖书架/分类与批量（02–06）、账户扩展/仓库（08–11）、Source 偏好（14）、停止/取消/分页/资源清理（12/15）、作品元数据/章节读态/书签/封面（16–19）、只读迁移映射与提交（20–21）、阅读进度/Access 恢复/设置覆盖（22–24）、全局设置和连接/诊断（26–28）。28.K1/K2 的主图取自跨源搜索失效，30.K1–K5 取自本漫画阅读设置，分类和封面提供作品分组及草稿的补充分项。各业务页的触发变体、转换、部分提交与失效恢复继续验收。
+验收覆盖书架/分类与批量（02–06）、账户扩展/仓库（08–11）、Source 偏好（14）、停止/取消/分页/资源清理（12/15）、作品元数据/章节读态/书签/封面（16–19）、只读迁移映射与提交（20–21）、阅读进度/Access 恢复/设置覆盖（22–24）、全局设置和连接/诊断（26–28）。28.K1/K2 的主图取自跨源搜索失效，30.K1–K5 取自本漫画阅读设置，30.K6/K7 取自章节批量标记。各业务页的触发变体与完整转换继续验收。[章节失效与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
 
 ### 04–06：Karuyomi 分类与批量确认的目标状态
 
@@ -1019,7 +1020,9 @@ stateDiagram-v2
     state "30.K3 等待章节确认" as ChapterSending
     state "30.K4 章节结果未知" as ChapterUnknown
     state "30.K5 章节写入冲突" as ChapterConflict
+    state "30.K6 章节部分提交" as ChapterPartial
     state "30.K7 章节身份或来源失效" as ChapterExpired
+    state "重开原未确认清单" as ChapterReopened
     UncollectedDetails --> ChapterMatch: 输入长标题
     ChapterMatch --> ChapterEmpty: 改为无匹配查询
     ChapterEmpty --> UncollectedDetails: 清空
@@ -1039,12 +1042,16 @@ stateDiagram-v2
     ChapterRange --> ChapterOptions: 明确退出并清空选择
     UncollectedDetails --> ChapterBookmarked: Tab和Return仅标记书签
     ChapterBookmarked --> UncollectedDetails: 明确移除书签
-    ChapterReview --> ChapterSending: 确认提交，待验
-    ChapterSending --> ChapterUnknown: 响应丢失，待验
+    ChapterReview --> ChapterSending: 确认提交
+    ChapterSending --> ChapterUnknown: 首章回执丢失，浅色补充
+    ChapterSending --> ChapterPartial: 首章确认后第二章回执丢失
+    ChapterPartial --> ChapterSending: 原样重试，再明确继续剩余章
     ChapterSending --> ChapterConflict: revision冲突，待验
-    ChapterSending --> ChapterExpired: 身份或Source失效，待验
+    ChapterSending --> ChapterExpired: 章节提交收到受控401
+    ChapterExpired --> ChapterReopened: 关闭并重新连接后打开原作品
+    ChapterReopened --> ChapterSending: 原样重试，再明确继续剩余章
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class UncollectedDetails,ChapterMatch,ChapterEmpty,ChapterOptions,ChapterOrderMenu,NoChapterSelection,ChapterRange,ChapterReview,ChapterBookmarked,ChapterEndpoint,ChapterEndpointEmpty paired
+    class UncollectedDetails,ChapterMatch,ChapterEmpty,ChapterOptions,ChapterOrderMenu,NoChapterSelection,ChapterRange,ChapterReview,ChapterBookmarked,ChapterEndpoint,ChapterEndpointEmpty,ChapterSending,ChapterPartial,ChapterExpired,ChapterReopened paired
 ```
 
 | 状态 ID | 最小必要信息                                                | 浅色正式Web                                       | 深色正式Web                                      |
@@ -1069,7 +1076,7 @@ stateDiagram-v2
 
 `bcac704`另以真实xkcd的3323: Meteor Fear和3322: Dragonfly两章复验双主题顶部预览、明确标已读及2/2确认；深色另标未读复位。图为`karuyomi-bcac704-editors-chapters-{preview,confirmed}-{light,dark}.jpg`，独立API确认没有创建续读位置或书签。本轮是两章直接选择，保留18.K3原六章范围主图，不冒充六章新证据；30.K各业务范围及故障继续待。
 
-普通Source封面、重复章节/扫描组实拍、30.K各故障、全部变体及生产仍待；双倍字号仅为组件证据。资料丢确认后重试及读取失败的正文/错误分离也只有组件证据，详见[章节验证](mihon-cupertino-fidelity.md#章节文字与书架资料确认的-cupertino-呈现)和[长选项验证](mihon-cupertino-fidelity.md#长选项与范围表单的自然尺寸)。
+`f084467` 的正式 Web 两主题使用真实 xkcd 的 3326、3325、3324 三章，核对等待、部分提交、受控 401、同一身份重开、原样重试和明确继续。主图登记为 30.K6/K7，18.K3 仍用原六章清单。普通 Source 封面、重复章节和扫描组、章节版本冲突、来源换代的失效变体、双倍字号实拍及生产继续验收。[章节批量](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收) · [长选项验证](mihon-cupertino-fidelity.md#长选项与范围表单的自然尺寸)
 
 ### 19：Karuyomi 自定义封面的目标状态
 
