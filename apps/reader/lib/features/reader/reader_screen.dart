@@ -45,6 +45,145 @@ final class ReaderViewportState {
   final bool? doublePage;
 }
 
+enum ReaderChapterEdge {
+  previous(-1),
+  next(1);
+
+  const ReaderChapterEdge(this.delta);
+  final int delta;
+}
+
+class const ReaderChapterTransition({
+  super.key,
+  required final ReaderChapterEdge edge,
+  required final ({String name, String scanlator}) currentChapter,
+  required final ({String name, String scanlator})? targetChapter,
+  required final ReaderBackground background,
+  required final int dimPercent,
+  required final bool loading,
+  required final String? error,
+  required final VoidCallback? onContinue,
+  required final VoidCallback? onRetry,
+  required final VoidCallback? onReturn,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final previous = edge == ReaderChapterEdge.previous;
+    final direction = previous ? '上一章' : '下一章';
+    final foreground = _readerForegroundColor(context, background);
+    final secondary = foreground.withValues(alpha: .75);
+    final theme = CupertinoTheme.of(context).textTheme;
+    final body = theme.textStyle.copyWith(color: foreground);
+    final caption = theme.actionSmallTextStyle.copyWith(color: secondary);
+
+    Widget chapter(String label, ({String name, String scanlator}) entry) =>
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: caption),
+            const SizedBox(height: 4),
+            Text(entry.name, style: body),
+            if (entry.scanlator.trim().isNotEmpty)
+              Text(entry.scanlator, style: caption),
+          ],
+        );
+
+    final target = targetChapter;
+    final neighbor = target == null
+        ? Text(
+            previous ? '前面没有章节' : '后面没有章节',
+            style: caption,
+            textAlign: TextAlign.center,
+          )
+        : chapter(direction, target);
+    return _ReaderContent(
+      background: background,
+      dimPercent: dimPercent,
+      child: LayoutBuilder(
+        builder: (context, bounds) {
+          final scale = MediaQuery.textScalerOf(context).scale(17) / 17;
+          final inset = (bounds.maxWidth * (scale > 1.5 ? .08 : .18)).clamp(
+            12.0,
+            64.0,
+          );
+          return Center(
+            child: SingleChildScrollView(
+              primary: false,
+              padding: EdgeInsets.symmetric(horizontal: inset, vertical: 16),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Semantics(
+                  container: true,
+                  label: '章节过渡',
+                  explicitChildNodes: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (previous) neighbor else chapter('本章', currentChapter),
+                      const SizedBox(height: 28),
+                      if (previous) chapter('本章', currentChapter) else neighbor,
+                      if (loading) ...[
+                        const SizedBox(height: 16),
+                        Semantics(
+                          liveRegion: true,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CupertinoActivityIndicator(color: secondary),
+                              const SizedBox(width: 8),
+                              Flexible(child: Text('正在加载章节页面', style: caption)),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (error case final message?) ...[
+                        const SizedBox(height: 16),
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            message,
+                            style: caption.copyWith(
+                              color: AppColors.error.resolveFrom(context),
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 8,
+                        children: [
+                          CupertinoButton(
+                            autofocus: onReturn != null,
+                            onPressed: onReturn,
+                            child: const Text('返回本章'),
+                          ),
+                          if (onRetry != null)
+                            CupertinoButton.filled(
+                              onPressed: onRetry,
+                              child: const Text('重试'),
+                            )
+                          else if (onContinue != null)
+                            CupertinoButton.filled(
+                              onPressed: onContinue,
+                              child: Text('进入$direction'),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 /// An online chapter view. Images are exclusively acquired through the Source's
 /// PageProvider; this screen never downloads raw Source image URLs itself.
 class const ReaderScreen({
@@ -94,6 +233,8 @@ class const ReaderScreen({
   final Widget? readingSettings,
   final VoidCallback? onAttached,
   final VoidCallback? onExit,
+  final ReaderChapterTransition? chapterTransition,
+  final ValueChanged<ReaderChapterEdge>? onChapterEdge,
   final ValueChanged<ReaderViewportState>? onViewportChanged,
 
   /// Explicit navigation such as a persisted reading-epoch reset. It changes
@@ -130,6 +271,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   final _horizontal = <String, ScrollController>{};
   final _pointers = <int>{};
   Offset? _dragStart;
+  double _edgePull = 0;
   bool _toolbar = true;
   bool _restoring = false;
   late ReadingPosition? _preferredPlacement = widget.preserveInitialPlacement
@@ -245,7 +387,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _viewportScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _viewportScheduled = false;
-      if (!mounted || _restoring || _reader.position == null) return;
+      if (!mounted ||
+          _restoring ||
+          widget.chapterTransition != null ||
+          _reader.position == null) {
+        return;
+      }
       final snapshot = _scheduler.snapshot;
       final manifest = _reader.manifest;
       if (ModalRoute.of(context)?.isCurrent == false) {
@@ -431,6 +578,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void didUpdateWidget(ReaderScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.chapterTransition != null &&
+        widget.chapterTransition == null) {
+      _scheduleViewport();
+    }
     if (oldWidget.background != widget.background ||
         oldWidget.dimPercent != widget.dimPercent ||
         oldWidget.fit != widget.fit ||
@@ -820,7 +971,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   void _onScroll() {
-    if (_restoring || !_scroll.hasClients || _viewportWidth <= 0) return;
+    if (_restoring ||
+        widget.chapterTransition != null ||
+        !_scroll.hasClients ||
+        _viewportWidth <= 0) {
+      return;
+    }
     _captureViewportAnchor();
     final position = _reader.position;
     if (position != null) {
@@ -971,6 +1127,80 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
     _transform.value = Matrix4.identity();
     _scheduleRestore();
+  }
+
+  void _turn(bool forward) {
+    final edge = forward ? ReaderChapterEdge.next : ReaderChapterEdge.previous;
+    if (widget.chapterTransition case final transition?) {
+      if (edge == transition.edge) {
+        transition.onContinue?.call();
+      } else {
+        transition.onReturn?.call();
+      }
+      return;
+    }
+    if (_reader.isContinuous &&
+        widget.onChapterEdge != null &&
+        _scroll.hasClients &&
+        _scroll.position.hasContentDimensions) {
+      final offset = _scroll.position;
+      final remaining = forward ? offset.extentAfter : offset.extentBefore;
+      if (remaining <= 1) {
+        _offerChapterEdge(edge);
+        return;
+      }
+    }
+    if (forward ? _reader.canAdvance : _reader.canGoBack) {
+      forward ? _advance() : _back();
+    } else if (!_reader.isContinuous) {
+      _offerChapterEdge(edge);
+    }
+  }
+
+  void _offerChapterEdge(ReaderChapterEdge edge) {
+    if (!widget.paused &&
+        !_zoomed &&
+        _reader.position != null &&
+        widget.chapterTransition == null) {
+      widget.onChapterEdge?.call(edge);
+    }
+  }
+
+  bool _onChapterOverscroll(ScrollNotification notification) {
+    if (notification.depth != 0 || widget.onChapterEdge == null) return false;
+    if (notification is ScrollStartNotification) {
+      _edgePull = 0;
+    } else if (notification is OverscrollNotification &&
+        notification.dragDetails != null) {
+      _edgePull += notification.overscroll;
+    } else if (notification is ScrollUpdateNotification &&
+        notification.dragDetails != null) {
+      final metrics = notification.metrics;
+      _edgePull =
+          metrics.pixels -
+          metrics.pixels.clamp(
+            metrics.minScrollExtent,
+            metrics.maxScrollExtent,
+          );
+    } else if (notification is ScrollEndNotification &&
+        _edgePull.abs() >= kMinInteractiveDimensionCupertino) {
+      final edge = _edgePull > 0
+          ? ReaderChapterEdge.next
+          : ReaderChapterEdge.previous;
+      final controller = _scroll;
+      // Scroll notifications arrive after layout. Only the current attached
+      // viewport can turn this completed drag into a chapter boundary.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            _reader.isContinuous &&
+            identical(controller, _scroll) &&
+            controller.hasClients) {
+          _offerChapterEdge(edge);
+        }
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
+    }
+    return false;
   }
 
   void _selectPage(int index) {
@@ -1238,43 +1468,49 @@ class _ReaderScreenState extends State<ReaderScreen> {
       final advance = widget.tapZones == ReaderInputPreset.reversed
           ? !forward
           : forward;
-      advance ? _advance() : _back();
+      _turn(advance);
     }
   }
 
-  Widget _continuous() => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    excludeFromSemantics: true,
-    onTapUp: _onCanvasTap,
-    child: ListView.builder(
-      key: const ValueKey('continuous-reader'),
-      controller: _scroll,
-      scrollCacheExtent: const ScrollCacheExtent.viewport(1),
-      itemCount: _reader.manifest.pages.length,
-      itemExtentBuilder: (index, dimensions) =>
-          _pageHeight(_reader.manifest.pages[index]) + _gap,
-      itemBuilder: (context, index) {
-        final page = _reader.manifest.pages[index];
-        final size = _pageSize(page);
-        return Padding(
-          padding: EdgeInsets.only(bottom: _gap),
-          child: _ContinuousImage(
-            key: ValueKey('continuous-image-${page.key}'),
-            pageKey: page.key,
-            viewportWidth: _viewportWidth,
-            imageSize: size,
-            onAttached: (controller) => _horizontal[page.key] = controller,
-            onDetached: (controller) {
-              if (identical(_horizontal[page.key], controller)) {
-                _horizontal.remove(page.key);
-              }
-            },
-            onMoved: _onHorizontalScroll,
-            onDoubleTap: () => _openZoom(page),
-            child: _image(page),
-          ),
-        );
-      },
+  Widget _continuous() => NotificationListener<ScrollNotification>(
+    onNotification: _onChapterOverscroll,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      excludeFromSemantics: true,
+      onTapUp: _onCanvasTap,
+      child: ListView.builder(
+        key: const ValueKey('continuous-reader'),
+        controller: _scroll,
+        physics: widget.onChapterEdge == null
+            ? null
+            : const AlwaysScrollableScrollPhysics(),
+        scrollCacheExtent: const ScrollCacheExtent.viewport(1),
+        itemCount: _reader.manifest.pages.length,
+        itemExtentBuilder: (index, dimensions) =>
+            _pageHeight(_reader.manifest.pages[index]) + _gap,
+        itemBuilder: (context, index) {
+          final page = _reader.manifest.pages[index];
+          final size = _pageSize(page);
+          return Padding(
+            padding: EdgeInsets.only(bottom: _gap),
+            child: _ContinuousImage(
+              key: ValueKey('continuous-image-${page.key}'),
+              pageKey: page.key,
+              viewportWidth: _viewportWidth,
+              imageSize: size,
+              onAttached: (controller) => _horizontal[page.key] = controller,
+              onDetached: (controller) {
+                if (identical(_horizontal[page.key], controller)) {
+                  _horizontal.remove(page.key);
+                }
+              },
+              onMoved: _onHorizontalScroll,
+              onDoubleTap: () => _openZoom(page),
+              child: _image(page),
+            ),
+          );
+        },
+      ),
     ),
   );
 
@@ -1300,7 +1536,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         final forward = _reader.mode == ReadingMode.rightToLeft
             ? delta.dx > 0
             : delta.dx < 0;
-        forward ? _advance() : _back();
+        _turn(forward);
       },
       onPointerCancel: (event) {
         _pointers.remove(event.pointer);
@@ -1344,11 +1580,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final advance = widget.keyboard == ReaderInputPreset.reversed
         ? !forward
         : forward;
-    advance ? _advance() : _back();
+    _turn(advance);
   }
 
   void _keyboardGoTo(int index) {
-    if (widget.keyboard != ReaderInputPreset.disabled) _goTo(index);
+    if (widget.keyboard != ReaderInputPreset.disabled &&
+        widget.chapterTransition == null) {
+      _goTo(index);
+    }
   }
 
   Widget _title() {
@@ -1461,15 +1700,83 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 if (_reader.manifest.pages.isEmpty) {
                   return const Center(child: Text('这一章没有页面'));
                 }
-                return _ReaderContent(
-                  background: widget.background,
-                  dimPercent: widget.dimPercent,
-                  child: _reader.isContinuous ? _continuous() : _paged(),
+                final transition = widget.chapterTransition;
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ExcludeSemantics(
+                      excluding: transition != null,
+                      child: ExcludeFocus(
+                        excluding: transition != null,
+                        child: IgnorePointer(
+                          ignoring: transition != null,
+                          child: _ReaderContent(
+                            background: widget.background,
+                            dimPercent: widget.dimPercent,
+                            child: _reader.isContinuous
+                                ? _continuous()
+                                : _paged(),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (widget.onChapterEdge != null)
+                      _chapterTransitionLayer(transition),
+                  ],
                 );
               },
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _chapterTransitionLayer(ReaderChapterTransition? transition) {
+    final reduceMotion =
+        MediaQuery.disableAnimationsOf(context) ||
+        MediaQuery.reduceMotionOf(context);
+    return IgnorePointer(
+      ignoring: transition == null,
+      child: ExcludeFocus(
+        excluding: transition == null,
+        child: ExcludeSemantics(
+          excluding: transition == null,
+          child: AnimatedSwitcher(
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
+            child: transition == null
+                ? const SizedBox.expand()
+                : GestureDetector(
+                    key: ValueKey(transition.edge),
+                    behavior: HitTestBehavior.opaque,
+                    excludeFromSemantics: true,
+                    onTapUp: _onCanvasTap,
+                    onHorizontalDragEnd: !_reader.isContinuous
+                        ? (details) {
+                            final velocity = details.primaryVelocity;
+                            if (velocity != null && velocity != 0) {
+                              _turn(
+                                _reader.mode == ReadingMode.rightToLeft
+                                    ? velocity > 0
+                                    : velocity < 0,
+                              );
+                            }
+                          }
+                        : null,
+                    onVerticalDragEnd: _reader.isContinuous
+                        ? (details) {
+                            final velocity = details.primaryVelocity;
+                            if (velocity != null && velocity != 0) {
+                              _turn(velocity < 0);
+                            }
+                          }
+                        : null,
+                    child: transition,
+                  ),
+          ),
+        ),
       ),
     );
   }
@@ -1517,18 +1824,25 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final toolbarProgress = _toolbarAnimation.drive(
       CurveTween(curve: Curves.easeInOutCubic),
     );
+    final chapterTransition = widget.chapterTransition;
     final navigationBar = toolbarMounted
         ? _ReaderNavigationBar(
             progress: toolbarProgress,
             interactive: toolbarInteractive,
             bar: CupertinoNavigationBar(
               automaticBackgroundVisibility: false,
+              automaticallyImplyLeading: chapterTransition == null,
               backgroundColor: AppColors.toolbar.resolveFrom(context),
-              leading: widget.onExit == null
+              leading:
+                  widget.onExit == null ||
+                      (chapterTransition != null &&
+                          chapterTransition.onReturn == null)
                   ? null
                   : CupertinoNavigationBarBackButton(onPressed: widget.onExit),
               middle: _title(),
-              trailing: widget.chapterActions,
+              trailing: chapterTransition == null
+                  ? widget.chapterActions
+                  : null,
             ),
           )
         : null;
@@ -1547,6 +1861,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
         const SingleActivator(LogicalKeyboardKey.home): () => _keyboardGoTo(0),
         const SingleActivator(LogicalKeyboardKey.end): () =>
             _keyboardGoTo(_reader.manifest.pages.length - 1),
+        if (chapterTransition case final transition?)
+          const SingleActivator(LogicalKeyboardKey.escape): () =>
+              transition.onReturn?.call(),
         if (widget.keyboard != ReaderInputPreset.disabled)
           const SingleActivator(LogicalKeyboardKey.keyT, includeRepeats: false):
               _toggleToolbar,
@@ -1572,9 +1889,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         if (toolbarMounted)
                           _ReaderToolbarTransition(
                             progress: toolbarProgress,
-                            interactive: toolbarInteractive,
+                            interactive:
+                                toolbarInteractive && chapterTransition == null,
                             slideFrom: const Offset(0, 1),
-                            child: _controls(),
+                            child: Opacity(
+                              opacity: chapterTransition == null ? 1 : .5,
+                              child: _controls(),
+                            ),
                           ),
                       ],
                     ),

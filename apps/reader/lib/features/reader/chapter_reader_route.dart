@@ -70,6 +70,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
   String? _preparationError;
   Future<void>? _moving;
   late final _preparation = ChapterPreparation(_openChapter);
+  ReaderChapterEdge? _chapterEdge;
   ReaderViewportState? _viewport;
   bool _preparationScheduled = false;
   String? _preparationAttempt;
@@ -498,6 +499,43 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     });
   }
 
+  void _backOrExit() {
+    if (_chapterEdge != null) {
+      _returnFromChapterEdge();
+    } else {
+      unawaited(_exit());
+    }
+  }
+
+  SequenceChapter? _adjacentChapter(ReaderChapterEdge edge) =>
+      _sequence.adjacent(_chapter.sourceIndex, _order, edge.delta);
+
+  String _preparationKey(SequenceChapter target) =>
+      '${_chapter.key}:${target.key}';
+
+  void _showChapterEdge(ReaderChapterEdge edge) {
+    if (_chapterEdge != null ||
+        _busy ||
+        _closing ||
+        _exitPending ||
+        _accessPaused ||
+        _recovering ||
+        _refreshingProgress) {
+      return;
+    }
+    setState(() {
+      _chapterEdge = edge;
+      _error = null;
+    });
+    _schedulePreparation();
+  }
+
+  void _returnFromChapterEdge() {
+    if (_chapterEdge == null || _busy || _closing) return;
+    setState(() => _chapterEdge = null);
+    _schedulePreparation();
+  }
+
   void _schedulePreparation() {
     if (_preparationScheduled || _closing) return;
     _preparationScheduled = true;
@@ -505,24 +543,26 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       _preparationScheduled = false;
       if (!mounted ||
           _closing ||
+          _exitPending ||
           _accessPaused ||
           _recovering ||
           _busy ||
           _preparation.busy ||
-          _preparation.ready ||
           _preparation.blocked ||
           widget.catalog.busy ||
-          !widget.catalog.isCurrentSource(_source) ||
-          _viewport?.atEnd != true ||
-          _viewport?.windowReady != true) {
+          !widget.catalog.isCurrentSource(_source)) {
         return;
       }
-      final next = _sequence.adjacent(_chapter.sourceIndex, _order, 1);
-      if (next == null) return;
-      final attempt = '${_chapter.key}:${next.key}';
+      final edge = _chapterEdge;
+      if (edge == null &&
+          (_viewport?.atEnd != true || _viewport?.windowReady != true)) {
+        return;
+      }
+      final target = _adjacentChapter(edge ?? ReaderChapterEdge.next);
+      if (target == null) return;
+      final attempt = _preparationKey(target);
       if (_preparationAttempt == attempt) return;
-      _preparationAttempt = attempt;
-      unawaited(_prepareNext(next));
+      unawaited(_prepareChapter(target, attempt));
     });
     WidgetsBinding.instance.ensureVisualUpdate();
   }
@@ -535,30 +575,36 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
         logicalChapterKey: chapter.key,
       );
 
-  Future<void> _prepareNext(SequenceChapter target) async {
-    if (_busy ||
-        _accessPaused ||
-        _recovering ||
-        _closing ||
-        _preparation.busy ||
-        _preparation.ready ||
-        _preparation.blocked) {
-      return;
-    }
-    final attempt = _preparationAttempt;
-    final pending = _preparation.prepare(target);
-    setState(() => _preparationError = null);
+  Future<void> _prepareChapter(SequenceChapter target, String attempt) async {
+    setState(() {
+      _preparationAttempt = attempt;
+      _preparationError = null;
+    });
     try {
-      await pending;
+      if (_preparation.ready) await _preparation.discard();
+      if (!mounted ||
+          _closing ||
+          _busy ||
+          _accessPaused ||
+          _recovering ||
+          _preparationAttempt != attempt) {
+        if (_preparationAttempt == attempt) _preparationAttempt = null;
+        return;
+      }
+      await _preparation.prepare(target);
       if (!_closing && mounted && _preparationAttempt == attempt) {
         setState(() {
-          _preparationError = _preparation.ready ? null : widget.catalog.error;
+          if (!_preparation.ready) {
+            _preparationError = widget.catalog.error ?? '章节页面未能加载';
+          }
         });
       }
     } catch (_) {
       if (!_closing && mounted && _preparationAttempt == attempt) {
-        setState(() => _preparationError = '下一章准备未完成，可进入时重试');
+        setState(() => _preparationError = '章节准备未完成，请重试');
       }
+    } finally {
+      _schedulePreparation();
     }
   }
 
@@ -583,7 +629,11 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     }());
   }
 
-  Future<void> _move(SequenceChapter target, {bool reopen = false}) {
+  Future<void> _move(
+    SequenceChapter target, {
+    bool reopen = false,
+    bool fromCanvas = false,
+  }) {
     if (_busy ||
         _closing ||
         _exitPending ||
@@ -594,7 +644,11 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       return Future.value();
     }
     ReaderBaselineScope.read(context)?.event('navigation', {
-      'action': reopen ? 'reopen_chapter' : 'change_chapter',
+      'action': reopen
+          ? 'reopen_chapter'
+          : fromCanvas
+          ? 'continue_chapter'
+          : 'change_chapter',
       'fromChapterKey': _chapter.key,
       'targetChapterKey': target.key,
     });
@@ -604,29 +658,34 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       _preparationError = null;
     });
     final navigator = Navigator.of(context);
-    final waiting = CupertinoDialogRoute<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => PopScope<void>(
-        canPop: false,
-        child: CupertinoAlertDialog(
-          title: Text(reopen ? '正在重新打开章节' : '正在切换章节'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(target.name),
-              const SizedBox(height: 12),
-              const CupertinoActivityIndicator(),
-            ],
-          ),
-        ),
-      ),
-    );
-    unawaited(navigator.push(waiting));
+    final waiting = fromCanvas
+        ? null
+        : CupertinoDialogRoute<void>(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => PopScope<void>(
+              canPop: false,
+              child: CupertinoAlertDialog(
+                title: Text(reopen ? '正在重新打开章节' : '正在切换章节'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(target.name),
+                    const SizedBox(height: 12),
+                    const CupertinoActivityIndicator(),
+                  ],
+                ),
+              ),
+            ),
+          );
+    if (waiting != null) unawaited(navigator.push(waiting));
     return _moving = _changeChapter(target).whenComplete(() {
       _moving = null;
-      if (!_closing && mounted) setState(() => _busy = false);
-      if (!navigator.mounted || !waiting.isActive) return;
+      if (!_closing && mounted) {
+        setState(() => _busy = false);
+        _schedulePreparation();
+      }
+      if (waiting == null || !navigator.mounted || !waiting.isActive) return;
       if (waiting.isCurrent) {
         navigator.pop();
       } else {
@@ -641,8 +700,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     try {
       // Next is an explicit completion action only when the real viewport has
       // displayed the chapter end. A jump or a prepared session is not one.
-      if (_sequence.adjacent(_chapter.sourceIndex, _order, 1)?.key ==
-              target.key &&
+      if (_adjacentChapter(ReaderChapterEdge.next)?.key == target.key &&
           _viewport?.atEnd == true &&
           _viewport?.observed != null) {
         _recordViewport(complete: true);
@@ -690,12 +748,16 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
         _positionRequest.value = null;
         _preparationAttempt = null;
         _preparationError = null;
+        _chapterEdge = null;
         _visible = true;
       });
       next = null; // The route owns it until onAttached mounts the new leaf.
     } catch (_) {
       if (!_closing && mounted) {
-        setState(() => _error = '章节切换未完成，请返回重新连接漫画源');
+        setState(() {
+          if (!_visible) _chapterEdge = null;
+          _error = '章节切换未完成，请返回重新连接漫画源';
+        });
       }
     } finally {
       if (next != null) {
@@ -710,12 +772,74 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     }
   }
 
+  ReaderChapterTransition? _chapterTransition() {
+    final edge = _chapterEdge;
+    if (edge == null) return null;
+    final target = _adjacentChapter(edge);
+    final pageCount = target == null ? null : _preparation.pageCountFor(target);
+    final sourceCurrent = widget.catalog.isCurrentSource(_source);
+    final String? error;
+    if (target == null || _busy) {
+      error = null;
+    } else if (_accessPaused || _recovering) {
+      error = '重新连接后可继续阅读';
+    } else if (_preparation.blocked) {
+      error = '章节资源清理失败，请返回重新连接漫画源';
+    } else if (!sourceCurrent) {
+      error = _error ?? _preparationError ?? '漫画源已中断，请返回重新连接';
+    } else if (pageCount == 0) {
+      error = '目标章节没有页面';
+    } else {
+      error =
+          _error ??
+          (_preparationKey(target) == _preparationAttempt
+              ? _preparationError
+              : null);
+    }
+    final canUseSource =
+        !_busy &&
+        !_accessPaused &&
+        !_recovering &&
+        !_refreshingProgress &&
+        sourceCurrent &&
+        !_preparation.blocked;
+    return ReaderChapterTransition(
+      edge: edge,
+      currentChapter: (
+        name: _chapter.name,
+        scanlator: _chapter.snapshot.scanlator,
+      ),
+      targetChapter: target == null
+          ? null
+          : (name: target.name, scanlator: target.snapshot.scanlator),
+      background: _background,
+      dimPercent: _dimPercent,
+      loading: target != null && error == null && (_busy || pageCount == null),
+      error: error,
+      onContinue:
+          target != null && canUseSource && error == null && pageCount != null
+          ? () => unawaited(_move(target, fromCanvas: true))
+          : null,
+      onRetry: target != null && canUseSource && error != null
+          ? () {
+              setState(() {
+                _preparationError = null;
+                _preparationAttempt = null;
+                _error = null;
+              });
+              _schedulePreparation();
+            }
+          : null,
+      onReturn: _busy ? null : _returnFromChapterEdge,
+    );
+  }
+
   ({Widget previous, Widget next}) _chapterNavigation() {
     final disabled =
         _busy || _accessPaused || _recovering || _refreshingProgress;
 
-    Widget button(int delta, String label) {
-      final target = _sequence.adjacent(_chapter.sourceIndex, _order, delta);
+    Widget button(ReaderChapterEdge edge, String label) {
+      final target = _adjacentChapter(edge);
       final enabled = !disabled && target != null;
       return Semantics(
         container: true,
@@ -731,7 +855,10 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       );
     }
 
-    return (previous: button(-1, '上一章'), next: button(1, '下一章'));
+    return (
+      previous: button(ReaderChapterEdge.previous, '上一章'),
+      next: button(ReaderChapterEdge.next, '下一章'),
+    );
   }
 
   Widget _chapterStatus() {
@@ -743,14 +870,15 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
         if (_busy && _moving == null) const CupertinoActivityIndicator(),
         if (_accessPaused) _accessNotice(),
         if (_preparation.busy && !_busy) const CupertinoActivityIndicator(),
-        if ((_error ?? _preparationError) case final error?)
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Text(
-              error,
-              style: TextStyle(color: AppColors.error.resolveFrom(context)),
+        if (_chapterEdge == null)
+          if ((_error ?? _preparationError) case final error?)
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                error,
+                style: TextStyle(color: AppColors.error.resolveFrom(context)),
+              ),
             ),
-          ),
         if (_settings case final settings?)
           if (_settingsState.busy ||
               _settingsState.error != null ||
@@ -949,28 +1077,32 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
     if (_settingsCurrent) _applySettings(ref.watch(_settingsProvider));
     return PopScope<void>(
-      canPop: _progress == null || _allowPop,
+      canPop: _chapterEdge == null && (_progress == null || _allowPop),
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) unawaited(_exit());
+        if (!didPop) _backOrExit();
       },
       child: _reader(),
     );
   }
 
   Widget _reader() {
+    final transition = _chapterTransition();
     if (!_visible) {
       return CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
-          leading: CupertinoNavigationBarBackButton(
-            onPressed: () => unawaited(_exit()),
-          ),
+          automaticallyImplyLeading: transition == null,
+          leading: transition == null
+              ? CupertinoNavigationBarBackButton(onPressed: _backOrExit)
+              : null,
           middle: Text(_manga.title),
         ),
         child: SafeArea(
           child: Column(
             children: [
               if (_accessPaused && !_allowPop) _accessNotice(),
-              if (_moving == null)
+              if (transition != null)
+                Expanded(child: transition)
+              else if (_moving == null)
                 Expanded(
                   child: Center(
                     child: _error == null
@@ -993,7 +1125,9 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       title: _manga.title,
       subtitle: _chapter.name,
       chapterActions: _chapterActions(),
-      onExit: () => unawaited(_exit()),
+      onExit: _backOrExit,
+      chapterTransition: transition,
+      onChapterEdge: _showChapterEdge,
       initialPosition: _initialPosition,
       preserveInitialPlacement: _preserveInitialPlacement,
       initialMode: _mode,

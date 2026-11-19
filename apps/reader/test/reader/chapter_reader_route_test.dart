@@ -18,6 +18,172 @@ import 'package:source_runtime/source_runtime.dart';
 import '../browse/fakes.dart';
 
 void main() {
+  testWidgets(
+    'turning past the chapter displays and retries its own page list',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final platform = TestPlatform();
+      final catalog = CatalogController(
+        api: platform,
+        runtime: platform.runtime,
+        rebuildRuntime: platform.rebuild,
+      );
+      addTearDown(() async {
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        catalog.dispose();
+        await platform.dispose();
+      });
+      await catalog.connect();
+      await catalog.openBuild(catalog.builds.single);
+      await catalog.selectSource(catalog.session!.sources.single);
+      final manga = catalog.mangas.single;
+      final sequence = ChapterSequence(
+        packageName: 'eu.kanade.source.test',
+        sourceId: sourceId,
+        mangaUrl: manga.url,
+        chapters: [
+          wire.Chapter(url: '/one', name: '原章'),
+          wire.Chapter(url: '/two', name: '目标章节及较长标题', scanlator: '示例翻译组'),
+        ],
+      );
+      final original = sequence.entries.first;
+      final opened = (await catalog.openChapter(
+        manga,
+        ChapterEntry(original.snapshot),
+        reference: catalog.sourceReference,
+        logicalChapterKey: original.key,
+      ))!;
+      final firstReply = Completer<wire.SourceResult>();
+      final closeEmpty = Completer<void>();
+      final closeOriginal = Completer<void>();
+      addTearDown(() {
+        if (!firstReply.isCompleted) {
+          firstReply.complete(
+            wire.SourceResult(
+              pageList: wire.PageList(pageSessionId: 'empty-pages'),
+            ),
+          );
+        }
+        if (!closeEmpty.isCompleted) closeEmpty.complete();
+        if (!closeOriginal.isCompleted) closeOriginal.complete();
+      });
+      var requests = 0;
+      platform.invokeHandler = (call) async {
+        expect(call.pages.chapter.url, '/two');
+        if (++requests == 1) return firstReply.future;
+        return wire.SourceResult(
+          pageList: wire.PageList(
+            pageSessionId: 'target-pages',
+            pages: [
+              wire.Page(pageKey: 'p-0', index: 0, sourceIndex: 0, url: '/p'),
+            ],
+          ),
+        );
+      };
+      platform.closePageSessionHandler = (id) => switch (id) {
+        'empty-pages' => closeEmpty.future,
+        'pages-1' => closeOriginal.future,
+        _ => Future.value(),
+      };
+      await tester.pumpApp(
+        CupertinoApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: ChapterReaderRoute(
+            catalog: catalog,
+            manga: manga,
+            source: catalog.sourceReference,
+            sequence: sequence,
+            initialChapter: original,
+            initialOpened: opened,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final panel = find.byType(ReaderChapterTransition);
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+      await tester.pumpAndSettle();
+      expect(find.text('前面没有章节'), findsOneWidget);
+      expect(requests, 0);
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.pumpAndSettle();
+      expect(panel, findsNothing);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 240));
+      expect(
+        find.descendant(of: panel, matching: find.text('原章')),
+        findsOneWidget,
+      );
+      expect(find.text('目标章节及较长标题'), findsOneWidget);
+      expect(find.text('示例翻译组'), findsOneWidget);
+      expect(find.text('正在加载章节页面'), findsOneWidget);
+      expect(find.byType(CupertinoAlertDialog), findsNothing);
+      expect(requests, 1);
+      expect(find.semantics.byLabel('页码跳转').evaluate(), isEmpty);
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 240));
+      expect(panel, findsNothing);
+      expect(
+        tester.widget<ReaderScreen>(find.byType(ReaderScreen)).provider,
+        same(opened.provider),
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.pump();
+      firstReply.complete(
+        wire.SourceResult(
+          pageList: wire.PageList(pageSessionId: 'empty-pages'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(requests, 1);
+      expect(find.text('目标章节没有页面'), findsOneWidget);
+      await tester.tap(find.descendant(of: panel, matching: find.text('重试')));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('正在加载章节页面'), findsOneWidget);
+      expect(requests, 1);
+      closeEmpty.complete();
+      await tester.pumpAndSettle();
+      expect(requests, 2);
+      expect(find.text('进入下一章'), findsOneWidget);
+      expect(
+        platform.imageControls.where((entry) => entry.$1 == 'acquireImage'),
+        hasLength(1),
+      );
+
+      await tester.tap(find.text('进入下一章'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(ReaderScreen), findsNothing);
+      expect(find.text('正在加载章节页面'), findsOneWidget);
+      expect(find.byType(CupertinoAlertDialog), findsNothing);
+      closeOriginal.complete();
+      await tester.pumpAndSettle();
+      expect(panel, findsNothing);
+      expect(
+        tester.widget<ReaderScreen>(find.byType(ReaderScreen)).subtitle,
+        '目标章节及较长标题',
+      );
+      expect(
+        platform.imageControls.where((entry) => entry.$1 == 'acquireImage'),
+        hasLength(2),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final appearance in Brightness.values) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(

@@ -119,6 +119,7 @@ Widget screen({
   int dimPercent = 0,
   ReaderInputPreset tapZones = ReaderInputPreset.standard,
   ReaderInputPreset keyboard = ReaderInputPreset.standard,
+  ValueChanged<ReaderChapterEdge>? onChapterEdge,
 }) => CupertinoApp(
   home: ReaderScreen(
     manifest: manifest,
@@ -137,6 +138,7 @@ Widget screen({
     dimPercent: dimPercent,
     tapZones: tapZones,
     keyboard: keyboard,
+    onChapterEdge: onChapterEdge,
     onPositionChanged: onPosition,
     onViewportChanged: onViewport,
     onModeChanged: onMode,
@@ -179,6 +181,54 @@ Future<void> choosePageLayout(WidgetTester tester, String label) async {
 }
 
 void main() {
+  for (final mode in [ReadingMode.continuous, ReadingMode.webtoon]) {
+    testWidgets(
+      '$mode only opens a chapter boundary after a drag beyond the scroll extent',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final edges = <ReaderChapterEdge>[];
+        final manifest = ChapterManifest(
+          chapterKey: 'chapter',
+          version: '1',
+          pages: [
+            for (var index = 0; index < 2; index++)
+              ReaderPage(key: 'page-$index', width: 600, height: 1200),
+          ],
+        );
+        await tester.pumpWidget(
+          screen(
+            provider: FixturePageProvider(),
+            manifest: manifest,
+            mode: mode,
+            onChapterEdge: edges.add,
+            imageBuilder: decodedImage(height: 1200),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final reader = find.byKey(const ValueKey('continuous-reader'));
+        final scroll = tester.widget<ListView>(reader).controller!.position;
+        scroll.jumpTo(scroll.maxScrollExtent);
+        await tester.pumpAndSettle();
+        expect(edges, isEmpty);
+        await tester.drag(reader, const Offset(0, -160));
+        await tester.pumpAndSettle();
+        expect(edges, [ReaderChapterEdge.next]);
+        scroll.jumpTo(scroll.minScrollExtent);
+        await tester.pumpAndSettle();
+        expect(edges, [ReaderChapterEdge.next]);
+        await tester.drag(reader, const Offset(0, 160));
+        await tester.pumpAndSettle();
+        expect(edges, [ReaderChapterEdge.next, ReaderChapterEdge.previous]);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'reader controls slide without moving the fitted page and can be reopened by keyboard',
     (tester) async {
