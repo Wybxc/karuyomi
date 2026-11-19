@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-19，Karuyomi 跨版本双主题主图现为 168/169（99.4%），新增逐章部分提交（30.K6）和编辑失效（30.K7）。未连接（27.K1）仍缺两侧。固定 Mihon 参考有 132/170 行完成双主题核对。最终像素、各触发变体与完整转场继续验收。[章节批量与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
+2026-11-19，Karuyomi 跨版本双主题主图为 168/169（99.4%），未连接（27.K1）仍缺两侧。固定 Mihon 参考补齐五个阅读状态，137/170 行（80.6%）完成双主题核对。最终像素、各触发变体与完整转场继续验收。[阅读器参考](mihon-cupertino-fidelity.md#mihon-章节过渡与空页的双主题参考) · [章节批量与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -651,12 +651,15 @@ stateDiagram-v2
     A5 --> A1: 跳转完成
     A1 --> A6: 读至相邻章过渡
     A6 --> A0: 下一章
+    A6 --> A1: 继续到相邻章的实际图片
     A6 --> A21: 相邻章页列表加载
     A21 --> A0: 加载完成
     A21 --> A22: 加载失败
     A22 --> A21: 重试
+    A22 --> A6: 补页后重试恢复原过渡
     A1 --> A23: 已到全书开头
-    A1 --> A24: 已到全书末尾
+    A23 --> A1: 返回本章第一页
+    A1 --> A24: 越过全书末页并显示工具
     A2 --> A25: 工具栏切换章节
     A25 --> A1: 载入完成
     A25 --> A2: 失败后回原章（待实测）
@@ -681,7 +684,7 @@ stateDiagram-v2
     A16 --> A1: 复位或关闭
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class A1,A2,A5,A7,A8,A9,A10,A11,A12,A14,A15,A16,A17,A18,A19,A20 paired
+    class A1,A2,A4,A5,A6,A7,A8,A9,A10,A11,A12,A14,A15,A16,A17,A18,A19,A20,A22,A23,A24 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                          | 浅色                                                                                                     | 深色                                                                                                  |
@@ -690,15 +693,15 @@ stateDiagram-v2
 | 22.02   | 实际图片与页码，工具隐藏                                                       | `s2202-reader-canvas-light`                                                                              | `s2202-reader-canvas-dark`                                                                            |
 | 22.03   | 返回、作品/章节、书签/更多、页码与底部工具                                     | `s2203-reader-tools-light`                                                                               | `s2203-reader-tools-dark`                                                                             |
 | 22.04   | 失败页、错误和重试；不要把外层全屏提示当图片失败                               | 待                                                                                                       | 待                                                                                                    |
-| 22.05   | 初始空页列表错误 toast 并返回作品；不是独立空画布，消息须真实触发              | 待                                                                                                       | 待                                                                                                    |
+| 22.05   | 初始空页返回原作品并显示系统 toast「没有图片」                                 | `s2205-reader-empty-toast-light`                                                                         | `s2205-reader-empty-toast-dark`                                                                       |
 | 22.06   | 3322 Dragonfly 的当前/总页数、滑杆落点；1→2 的实际第二页图片及返回 1           | `s2206-reader-jump-{before,result,restored}-light`                                                       | `s2206-reader-jump-{before,result,restored}-dark`                                                     |
-| 22.07   | 当前章/相邻章、方向和可继续过渡；不含加载/失败及无相邻章分支                   | 待                                                                                                       | 待                                                                                                    |
+| 22.07   | 已读完第 1 章与下一章第 2 章，继续翻页到下一章图片                             | `s2207-reader-neighbor-next-auto-light`                                                                  | `s2207-reader-neighbor-next-auto-dark`                                                                |
 | 22.08   | 初始章节请求失败，退出阅读器回原作品并显示真实错误；恢复网络后重开同章成功     | `s2208-reader-initial-failure-light-5`、`s2209-reader-retry-light-settled`                               | `s2208-reader-initial-failure-dark-5`、`s2209-reader-retry-dark-settled`                              |
 | 22.09   | 首次进入的黑色阅读画布、实际旋转指示；尚无页位工具，读取阶段不由瞬态图推断     | `s2209-reader-retry-light-5`                                                                             | `s2209-reader-retry-dark-5`                                                                           |
 | 22.10   | 相邻章过渡保留原/目标章，显示页列表加载指示与说明                              | 待                                                                                                       | 待                                                                                                    |
-| 22.11   | 相邻章过渡的实际错误、原/目标章和重试                                          | 待                                                                                                       | 待                                                                                                    |
-| 22.12   | 无上一章的边界说明与当前章；不能用普通首页代替                                 | 待                                                                                                       | 待                                                                                                    |
-| 22.13   | 无下一章的边界说明与当前章；不能用普通末页代替                                 | 待                                                                                                       | 待                                                                                                    |
+| 22.11   | 保留相邻两章，显示「图片加载失败：没有图片」和「重试」                         | `s2211-reader-neighbor-error-auto-light`                                                                 | `s2211-reader-neighbor-error-auto-dark`                                                               |
+| 22.12   | 越过首章第一页后显示「前面没有啦」与原章节                                     | `s2212-reader-no-previous-auto-light`                                                                    | `s2212-reader-no-previous-auto-dark`                                                                  |
+| 22.13   | 越过尾章末页后显示「后面没有啦」、已完成章节与工具                             | `s2213-reader-no-next-auto-light`                                                                        | `s2213-reader-no-next-auto-dark`                                                                      |
 | 22.14   | 工具栏切章的不可取消等待弹层、加载指示与说明，和画布内过渡加载区分             | 待                                                                                                       | 待                                                                                                    |
 | 23.01   | 当前模式、可选模式、应用及关闭                                                 | `s2301-reader-mode-light`                                                                                | `s2301-reader-mode-dark`                                                                              |
 | 23.02   | 当前章节可用操作与关闭                                                         | `s2302-reader-more-light`                                                                                | `s2302-reader-more-dark`                                                                              |
@@ -716,6 +719,8 @@ stateDiagram-v2
 阅读新图已实看 `reader-initial-burst-{light,dark}.jpg`、`reader-retry-burst-{light,dark}.jpg`、`reader-jump-pairs.jpg` 和四张 `s2503-reader-zoom-{confirmed,reset}-{light,dark}.png`。同一 xkcd 3322 在专用模拟器断网时实际返回 `Failed to connect to /10.0.2.2:7890`，退出阅读器并由系统显示 toast；恢复网络后重开同章得到真实图片。进入时的旋转指示与阅读模式 toast 同屏，不能把模式提示当作错误。采样帧为先截图的短时连续 PNG，时间记录在同前缀 `.timing.json`，没有同帧 XML；随后 `settled.xml` 只代表稍后的页面。首次章与图片加载复用指示组件，仅凭黑底旋转帧不能证明内部所处阶段，已知页位的 22.01 继续待采。
 
 页码滑杆从 1 拖至 2 后菜单自动隐藏，重开工具后显示页码 2 及真实第二页，再拖回 1；操作前后的稳定主图成对，拖动中的浮动反馈帧仍待。第二页是 Source 提供的文字图片，按原比例显示可能横向裁切，不当作缩放证据。早期无明确双击间隔的 `doubletap` / `zoomed-picture` 图仅切换了工具，均排除；正式 25.03 使用两次触点间 100ms，取得约两倍放大的实际第一张图片及复位。深色主图有完整页码，浅色放大图的页码未显示，工具/计时变体继续单列。两主题沿用黑色阅读背景，图片本身未染色；已读标记因实际阅读改变，失败前的读状态不同不作同数据叠图。未触发空页、单张图片失败或章节过渡分支。Wi-Fi/移动数据已恢复为原启用值，模拟器暂停。
+
+2026-11-19 使用固定 Mihon 0.21.3 的本地图源补齐 22.05、22.07、22.11–22.13。两主题使用同样的章节和翻页方向，稳定过渡使用自动阅读背景。空章直接退出显示系统提示，两份稍后 XML 核对相同的三章排序及唯一未读项。相邻章失败保留当前与目标，浅色为目标补页后原重试恢复，并继续到实际图片。已知页位加载、单页解码错误、过渡加载及工具切章等待继续采集。[参考图片与归一化量测](mihon-cupertino-fidelity.md#mihon-章节过渡与空页的双主题参考)
 
 ## 26–30：设置、选择与通用弹层
 
