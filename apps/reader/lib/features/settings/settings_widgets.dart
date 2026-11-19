@@ -563,7 +563,7 @@ class const _SettingsEditor({
                 (value) => r.keyboard = value,
                 r.clearKeyboard,
               ),
-            ], footer: '反向会交换方向键、上下翻页键和空格的翻页方向；Home/End 仍到首末页。'),
+            ], footer: '反向会交换方向键、上下翻页键和空格的翻页方向。Home/End 到首末页，T 显示或隐藏工具栏。'),
           ],
         ],
         if (!manga &&

@@ -1376,6 +1376,17 @@ flutter test --no-pub --concurrency=1 test/reader/reader_screen_test.dart test/r
 
 独立读回每个阶段的六个 API。显隐工具及打开、取消菜单前后快照相同；书签增、删与滑杆跳转各写一次，新标签续读快照相同。浅色 50 条、深色 52 条审计均有终态。深色响应式量测额外保存一次第 2 页的横向锚点。同章读回和实际图片在两主题均通过。验收标签及服务均关闭，恢复内置浏览器默认视口。[验收入口](../../apps/api/test/README.md)
 
+## 阅读器显隐与页码
+
+固定 Mihon 的 `ReaderAppBars.kt` 用 200 毫秒滑动和 150 毫秒淡入淡出显示上下工具栏。`ReaderActivity.kt` 在隐藏时保留底部页码，参考 22.02 两色的 `1 / 2` 辅助范围归一化后都是 `[165.5,786,194.5,800]`。Karuyomi 此前同页隐藏工具时没有可见页码，连续与条漫缺中央显隐入口。
+
+Flutter 3.50.0 的 153 项定向回归和三个 Dart 文件的严格分析通过。组件测试在动画中间确认导航向上、底部工具向下、画布尺寸与适屏图片位置保持稳定，移动中的控件从触控与辅助树退出。测试覆盖隐藏页码的值和可点击范围、Tab 与回车恢复、快速反向切换、系统减弱动态与关闭动画。连续和条漫逐一核对单击显隐、双击查看及当前阅读锚点保持。旧连续模式用例暴露拆除图片的双击识别器时仍会交付待确认的单击；布局和拆除阶段忽略该迟到事件后复验通过。正式 Web 双主题待验。
+
+```sh
+cd apps/reader
+flutter test --no-pub --concurrency=1 test/reader/reader_screen_test.dart test/reader/chapter_reader_route_test.dart test/reader/reader_access_recovery_test.dart test/reader/reading_progress_navigation_test.dart test/browse/chapter_read_navigation_test.dart test/settings/settings_navigation_test.dart test/widgets/choice_field_test.dart test/widget_test.dart
+```
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。

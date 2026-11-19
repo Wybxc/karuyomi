@@ -174,7 +174,7 @@ Future<void> choosePageLayout(WidgetTester tester, String label) async {
 
 void main() {
   testWidgets(
-    'showing reader controls keeps a fully fitted page centered in the safe area',
+    'reader controls slide without moving the fitted page and can be reopened by keyboard',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(360, 844);
@@ -198,18 +198,56 @@ void main() {
       expect(withControls.center.dy, closeTo((24 + 844 - 34) / 2, 1));
       expect(tester.getRect(viewport).contains(withControls.center), isTrue);
       expect(withControls.bottom, lessThan(tester.getRect(viewport).bottom));
-      Future<void> toggleControls() async {
-        await tester.tapAt(tester.getCenter(viewport));
-        await tester.pump(kDoubleTapTimeout);
-        await tester.pumpAndSettle();
-      }
+      final navigationBar = find.byType(CupertinoNavigationBar);
+      final bottomControl = iconLabel('下一页');
+      final indicator = find.byKey(const ValueKey('reader-page-indicator'));
+      final shownTop = tester.getTopLeft(navigationBar).dy;
+      final shownBottom = tester.getCenter(bottomControl).dy;
+      final shownViewport = tester.getRect(viewport);
 
-      await toggleControls();
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(tester.getTopLeft(navigationBar).dy, lessThan(shownTop));
+      expect(tester.getCenter(bottomControl).dy, greaterThan(shownBottom));
+      expect(tester.getRect(viewport), shownViewport);
       expect(tester.getRect(image), withControls);
+      expect(pageLayoutMenu.hitTestable(), findsNothing);
+      expect(find.semantics.byLabel('下一页').evaluate(), isEmpty);
+      expect(indicator, findsNothing);
+      await tester.pumpAndSettle();
       expect(pageLayoutMenu, findsNothing);
-      await toggleControls();
+      expect(find.text('1 / 20'), findsOneWidget);
+      expect(tester.getRect(image), withControls);
+      final pageControl = tester.getSemantics(indicator).getSemanticsData();
+      expect(pageControl.label, '显示阅读工具');
+      expect(pageControl.value, '1 / 20');
+      expect(pageControl.flagsCollection.isButton, isTrue);
+      expect(tester.getSize(indicator).shortestSide, greaterThanOrEqualTo(44));
+      expect(tester.getRect(indicator).bottom, lessThanOrEqualTo(810));
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getSemantics(indicator)
+            .getSemanticsData()
+            .flagsCollection
+            .isFocused,
+        Tristate.isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
       expect(tester.getRect(image), withControls);
       expect(pageLayoutMenu.hitTestable(), findsOneWidget);
+      expect(indicator, findsNothing);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+      await tester.pumpAndSettle();
+      expect(pageLayoutMenu.hitTestable(), findsOneWidget);
+      expect(tester.getRect(image), withControls);
 
       tester.view.physicalSize = const Size(360, 420);
       await tester.pumpAndSettle();
@@ -222,6 +260,115 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+
+  for (final disabled in [false, true]) {
+    testWidgets(
+      'reader tool motion respects accessibility settings (disabled: $disabled)',
+      (tester) async {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            FakeAccessibilityFeatures(
+              reduceMotion: true,
+              disableAnimations: disabled,
+            );
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        await tester.pumpWidget(
+          screen(
+            provider: FixturePageProvider(),
+            manifest: fixtureChapter(),
+            doublePage: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final header = find.byType(CupertinoNavigationBar);
+        final original = tester.getRect(header);
+        await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+        await tester.pump();
+        if (disabled) {
+          expect(header, findsNothing);
+          expect(find.text('1 / 20'), findsOneWidget);
+        } else {
+          await tester.pump(const Duration(milliseconds: 80));
+          expect(tester.getRect(header), original);
+          final fades = tester.widgetList<FadeTransition>(
+            find.ancestor(of: header, matching: find.byType(FadeTransition)),
+          );
+          expect(
+            fades.any(
+              (fade) => fade.opacity.value > 0 && fade.opacity.value < 1,
+            ),
+            isTrue,
+          );
+          await tester.pumpAndSettle();
+          expect(header, findsNothing);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
+  for (final mode in [ReadingMode.continuous, ReadingMode.webtoon]) {
+    testWidgets(
+      'central tap toggles $mode tools and double tap still opens the image',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        final manifest = fixtureChapter();
+        final viewports = <ReaderViewportState>[];
+        await tester.pumpWidget(
+          screen(
+            provider: FixturePageProvider(),
+            manifest: manifest,
+            position: manifest.positionAt(5, offset: .3),
+            mode: mode,
+            tapZones: ReaderInputPreset.disabled,
+            imageBuilder: decodedImage(),
+            onViewport: viewports.add,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final current = viewports.last.current;
+        final list = find.byKey(const ValueKey('continuous-reader'));
+        final navigationBar = find.byType(CupertinoNavigationBar);
+        final indicator = find.byKey(const ValueKey('reader-page-indicator'));
+        await tester.tapAt(tester.getCenter(list));
+        await tester.pump(kDoubleTapTimeout);
+        await tester.pumpAndSettle();
+        expect(navigationBar, findsNothing);
+        expect(indicator.hitTestable(), findsOneWidget);
+        expect(find.text('6 / 20'), findsOneWidget);
+        expect(viewports.last.current, current);
+
+        await tester.tapAt(tester.getCenter(list));
+        await tester.pump(kDoubleTapTimeout);
+        await tester.pumpAndSettle();
+        expect(navigationBar, findsOneWidget);
+        expect(indicator, findsNothing);
+        expect(viewports.last.current, current);
+
+        final image = find.byKey(ValueKey('image-rect-${current.pageKey}'));
+        final imagePoint = tester
+            .getRect(image)
+            .intersect(tester.getRect(list))
+            .center;
+        await tester.tapAt(imagePoint);
+        await tester.pump(const Duration(milliseconds: 60));
+        await tester.tapAt(imagePoint);
+        await tester.pumpAndSettle();
+        expect(find.text('查看图片'), findsOneWidget);
+        await tester.tap(iconLabel('关闭图片'));
+        await tester.pumpAndSettle();
+        expect(navigationBar, findsOneWidget);
+        expect(viewports.last.current, current);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
 
   testWidgets(
     'default reader image pipeline trims actual file pixels and preserves original anchors',

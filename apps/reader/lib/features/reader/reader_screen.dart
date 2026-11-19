@@ -126,6 +126,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   late ReaderResourcePool _resourcePool;
   late ScrollController _scroll;
   late TransformationController _transform;
+  late AnimationController _toolbarAnimation;
   final _horizontal = <String, ScrollController>{};
   final _pointers = <int>{};
   Offset? _dragStart;
@@ -461,6 +462,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
         _publishAppearance();
       }
       _reader.updateManifest(widget.manifest);
+      if (!_toolbar && _reader.position == null) {
+        _toolbar = true;
+        _toolbarAnimation.value = 1;
+      }
       _scheduleDimensions();
       _scheduleRestore();
     }
@@ -1187,35 +1192,75 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
-  Widget _continuous() => ListView.builder(
-    key: const ValueKey('continuous-reader'),
-    controller: _scroll,
-    scrollCacheExtent: const ScrollCacheExtent.viewport(1),
-    itemCount: _reader.manifest.pages.length,
-    itemExtentBuilder: (index, dimensions) =>
-        _pageHeight(_reader.manifest.pages[index]) + _gap,
-    itemBuilder: (context, index) {
-      final page = _reader.manifest.pages[index];
-      final size = _pageSize(page);
-      return Padding(
-        padding: EdgeInsets.only(bottom: _gap),
-        child: _ContinuousImage(
-          key: ValueKey('continuous-image-${page.key}'),
-          pageKey: page.key,
-          viewportWidth: _viewportWidth,
-          imageSize: size,
-          onAttached: (controller) => _horizontal[page.key] = controller,
-          onDetached: (controller) {
-            if (identical(_horizontal[page.key], controller)) {
-              _horizontal.remove(page.key);
-            }
-          },
-          onMoved: _onHorizontalScroll,
-          onDoubleTap: () => _openZoom(page),
-          child: _image(page),
-        ),
-      );
-    },
+  void _toggleToolbar() {
+    if (_reader.position == null) return;
+    setState(() => _toolbar = !_toolbar);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _toolbarAnimation.value = _toolbar ? 1 : 0;
+    } else if (_toolbar) {
+      _toolbarAnimation.forward();
+    } else {
+      _toolbarAnimation.reverse();
+    }
+  }
+
+  void _onCanvasTap(TapUpDetails details) {
+    // Disposing a page's double-tap recognizer can release a pending single tap.
+    if (!mounted ||
+        WidgetsBinding.instance.schedulerPhase ==
+            SchedulerPhase.persistentCallbacks) {
+      return;
+    }
+    final fraction = details.localPosition.dx / _viewportWidth;
+    if (fraction > 1 / 3 && fraction < 2 / 3) {
+      _toggleToolbar();
+    } else if (!_reader.isContinuous &&
+        !_zoomed &&
+        widget.tapZones != ReaderInputPreset.disabled) {
+      final forward = _reader.mode == ReadingMode.rightToLeft
+          ? fraction < 1 / 3
+          : fraction > 2 / 3;
+      final advance = widget.tapZones == ReaderInputPreset.reversed
+          ? !forward
+          : forward;
+      advance ? _advance() : _back();
+    }
+  }
+
+  Widget _continuous() => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    excludeFromSemantics: true,
+    onTapUp: _onCanvasTap,
+    child: ListView.builder(
+      key: const ValueKey('continuous-reader'),
+      controller: _scroll,
+      scrollCacheExtent: const ScrollCacheExtent.viewport(1),
+      itemCount: _reader.manifest.pages.length,
+      itemExtentBuilder: (index, dimensions) =>
+          _pageHeight(_reader.manifest.pages[index]) + _gap,
+      itemBuilder: (context, index) {
+        final page = _reader.manifest.pages[index];
+        final size = _pageSize(page);
+        return Padding(
+          padding: EdgeInsets.only(bottom: _gap),
+          child: _ContinuousImage(
+            key: ValueKey('continuous-image-${page.key}'),
+            pageKey: page.key,
+            viewportWidth: _viewportWidth,
+            imageSize: size,
+            onAttached: (controller) => _horizontal[page.key] = controller,
+            onDetached: (controller) {
+              if (identical(_horizontal[page.key], controller)) {
+                _horizontal.remove(page.key);
+              }
+            },
+            onMoved: _onHorizontalScroll,
+            onDoubleTap: () => _openZoom(page),
+            child: _image(page),
+          ),
+        );
+      },
+    ),
   );
 
   Widget _paged() {
@@ -1249,21 +1294,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onDoubleTap: () => _zoom(_zoomed ? 0.2 : 2),
-        onTapUp: (details) {
-          final fraction = details.localPosition.dx / _viewportWidth;
-          if (fraction > 1 / 3 && fraction < 2 / 3) {
-            setState(() => _toolbar = !_toolbar);
-          } else if (!_zoomed &&
-              widget.tapZones != ReaderInputPreset.disabled) {
-            final forward = _reader.mode == ReadingMode.rightToLeft
-                ? fraction < 1 / 3
-                : fraction > 2 / 3;
-            final advance = widget.tapZones == ReaderInputPreset.reversed
-                ? !forward
-                : forward;
-            advance ? _advance() : _back();
-          }
-        },
+        onTapUp: _onCanvasTap,
         child: InteractiveViewer(
           key: ValueKey('spread-${spread.pages.first.key}'),
           transformationController: _transform,
@@ -1343,6 +1374,41 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
+  Widget _pageIndicator() {
+    final count = '${_reader.pageIndex + 1} / ${_reader.manifest.pages.length}';
+    return Semantics(
+      key: const ValueKey('reader-page-indicator'),
+      container: true,
+      label: '显示阅读工具',
+      value: count,
+      child: CupertinoButton(
+        onPressed: _toggleToolbar,
+        alignment: Alignment.bottomCenter,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: ExcludeSemantics(
+          child: DecoratedBox(
+            decoration: ShapeDecoration(
+              color: CupertinoColors.black.withValues(alpha: .8),
+              shape: const StadiumBorder(),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: Text(
+                count,
+                style: const TextStyle(
+                  color: CupertinoColors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: [ui.FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _readingCanvas(double centerY) {
     final needsPositionNotice = _reader.requiresPositionNotice;
     return DefaultTextStyle.merge(
@@ -1397,6 +1463,23 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Widget build(BuildContext context) {
     _scroll = useScrollController();
     _transform = useTransformationController();
+    _toolbarAnimation = useAnimationController(
+      duration: const Duration(milliseconds: 200),
+      initialValue: 1,
+    );
+    useEffect(() {
+      final animation = _toolbarAnimation;
+      void update(AnimationStatus status) {
+        if (mounted &&
+            (status == AnimationStatus.completed ||
+                status == AnimationStatus.dismissed)) {
+          setState(() {});
+        }
+      }
+
+      animation.addStatusListener(update);
+      return () => animation.removeStatusListener(update);
+    }, [_toolbarAnimation]);
     _appearance = useValueNotifier<_ReaderAppearance>((
       background: widget.background,
       dimPercent: widget.dimPercent,
@@ -1413,15 +1496,25 @@ class _ReaderScreenState extends State<ReaderScreen> {
     useOnListenableChange(_scroll, _onScroll);
     useOnListenableChange(_transform, _onTransform);
     useOnListenableChange(widget.positionRequest, _applyPositionRequest);
-    final navigationBar = _toolbar
-        ? CupertinoNavigationBar(
-            automaticBackgroundVisibility: false,
-            backgroundColor: AppColors.toolbar.resolveFrom(context),
-            leading: widget.onExit == null
-                ? null
-                : CupertinoNavigationBarBackButton(onPressed: widget.onExit),
-            middle: _title(),
-            trailing: widget.chapterActions,
+    // Keep the canvas constraints steady while painting the exit transition.
+    final toolbarMounted = _toolbar || !_toolbarAnimation.isDismissed;
+    final toolbarInteractive = _toolbar && _toolbarAnimation.isCompleted;
+    final toolbarProgress = _toolbarAnimation.drive(
+      CurveTween(curve: Curves.easeInOutCubic),
+    );
+    final navigationBar = toolbarMounted
+        ? _ReaderNavigationBar(
+            progress: toolbarProgress,
+            interactive: toolbarInteractive,
+            bar: CupertinoNavigationBar(
+              automaticBackgroundVisibility: false,
+              backgroundColor: AppColors.toolbar.resolveFrom(context),
+              leading: widget.onExit == null
+                  ? null
+                  : CupertinoNavigationBarBackButton(onPressed: widget.onExit),
+              middle: _title(),
+              trailing: widget.chapterActions,
+            ),
           )
         : null;
     return CallbackShortcuts(
@@ -1439,6 +1532,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
         const SingleActivator(LogicalKeyboardKey.home): () => _keyboardGoTo(0),
         const SingleActivator(LogicalKeyboardKey.end): () =>
             _keyboardGoTo(_reader.manifest.pages.length - 1),
+        if (widget.keyboard != ReaderInputPreset.disabled)
+          const SingleActivator(LogicalKeyboardKey.keyT, includeRepeats: false):
+              _toggleToolbar,
       },
       child: Focus(
         autofocus: true,
@@ -1452,10 +1548,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 // Express the full safe area's center in the canvas's coordinates.
                 final barHeight = navigationBar?.preferredSize.height ?? 0;
                 final centerY = (bounds.maxHeight - barHeight) / 2;
-                return Column(
+                return Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Expanded(child: _readingCanvas(centerY)),
-                    if (_toolbar) _controls(),
+                    Column(
+                      children: [
+                        Expanded(child: _readingCanvas(centerY)),
+                        if (toolbarMounted)
+                          _ReaderToolbarTransition(
+                            progress: toolbarProgress,
+                            interactive: toolbarInteractive,
+                            slideFrom: const Offset(0, 1),
+                            child: _controls(),
+                          ),
+                      ],
+                    ),
+                    if (!toolbarMounted && _reader.position != null)
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: _pageIndicator(),
+                      ),
                   ],
                 );
               },
@@ -1682,6 +1794,63 @@ class _ReaderScreenState extends State<ReaderScreen> {
     unawaited(_reader.dispose());
     super.dispose();
   }
+}
+
+class _ReaderToolbarTransition extends StatelessWidget {
+  const _ReaderToolbarTransition({
+    required this.progress,
+    required this.interactive,
+    required this.slideFrom,
+    required this.child,
+  });
+
+  final Animation<double> progress;
+  final bool interactive;
+  final Offset slideFrom;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    excluding: !interactive,
+    child: ExcludeFocus(
+      excluding: !interactive,
+      child: IgnorePointer(
+        ignoring: !interactive,
+        child: ClipRect(
+          clipBehavior: interactive ? Clip.none : Clip.hardEdge,
+          child: FadeTransition(
+            opacity: progress,
+            child: SlideTransition(
+              position: MediaQuery.reduceMotionOf(context)
+                  ? const AlwaysStoppedAnimation(Offset.zero)
+                  : progress.drive(
+                      Tween<Offset>(begin: slideFrom, end: Offset.zero),
+                    ),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _ReaderNavigationBar extends _ReaderToolbarTransition
+    implements ObstructingPreferredSizeWidget {
+  const _ReaderNavigationBar({
+    required this.bar,
+    required super.progress,
+    required super.interactive,
+  }) : super(slideFrom: const Offset(0, -1), child: bar);
+
+  final CupertinoNavigationBar bar;
+
+  @override
+  Size get preferredSize => bar.preferredSize;
+
+  @override
+  bool shouldFullyObstruct(BuildContext context) =>
+      bar.shouldFullyObstruct(context);
 }
 
 /// Each lazily built page owns its horizontal position and disposes it when
