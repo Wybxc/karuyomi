@@ -4,7 +4,7 @@ import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -694,6 +694,15 @@ void main() {
       expect(_posts(platform), hasLength(3));
       expect(_posts(platform).last.body, uncertain);
       expect(find.text('已确认 2 / 4 章 · 未开始 2 章'), findsOneWidget);
+      final end = tester
+          .getSemantics(find.widgetWithText(CupertinoButton, '结束剩余操作'))
+          .getSemanticsData();
+      expect(end.label, '结束剩余操作');
+      expect(end.hasAction(SemanticsAction.tap), isTrue);
+      const retention = '当前会话保留原清单和未确认操作；关闭不会撤回已发请求。';
+      final note = tester.getSemantics(find.text(retention)).getSemanticsData();
+      expect(note.label, retention);
+      expect(note.hasAction(SemanticsAction.tap), isFalse);
       expect(
         platform.businessServer.progress(
           _sequence.mangaKey,
@@ -900,6 +909,11 @@ void main() {
         () => received.future.timeout(const Duration(seconds: 5)),
       );
       expect(find.text('全部标记已由服务端确认。'), findsNothing);
+      final pause = tester
+          .getSemantics(find.widgetWithText(CupertinoButton, '暂停剩余操作'))
+          .getSemanticsData();
+      expect(pause.label, '暂停剩余操作');
+      expect(pause.hasAction(SemanticsAction.tap), isTrue);
       final dismiss = find.widgetWithText(CupertinoButton, '稍后');
       expect(
         tester

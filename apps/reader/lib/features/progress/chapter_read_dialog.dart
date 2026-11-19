@@ -241,9 +241,12 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
           if (_expired)
             Text('请关闭并重新连接服务，再打开原作品查看章节标记。', style: TextStyle(color: noteColor))
           else if (draft.attempted && !draft.finished)
-            Text(
-              '当前会话保留原清单和未确认操作；关闭不会撤回已发请求。',
-              style: TextStyle(color: noteColor),
+            Semantics(
+              container: true,
+              child: Text(
+                '当前会话保留原清单和未确认操作；关闭不会撤回已发请求。',
+                style: TextStyle(color: noteColor),
+              ),
             ),
           if (!_expired && draft.busy)
             Semantics(
