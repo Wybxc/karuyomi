@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/widgets.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:image/image.dart' as img;
 
 import '../../diagnostics/reader_baseline.dart';
@@ -479,6 +479,16 @@ class _ResourceImageState extends State<ResourceImage> {
     gaplessPlayback: false,
     excludeFromSemantics: true,
     frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+      if (frame == null && _error == null) {
+        return Center(
+          child: Semantics(
+            label: '正在加载图片',
+            child: CupertinoActivityIndicator(
+              color: DefaultTextStyle.of(context).style.color,
+            ),
+          ),
+        );
+      }
       if (frame != null && _error == null) {
         final baseline = _baseline;
         if (baseline != null && baseline.recording) {

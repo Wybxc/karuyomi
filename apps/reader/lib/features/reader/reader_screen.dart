@@ -1017,9 +1017,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Widget _image(ReaderPage page, {BoxFit fit = BoxFit.contain}) {
     final snapshot = _scheduler.snapshot;
     final resource = snapshot.resources[page.key];
+    final number = _reader.manifest.pages.indexOf(page) + 1;
     if (resource != null) {
       return Semantics(
-        label: '第 ${_reader.manifest.pages.indexOf(page) + 1} 页',
+        label: '第 $number 页',
         image: true,
         child: NotificationListener<ReaderImageDecoded>(
           onNotification: (notification) {
@@ -1097,34 +1098,48 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (snapshot.cleanupError != null) {
       return const Center(child: Text('图片资源清理失败，请重新打开章节。'));
     }
-    if (snapshot.errors.containsKey(page.key)) {
+    if (snapshot.errors[page.key] case final error?) {
+      final detail = switch (error) {
+        RuntimeException(code: RuntimeErrorCode.unsupportedCapability) =>
+          '当前平台尚未支持图片阅读',
+        RuntimeException(code: RuntimeErrorCode.accessRequired) =>
+          '访问验证已失效，请返回重新登录',
+        RuntimeException(code: RuntimeErrorCode.runtimeLost) =>
+          '漫画源已中断，请返回重新连接',
+        ImageBudgetExceeded(:final message) => message,
+        _ => null,
+      };
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(switch (snapshot.errors[page.key]) {
-              RuntimeException(code: RuntimeErrorCode.unsupportedCapability) =>
-                '当前平台尚未支持图片阅读',
-              RuntimeException(code: RuntimeErrorCode.accessRequired) =>
-                '访问验证已失效，请返回重新登录',
-              RuntimeException(code: RuntimeErrorCode.runtimeLost) =>
-                '漫画源已中断，请返回重新连接',
-              ImageBudgetExceeded(:final message) => message,
-              _ => '图片未能加载',
-            }),
-            const SizedBox(height: 8),
-            CupertinoButton.filled(
-              onPressed: widget.paused
-                  ? null
-                  : () => _scheduler.retry(page.key),
-              child: const Text('重试'),
-            ),
-          ],
+        child: SingleChildScrollView(
+          primary: false,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('第 $number 页未能加载', textAlign: TextAlign.center),
+              if (detail != null) Text(detail, textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              CupertinoButton.filled(
+                onPressed: widget.paused
+                    ? null
+                    : () => _scheduler.retry(page.key),
+                child: const Text('重试'),
+              ),
+            ],
+          ),
         ),
       );
     }
     return snapshot.loading.contains(page.key)
-        ? const Center(child: CupertinoActivityIndicator())
+        ? Center(
+            child: Semantics(
+              container: true,
+              label: '正在加载第 $number 页',
+              child: CupertinoActivityIndicator(
+                color: _readerForegroundColor(context, widget.background),
+              ),
+            ),
+          )
         : const SizedBox.shrink();
   }
 

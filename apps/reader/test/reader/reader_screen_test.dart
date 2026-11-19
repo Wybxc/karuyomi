@@ -20,9 +20,14 @@ import 'package:karuyomi/theme/app_theme.dart';
 import 'package:reader_core/reader_core.dart';
 
 final class FixturePageProvider implements PageProvider {
-  FixturePageProvider({this.location, this.byteLength = 100});
+  FixturePageProvider({
+    this.location,
+    this.byteLength = 100,
+    this.beforeAcquire,
+  });
   final Uri? location;
   final int byteLength;
+  final Future<void> Function(PageRef)? beforeAcquire;
   final acquired = <PageRef>[];
   final released = <String>[];
   final cancelled = <String>[];
@@ -30,6 +35,7 @@ final class FixturePageProvider implements PageProvider {
   @override
   Future<ImageResource> acquire(PageRef ref) async {
     acquired.add(ref);
+    if (beforeAcquire case final gate?) await gate(ref);
     return ImageResource(
       id: '${ref.generation}-${ref.pageKey}',
       generation: ref.generation,
@@ -2441,9 +2447,13 @@ void main() {
   );
 
   testWidgets(
-    'decoder error clears observed progress and rejects a queued late frame',
+    'loading, failure and decoded retry preserve the same page without false observation',
     (tester) async {
-      final provider = FixturePageProvider();
+      final acquireGate = Completer<void>();
+      final provider = FixturePageProvider(
+        beforeAcquire: (ref) =>
+            ref.pageKey == 'page-0' ? acquireGate.future : Future.value(),
+      );
       final viewports = <ReaderViewportState>[];
       BuildContext? imageContext;
       await tester.pumpWidget(
@@ -2457,6 +2467,10 @@ void main() {
           },
         ),
       );
+      await tester.pump();
+      expect(find.semantics.byLabel('正在加载第 1 页').evaluate(), hasLength(1));
+      expect(viewports.where((viewport) => viewport.observed != null), isEmpty);
+      acquireGate.complete();
       await tester.pumpAndSettle();
       expect(viewports.last.observed, isNull);
       ReaderImageDecoded(
@@ -2479,8 +2493,25 @@ void main() {
       expect(viewports.last.observed, isNull);
       expect(viewports.last.windowReady, false);
       expect(viewports.last.atEnd, false);
-      expect(find.text('图片未能加载'), findsOneWidget);
+      expect(find.text('第 1 页未能加载'), findsOneWidget);
       expect(provider.released, contains('runtime-1-page-0'));
+      await tester.tap(find.text('重试'));
+      await tester.pump(kDoubleTapTimeout);
+      await tester.pumpAndSettle();
+      final attempts = provider.acquired.where(
+        (ref) => ref.pageKey == 'page-0',
+      );
+      expect(attempts.map((ref) => ref.requestId).toSet(), hasLength(2));
+      expect(find.text('第 1 页未能加载'), findsNothing);
+      expect(viewports.last.current.pageKey, 'page-0');
+      expect(viewports.last.observed, isNull);
+      ReaderImageDecoded(
+        'runtime-1-page-0',
+        width: 600,
+        height: 900,
+      ).dispatch(imageContext!);
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed?.pageKey, 'page-0');
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);

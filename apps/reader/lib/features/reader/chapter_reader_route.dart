@@ -584,6 +584,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
   Future<void> _move(SequenceChapter target, {bool reopen = false}) {
     if (_busy ||
         _closing ||
+        _exitPending ||
         _accessPaused ||
         _recovering ||
         _refreshingProgress ||
@@ -599,9 +600,36 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       _busy = true;
       _error = null;
     });
-    final operation = _changeChapter(target);
-    _moving = operation;
-    return operation;
+    final navigator = Navigator.of(context);
+    final waiting = CupertinoDialogRoute<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PopScope<void>(
+        canPop: false,
+        child: CupertinoAlertDialog(
+          title: Text(reopen ? '正在重新打开章节' : '正在切换章节'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(target.name),
+              const SizedBox(height: 12),
+              const CupertinoActivityIndicator(),
+            ],
+          ),
+        ),
+      ),
+    );
+    unawaited(navigator.push(waiting));
+    return _moving = _changeChapter(target).whenComplete(() {
+      _moving = null;
+      if (!_closing && mounted) setState(() => _busy = false);
+      if (!navigator.mounted || !waiting.isActive) return;
+      if (waiting.isCurrent) {
+        navigator.pop();
+      } else {
+        navigator.removeRoute(waiting);
+      }
+    });
   }
 
   Future<void> _changeChapter(SequenceChapter target) async {
@@ -675,7 +703,6 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
           }
         }
       }
-      if (!_closing && mounted) setState(() => _busy = false);
     }
   }
 
@@ -709,7 +736,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (_busy) const CupertinoActivityIndicator(),
+        if (_busy && _moving == null) const CupertinoActivityIndicator(),
         if (_accessPaused) _accessNotice(),
         if (_preparation.busy && !_busy) const CupertinoActivityIndicator(),
         if (_error case final error?)
@@ -939,13 +966,14 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
           child: Column(
             children: [
               if (_accessPaused && !_allowPop) _accessNotice(),
-              Expanded(
-                child: Center(
-                  child: _error == null
-                      ? const CupertinoActivityIndicator()
-                      : Text(_error!),
+              if (_moving == null)
+                Expanded(
+                  child: Center(
+                    child: _error == null
+                        ? const CupertinoActivityIndicator()
+                        : Text(_error!),
+                  ),
                 ),
-              ),
             ],
           ),
         ),

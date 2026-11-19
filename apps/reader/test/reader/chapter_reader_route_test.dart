@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
@@ -12,6 +13,7 @@ import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+import 'package:source_runtime/source_runtime.dart';
 
 import '../browse/fakes.dart';
 
@@ -317,6 +319,7 @@ void main() {
         await tester.pump();
         await tester.pump();
         expect(find.byType(ReaderScreen), findsNothing);
+        expect(find.text('正在切换章节'), findsOneWidget);
         expect(
           platform.invocations.last.pages.chapter,
           sequence.entries[1].snapshot,
@@ -350,6 +353,7 @@ void main() {
         }
         await tester.pumpAndSettle();
         expect(find.byType(ReaderScreen), findsOneWidget);
+        expect(find.byType(CupertinoAlertDialog), findsNothing);
         expect(
           find.semantics.byLabel('${manga.title} · 二').evaluate(),
           hasLength(1),
@@ -380,78 +384,124 @@ void main() {
     );
   }
 
-  testWidgets(
-    'route exit closes a late next chapter without acquiring images',
-    (tester) async {
-      final platform = TestPlatform();
-      final catalog = CatalogController(
-        api: platform,
-        runtime: platform.runtime,
-        rebuildRuntime: platform.rebuild,
-      );
-      await catalog.connect();
-      await catalog.openBuild(catalog.builds.single);
-      await catalog.selectSource(catalog.session!.sources.single);
-      final manga = catalog.mangas.single;
-      final sequence = ChapterSequence(
-        packageName: 'eu.kanade.source.test',
-        sourceId: sourceId,
-        mangaUrl: manga.url,
-        chapters: [
-          wire.Chapter(url: '/one', name: '一'),
-          wire.Chapter(url: '/two', name: '二'),
-        ],
-      );
-      final opened = await catalog.openChapter(
-        manga,
-        ChapterEntry(sequence.entries.first.snapshot),
-        reference: catalog.sourceReference,
-        logicalChapterKey: sequence.entries.first.key,
-      );
-      final delayed = Completer<wire.SourceResult>();
-      platform.invokeHandler = (_) => delayed.future;
-      await tester.pumpApp(
-        CupertinoApp(
-          home: ChapterReaderRoute(
-            catalog: catalog,
-            manga: manga,
-            source: catalog.sourceReference,
-            sequence: sequence,
-            initialChapter: sequence.entries.first,
-            initialOpened: opened!,
+  for (final exit in [false, true]) {
+    testWidgets(
+      exit ? 'route exit closes a late next chapter without acquiring images' : 'a failed toolbar hop keeps the original chapter and restores its actions',
+      (tester) async {
+        final platform = TestPlatform();
+        final catalog = CatalogController(
+          api: platform,
+          runtime: platform.runtime,
+          rebuildRuntime: platform.rebuild,
+        );
+        await catalog.connect();
+        await catalog.openBuild(catalog.builds.single);
+        await catalog.selectSource(catalog.session!.sources.single);
+        final manga = catalog.mangas.single;
+        final sequence = ChapterSequence(
+          packageName: 'eu.kanade.source.test',
+          sourceId: sourceId,
+          mangaUrl: manga.url,
+          chapters: [
+            wire.Chapter(url: '/one', name: '一'),
+            wire.Chapter(url: '/two', name: '二'),
+          ],
+        );
+        final opened = await catalog.openChapter(
+          manga,
+          ChapterEntry(sequence.entries.first.snapshot),
+          reference: catalog.sourceReference,
+          logicalChapterKey: sequence.entries.first.key,
+        );
+        final delayed = Completer<wire.SourceResult>();
+        platform.invokeHandler = (_) => delayed.future;
+        await tester.pumpApp(
+          CupertinoApp(
+            home: ChapterReaderRoute(
+              catalog: catalog,
+              manga: manga,
+              source: catalog.sourceReference,
+              sequence: sequence,
+              initialChapter: sequence.entries.first,
+              initialOpened: opened!,
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('下一章'));
-      await tester.pump();
-      await tester.pumpApp(const SizedBox.shrink());
-      await tester.pumpAndSettle();
-      delayed.complete(
-        wire.SourceResult(
-          pageList: wire.PageList(
-            pageSessionId: 'late-next',
-            pages: [
-              wire.Page(pageKey: 'p-0', index: 0, sourceIndex: 0, url: '/p'),
-            ],
+        );
+        await tester.pumpAndSettle();
+        final nextLocation = tester.getCenter(find.text('下一章'));
+        await tester.tap(find.text('下一章'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        final waiting = find.byType(CupertinoAlertDialog);
+        expect(find.text('正在切换章节'), findsOneWidget);
+        expect(
+          find.descendant(of: waiting, matching: find.text('二')),
+          findsOneWidget,
+        );
+        expect(find.text('一'), findsOneWidget);
+        expect(find.semantics.byLabel('下一章').evaluate(), isEmpty);
+        await tester.tapAt(nextLocation);
+        await tester.binding.handlePopRoute();
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pump();
+        expect(waiting, findsOneWidget);
+        expect(
+          platform.invocations.where((call) => call.hasPages()),
+          hasLength(2),
+        );
+
+        if (!exit) {
+          delayed.completeError(
+            const RuntimeException(RuntimeErrorCode.sourceError, 'Page error'),
+          );
+          await tester.pumpAndSettle();
+          expect(waiting, findsNothing);
+          expect(find.text('漫画源请求失败，请重试'), findsOneWidget);
+          expect(find.text('下一章').hitTestable(), findsOneWidget);
+          final reader = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
+          expect(reader.provider, same(opened.provider));
+          expect(
+            platform.imageControls.where(
+              (entry) => entry.$1 == 'closePageSession',
+            ),
+            isEmpty,
+          );
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          catalog.dispose();
+          await platform.dispose();
+          return;
+        }
+
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        delayed.complete(
+          wire.SourceResult(
+            pageList: wire.PageList(
+              pageSessionId: 'late-next',
+              pages: [
+                wire.Page(pageKey: 'p-0', index: 0, sourceIndex: 0, url: '/p'),
+              ],
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byType(ReaderScreen), findsNothing);
-      expect(
-        platform.imageControls.where((entry) => entry.$1 == 'acquireImage'),
-        hasLength(1),
-      );
-      expect(
-        platform.imageControls
-            .where((entry) => entry.$1 == 'closePageSession')
-            .map((entry) => entry.$2['pageSessionId']),
-        containsAll(['pages-1', 'late-next']),
-      );
-      expect(tester.takeException(), isNull);
-      catalog.dispose();
-      await platform.dispose();
-    },
-  );
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(ReaderScreen), findsNothing);
+        expect(
+          platform.imageControls.where((entry) => entry.$1 == 'acquireImage'),
+          hasLength(1),
+        );
+        expect(
+          platform.imageControls
+              .where((entry) => entry.$1 == 'closePageSession')
+              .map((entry) => entry.$2['pageSessionId']),
+          containsAll(['pages-1', 'late-next']),
+        );
+        expect(tester.takeException(), isNull);
+        catalog.dispose();
+        await platform.dispose();
+      },
+    );
+  }
 }
