@@ -1361,12 +1361,20 @@ flutter test --no-pub --concurrency=1 test/reader/reader_screen_test.dart test/r
 
 2026-11-19，固定 Mihon 的 `reader_activity.xml` 将 `viewer_container` 和 `compose_overlay` 分层。`ReaderTopBar.kt` 显示作品、章节、书签和更多，`ReaderAppBars.kt` 将章节滑杆与常用工具放在底部。Karuyomi 使用 Cupertino 导航栏分两行显示标题，书签和阅读选项移到顶部。页码进入滑杆所在行，翻页、模式、分页、缩放和设置归到下方工具区。
 
-Flutter 3.50.0 的 122 项定向回归和 10 个文件的严格分析通过。360×844 含顶部和底部安全区的适屏图片在工具显隐时保持同一矩形，短屏图片仍全部位于可见画布。正式章节组件在 360×800 两主题、1×和 2×字号核对两行标题、顶部书签及更多、底部设置、边界禁用和原操作。原点按回归先发现当前页位数变化会横移滑杆，给计数分配稳定宽度后通过。画布位置、辅助焦点与真实图片需复验正式 Web。
+Flutter 3.50.0 的 122 项定向回归和 10 个文件的严格分析通过。360×844 含顶部和底部安全区的适屏图片在工具显隐时保持同一矩形，短屏图片仍全部位于可见画布。正式章节组件在 360×800 两主题、1×和 2×字号核对两行标题、顶部书签及更多、底部设置、边界禁用和原操作。原点按回归先发现当前页位数变化会横移滑杆，给计数分配稳定宽度后通过。
 
 ```sh
 cd apps/reader
 flutter test --no-pub --concurrency=1 test/reader/reader_screen_test.dart test/reader/chapter_reader_route_test.dart test/reader/reader_access_recovery_test.dart test/reader/reading_progress_navigation_test.dart test/browse/chapter_read_navigation_test.dart test/settings/settings_navigation_test.dart test/widgets/choice_field_test.dart
 ```
+
+`313bbc9` 完整分支 CI、PR CI 和 Wasm 通过，部署跳过。正式 Web 归档 `14506020393` 为 16,315,637 字节，SHA-256 为 `41d51d935e504a4ccfbf36fcdeff232fc259088c06c0aaef077d91e4c984fe70`。核对归档 39 项资源、两个 Wrangler 实际 HTTP 清单各 35 项、入口 `main.dart.9d5d2b8b.js` 和原运行时 host 字节。[分支 CI](https://github.com/Wybxc/karuyomi/actions/runs/44472093411) · [PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44472099788)
+
+在 360×800 内置浏览器，用两套独立 `editor-ui` Wrangler/D1 分别设浅、深色并收藏英文 xkcd。用 3324 第 1 页、从右到左复用上节的六点采样。Karuyomi 工具栏显示、隐藏、再显示三次的连续图片范围均为 `y=[128,673)`。上版 `7db8551` 为 `y=[47,582)`，Mihon 浅色为 `y=[132,673)`，深色为 `y=[133,673)`。工具显示时可操作画布由 541 增至 649 高，隐藏后为 800 高。下一章辅助中心由 `(41,627)` 到 `(41,715)`，Mihon 参考为约 `(32,696)`。书签、阅读选项和齿轮入口均为 44×44，滑杆辅助范围约 115×40。深色 320×640 工具可换行，画布高 445，844×390 仍有 239 高画布。顶部系统区和底栏仍有可见差距。
+
+两种主题都用 Tab 与回车进入顶部「阅读选项」及底部「分页布局」。焦点分别从「刷新进度」和当前「自动」开始，Escape 回到各自入口。齿轮打开「本漫画阅读设置」，关闭后保留第 1 页。两色均实按顶部添加和移除书签，再用滑杆拖到第 2 页，关闭原标签后从新标签续读第 2 页。
+
+独立读回每个阶段的六个 API。显隐工具及打开、取消菜单前后快照相同；书签增、删与滑杆跳转各写一次，新标签续读快照相同。浅色 50 条、深色 52 条审计均有终态。深色响应式量测额外保存一次第 2 页的横向锚点。同章读回和实际图片在两主题均通过。验收标签及服务均关闭，恢复内置浏览器默认视口。[验收入口](../../apps/api/test/README.md)
 
 ## 仍需的证据
 

@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-19，`313bbc9` 的正式 Web 双主题同页图片上缘从 47 px 移到 128 px，参考 Mihon 为 132–133 px。工具显隐、菜单焦点、书签和新标签续读通过，122 项定向回归、分支与 PR CI 和 Wasm 通过。[阅读器工具区与画布](verification/mihon-cupertino-fidelity.md#阅读器工具区与画布)
+
 2026-11-19，`7db8551` 的正式 Web 双主题通过阅读器页码滑杆、从右到左方向、键盘操作和新标签续读。三个跳转动作各提交一次进度。100 项定向回归、分支与 PR CI 通过；同页画布纵向位置和工具区仍需对齐。[阅读页码与方向](verification/mihon-cupertino-fidelity.md#阅读页码滑杆与方向排列)
 
 2026-11-19，`4026db3` 的第 3324 章第一页完成与 Mihon 的同页量测。`21f23d6` 正式 Web 深浅色核对暂停确认后的独立结束节点、首次回车、页章边界禁用与 D1 续读位置第 2 页。两轮各只有一次章节标记，106 项 Flutter 回归通过。[键盘焦点](verification/mihon-cupertino-fidelity.md#章节批量动作名称与焦点范围) · [同页对照](verification/mihon-cupertino-fidelity.md#阅读器同页与边界的正式-web-双主题对照)

@@ -726,6 +726,8 @@ stateDiagram-v2
 
 `7db8551` 在相同 3324 章和双主题复验 22.03 的方向几何，22.06 通过滑杆拖动、键盘、点按及新文档续读。主图计数保持 168/169 和 137/170，画布纵向位置及控制区仍有差距。[页码滑杆量测与读回](mihon-cupertino-fidelity.md#阅读页码滑杆与方向排列)
 
+`313bbc9` 正式 Web 双主题核对 22.02 与 22.03 的同页显隐。三种工具阶段的图像边界均为 `[128,673)`，Mihon 的同页显示工具参考约为 `[132,673)`。23.02 的阅读选项和 23.03 的书签入口移入顶部并通过原动作。底栏与其余阅读状态继续验收。[阅读器工具区与画布](mihon-cupertino-fidelity.md#阅读器工具区与画布)
+
 ## 26–30：设置、选择与通用弹层
 
 依据：`presentation/more/settings/screen/SettingsMainScreen.kt`、`SettingsAppearanceScreen.kt`、`SettingsReaderScreen.kt`、`SettingsAdvancedScreen.kt`、`debug/DebugInfoScreen.kt`、`WorkerInfoScreen.kt`，以及官方 Preference 对应选择/编辑对话框。通用弹层复用前面已定义状态，不用另一个页面的常态代替。
