@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-20，Karuyomi 跨版本双主题主图为 168/169（99.4%），未连接（27.K1）仍缺两侧。固定 Mihon 参考补齐封面菜单、取消与恢复结果，以及阅读模式覆盖与继承，144/170 行（84.7%）完成双主题主图核对。最终像素、各触发变体与完整转场继续验收。[封面和阅读模式参考](mihon-cupertino-fidelity.md#mihon-封面操作与阅读模式继承) · [章节批量与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
+2026-11-20，Karuyomi 跨版本双主题主图为 168/169（99.4%），未连接（27.K1）仍缺两侧。固定 Mihon 参考新增详情刷新等待、章节请求失败、源空清单和筛选无匹配，148/170 行（87.1%）完成双主题主图核对。最终像素、各触发变体与完整转场继续验收。[详情刷新与章节空态](mihon-cupertino-fidelity.md#mihon-详情刷新与章节空态) · [章节批量与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -487,7 +487,8 @@ stateDiagram-v2
     state "21.03 迁移完成" as Q7
     M0 --> M1: 成功且未收藏
     M0 --> M2: 成功且已收藏
-    M0 --> M6: 本地已有摘要且远端未补齐
+    M0 --> M6: 本地已有摘要且远端未补齐（待验）
+    M2 --> M6: 下拉刷新已收藏作品
     M6 --> M1: 补载完成且未收藏
     M6 --> M2: 补载完成且已收藏
     M6 --> M4: 更新失败并保留摘要
@@ -503,6 +504,7 @@ stateDiagram-v2
     M1 --> H0: 章节加载成功
     M2 --> H0: 章节加载成功
     M1 --> H1: 没有章节
+    H1 --> H1: 下拉重读空章节（浅色）
     H0 --> H2: 筛选
     H2 --> H3: 排序页签
     H3 --> H4: 显示页签
@@ -547,7 +549,7 @@ stateDiagram-v2
     Q6 --> Q7: 完成
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class M1,M2,M3,M5,H0,H2,H3,H4,H6,H7,H8,V0,V1,V2,Q2,Q3,Q4,Q5,Q8,Q9,Q10,Q12 paired
+    class M1,M2,M3,M4,M5,M6,H0,H1,H2,H3,H4,H5,H6,H7,H8,V0,V1,V2,Q2,Q3,Q4,Q5,Q8,Q9,Q10,Q12 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                                          | 浅色                                                                                                                           | 深色                                                                                                                       |
@@ -556,15 +558,15 @@ stateDiagram-v2
 | 16.02   | One Piece / MangaDex ALL 的完整未收藏详情、作者、状态、摘要和添加入口                          | `s1602-one-piece-ready-light`                                                                                                  | `s1602-one-piece-ready-dark`                                                                                               |
 | 16.03   | 已在书架状态、分类/续读入口及同一元数据                                                        | `s1603-details-light`                                                                                                          | `s1603-details-dark`                                                                                                       |
 | 16.04   | 同一 One Piece 的长简介、完整标签及收起；分首屏与末段，并核对收起后回原详情                    | `s1604-one-piece-expanded-{top,tail}-light`、`s1602-one-piece-ready-light`                                                     | `s1604-one-piece-expanded-{top,tail}-dark`、`s1602-one-piece-ready-dark`                                                   |
-| 16.05   | 加载失败保留资料、具体错误与再次刷新入口；元数据/章节失败分别采集                              | 待                                                                                                                             | 待                                                                                                                         |
+| 16.05   | xkcd 章节刷新返回 502 后保留资料和原清单；再次下拉恢复；单独元数据失败待采                     | `s1605-details-chapters-failed-light`                                                                                          | `s1605-details-chapters-failed-dark`                                                                                       |
 | 16.06   | 重复作品名称、封面、来源、章节数、仍然添加与取消；两侧取消后目标仍未收藏，查看/迁移/添加转换待 | `s1606-one-piece-duplicate-light`、`s1606-duplicate-cancel-light`                                                              | `s1606-one-piece-duplicate-dark`、`s1606-duplicate-cancel-dark`                                                            |
-| 16.07   | 已有摘要时补载元数据/章节，保留摘要并显示更新反馈；早期 XML 的 0 章不能证明稍后 PNG 的加载态   | 待                                                                                                                             | 待                                                                                                                         |
+| 16.07   | xkcd 已有简介和清单，下拉后保留原内容并显示刷新指示；本地摘要后的首轮远程补载另验              | `s1607-details-held-light`                                                                                                     | `s1607-details-held-dark`                                                                                                  |
 | 17.01   | 同一 xkcd 的章节数量、名称、日期、已读/未读和下载操作；Dragonfly 已读，其余首屏章节未读        | `s1701-chapter-list-light`                                                                                                     | `s1701-chapter-list-dark`                                                                                                  |
-| 17.02   | 空章节说明和重新读取入口                                                                       | 待                                                                                                                             | 待                                                                                                                         |
+| 17.02   | 本地图源实际为空，显示共 0 章、底层详情及筛选与更多；浅色实际下拉重读仍为空                    | `s1702-true-empty-chapters-light`                                                                                              | `s1702-true-empty-chapters-dark`                                                                                           |
 | 17.03   | 筛选页签、未读/书签等三态、翻译组入口                                                          | `s1703-chapter-filter-light`                                                                                                   | `s1703-chapter-filter-dark`                                                                                                |
 | 17.04   | 当前排序字段/方向                                                                              | `s1704-chapter-sort-light`                                                                                                     | `s1704-chapter-sort-dark`                                                                                                  |
 | 17.05   | 当前显示方式                                                                                   | `s1705-chapter-display-light`                                                                                                  | `s1705-chapter-display-dark`                                                                                               |
-| 17.06   | 生效条件、无章节及清除/返回                                                                    | 待                                                                                                                             | 待                                                                                                                         |
+| 17.06   | xkcd 启用「已下载」后共 0 章且保留作品资料；恢复无条件后重新显示全列表                         | `s1706-chapters-filtered-light`                                                                                                | `s1706-chapters-filtered-dark`                                                                                             |
 | 17.07   | 默认设置/重置菜单及底层上下文；参考附加分支，不据此扩展本轮产品功能                            | `s1707-chapter-options-more-light`                                                                                             | `s1707-chapter-options-more-dark`                                                                                          |
 | 18.01   | 选中数量、选中行、退出/全选和底部动作                                                          | `s1801-chapter-selection-light`                                                                                                | `s1801-chapter-selection-dark`                                                                                             |
 | 18.02   | 已读/未读/书签三类结果各自可见，不能只凭点击记录                                               | `s1802-chapter-read-light`、`s1802-chapter-unread-light`、`s1802-chapter-bookmarked-light`、`s1802-chapter-unbookmarked-light` | `s1802-chapter-read-dark`、`s1802-chapter-unread-dark`、`s1802-chapter-bookmarked-dark`、`s1802-chapter-unbookmarked-dark` |
@@ -590,6 +592,8 @@ stateDiagram-v2
 16–21 已实看 `migration-reference-pairs-0.jpg` 至 `migration-reference-pairs-3.jpg`、`migration-reference-selected-pairs.jpg`，以及 `manga-reference-pairs-0.jpg` 至 `manga-reference-pairs-2.jpg`。原作品为 xkcd，目标源保持最初三个已选项；先全不选、查看菜单、返回并全选恢复，再继续搜索。xkcd 查询真实返回三源无结果；输入 one piece 得到 MangaDex ALL/EN 的真实作品，选择 ALL 第一项进入数据选择。此操作只查看目标作品，未执行共存或迁移。One Piece ALL 与书架已有 EN 版本触发真实重复提示，两主题均取消，目标保持未收藏。返回书架后原 xkcd/One Piece EN 关系保持；模拟器已暂停。
 
 长简介展开首屏和末段已成对，完整显示正文与标签，再收起回原详情。首个目标详情的 XML 曾为未知作者/0章，而随后同前缀 PNG 已完成元数据和章节加载；该帧不能作为16.01/16.07或17.02的图片证据。早期输入丢字产生的 o ie 查询只留在忽略目录，不填入同条件主图。20.06 的正式成对图包含选中背景与继续按钮；未实际点击此入口进入配置，不能用作品更多菜单的成功转换替代。空书架迁移、冷加载、迁移失败、共存/迁移后的落点和所有修改/取消变体仍待。
+
+刷新等待和 502 由同一次真实 xkcd 章节更新得到，两色均保留原简介与各自当时的章节数。放行后再次下拉恢复。两色均启用再清除下载筛选，并从本地图源实际打开无章节作品。[双主题画面与测试条件](mihon-cupertino-fidelity.md#mihon-详情刷新与章节空态)
 
 以下为两主题稳定 XML 相同的主要矩形，均为720×1600/320dpi的物理像素；仅建立参考锚点，尚未与 Karuyomi 迁移页叠图：
 

@@ -101,7 +101,8 @@ Future<void> _reveal(WidgetTester tester, Finder finder) async {
           matching: find.byType(Scrollable),
         )
         .first;
-    await tester.drag(scrollable, const Offset(0, 3000));
+    final position = tester.state<ScrollableState>(scrollable).position;
+    position.jumpTo(position.minScrollExtent);
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(finder, 250, scrollable: scrollable);
   }

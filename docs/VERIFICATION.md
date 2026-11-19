@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-20，固定 Mihon 0.21.3 的刷新等待、章节失败、源空清单和筛选无匹配新增四组双主题实拍，累计 148/170（87.1%）。Karuyomi 详情的 Cupertino 下拉刷新保留原资料直到两段读取成功，增加失败重试和筛选清除。最新版的正式 Web 双主题继续待验。[详情刷新与章节空态](verification/mihon-cupertino-fidelity.md#mihon-详情刷新与章节空态)
+
 2026-11-20，`66be7cd` 正式 Web 双主题通过分页、连续和条漫的工具显隐、隐藏页码与恢复入口。三种模式均保留当前页位，连续的最远页随新露出的实际图片推进。153 项回归覆盖转场、快速切换和系统减弱动态，分支、PR CI 和 Wasm 通过。[阅读器显隐与页码](verification/mihon-cupertino-fidelity.md#阅读器显隐与页码)
 
 2026-11-19，`313bbc9` 的正式 Web 双主题同页图片上缘从 47 px 移到 128 px，参考 Mihon 为 132–133 px。工具显隐、菜单焦点、书签和新标签续读通过，122 项定向回归、分支与 PR CI 和 Wasm 通过。[阅读器工具区与画布](verification/mihon-cupertino-fidelity.md#阅读器工具区与画布)

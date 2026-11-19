@@ -46,12 +46,18 @@ class const MangaDetailsPage({
 
 enum _ChapterReadFilter { all, read, unread }
 
+enum _DetailsRefresh { pull, action }
+
 class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
   CatalogController get controller => widget.controller;
-  MangaEntry get manga => widget.manga;
-  List<ChapterEntry> get chapters => widget.chapters;
+  MangaEntry get manga => _refreshedDetails?.manga ?? widget.manga;
+  List<ChapterEntry> get chapters =>
+      _refreshedDetails?.chapters ?? widget.chapters;
   CatalogSourceRef get source => widget.source;
   ChapterSequence? _sequence;
+  ({MangaEntry manga, List<ChapterEntry> chapters})? _refreshedDetails;
+  _DetailsRefresh? _sourceRefresh;
+  String? _sourceRefreshError;
   MangaResume? _resume;
   String? _resumeError;
   bool _resumeReadFailed = false;
@@ -86,27 +92,34 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
   final _chapterNameCounts = <String, int>{};
   final _chapterUrlCounts = <String, int>{};
 
+  void _rebuildSequence(String packageName) {
+    final sequence = ChapterSequence(
+      packageName: packageName,
+      sourceId: source.sourceId,
+      mangaUrl: manga.url,
+      chapters: chapters.map((chapter) => chapter.snapshot),
+    );
+    _sequence = sequence;
+    _chapterNameCounts.clear();
+    _chapterUrlCounts.clear();
+    for (final chapter in sequence.entries) {
+      _chapterNameCounts.update(
+        chapter.name,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+      _chapterUrlCounts.update(
+        chapter.snapshot.url,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+    }
+  }
+
   void _initialize() {
     final build = controller.activeBuild;
     if (build != null) {
-      _sequence = ChapterSequence(
-        packageName: build.packageName,
-        sourceId: source.sourceId,
-        mangaUrl: manga.url,
-        chapters: chapters.map((chapter) => chapter.snapshot),
-      );
-      for (final chapter in _sequence!.entries) {
-        _chapterNameCounts.update(
-          chapter.name,
-          (count) => count + 1,
-          ifAbsent: () => 1,
-        );
-        _chapterUrlCounts.update(
-          chapter.snapshot.url,
-          (count) => count + 1,
-          ifAbsent: () => 1,
-        );
-      }
+      _rebuildSequence(build.packageName);
       _library = controller.library;
       if (_library != null) _covers = CoverRepository(_library!.client);
       final repository = controller.bookmarks;
@@ -152,6 +165,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         !identical(oldWidget.manga, widget.manga) ||
         !identical(oldWidget.chapters, widget.chapters)) {
       _detailsExpired = true;
+      _refreshedDetails = null;
       _chapterSelection.clear();
       _selectingChapters = false;
       _bookmarks?.checkCurrent();
@@ -204,6 +218,73 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         );
       }
     }
+  }
+
+  bool get _canRefreshSource =>
+      _sourceRefresh == null &&
+      !_detailsExpired &&
+      !_opening &&
+      !_editingCover &&
+      !_migrating &&
+      !_savingFavorite &&
+      !_selectingChapters &&
+      !_markingChapters &&
+      !controller.busy &&
+      controller.status == ServiceStatus.ready &&
+      controller.isCurrentSource(source);
+
+  Future<void> _refreshSource(_DetailsRefresh refresh) async {
+    if (!_canRefreshSource) return;
+    final catalog = controller;
+    final build = catalog.activeBuild;
+    if (build == null) return;
+    final route = ModalRoute.of(context);
+    final reference = source;
+    bool current() =>
+        mounted &&
+        !_detailsExpired &&
+        identical(controller, catalog) &&
+        identical(source, reference) &&
+        route?.isCurrent == true &&
+        catalog.status == ServiceStatus.ready &&
+        catalog.isCurrentSource(reference);
+    if (!current()) return;
+    setState(() {
+      _sourceRefresh = refresh;
+      _sourceRefreshError = null;
+    });
+    final result = await catalog.details(manga, shouldContinue: current);
+    if (!mounted) return;
+    if (!current()) {
+      setState(() => _sourceRefresh = null);
+      return;
+    }
+    if (result == null ||
+        !catalog.isCurrentSource(result.source) ||
+        result.manga.url != manga.url) {
+      setState(() {
+        _sourceRefresh = null;
+        _sourceRefreshError = result == null
+            ? catalog.error ?? '请稍后重试。'
+            : '漫画源返回了不同的作品。';
+      });
+      return;
+    }
+    setState(() {
+      _sourceRefresh = null;
+      _refreshedDetails = (manga: result.manga, chapters: result.chapters);
+      _rebuildSequence(build.packageName);
+      _resetRange();
+      _failedChapter = null;
+      _chapterOpenError = null;
+      if (_resume case final resume?
+          when !_sequence!.entries.any(
+            (entry) => entry.key == resume.chapterKey,
+          )) {
+        _resume = null;
+      }
+    });
+    unawaited(_refreshResume());
   }
 
   @override
@@ -913,6 +994,17 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
     ];
   }
 
+  Widget _sourceRefreshButton({bool retry = false}) => CupertinoButton(
+    key: const ValueKey('details-source-refresh'),
+    padding: const EdgeInsets.all(8),
+    onPressed: _canRefreshSource
+        ? () => unawaited(_refreshSource(_DetailsRefresh.action))
+        : null,
+    child: retry
+        ? const Text('重试刷新')
+        : const Icon(CupertinoIcons.refresh, semanticLabel: '刷新作品资料和章节'),
+  );
+
   List<Widget> _chapterList() {
     final sequence = _sequence;
     final query = _chapterSearch.text.trim().toLowerCase();
@@ -954,6 +1046,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
               semanticLabel: _chapterOptions ? '收起章节选项' : '章节选项',
             ),
           ),
+          if (_sourceRefreshError == null) _sourceRefreshButton(),
         ],
       ),
       const SizedBox(height: 12),
@@ -1048,20 +1141,41 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         ..._chapterReadControls(visible),
       ],
       Text('显示 ${visible.length} / ${chapters.length} 章'),
-      if (controller.busy) const CupertinoActivityIndicator(),
-      if (controller.error != null && _chapterOpenError == null)
+      if (controller.busy && _sourceRefresh == null)
+        const CupertinoActivityIndicator(),
+      if (controller.error != null &&
+          _chapterOpenError == null &&
+          _sourceRefreshError == null)
         Text(controller.error!),
       if (chapters.isEmpty)
         const Padding(padding: EdgeInsets.all(24), child: Text('这个漫画源没有返回章节'))
       else if (visible.isEmpty)
         Padding(
           padding: const EdgeInsets.all(16),
-          child: Text(
-            query.isEmpty && _onlyBookmarks
-                ? '当前章节列表中没有书签'
-                : _onlyBookmarks
-                ? '没有符合搜索和书签筛选的章节'
-                : '没有匹配的章节',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                query.isEmpty && _onlyBookmarks
+                    ? '当前章节列表中没有书签'
+                    : _onlyBookmarks
+                    ? '没有符合搜索和书签筛选的章节'
+                    : '没有匹配的章节',
+              ),
+              CupertinoButton(
+                key: const ValueKey('clear-chapter-filters'),
+                padding: EdgeInsets.zero,
+                onPressed: _markingChapters
+                    ? null
+                    : () => setState(() {
+                        _chapterSearch.clear();
+                        _onlyBookmarks = false;
+                        _readFilter = _ChapterReadFilter.all;
+                        _resetRange();
+                      }),
+                child: const Text('清除章节筛选'),
+              ),
+            ],
           ),
         ),
       for (final chapter in visible)
@@ -1188,132 +1302,186 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
             : Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 900),
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      if (widget.notice case final notice?) Text(notice),
-                      if (_library != null) ...[
-                        _favoriteControl(),
-                        const SizedBox(height: 16),
-                      ] else
-                        _mangaInformation(null),
-                      if (manga.genres.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 8,
+                  child: CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      CupertinoSliverRefreshControl(
+                        onRefresh: () => _refreshSource(_DetailsRefresh.pull),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.all(16),
+                        sliver: SliverList.list(
                           children: [
-                            for (final genre in manga.genres)
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: AppColors.selection.resolveFrom(
-                                    context,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
+                            if (widget.notice case final notice?) Text(notice),
+                            if (_library != null) ...[
+                              _favoriteControl(),
+                              const SizedBox(height: 16),
+                            ] else
+                              _mangaInformation(null),
+                            if (_sourceRefresh != null)
+                              Semantics(
+                                liveRegion: true,
+                                child: Row(
+                                  children: [
+                                    if (_sourceRefresh ==
+                                        _DetailsRefresh.action) ...[
+                                      const CupertinoActivityIndicator(),
+                                      const SizedBox(width: 8),
+                                    ],
+                                    const Flexible(child: Text('正在刷新作品资料和章节')),
+                                  ],
                                 ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  child: Text(
-                                    genre,
-                                    style: TextStyle(
-                                      color: AppColors.onSelection.resolveFrom(
-                                        context,
+                              ),
+                            if (_sourceRefreshError case final error?)
+                              Semantics(
+                                liveRegion: true,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '未能刷新作品资料和章节。$error',
+                                      style: TextStyle(
+                                        color: AppColors.error.resolveFrom(
+                                          context,
+                                        ),
                                       ),
-                                      fontSize: 13,
+                                    ),
+                                    _sourceRefreshButton(retry: true),
+                                  ],
+                                ),
+                              ),
+                            if (manga.genres.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  for (final genre in manga.genres)
+                                    DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: AppColors.selection.resolveFrom(
+                                          context,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        child: Text(
+                                          genre,
+                                          style: TextStyle(
+                                            color: AppColors.onSelection
+                                                .resolveFrom(context),
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                            if (manga.description?.isNotEmpty ?? false) ...[
+                              const SizedBox(height: 16),
+                              SelectableRegion(
+                                selectionControls:
+                                    cupertinoTextSelectionControls,
+                                contextMenuBuilder: (context, state) =>
+                                    CupertinoAdaptiveTextSelectionToolbar.buttonItems(
+                                      buttonItems: state.contextMenuButtonItems,
+                                      anchors: state.contextMenuAnchors,
+                                    ),
+                                child: Text(
+                                  manga.description!,
+                                  maxLines: _descriptionExpanded ? null : 3,
+                                  overflow: _descriptionExpanded
+                                      ? TextOverflow.visible
+                                      : TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: AppColors.secondaryLabel.resolveFrom(
+                                      context,
                                     ),
                                   ),
                                 ),
                               ),
+                              CupertinoButton(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                onPressed: () => setState(
+                                  () => _descriptionExpanded =
+                                      !_descriptionExpanded,
+                                ),
+                                child: Text(
+                                  _descriptionExpanded ? '收起简介' : '展开简介',
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 32),
+                            if (_failedChapter case final chapter?) ...[
+                              Text(
+                                '未能打开「${chapter.name}」：$_chapterOpenError',
+                                key: const ValueKey('chapter-open-failure'),
+                              ),
+                              CupertinoButton(
+                                key: const ValueKey('retry-open-chapter'),
+                                onPressed:
+                                    _opening ||
+                                        controller.busy ||
+                                        _selectingChapters
+                                    ? null
+                                    : () => _openChapter(
+                                        context,
+                                        chapter.sourceIndex,
+                                      ),
+                                child: Text('重试打开「${chapter.name}」'),
+                              ),
+                            ],
+                            if (_resume case final resume?)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: CupertinoButton.filled(
+                                  onPressed:
+                                      _opening ||
+                                          controller.busy ||
+                                          _selectingChapters
+                                      ? null
+                                      : () => _openChapter(
+                                          context,
+                                          _sequence!.entries.indexWhere(
+                                            (entry) =>
+                                                entry.key == resume.chapterKey,
+                                          ),
+                                        ),
+                                  child: const Text('继续阅读'),
+                                ),
+                              ),
+                            if (_resumeError != null) Text(_resumeError!),
+                            if (_resumeReadFailed)
+                              CupertinoButton(
+                                key: const ValueKey('retry-read-resume'),
+                                onPressed:
+                                    _loadingResume ||
+                                        _opening ||
+                                        controller.busy ||
+                                        _selectingChapters
+                                    ? null
+                                    : () => unawaited(_refreshResume()),
+                                child: Text(
+                                  _loadingResume ? '正在读取阅读位置' : '重新读取阅读位置',
+                                ),
+                              ),
+                            if (controller.hasUnsavedReadingProgress) ...[
+                              const Text('部分阅读进度尚未保存，当前会话仍保留记录。'),
+                              CupertinoButton(
+                                onPressed: () => unawaited(_retryProgress()),
+                                child: const Text('重试保存进度'),
+                              ),
+                            ],
+                            ..._chapterList(),
                           ],
                         ),
-                      ],
-                      if (manga.description?.isNotEmpty ?? false) ...[
-                        const SizedBox(height: 16),
-                        SelectableRegion(
-                          selectionControls: cupertinoTextSelectionControls,
-                          contextMenuBuilder: (context, state) =>
-                              CupertinoAdaptiveTextSelectionToolbar.buttonItems(
-                                buttonItems: state.contextMenuButtonItems,
-                                anchors: state.contextMenuAnchors,
-                              ),
-                          child: Text(
-                            manga.description!,
-                            maxLines: _descriptionExpanded ? null : 3,
-                            overflow: _descriptionExpanded
-                                ? TextOverflow.visible
-                                : TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: AppColors.secondaryLabel.resolveFrom(
-                                context,
-                              ),
-                            ),
-                          ),
-                        ),
-                        CupertinoButton(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          onPressed: () => setState(
-                            () => _descriptionExpanded = !_descriptionExpanded,
-                          ),
-                          child: Text(_descriptionExpanded ? '收起简介' : '展开简介'),
-                        ),
-                      ],
-                      const SizedBox(height: 32),
-                      if (_failedChapter case final chapter?) ...[
-                        Text(
-                          '未能打开「${chapter.name}」：$_chapterOpenError',
-                          key: const ValueKey('chapter-open-failure'),
-                        ),
-                        CupertinoButton(
-                          key: const ValueKey('retry-open-chapter'),
-                          onPressed:
-                              _opening || controller.busy || _selectingChapters
-                              ? null
-                              : () =>
-                                    _openChapter(context, chapter.sourceIndex),
-                          child: Text('重试打开「${chapter.name}」'),
-                        ),
-                      ],
-                      if (_resume case final resume?)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: CupertinoButton.filled(
-                            onPressed:
-                                _opening ||
-                                    controller.busy ||
-                                    _selectingChapters
-                                ? null
-                                : () => _openChapter(
-                                    context,
-                                    _sequence!.entries.indexWhere(
-                                      (entry) => entry.key == resume.chapterKey,
-                                    ),
-                                  ),
-                            child: const Text('继续阅读'),
-                          ),
-                        ),
-                      if (_resumeError != null) Text(_resumeError!),
-                      if (_resumeReadFailed)
-                        CupertinoButton(
-                          key: const ValueKey('retry-read-resume'),
-                          onPressed:
-                              _loadingResume ||
-                                  _opening ||
-                                  controller.busy ||
-                                  _selectingChapters
-                              ? null
-                              : () => unawaited(_refreshResume()),
-                          child: Text(_loadingResume ? '正在读取阅读位置' : '重新读取阅读位置'),
-                        ),
-                      if (controller.hasUnsavedReadingProgress) ...[
-                        const Text('部分阅读进度尚未保存，当前会话仍保留记录。'),
-                        CupertinoButton(
-                          onPressed: () => unawaited(_retryProgress()),
-                          child: const Text('重试保存进度'),
-                        ),
-                      ],
-                      ..._chapterList(),
+                      ),
                     ],
                   ),
                 ),
