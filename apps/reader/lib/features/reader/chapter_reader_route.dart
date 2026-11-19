@@ -679,19 +679,35 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     }
   }
 
+  ({Widget previous, Widget next}) _chapterNavigation() {
+    final disabled =
+        _busy || _accessPaused || _recovering || _refreshingProgress;
+
+    Widget button(int delta, String label) {
+      final target = _sequence.adjacent(_chapter.sourceIndex, _order, delta);
+      final enabled = !disabled && target != null;
+      return Semantics(
+        container: true,
+        enabled: enabled,
+        child: CupertinoButton(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          onPressed: enabled ? () => unawaited(_move(target)) : null,
+          child: Text(
+            target == null ? '没有$label' : label,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return (previous: button(-1, '上一章'), next: button(1, '下一章'));
+  }
+
   Widget _chapterControls() {
-    final previous = _sequence.adjacent(_chapter.sourceIndex, _order, -1);
-    final next = _sequence.adjacent(_chapter.sourceIndex, _order, 1);
     final progress = _progress;
     final bookmarks = _bookmarks;
     final disabled =
         _busy || _accessPaused || _recovering || _refreshingProgress;
-    final goToPrevious = disabled || previous == null
-        ? null
-        : () => unawaited(_move(previous));
-    final goToNext = disabled || next == null
-        ? null
-        : () => unawaited(_move(next));
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -730,15 +746,6 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
           alignment: WrapAlignment.center,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Semantics(
-              container: true,
-              enabled: goToPrevious != null,
-              child: CupertinoButton(
-                padding: const EdgeInsets.all(8),
-                onPressed: goToPrevious,
-                child: Text(previous == null ? '没有上一章' : '上一章'),
-              ),
-            ),
             if (bookmarks != null)
               ChapterBookmarkButton(
                 controller: bookmarks,
@@ -837,15 +844,6 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
                   CupertinoIcons.ellipsis,
                   semanticLabel: '阅读选项',
                 ),
-              ),
-            ),
-            Semantics(
-              container: true,
-              enabled: goToNext != null,
-              child: CupertinoButton(
-                padding: const EdgeInsets.all(8),
-                onPressed: goToNext,
-                child: Text(next == null ? '没有下一章' : '下一章'),
               ),
             ),
           ],
@@ -985,6 +983,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       layoutSettingsEnabled: _canEditSettings,
       positionRequest: _positionRequest,
       paused: _accessPaused || _recovering,
+      chapterNavigation: _chapterNavigation(),
       chapterControls: _chapterControls(),
       onViewportChanged: (viewport) {
         if (_closing || !identical(opened, _opened)) return;

@@ -4,6 +4,7 @@ import 'package:karuyomi/widgets/choice_field.dart';
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -1299,6 +1300,127 @@ void main() {
         find.byKey(const ValueKey('continuous-reader')),
       );
       expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'page slider previews without requesting pages and jumps only on release',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      final positions = <ReadingPosition>[];
+      final viewports = <ReaderViewportState>[];
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: manifest,
+          imageBuilder: decodedImage(),
+          doublePage: false,
+          onPosition: positions.add,
+          onViewport: viewports.add,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final slider = find.byType(CupertinoSlider);
+      final track = tester.getRect(slider);
+      final acquired = List.of(provider.acquired);
+      positions.clear();
+
+      Future<TestGesture> previewLastPage() async {
+        final gesture = await tester.startGesture(
+          Offset(
+            track.left + kMinInteractiveDimensionCupertino / 2,
+            track.center.dy,
+          ),
+        );
+        await gesture.moveBy(const Offset(30, 0));
+        await gesture.moveTo(track.centerRight + const Offset(40, 0));
+        await tester.pumpAndSettle();
+        expect(find.text('20 / 20'), findsOneWidget);
+        expect(viewports.last.observed?.pageKey, 'page-0');
+        expect(provider.acquired, acquired);
+        expect(positions, isEmpty);
+        return gesture;
+      }
+
+      final cancelled = await previewLastPage();
+      await cancelled.cancel();
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 20'), findsOneWidget);
+      expect(positions, isEmpty);
+
+      final released = await previewLastPage();
+      await released.up();
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed?.pageKey, 'page-19');
+      expect(positions.map((position) => position.pageKey).toSet(), {
+        'page-19',
+      });
+      expect(provider.acquired.skip(acquired.length).first.pageKey, 'page-19');
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'RTL slider offers page numbers and supports touch, keyboard and semantics',
+    (tester) async {
+      final provider = FixturePageProvider();
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: fixtureChapter(),
+          mode: ReadingMode.rightToLeft,
+          doublePage: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final slider = find.byType(CupertinoSlider);
+      final label = find.semantics.byLabel('页码跳转');
+      final data = label.evaluate().single.getSemanticsData();
+      expect(data.flagsCollection.isSlider, isTrue);
+      expect(data.value, '1');
+      expect(data.minValue, '1');
+      expect(data.maxValue, '20');
+      expect(data.increasedValue, '2');
+      final next = iconLabel('下一页');
+      final previous = iconLabel('上一页');
+      expect(
+        tester.getCenter(next).dx,
+        lessThan(tester.getCenter(previous).dx),
+      );
+      expect(tester.widget<Icon>(next).icon, CupertinoIcons.backward_end);
+      expect(tester.widget<Icon>(previous).icon, CupertinoIcons.forward_end);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      expect(
+        label.evaluate().single.getSemanticsData().flagsCollection.isFocused,
+        Tristate.isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(find.text('2 / 20'), findsOneWidget);
+      tester.semantics.increase(label);
+      await tester.pumpAndSettle();
+      expect(find.text('3 / 20'), findsOneWidget);
+      tester.semantics.decrease(label);
+      await tester.pumpAndSettle();
+      expect(find.text('2 / 20'), findsOneWidget);
+
+      final track = tester.getRect(slider);
+      await tester.tapAt(Offset(track.left + 4, track.center.dy));
+      await tester.pumpAndSettle();
+      expect(find.text('20 / 20'), findsOneWidget);
+      await tester.tapAt(Offset(track.right - 4, track.center.dy));
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 20'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
     },

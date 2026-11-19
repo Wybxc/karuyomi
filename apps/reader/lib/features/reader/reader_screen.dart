@@ -15,6 +15,7 @@ import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
 
 import '../../diagnostics/reader_baseline.dart';
+import 'reader_page_navigation.dart';
 import 'reader_preferences.dart';
 import 'resource_image.dart';
 import 'resource_pool.dart';
@@ -86,6 +87,7 @@ class const ReaderScreen({
 
   /// Publishes the complete cleanup future as soon as this leaf unmounts.
   final ValueChanged<Future<void>>? onClosing,
+  final ({Widget previous, Widget next})? chapterNavigation,
   final Widget? chapterControls,
   final VoidCallback? onAttached,
   final VoidCallback? onExit,
@@ -1445,9 +1447,80 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
+  Widget _pageStep({
+    required bool enabled,
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+  }) => Semantics(
+    container: true,
+    enabled: enabled,
+    child: CupertinoButton(
+      onPressed: enabled ? onPressed : null,
+      padding: const EdgeInsets.all(8),
+      child: Icon(icon, semanticLabel: label),
+    ),
+  );
+
+  Widget _pageTools(TextDirection direction) {
+    final rtl = direction == TextDirection.rtl;
+    return Wrap(
+      textDirection: direction,
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _pageStep(
+          enabled: _reader.canGoBack,
+          onPressed: _back,
+          icon: rtl ? CupertinoIcons.forward_end : CupertinoIcons.backward_end,
+          label: '上一页',
+        ),
+        if (_reader.isContinuous)
+          CupertinoButton(
+            onPressed: _reader.position == null
+                ? null
+                : () => _openZoom(_reader.manifest.pages[_reader.pageIndex]),
+            padding: const EdgeInsets.all(8),
+            child: const Icon(CupertinoIcons.zoom_in, semanticLabel: '放大当前图片'),
+          )
+        else ...[
+          for (final (factor, icon, label) in [
+            (0.5, CupertinoIcons.zoom_out, '缩小'),
+            (2.0, CupertinoIcons.zoom_in, '放大'),
+          ])
+            CupertinoButton(
+              onPressed: () => _zoom(factor),
+              padding: const EdgeInsets.all(8),
+              child: Icon(icon, semanticLabel: label),
+            ),
+          CupertinoButton(
+            onPressed: () {
+              _preferredPlacement = null;
+              _restoring = true;
+              _transform.value = Matrix4.identity();
+              _scheduleRestore();
+            },
+            padding: const EdgeInsets.all(8),
+            child: const Icon(
+              CupertinoIcons.arrow_up_left_arrow_down_right,
+              semanticLabel: '重置缩放',
+            ),
+          ),
+        ],
+        _pageStep(
+          enabled: _reader.canAdvance,
+          onPressed: _advance,
+          icon: rtl ? CupertinoIcons.backward_end : CupertinoIcons.forward_end,
+          label: '下一页',
+        ),
+      ],
+    );
+  }
+
   Widget _scrollableControls() {
-    final canGoBack = _reader.canGoBack;
-    final canAdvance = _reader.canAdvance;
+    final direction = _reader.mode == ReadingMode.rightToLeft
+        ? TextDirection.rtl
+        : TextDirection.ltr;
     return SingleChildScrollView(
       primary: false,
       child: Padding(
@@ -1455,79 +1528,22 @@ class _ReaderScreenState extends State<ReaderScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Semantics(
-                  container: true,
-                  enabled: canGoBack,
-                  child: CupertinoButton(
-                    onPressed: canGoBack ? _back : null,
-                    padding: const EdgeInsets.all(8),
-                    child: const Icon(
-                      CupertinoIcons.backward_end,
-                      semanticLabel: '上一页',
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    _reader.position == null
-                        ? '0 / 0'
-                        : '${_reader.pageIndex + 1} / ${_reader.manifest.pages.length}',
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                Semantics(
-                  container: true,
-                  enabled: canAdvance,
-                  child: CupertinoButton(
-                    onPressed: canAdvance ? _advance : null,
-                    padding: const EdgeInsets.all(8),
-                    child: const Icon(
-                      CupertinoIcons.forward_end,
-                      semanticLabel: '下一页',
-                    ),
-                  ),
-                ),
-                if (_reader.isContinuous)
-                  CupertinoButton(
-                    onPressed: _reader.position == null
-                        ? null
-                        : () => _openZoom(
-                            _reader.manifest.pages[_reader.pageIndex],
-                          ),
-                    padding: const EdgeInsets.all(8),
-                    child: const Icon(
-                      CupertinoIcons.zoom_in,
-                      semanticLabel: '放大当前图片',
-                    ),
-                  ),
-                if (!_reader.isContinuous) ...[
-                  for (final (factor, icon, label) in [
-                    (0.5, CupertinoIcons.zoom_out, '缩小'),
-                    (2.0, CupertinoIcons.zoom_in, '放大'),
-                  ])
-                    CupertinoButton(
-                      onPressed: () => _zoom(factor),
-                      padding: const EdgeInsets.all(8),
-                      child: Icon(icon, semanticLabel: label),
-                    ),
-                  CupertinoButton(
-                    onPressed: () {
-                      _preferredPlacement = null;
-                      _restoring = true;
-                      _transform.value = Matrix4.identity();
-                      _scheduleRestore();
-                    },
-                    padding: const EdgeInsets.all(8),
-                    child: const Icon(
-                      CupertinoIcons.arrow_up_left_arrow_down_right,
-                      semanticLabel: '重置缩放',
-                    ),
-                  ),
-                ],
-              ],
+            ReaderPageNavigation(
+              key: ValueKey((
+                widget.provider,
+                widget.generation,
+                widget.manifest,
+                widget.paused,
+                _reader.mode,
+              )),
+              pageIndex: _reader.pageIndex,
+              pageCount: _reader.manifest.pages.length,
+              direction: direction,
+              onSelect: widget.paused ? null : _goTo,
+              keyboardEnabled: widget.keyboard != ReaderInputPreset.disabled,
+              chapters: widget.chapterNavigation,
             ),
+            _pageTools(direction),
             LayoutBuilder(
               builder: (context, constraints) => Wrap(
                 alignment: WrapAlignment.center,

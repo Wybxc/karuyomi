@@ -1338,6 +1338,17 @@ Mihon 将作品和章节放在上下两行，用底部滑杆和左右端的章�
 
 正式 Web 两主题均在 3326 第一页显示「没有上一章」，第二页反转来源顺序后显示「没有下一章」。首尾两页键与相应章节键均实际报告 `aria-disabled="true"`，另一章按钮保持可用。页方向触控区实测 44×44，章边界约 98.95×44。边界原图包含图片加载指示，截图记录可见控件和辅助状态。六组六路读回与浅色 27 条、深色 33 条终态审计核对每组两次准备、一次章节标记和三次阅读进度写入，退出后服务端保存的续读位置为 3326 第 2 页。新原图与读回保留在 `.local/mihon-reference/21f23d6-reader-boundaries/`，本轮隔离服务和临时标签均已关闭。Karuyomi 跨版本双主题主图为 168/169，Mihon 对照为 137/170。
 
+## 阅读页码滑杆与方向排列
+
+2026-11-19，根据固定 Mihon 的 `ChapterNavigator.kt` 及 22.03、22.06 的双主题参考，将上一章、下一章移至页码滑杆两端。从右到左时，下一章在左端，滑杆往左增加，页方向按钮和图标随之翻转。页码采用 Cupertino 原生滑杆及独立的当前页／总页数显示。空章和单页章仍显示固定页数。
+
+本机固定 Flutter 3.50.0 通过 100 项回归。20 页夹具从第 1 页拖动到第 20 页时，预览改变页码，已观察画面和资源请求保持原页。取消回到原页，松手则加载并观察到第 20 页。另验证从右到左的轨道点选、Tab 和方向键、辅助树的页值和逐页增减。正式章路由覆盖双主题、360×800、1×／2× 字号及单页边界，画布和章操作保持可达。正式 Web 同页位置、真实图片与服务端续读另行验收。
+
+```sh
+cd apps/reader
+flutter test --no-pub --concurrency=1 test/reader/reader_screen_test.dart test/reader/chapter_reader_route_test.dart test/reader/reader_access_recovery_test.dart test/reader/reading_progress_navigation_test.dart test/browse/chapter_read_navigation_test.dart test/settings/settings_navigation_test.dart
+```
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。

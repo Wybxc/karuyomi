@@ -48,6 +48,18 @@ void main() {
             mangaUrl: manga.url,
             chapters: [wire.Chapter(url: '/one', name: '用于核对较长中文标题的第一章')],
           );
+          final rtl = appearance == Brightness.dark;
+          if (rtl) {
+            final settings = catalog.settings!;
+            final before = await settings.loadManga(sequence.mangaKey);
+            await settings.setManga(
+              mangaKey: sequence.mangaKey,
+              overrides: wire.ReaderSettingsOverride(
+                mode: wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
+              ),
+              basedOnRevision: before.mangaRevision!,
+            );
+          }
           final opened = (await catalog.openChapter(
             manga,
             ChapterEntry(sequence.entries.first.snapshot),
@@ -102,6 +114,13 @@ void main() {
               Tristate.isFalse,
             );
           }
+          final previous = tester.getCenter(find.text('没有上一章'));
+          final next = tester.getCenter(find.text('没有下一章'));
+          expect(previous.dy, next.dy);
+          expect(rtl ? next.dx : previous.dx, lessThan(180));
+          expect(rtl ? previous.dx : next.dx, greaterThan(180));
+          expect(find.byType(CupertinoSlider), findsNothing);
+          expect(find.text('1 / 1'), findsOneWidget);
           expect(find.text('重新阅读本章'), findsNothing);
           expect(find.text('刷新书签'), findsNothing);
           final options = find.byKey(const ValueKey('reader-chapter-options'));
