@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-19，Karuyomi 跨版本双主题主图现为 161/169（95.3%），新增跨源搜索失效后的资源释放等待与失败（28.K1/K2）。余下 8 个主状态均缺两侧，包括未连接（27.K1）和共享编辑（30.K1–K7）。最终像素、各触发变体与完整转场继续验收。[释放与恢复](mihon-cupertino-fidelity.md#失效后释放搜索资源的正式-web-双主题验收)
+2026-11-19，Karuyomi 跨版本双主题主图现为 166/169（98.2%），新增共享编辑的确认、草稿、等待、结果未知与版本冲突（30.K1–K5）。剩余 3 个主状态均缺两侧，分别为未连接（27.K1）、部分提交（30.K6）和编辑失效（30.K7）。最终像素、各触发变体与完整转场继续验收。[共享编辑](mihon-cupertino-fidelity.md#共享编辑对象与保存阶段的正式-web-双主题验收)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -861,7 +861,7 @@ stateDiagram-v2
     Q0 --> K5: 取消并返回原值
     Q1 --> K5: 取消并返回原值
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class K1,K2,K3,K4,K12,K13,Q0,Q1 paired
+    class K1,K2,K3,K4,K5,K6,K7,K8,K9,K12,K13,Q0,Q1 paired
 ```
 
 | 状态 ID | 最小必要信息与操作边界                                                | 浅色                                                                            | 深色                                                                           |
@@ -871,11 +871,11 @@ stateDiagram-v2
 | 27.K3   | 登录已失效、受影响操作、显式登录/重试入口及未确认草稿提示             | `karuyomi-0a28f6a-connection-expired-light`（带草稿变体待验）                   | `karuyomi-19c2260-connection-expired-dark`（带草稿变体待验）                   |
 | 27.K4   | 当前服务、拒绝访问原因和切换账号/连接入口                             | `karuyomi-0a28f6a-connection-denied-light`                                      | `karuyomi-19c2260-connection-denied-dark`                                      |
 | 27.K5   | 已确认的服务与身份、连接状态和后续可用入口                            | `karuyomi-19c2260-connection-ready-light`                                       | `karuyomi-19c2260-connection-ready-dark`                                       |
-| 30.K1   | 当前对象、服务端已确认值及适用的保存反馈                              | 待                                                                              | 待                                                                             |
-| 30.K2   | 当前对象与草稿、尚未保存提示、可提交/校验原因及取消                   | 待                                                                              | 待                                                                             |
-| 30.K3   | 保存中、操作对象和提交范围；禁止重复提交并保留草稿                    | 待                                                                              | 待                                                                             |
-| 30.K4   | 结果尚未确认、保留的原操作及同一操作重试；不误报成功或失败            | 待                                                                              | 待                                                                             |
-| 30.K5   | 服务端值已变化、受影响草稿与显式重新读取入口                          | 待                                                                              | 待                                                                             |
+| 30.K1   | 当前对象、服务端已确认值及适用的保存反馈                              | `karuyomi-d0d963c-reader-settings-confirmed-light.jpg`                          | `karuyomi-d0d963c-reader-settings-confirmed-dark.jpg`                          |
+| 30.K2   | 当前对象与草稿、尚未保存提示、可提交/校验原因及取消                   | `karuyomi-d0d963c-reader-settings-draft-light.jpg`                              | `karuyomi-d0d963c-reader-settings-draft-dark.jpg`                              |
+| 30.K3   | 保存中、操作对象和提交范围；禁止重复提交并保留草稿                    | `karuyomi-d0d963c-reader-settings-waiting-light.jpg`                            | `karuyomi-d0d963c-reader-settings-waiting-dark.jpg`                            |
+| 30.K4   | 结果尚未确认、保留的原操作及同一操作重试；不误报成功或失败            | `karuyomi-d0d963c-reader-settings-unknown-light.jpg`                            | `karuyomi-d0d963c-reader-settings-unknown-dark.jpg`                            |
+| 30.K5   | 服务端值已变化、受影响草稿与显式重新读取入口                          | `karuyomi-d0d963c-reader-settings-conflict-light.jpg`                           | `karuyomi-d0d963c-reader-settings-conflict-dark.jpg`                           |
 | 30.K6   | 已确认/失败/未知的对象及数量、剩余操作和精确重试                      | 待                                                                              | 待                                                                             |
 | 30.K7   | 原身份或来源已失效、受影响草稿、旧操作不可继续及恢复入口              | 待                                                                              | 待                                                                             |
 | 28.K1   | 正在关闭的页面/资源、等待确认及受阻操作                               | `karuyomi-704d148-retired-search-releasing-light.jpg`                           | `karuyomi-704d148-retired-search-releasing-dark.jpg`                           |
@@ -883,7 +883,7 @@ stateDiagram-v2
 | 29.K1   | 当前项、完整长名称/来源序号、查询/清空/取消与键盘；本轮为xkcd范围草稿 | `karuyomi-0c4da11-range-{current-choice,search-match,search-cleared}-light.jpg` | `karuyomi-0c4da11-range-{current-choice,search-match,search-cleared}-dark.jpg` |
 | 29.K2   | 当前查询、无匹配、清空或修改查询及取消；保留调用方原值                | `karuyomi-0c4da11-range-search-empty-light.jpg`                                 | `karuyomi-0c4da11-range-search-empty-dark.jpg`                                 |
 
-验收覆盖书架/分类与批量（02–06）、账户扩展/仓库（08–11）、Source 偏好（14）、停止/取消/分页/资源清理（12/15）、作品元数据/章节读态/书签/封面（16–19）、只读迁移映射与提交（20–21）、阅读进度/Access 恢复/设置覆盖（22–24）、全局设置和连接/诊断（26–28）。28.K1/K2 的主图取自跨源搜索失效。各业务页的触发变体、转换和 30.K7 的草稿恢复继续验收。
+验收覆盖书架/分类与批量（02–06）、账户扩展/仓库（08–11）、Source 偏好（14）、停止/取消/分页/资源清理（12/15）、作品元数据/章节读态/书签/封面（16–19）、只读迁移映射与提交（20–21）、阅读进度/Access 恢复/设置覆盖（22–24）、全局设置和连接/诊断（26–28）。28.K1/K2 的主图取自跨源搜索失效，30.K1–K5 取自本漫画阅读设置，分类和封面提供作品分组及草稿的补充分项。各业务页的触发变体、转换、部分提交与失效恢复继续验收。
 
 ### 04–06：Karuyomi 分类与批量确认的目标状态
 
@@ -1137,8 +1137,8 @@ stateDiagram-v2
 | 19.K4   | 已确认的当前封面、替换和清除入口；清除用系统危险色，最终提交须由保存触发                        | `karuyomi-0e605c5-editors-cover-confirmed-light.jpg`           | `karuyomi-0e605c5-editors-cover-confirmed-dark.jpg`        |
 | 19.K5   | 原已确认封面、选图处理中、编辑禁用；取消保持原值，非法/读取失败保留可修正原因，身份变化另转失效 | `karuyomi-1d29865-cover-picking-confirmed-light-fixed.jpg`     | `karuyomi-1d29865-cover-picking-system-dark.jpg`           |
 | 19.K6   | 已确认封面与待保存图片分区、仅当前会话保留、明确保存或关闭；选图本身零上传                      | `karuyomi-c5f6759-cover-{draft,replace-draft}-light.jpg`       | `karuyomi-c5f6759-cover-{draft,replace-draft}-dark.jpg`    |
-| 19.K7   | 当前封面、待清除提示、明确保存或关闭；清除草稿不先修改远端                                      | `karuyomi-0e605c5-editors-cover-clear-draft-light.jpg`         | `karuyomi-0e605c5-editors-cover-clear-draft-dark.jpg`      |
-| 19.K8   | 原确认值、正在提交的原修改、等待确认、动作禁用；不能提前显示已保存，替换/清除分别验             | `karuyomi-a9d880a-cover-k8-light.jpg`，清除                    | `karuyomi-a9d880a-cover-k8-dark.jpg`，清除                 |
+| 19.K7   | 当前封面、待清除提示、明确保存或关闭；清除草稿不先修改远端                                      | `karuyomi-d0d963c-cover-draft-light.jpg`                       | `karuyomi-d0d963c-cover-draft-dark.jpg`                    |
+| 19.K8   | 原确认值、正在提交的原修改、等待确认、动作禁用；不能提前显示已保存，替换/清除分别验             | `karuyomi-d0d963c-cover-waiting-light.jpg`，清除               | `karuyomi-d0d963c-cover-waiting-dark.jpg`，清除            |
 | 19.K9   | 尚未确认及原草稿、精确重试、稍后处理；重开/重取失败时仍保留原命令，不能换图覆盖                 | `karuyomi-a9d880a-cover-k9-light.jpg`                          | `karuyomi-a9d880a-cover-k9-dark.jpg`                       |
 | 19.K10  | 冲突或拒绝原因、原确认值、明确重读；禁用提交与重试，重取失败仍保留错误及原确认快照              | `karuyomi-3a57cdf-migration-cover-rejected-light.jpg`          | `karuyomi-3a57cdf-migration-cover-rejected-dark.jpg`       |
 | 19.K11  | 编辑已停用及关闭入口、旧操作结果不再应用；加载/选图/保存/待确认阶段分别触发并丢弃迟到结果       | `karuyomi-138ccbd-cover-expired-confirmed-light.jpg`，首次读取 | `karuyomi-b29c3bb-cover-expired-system-dark.jpg`，首次读取 |
@@ -1347,11 +1347,11 @@ stateDiagram-v2
 | ------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | 24.K1   | 本漫画范围、明确读取进度、无已确认提示、编辑与保存不可用、关闭               | `karuyomi-bcac704-settings-k1-light.jpg`                                | `karuyomi-bcac704-settings-k1-dark.jpg`                                    |
 | 24.K2   | 本漫画范围、读取失败、明确重新读取与关闭；无连接误报或假确认                 | `karuyomi-bcac704-settings-k2-light.jpg`                                | `karuyomi-bcac704-settings-k2-dark.jpg`                                    |
-| 24.K3   | 本漫画范围、各字段继承/显式值、已确认状态、修改与重读                        | `karuyomi-bcac704-settings-k3-light.jpg`                                | `karuyomi-bcac704-settings-k3-dark.jpg`                                    |
-| 24.K4   | 原字段与当前草稿、尚未保存、明确保存和关闭；关闭零写入                       | `karuyomi-bcac704-settings-k4-light.jpg`                                | `karuyomi-bcac704-settings-k4-dark.jpg`                                    |
-| 24.K5   | 本漫画范围、正在提交的设置、等待服务端确认、编辑/重复保存/关闭禁用           | `karuyomi-bcac704-settings-k5-light.jpg`                                | `karuyomi-bcac704-settings-k5-dark.jpg`                                    |
-| 24.K6   | 原提交值、结果未确认、同一命令重试、只读重取；不能改值或误报成功             | `karuyomi-bcac704-settings-k6-light.jpg`                                | `karuyomi-bcac704-settings-k6-dark.jpg`                                    |
-| 24.K7   | 原草稿、具体版本冲突、重读入口、禁止重试新版本；重读成功前冻结               | `karuyomi-bcac704-settings-k7-light.jpg`                                | `karuyomi-bcac704-settings-k7-dark.jpg`                                    |
+| 24.K3   | 本漫画范围、各字段继承/显式值、已确认状态、修改与重读                        | `karuyomi-d0d963c-reader-settings-confirmed-light.jpg`                  | `karuyomi-d0d963c-reader-settings-confirmed-dark.jpg`                      |
+| 24.K4   | 原字段与当前草稿、尚未保存、明确保存和关闭；关闭零写入                       | `karuyomi-d0d963c-reader-settings-draft-light.jpg`                      | `karuyomi-d0d963c-reader-settings-draft-dark.jpg`                          |
+| 24.K5   | 本漫画范围、正在提交的设置、等待服务端确认、编辑/重复保存/关闭禁用           | `karuyomi-d0d963c-reader-settings-waiting-light.jpg`                    | `karuyomi-d0d963c-reader-settings-waiting-dark.jpg`                        |
+| 24.K6   | 原提交值、结果未确认、同一命令重试、只读重取；不能改值或误报成功             | `karuyomi-d0d963c-reader-settings-unknown-light.jpg`                    | `karuyomi-d0d963c-reader-settings-unknown-dark.jpg`                        |
+| 24.K7   | 原草稿、具体版本冲突、重读入口、禁止重试新版本；重读成功前冻结               | `karuyomi-d0d963c-reader-settings-conflict-light.jpg`                   | `karuyomi-d0d963c-reader-settings-conflict-dark.jpg`                       |
 | 24.K8   | 原草稿、明确拒绝、重读入口、原命令不可重试；与未知结果分开                   | `karuyomi-bcac704-settings-k8-light.jpg`                                | `karuyomi-bcac704-settings-k8-dark.jpg`                                    |
 | 24.K9   | 明确读取进度、保留的原值/草稿/未知原命令、禁用重复动作、允许关闭；只读零提交 | `karuyomi-bcac704-settings-k9-light.jpg`                                | `karuyomi-bcac704-settings-k9-dark.jpg`                                    |
 | 24.K10  | 读取错误与原值、原未知命令仍保留、对应重读/精确重试/关闭；失败不撤回确认     | `karuyomi-bcac704-settings-k10-light.jpg`                               | `karuyomi-bcac704-settings-k10-dark.jpg`                                   |
