@@ -11,6 +11,7 @@ import '../../data/business_state_client.dart';
 import '../../data/source_migration_matching.dart';
 import '../../data/source_migration_repository.dart';
 import '../browse/catalog_controller.dart';
+import '../browse/manga_cover_tile.dart';
 import 'migration_controller.dart';
 
 class const MigrationPage({
@@ -470,6 +471,83 @@ class _MigrationPageState extends State<MigrationPage> {
         ],
       );
 
+  List<Widget> _candidateSlivers(BuildContext context) {
+    final candidates = controller.results;
+    final empty = controller.busy ? null : controller.emptyResultsMessage;
+    if (candidates.isEmpty && empty == null) return const [];
+    const spacing = 12.0;
+    const minimumCoverWidth = 128.0;
+    return [
+      if (candidates.isEmpty)
+        SliverToBoxAdapter(
+          child: CupertinoFormSection.insetGrouped(
+            header: const Text('候选作品'),
+            children: [CupertinoFormRow(child: Text(empty!))],
+          ),
+        )
+      else ...[
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            child: Semantics(
+              header: true,
+              child: Text(
+                '候选作品',
+                style: TextStyle(
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: spacing),
+          sliver: SliverLayoutBuilder(
+            builder: (context, constraints) => SliverGrid.builder(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount:
+                    ((constraints.crossAxisExtent + spacing) /
+                            (minimumCoverWidth + spacing))
+                        .floor()
+                        .clamp(1, 100),
+                mainAxisSpacing: spacing,
+                crossAxisSpacing: spacing,
+                childAspectRatio: 2 / 3,
+              ),
+              itemCount: candidates.length,
+              itemBuilder: (context, index) {
+                final manga = candidates[index];
+                return MangaCoverTile(
+                  key: ValueKey(('migration-result', index)),
+                  title: manga.title,
+                  onPressed: controller.canChange
+                      ? () {
+                          _mappingPage = 0;
+                          unawaited(controller.chooseManga(manga));
+                        }
+                      : null,
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+      if (controller.hasNextPage)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: spacing),
+            child: _readButton(
+              id: 'migration-search-more',
+              label: '加载更多目标结果',
+              enabled: controller.canChange,
+              read: () => unawaited(controller.loadMore()),
+            ),
+          ),
+        ),
+    ];
+  }
+
   Widget _contentWithTargetFeedback({
     required bool pinFeedback,
     required Widget child,
@@ -509,294 +587,248 @@ class _MigrationPageState extends State<MigrationPage> {
       navigationBar: CupertinoNavigationBar(middle: const Text('迁移到其他漫画源')),
       child: _contentWithTargetFeedback(
         pinFeedback: pinFeedback,
-        child: ListView(
+        child: CustomScrollView(
           // The retired view has its own scroll position from the first frame.
           key: ValueKey(available),
-          padding: const EdgeInsets.only(bottom: 20),
-          children: [
-            if (!available)
-              CupertinoFormSection.insetGrouped(
-                header: const Text('迁移已停用'),
-                children: [
-                  CupertinoFormRow(
-                    child: Text(
-                      controller.error ?? '身份或服务已改变，请关闭后重新开始迁移。',
-                      key: const ValueKey('migration-error'),
-                      style: TextStyle(
-                        color: AppColors.error.resolveFrom(context),
-                      ),
-                    ),
-                  ),
-                  CupertinoButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('返回'),
-                  ),
-                ],
-              )
-            else ...[
-              if (!pinFeedback && (controller.busy || controller.error != null))
-                _operationFeedback(context),
-              CupertinoFormSection.insetGrouped(
-                header: const Text('原作品'),
-                footer: Text(
-                  controller.completed
-                      ? '原作品已保留；迁移结果见下方服务端确认。'
-                      : pending != null
-                      ? '原操作的复制范围已固定，原作品保留。'
-                      : controller.sourceSequence != null
-                      ? '已捕获 ${controller.sourceSequence!.entries.length} 章；切换目标源后仍保留本次章节快照。'
-                      : controller.categoriesOnly
-                      ? '已选择仅迁移收藏和分类，章节标记不复制。'
-                      : '先读取原源章节，或明确选择仅迁移收藏和分类。',
-                ),
-                children: [
-                  CupertinoFormRow(
-                    child: Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: Text(
-                        '${widget.seed.metadata.manga.title} · ${widget.seed.metadata.sourceName} · ${widget.seed.metadata.sourceLang}',
-                      ),
-                    ),
-                  ),
-                  if (!controller.completed &&
-                      pending == null &&
-                      controller.selectedSource == null) ...[
-                    _readButton(
-                      id: 'migration-load-source',
-                      label: '读取原漫画源章节',
-                      enabled: controller.canChange,
-                      read: () => unawaited(controller.readOriginalChapters()),
-                    ),
-                    _readButton(
-                      id: 'migration-categories-only',
-                      label: '仅迁移收藏和分类',
-                      enabled: controller.canChange,
-                      read: controller.chooseCategoriesOnly,
-                    ),
-                  ],
-                ],
-              ),
-              if (pending != null)
-                CupertinoFormSection.insetGrouped(
-                  header: Text(pending.retryable ? '原迁移尚未确认' : '原迁移已拒绝'),
-                  footer: Text(
-                    pending.retryable
-                        ? '原操作的目标与复制范围已固定，新目标和新映射均不可提交。仅明确重试会重新发送原操作。'
-                        : '服务端已明确拒绝原操作。请重新读取当前数据，再检查新的迁移预览。',
-                  ),
-                  children: [
-                    CupertinoFormRow(
-                      child: Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Text(
-                          '${target!.manga.title} · ${target.sourceName} · ${target.sourceLang}',
-                        ),
-                      ),
-                    ),
-                    CupertinoFormRow(
-                      child: Text(
-                        '合并分类：${pending.request.migrateFrom.copyCategories ? '是' : '否'}\n'
-                        '补充已读 ${pending.request.migrateFrom.chapters.where((item) => item.copyRead).length} 章、'
-                        '书签 ${pending.request.migrateFrom.chapters.where((item) => item.copyBookmark).length} 个',
-                      ),
-                    ),
-                    if (pending.retryable)
-                      CupertinoButton.filled(
-                        key: const ValueKey('migration-retry-original'),
-                        onPressed: !controller.busy
-                            ? () => unawaited(controller.retry())
-                            : null,
-                        child: const Text('重试原迁移操作'),
-                      )
-                    else
-                      CupertinoButton(
-                        key: const ValueKey('migration-discard-rejected'),
-                        alignment: AlignmentDirectional.centerStart,
-                        onPressed: !controller.busy
-                            ? () => unawaited(controller.discardRejected())
-                            : null,
-                        child: Text(
-                          controller.targetMetadata == null
-                              ? '结束已拒绝的原操作并重新选择'
-                              : '重新读取并结束已拒绝的原操作',
-                        ),
-                      ),
-                    CupertinoButton(
-                      key: const ValueKey('migration-original-details'),
-                      alignment: AlignmentDirectional.centerStart,
-                      onPressed: () => unawaited(_showOriginalDetails(pending)),
-                      child: const Text('查看原操作详情'),
-                    ),
-                    CupertinoButton(
-                      key: const ValueKey('migration-refresh-sources'),
-                      alignment: AlignmentDirectional.centerStart,
-                      onPressed: !controller.busy
-                          ? () => unawaited(controller.refreshSources())
-                          : null,
-                      child: const Text('重新读取迁移输入（只读）'),
-                    ),
-                  ],
-                )
-              else if (controller.completed)
-                CupertinoFormSection.insetGrouped(
-                  header: const Text('服务端已确认'),
-                  footer: Text(controller.notice!),
-                  children: [
-                    CupertinoFormRow(
-                      child: Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Text(
-                          '${target!.manga.title} · ${target.sourceName} · ${target.sourceLang}',
-                        ),
-                      ),
-                    ),
-                    CupertinoButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('返回'),
-                    ),
-                  ],
-                )
-              else ...[
-                CupertinoFormSection.insetGrouped(
-                  header: const Text('目标漫画源'),
-                  children: [
-                    if (controller.inputsReady &&
-                        !controller.busy &&
-                        controller.sources.isEmpty)
-                      const CupertinoFormRow(
-                        child: Text('没有其他已安装且启用的可用漫画源。请先在扩展管理中准备目标。'),
-                      ),
-                    ChoiceField<String>(
-                      key: const ValueKey('migration-source'),
-                      inline: false,
-                      label: '目标漫画源',
-                      value:
-                          controller.sources.any(
-                            (choice) => choice.key == selectedKey,
-                          )
-                          ? selectedKey
-                          : null,
-                      options: {
-                        for (final choice in controller.sources)
-                          choice.key:
-                              '${choice.source.name} · ${choice.source.lang} · ${choice.build.packageName}',
-                      },
-                      onChanged:
-                          controller.canChange && controller.sourceDecided
-                          ? (key) {
-                              if (key != null) {
-                                unawaited(
-                                  controller.chooseSource(
-                                    controller.sources.singleWhere(
-                                      (choice) => choice.key == key,
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                          : null,
-                    ),
-                    _readButton(
-                      id: 'migration-refresh-sources',
-                      label: '重新读取可用漫画源（只读）',
-                      enabled: !controller.busy,
-                      read: () => unawaited(controller.refreshSources()),
-                    ),
-                  ],
-                ),
-                if (controller.selectedSource != null)
+          slivers: [
+            SliverList.list(
+              children: [
+                if (!available)
                   CupertinoFormSection.insetGrouped(
-                    header: const Text('查找目标作品'),
+                    header: const Text('迁移已停用'),
                     children: [
                       CupertinoFormRow(
-                        child: CupertinoTextField(
-                          autofillHints: null,
-                          key: const ValueKey('migration-search'),
-                          controller: _search,
-                          enabled: controller.canChange,
-                          onSubmitted: (value) =>
-                              unawaited(controller.search(value)),
-                          placeholder: '搜索目标作品',
-                          decoration: null,
+                        child: Text(
+                          controller.error ?? '身份或服务已改变，请关闭后重新开始迁移。',
+                          key: const ValueKey('migration-error'),
+                          style: TextStyle(
+                            color: AppColors.error.resolveFrom(context),
+                          ),
                         ),
                       ),
-                      _readButton(
-                        id: 'migration-search-submit',
-                        label: '搜索',
-                        enabled: controller.canChange,
-                        read: () => unawaited(controller.search(_search.text)),
-                      ),
-                      _readButton(
-                        id: 'migration-popular',
-                        label: '浏览目标源热门作品',
-                        enabled: controller.canChange,
-                        read: () => unawaited(controller.browsePopular()),
+                      CupertinoButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('返回'),
                       ),
                     ],
-                  ),
-                if (controller.results.isNotEmpty ||
-                    (!controller.busy &&
-                        controller.emptyResultsMessage != null))
+                  )
+                else ...[
+                  if (!pinFeedback &&
+                      (controller.busy || controller.error != null))
+                    _operationFeedback(context),
                   CupertinoFormSection.insetGrouped(
-                    header: const Text('候选作品'),
+                    header: const Text('原作品'),
+                    footer: Text(
+                      controller.completed
+                          ? '原作品已保留；迁移结果见下方服务端确认。'
+                          : pending != null
+                          ? '原操作的复制范围已固定，原作品保留。'
+                          : controller.sourceSequence != null
+                          ? '已捕获 ${controller.sourceSequence!.entries.length} 章；切换目标源后仍保留本次章节快照。'
+                          : controller.categoriesOnly
+                          ? '已选择仅迁移收藏和分类，章节标记不复制。'
+                          : '先读取原源章节，或明确选择仅迁移收藏和分类。',
+                    ),
                     children: [
-                      if (controller.emptyResultsMessage case final message?
-                          when !controller.busy)
-                        CupertinoFormRow(child: Text(message)),
-                      for (
-                        var index = 0;
-                        index < controller.results.length;
-                        index++
-                      )
-                        Semantics(
-                          container: true,
+                      CupertinoFormRow(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(
+                            '${widget.seed.metadata.manga.title} · ${widget.seed.metadata.sourceName} · ${widget.seed.metadata.sourceLang}',
+                          ),
+                        ),
+                      ),
+                      if (!controller.completed &&
+                          pending == null &&
+                          controller.selectedSource == null) ...[
+                        _readButton(
+                          id: 'migration-load-source',
+                          label: '读取原漫画源章节',
                           enabled: controller.canChange,
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: CupertinoButton(
-                              key: ValueKey(('migration-result', index)),
-                              alignment: AlignmentDirectional.centerStart,
-                              onPressed: controller.canChange
-                                  ? () {
-                                      _mappingPage = 0;
-                                      unawaited(
-                                        controller.chooseManga(
-                                          controller.results[index],
-                                        ),
-                                      );
-                                    }
-                                  : null,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(controller.results[index].title),
-                                  Text(
-                                    controller.results[index].url,
-                                    style: TextStyle(
-                                      color: AppColors.secondaryLabel
-                                          .resolveFrom(context),
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          read: () =>
+                              unawaited(controller.readOriginalChapters()),
+                        ),
+                        _readButton(
+                          id: 'migration-categories-only',
+                          label: '仅迁移收藏和分类',
+                          enabled: controller.canChange,
+                          read: controller.chooseCategoriesOnly,
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (pending != null)
+                    CupertinoFormSection.insetGrouped(
+                      header: Text(pending.retryable ? '原迁移尚未确认' : '原迁移已拒绝'),
+                      footer: Text(
+                        pending.retryable
+                            ? '原操作的目标与复制范围已固定，新目标和新映射均不可提交。仅明确重试会重新发送原操作。'
+                            : '服务端已明确拒绝原操作。请重新读取当前数据，再检查新的迁移预览。',
+                      ),
+                      children: [
+                        CupertinoFormRow(
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Text(
+                              '${target!.manga.title} · ${target.sourceName} · ${target.sourceLang}',
                             ),
                           ),
                         ),
-                      if (controller.hasNextPage)
-                        _readButton(
-                          id: 'migration-search-more',
-                          label: '加载更多目标结果',
-                          enabled: controller.canChange,
-                          read: () => unawaited(controller.loadMore()),
+                        CupertinoFormRow(
+                          child: Text(
+                            '合并分类：${pending.request.migrateFrom.copyCategories ? '是' : '否'}\n'
+                            '补充已读 ${pending.request.migrateFrom.chapters.where((item) => item.copyRead).length} 章、'
+                            '书签 ${pending.request.migrateFrom.chapters.where((item) => item.copyBookmark).length} 个',
+                          ),
                         ),
-                    ],
-                  ),
-                if (controller.preview != null)
-                  _preview()
-                else if (controller.targetMetadata case final metadata?
-                    when controller.targetSequence != null)
-                  CupertinoFormSection.insetGrouped(
+                        if (pending.retryable)
+                          CupertinoButton.filled(
+                            key: const ValueKey('migration-retry-original'),
+                            onPressed: !controller.busy
+                                ? () => unawaited(controller.retry())
+                                : null,
+                            child: const Text('重试原迁移操作'),
+                          )
+                        else
+                          CupertinoButton(
+                            key: const ValueKey('migration-discard-rejected'),
+                            alignment: AlignmentDirectional.centerStart,
+                            onPressed: !controller.busy
+                                ? () => unawaited(controller.discardRejected())
+                                : null,
+                            child: Text(
+                              controller.targetMetadata == null
+                                  ? '结束已拒绝的原操作并重新选择'
+                                  : '重新读取并结束已拒绝的原操作',
+                            ),
+                          ),
+                        CupertinoButton(
+                          key: const ValueKey('migration-original-details'),
+                          alignment: AlignmentDirectional.centerStart,
+                          onPressed: () =>
+                              unawaited(_showOriginalDetails(pending)),
+                          child: const Text('查看原操作详情'),
+                        ),
+                        CupertinoButton(
+                          key: const ValueKey('migration-refresh-sources'),
+                          alignment: AlignmentDirectional.centerStart,
+                          onPressed: !controller.busy
+                              ? () => unawaited(controller.refreshSources())
+                              : null,
+                          child: const Text('重新读取迁移输入（只读）'),
+                        ),
+                      ],
+                    )
+                  else if (controller.completed)
+                    CupertinoFormSection.insetGrouped(
+                      header: const Text('服务端已确认'),
+                      footer: Text(controller.notice!),
+                      children: [
+                        CupertinoFormRow(
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Text(
+                              '${target!.manga.title} · ${target.sourceName} · ${target.sourceLang}',
+                            ),
+                          ),
+                        ),
+                        CupertinoButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('返回'),
+                        ),
+                      ],
+                    )
+                  else ...[
+                    CupertinoFormSection.insetGrouped(
+                      header: const Text('目标漫画源'),
+                      children: [
+                        if (controller.inputsReady &&
+                            !controller.busy &&
+                            controller.sources.isEmpty)
+                          const CupertinoFormRow(
+                            child: Text('没有其他已安装且启用的可用漫画源。请先在扩展管理中准备目标。'),
+                          ),
+                        ChoiceField<String>(
+                          key: const ValueKey('migration-source'),
+                          inline: false,
+                          label: '目标漫画源',
+                          value:
+                              controller.sources.any(
+                                (choice) => choice.key == selectedKey,
+                              )
+                              ? selectedKey
+                              : null,
+                          options: {
+                            for (final choice in controller.sources)
+                              choice.key:
+                                  '${choice.source.name} · ${choice.source.lang} · ${choice.build.packageName}',
+                          },
+                          onChanged:
+                              controller.canChange && controller.sourceDecided
+                              ? (key) {
+                                  if (key != null) {
+                                    unawaited(
+                                      controller.chooseSource(
+                                        controller.sources.singleWhere(
+                                          (choice) => choice.key == key,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                              : null,
+                        ),
+                        _readButton(
+                          id: 'migration-refresh-sources',
+                          label: '重新读取可用漫画源（只读）',
+                          enabled: !controller.busy,
+                          read: () => unawaited(controller.refreshSources()),
+                        ),
+                      ],
+                    ),
+                    if (controller.selectedSource != null)
+                      CupertinoFormSection.insetGrouped(
+                        header: const Text('查找目标作品'),
+                        children: [
+                          CupertinoFormRow(
+                            child: CupertinoTextField(
+                              autofillHints: null,
+                              key: const ValueKey('migration-search'),
+                              controller: _search,
+                              enabled: controller.canChange,
+                              onSubmitted: (value) =>
+                                  unawaited(controller.search(value)),
+                              placeholder: '搜索目标作品',
+                              decoration: null,
+                            ),
+                          ),
+                          _readButton(
+                            id: 'migration-search-submit',
+                            label: '搜索',
+                            enabled: controller.canChange,
+                            read: () =>
+                                unawaited(controller.search(_search.text)),
+                          ),
+                          _readButton(
+                            id: 'migration-popular',
+                            label: '浏览目标源热门作品',
+                            enabled: controller.canChange,
+                            read: () => unawaited(controller.browsePopular()),
+                          ),
+                        ],
+                      ),
+                  ],
+                ],
+              ],
+            ),
+            if (available && pending == null && !controller.completed) ...[
+              ..._candidateSlivers(context),
+              if (controller.preview != null)
+                SliverToBoxAdapter(child: _preview())
+              else if (controller.targetMetadata case final metadata?
+                  when controller.targetSequence != null)
+                SliverToBoxAdapter(
+                  child: CupertinoFormSection.insetGrouped(
                     header: const Text('迁移预览尚未取得'),
                     footer: const Text('尚未提交迁移。重新读取当前资料后，才能检查复制范围并确认。'),
                     children: [
@@ -818,8 +850,9 @@ class _MigrationPageState extends State<MigrationPage> {
                       ),
                     ],
                   ),
-              ],
+                ),
             ],
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
           ],
         ),
       ),

@@ -812,6 +812,16 @@ void main() {
             tester.platformDispatcher.clearPlatformBrightnessTestValue,
           );
           addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final source = platform.invokeHandler!;
+          platform.invokeHandler = (call) async {
+            final result = await source(call);
+            if (call.hasSearch()) {
+              result.mangaPage.mangas.add(
+                wire.Manga(url: '/other-candidate', title: '图源返回的另一部候选作品'),
+              );
+            }
+            return result;
+          };
           final readPath = '/api/state/manga/${sequence.mangaKey}';
           final readGate = Completer<void>();
           var failRead = true;
@@ -911,17 +921,21 @@ void main() {
           await tester.tap(control('migration-search'));
           await tester.enterText(control('migration-search'), '目标作品');
           await tap('migration-search-submit');
-          final rowWidth = tester.getSize(control('migration-search')).width;
           final firstResult = find.byKey(
             const ValueKey(('migration-result', 0)),
           );
-          await reveal(firstResult);
-          expect(
-            tester.getSize(firstResult).width,
-            greaterThanOrEqualTo(rowWidth),
-            reason:
-                'A short candidate title still needs a complete tappable row',
+          final secondResult = find.byKey(
+            const ValueKey(('migration-result', 1)),
           );
+          await reveal(firstResult);
+          final firstCard = tester.getRect(firstResult);
+          final secondCard = tester.getRect(secondResult);
+          expect(firstCard.width, closeTo(162, 0.1));
+          expect(firstCard.height, closeTo(243, 0.1));
+          expect(secondCard.top, firstCard.top);
+          expect(secondCard.left - firstCard.right, closeTo(12, 0.1));
+          expect(find.text('/target'), findsNothing);
+          expect(find.text('/other-candidate'), findsNothing);
           failRead = true;
           await tester.tapAt(
             tester.getRect(firstResult).centerRight - const Offset(8, 0),
@@ -1143,6 +1157,9 @@ void main() {
       final scrollable = find.byType(Scrollable).first;
       Future<void> tap(Finder finder) async {
         await tester.scrollUntilVisible(finder, 220, scrollable: scrollable);
+        await Scrollable.ensureVisible(tester.element(finder), alignment: .5);
+        await tester.pumpAndSettle();
+        expect(finder.hitTestable(), findsOneWidget);
         await tester.tap(finder);
         await tester.pumpAndSettle();
       }
@@ -1228,7 +1245,7 @@ void main() {
       final more = find.byKey(const ValueKey('migration-search-more'));
       final scrollable = find
           .descendant(
-            of: find.byType(ListView),
+            of: find.byType(CustomScrollView),
             matching: find.byType(Scrollable),
           )
           .first;

@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-20，Karuyomi 跨版本双主题主图为 168/169（99.4%），未连接（27.K1）仍缺两侧。固定 Mihon 参考新增详情刷新等待、章节请求失败、源空清单和筛选无匹配，148/170 行（87.1%）完成双主题主图核对。最终像素、各触发变体与完整转场继续验收。[详情刷新与章节空态](mihon-cupertino-fidelity.md#mihon-详情刷新与章节空态) · [章节批量与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
+2026-11-20，Karuyomi 跨版本双主题主图为 168/169（99.4%），未连接（27.K1）仍缺两侧。固定 Mihon 参考新增迁移搜索、单源结果与共存流程，已有 153/170 行（90.0%）双主题主图。最终像素、各触发变体与完整转场继续验收。[迁移参考](mihon-cupertino-fidelity.md#mihon-迁移搜索与共存) · [章节批量与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -538,18 +538,21 @@ stateDiagram-v2
     Q11 --> Q13: 请求失败
     Q4 --> Q11: 修改查询
     Q12 --> Q11: 修改查询
-    Q13 --> Q11: 重新搜索
+    Q13 --> Q11: 修改查询后重新搜索
     Q4 --> Q5: 选择结果
-    Q4 --> Q14: 进入单个目标源（待验）
+    Q4 --> Q14: 进入单个目标源
+    Q14 --> Q14: 无结果、失败及明确重试
     Q14 --> Q5: 选择结果（待验）
     Q5 --> M1: 显示目标作品
     M1 --> Q4: 从目标作品返回搜索
     Q5 --> Q4: 取消
-    Q5 --> Q6: 共存或迁移
-    Q6 --> Q7: 完成
+    Q5 --> Q6: 共存
+    Q5 --> Q6: 迁移替换原作（待验）
+    Q6 --> Q7: 放行后完成共存
+    Q7 --> M2: 返回英文原作
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class M1,M2,M3,M4,M5,M6,H0,H1,H2,H3,H4,H5,H6,H7,H8,V0,V1,V2,Q2,Q3,Q4,Q5,Q8,Q9,Q10,Q12 paired
+    class M1,M2,M3,M4,M5,M6,H0,H1,H2,H3,H4,H5,H6,H7,H8,V0,V1,V2,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10,Q11,Q12,Q13,Q14 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                                          | 浅色                                                                                                                           | 深色                                                                                                                       |
@@ -581,19 +584,21 @@ stateDiagram-v2
 | 20.06   | 待迁移作品的选中行、源名、继续与返回清除选择；继续转换待验                                     | `s2006-migration-selected-light`                                                                                               | `s2006-migration-selected-dark`                                                                                            |
 | 20.07   | 全不选后仅显示可选源、无排序把手；参考继续按钮仍可见，全选恢复；未选时继续待验                 | `s2004-migration-none-light`                                                                                                   | `s2004-migration-none-dark`                                                                                                |
 | 20.08   | 选择已启用/已置顶源的快捷菜单；返回后保持原选择，快捷选择执行待验                              | `s2004-migration-options-light`                                                                                                | `s2004-migration-options-dark`                                                                                             |
-| 20.09   | 实际迁移查询、分源旋转指示、已返回项与搜索进度；不得以15的图替代                               | 待                                                                                                                             | 待                                                                                                                         |
+| 20.09   | 实际查询 `one piece`，两个 MangaDex 分组等待、xkcd 无结果，顶部显示进度                        | `s2009-migration-search-held-light`                                                                                            | `s2009-migration-search-held-dark`                                                                                         |
 | 20.10   | 实际迁移查询 xkcd、各源无结果及原源标记；改为 one piece 后恢复结果                             | `s2005-migration-search-light`                                                                                                 | `s2005-migration-search-dark`                                                                                              |
-| 20.11   | 实际迁移查询、失败源和具体错误、重新搜索；混合成功/失败另列变体                                | 待                                                                                                                             | 待                                                                                                                         |
-| 20.12   | 单个目标源内的迁移搜索、查询与原作品上下文；加载/成功/空/失败均待                              | 待                                                                                                                             | 待                                                                                                                         |
+| 20.11   | 两组 MangaDex 502，xkcd 无结果；放行并改用 `One Piece` 搜索成功                                | `s2011-migration-search-failed-light`                                                                                          | `s2011-migration-search-failed-dark`                                                                                       |
+| 20.12   | MangaDex ALL 内同一查询的封面格子；等待、无结果、502 和明确重试另有成对补图                    | `s2012-migration-single-light`                                                                                                 | `s2012-migration-single-dark`                                                                                              |
 | 21.01   | 参考弹层为章节/分类选项及显示作品/共存/迁移；显示作品后实际打开目标并返回；改选、取消和提交待  | `s2101-migration-confirm-light`、`s1602-one-piece-ready-light`                                                                 | `s2101-migration-confirm-dark`、`s1602-one-piece-ready-dark`                                                               |
-| 21.02   | 原/目标上下文和进行中反馈、操作禁用                                                            | 待                                                                                                                             | 待                                                                                                                         |
-| 21.03   | 目标作品落点、原书架关系及完成后可用操作                                                       | 待                                                                                                                             | 待                                                                                                                         |
+| 21.02   | 点击共存后收起确认选项，底层保留原源标记与目标结果，中央显示等待                               | `s2102-migration-working-light`                                                                                                | `s2102-migration-working-dark`                                                                                             |
+| 21.03   | 共存后打开已在书架的 MangaDex ALL 目标；保留英文原作，替换落点待验                             | `s2103-migration-coexisted-light`                                                                                              | `s2103-migration-coexisted-dark`                                                                                           |
 
 16–21 已实看 `migration-reference-pairs-0.jpg` 至 `migration-reference-pairs-3.jpg`、`migration-reference-selected-pairs.jpg`，以及 `manga-reference-pairs-0.jpg` 至 `manga-reference-pairs-2.jpg`。原作品为 xkcd，目标源保持最初三个已选项；先全不选、查看菜单、返回并全选恢复，再继续搜索。xkcd 查询真实返回三源无结果；输入 one piece 得到 MangaDex ALL/EN 的真实作品，选择 ALL 第一项进入数据选择。此操作只查看目标作品，未执行共存或迁移。One Piece ALL 与书架已有 EN 版本触发真实重复提示，两主题均取消，目标保持未收藏。返回书架后原 xkcd/One Piece EN 关系保持；模拟器已暂停。
 
-长简介展开首屏和末段已成对，完整显示正文与标签，再收起回原详情。首个目标详情的 XML 曾为未知作者/0章，而随后同前缀 PNG 已完成元数据和章节加载；该帧不能作为16.01/16.07或17.02的图片证据。早期输入丢字产生的 o ie 查询只留在忽略目录，不填入同条件主图。20.06 的正式成对图包含选中背景与继续按钮；未实际点击此入口进入配置，不能用作品更多菜单的成功转换替代。空书架迁移、冷加载、迁移失败、共存/迁移后的落点和所有修改/取消变体仍待。
+长简介展开首屏和末段已成对，完整显示正文与标签，再收起回原详情。首个目标详情的 XML 曾为未知作者/0章，而随后同前缀 PNG 已完成元数据和章节加载；该帧不能作为16.01/16.07或17.02的图片证据。早期输入丢字产生的 o ie 查询只留在忽略目录，不填入同条件主图。20.06 的正式成对图包含选中背景与继续按钮；未实际点击此入口进入配置，不能用作品更多菜单的成功转换替代。这批画面之后继续补空书架、冷加载、故障和提交转换。
 
 刷新等待和 502 由同一次真实 xkcd 章节更新得到，两色均保留原简介与各自当时的章节数。放行后再次下拉恢复。两色均启用再清除下载筛选，并从本地图源实际打开无章节作品。[双主题画面与测试条件](mihon-cupertino-fidelity.md#mihon-详情刷新与章节空态)
+
+20.09、20.11、20.12、21.02、21.03 已取得双主题主图。两色均实测单源无结果和 502 后的明确重试，再以 MangaDex 英文版作为原作完成共存。目标 ALL 版由未收藏转为已收藏，返回时英文版仍在书架。替换原作、批量路径和空书架继续验收。[迁移参考与量测](mihon-cupertino-fidelity.md#mihon-迁移搜索与共存)
 
 以下为两主题稳定 XML 相同的主要矩形，均为720×1600/320dpi的物理像素；仅建立参考锚点，尚未与 Karuyomi 迁移页叠图：
 

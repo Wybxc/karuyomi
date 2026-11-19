@@ -69,13 +69,15 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 2026-11-16，调整PR #8的推进顺序：先收敛同类最终界面实现并提交，再集中验收正式产物；不再为已知即将修改的中间布局反复补拍全套主图。停止使用没有固定权重的“约50%”，改为报告“最终界面代码、最终版本逐状态验收、合并发布与生产闭环”三项实绩和剩余门槛，详见[当前交付表](mihon-cupertino-fidelity.md#目标与当前状态)。状态覆盖和双主题验收范围保持不变。
 
-**当前视觉重构**按全部现有状态推进，统一 Cupertino 导航、控件、语义色与转场。Karuyomi 跨版本双主题主图为 168/169（99.4%），Mihon 新增详情刷新、章节请求失败和两类章节空态后达到 148/170（87.1%）。剩余未连接主状态，以及参考图补采、最终像素复核、变体、转换和生产验收。PR #8 为草稿。[交付计划](mihon-cupertino-fidelity.md) · [逐状态清单](../verification/mihon-state-coverage.md)
+**当前视觉重构**按全部现有状态推进，统一 Cupertino 导航、控件、语义色与转场。Karuyomi 跨版本双主题主图为 168/169（99.4%），Mihon 新增迁移搜索、单源页与共存流程后达到 153/170（90.0%）。剩余未连接主状态，以及参考图补采、最终像素复核、变体、转换和生产验收。PR #8 为草稿。[交付计划](mihon-cupertino-fidelity.md) · [逐状态清单](../verification/mihon-state-coverage.md)
 
 阅读器双主题正式 Web 已核对工具显隐和单页重试。章间布局在浅、深色的稳定缺页和就绪状态均完成量测，深色短横屏实测重试并从新文档续读目标第 1 页。深色稳定等待图继续补采。[单页与切章等待参考](../verification/mihon-cupertino-fidelity.md#mihon-单页与切章等待的双主题参考) · [画布内等待量测](../verification/mihon-cupertino-fidelity.md#画布内等待的信息间距与按钮)
 
 封面编辑采用居中的完整比例预览。深色正式 Web 发现宽图固定占高导致留白及横屏裁下沿，组件已改用图片实际显示高度与弹层可用视区确定占位。修正后的正式 Web 双主题继续验收。[封面预览量测](../verification/mihon-cupertino-fidelity.md#karuyomi-封面预览)
 
 作品详情支持原位下拉刷新、失败重试及清除无结果的章节筛选。组件回归覆盖保留原简介和章节、晚到结果和真正空清单的重读。正式 Web 双主题继续验收。[详情刷新与章节空态](../verification/mihon-cupertino-fidelity.md#mihon-详情刷新与章节空态)
+
+迁移候选改用可随宽度排布的封面网格和底部标题。115 项定向回归覆盖卡片点击、分页和迁移确认。Mihon 两色均实测单源恢复及同名作品共存，Karuyomi 新网格的正式 Web 待验。[迁移参考与验证](../verification/mihon-cupertino-fidelity.md#mihon-迁移搜索与共存)
 
 `5f5d287` 正式 Web 双主题确认批量分类失效后保留原清单、末项未发送、关闭返回书架。`78f4c4b` 正式 Web 确认迁移选中超过 256 条时禁用提交，减少选择后可进入二次确认。[批量实拍](../verification/mihon-cupertino-fidelity.md#批量分类失效的正式-web-双主题验收) · [迁移实拍](../verification/mihon-cupertino-fidelity.md#章节映射超限的正式-web-双主题验收)
 
