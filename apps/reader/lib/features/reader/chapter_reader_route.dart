@@ -686,6 +686,12 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     final bookmarks = _bookmarks;
     final disabled =
         _busy || _accessPaused || _recovering || _refreshingProgress;
+    final goToPrevious = disabled || previous == null
+        ? null
+        : () => unawaited(_move(previous));
+    final goToNext = disabled || next == null
+        ? null
+        : () => unawaited(_move(next));
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -724,12 +730,14 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
           alignment: WrapAlignment.center,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            CupertinoButton(
-              padding: const EdgeInsets.all(8),
-              onPressed: disabled || previous == null
-                  ? null
-                  : () => unawaited(_move(previous)),
-              child: const Text('上一章'),
+            Semantics(
+              container: true,
+              enabled: goToPrevious != null,
+              child: CupertinoButton(
+                padding: const EdgeInsets.all(8),
+                onPressed: goToPrevious,
+                child: Text(previous == null ? '没有上一章' : '上一章'),
+              ),
             ),
             if (bookmarks != null)
               ChapterBookmarkButton(
@@ -831,12 +839,14 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
                 ),
               ),
             ),
-            CupertinoButton(
-              padding: const EdgeInsets.all(8),
-              onPressed: disabled || next == null
-                  ? null
-                  : () => unawaited(_move(next)),
-              child: const Text('下一章'),
+            Semantics(
+              container: true,
+              enabled: goToNext != null,
+              child: CupertinoButton(
+                padding: const EdgeInsets.all(8),
+                onPressed: goToNext,
+                child: Text(next == null ? '没有下一章' : '下一章'),
+              ),
             ),
           ],
         ),

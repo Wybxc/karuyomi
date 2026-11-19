@@ -250,6 +250,7 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
             ),
           if (!_expired && draft.busy)
             Semantics(
+              key: const ValueKey('chapter-read-pause'),
               container: true,
               enabled: !draft.pauseRequested,
               child: CupertinoButton(
@@ -259,6 +260,7 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
             ),
           if (!_expired && draft.canContinue)
             Semantics(
+              key: const ValueKey('chapter-read-end'),
               container: true,
               child: CupertinoButton(
                 onPressed: () {

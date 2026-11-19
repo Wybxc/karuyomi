@@ -9,6 +9,7 @@ import 'dart:ui' show SemanticsAction, Tristate;
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:karuyomi/data/bookmark_repository.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -832,6 +833,63 @@ void main() {
       await _finish(tester, platform, catalog);
     },
   );
+
+  testWidgets('pausing and ending a batch have separate keyboard targets', (
+    tester,
+  ) async {
+    final platform = _platform();
+    final catalog = await _details(tester, platform);
+    platform.businessServer.requests.clear();
+    final received = Completer<void>();
+    final release = Completer<void>();
+    addTearDown(() {
+      if (!release.isCompleted) release.complete();
+    });
+    platform.afterBusinessReply = (request, reply) async {
+      if (request.method == 'POST' &&
+          request.uri.path == '/api/state/mutations') {
+        platform.afterBusinessReply = null;
+        received.complete();
+        await release.future;
+      }
+      return reply;
+    };
+    await _selectAll(tester);
+    await _tap(tester, _control('chapter-mark-read'));
+    await tester.runAsync(() async {
+      await tester.tap(find.text('开始'));
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pump(const Duration(milliseconds: 32));
+    await tester.runAsync(
+      () => received.future.timeout(const Duration(seconds: 5)),
+    );
+    final pause = find.text('暂停剩余操作');
+    Focus.of(tester.element(pause)).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(find.textContaining('已请求暂停'), findsOneWidget);
+    final pausedId = tester.getSemantics(pause).id;
+
+    await tester.runAsync(() async {
+      release.complete();
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pumpAndSettle();
+    final end = find.text('结束剩余操作');
+    final endFocus = Focus.of(tester.element(end));
+    expect(tester.getSemantics(end).id, isNot(pausedId));
+    expect(endFocus.hasFocus, false);
+    endFocus.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('剩余章节未再发送'), findsOneWidget);
+    expect(_posts(platform), hasLength(1));
+    await _tap(tester, find.text('完成'));
+    await _finish(tester, platform, catalog);
+  });
 
   testWidgets(
     'an open marking batch keeps its old revision and ends a conflict through readonly refresh',

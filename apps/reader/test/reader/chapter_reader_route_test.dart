@@ -1,6 +1,7 @@
 import '../test_app.dart';
 
 import 'dart:async';
+import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -76,6 +77,31 @@ void main() {
             tester.getSize(find.byType(InteractiveViewer).first).height,
             greaterThan(scale == 1 ? 400 : 240),
           );
+          for (final label in ['上一页', '下一页']) {
+            final icon = find.byWidgetPredicate(
+              (widget) => widget is Icon && widget.semanticLabel == label,
+            );
+            expect(
+              tester
+                  .getSemantics(icon)
+                  .getSemanticsData()
+                  .flagsCollection
+                  .isEnabled,
+              Tristate.isFalse,
+            );
+          }
+          for (final label in ['没有上一章', '没有下一章']) {
+            final button = find.widgetWithText(CupertinoButton, label);
+            expect(button, findsOneWidget);
+            expect(
+              tester
+                  .getSemantics(button)
+                  .getSemanticsData()
+                  .flagsCollection
+                  .isEnabled,
+              Tristate.isFalse,
+            );
+          }
           expect(find.text('重新阅读本章'), findsNothing);
           expect(find.text('刷新书签'), findsNothing);
           final options = find.byKey(const ValueKey('reader-chapter-options'));

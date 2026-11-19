@@ -1446,6 +1446,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Widget _scrollableControls() {
+    final canGoBack = _reader.canGoBack;
+    final canAdvance = _reader.canAdvance;
     return SingleChildScrollView(
       primary: false,
       child: Padding(
@@ -1455,12 +1457,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
           children: [
             Row(
               children: [
-                CupertinoButton(
-                  onPressed: _reader.canGoBack ? _back : null,
-                  padding: const EdgeInsets.all(8),
-                  child: const Icon(
-                    CupertinoIcons.backward_end,
-                    semanticLabel: '上一页',
+                Semantics(
+                  container: true,
+                  enabled: canGoBack,
+                  child: CupertinoButton(
+                    onPressed: canGoBack ? _back : null,
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(
+                      CupertinoIcons.backward_end,
+                      semanticLabel: '上一页',
+                    ),
                   ),
                 ),
                 Expanded(
@@ -1471,12 +1477,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-                CupertinoButton(
-                  onPressed: _reader.canAdvance ? _advance : null,
-                  padding: const EdgeInsets.all(8),
-                  child: const Icon(
-                    CupertinoIcons.forward_end,
-                    semanticLabel: '下一页',
+                Semantics(
+                  container: true,
+                  enabled: canAdvance,
+                  child: CupertinoButton(
+                    onPressed: canAdvance ? _advance : null,
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(
+                      CupertinoIcons.forward_end,
+                      semanticLabel: '下一页',
+                    ),
                   ),
                 ),
                 if (_reader.isContinuous)
