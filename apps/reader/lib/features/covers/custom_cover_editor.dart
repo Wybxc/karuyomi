@@ -233,11 +233,19 @@ class _CoverEditorState extends State<_CoverEditor> {
         _confirmed != null;
 
     const previewPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 8);
-    Widget previewFrame(Widget Function(Size) buildPreview) => LayoutBuilder(
+    Widget previewFrame(
+      double viewportHeight,
+      Widget Function(BoxConstraints) buildPreview,
+    ) => LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final height = math.min(width, MediaQuery.sizeOf(context).height * .4);
-        return buildPreview(Size(width, height));
+        return buildPreview(
+          BoxConstraints(
+            minWidth: width,
+            maxWidth: width,
+            maxHeight: math.min(width, viewportHeight * .35),
+          ),
+        );
       },
     );
 
@@ -277,182 +285,186 @@ class _CoverEditorState extends State<_CoverEditor> {
                 ),
               )
             : null,
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_expired)
-                CupertinoListSection.insetGrouped(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        '身份或服务已变化，原窗口已停用。请关闭后重新打开。',
-                        style: TextStyle(
-                          color: AppColors.error.resolveFrom(context),
+        content: LayoutBuilder(
+          builder: (context, viewport) => SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_expired)
+                  CupertinoListSection.insetGrouped(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          '身份或服务已变化，原窗口已停用。请关闭后重新打开。',
+                          style: TextStyle(
+                            color: AppColors.error.resolveFrom(context),
+                          ),
                         ),
                       ),
+                    ],
+                  )
+                else ...[
+                  widget.target,
+                  CupertinoFormSection.insetGrouped(
+                    header: Text(
+                      _confirmed == null
+                          ? '服务端封面'
+                          : _attempted || pending != null
+                          ? '上次服务端确认'
+                          : '服务端已确认',
                     ),
-                  ],
-                )
-              else ...[
-                widget.target,
-                CupertinoFormSection.insetGrouped(
-                  header: Text(
-                    _confirmed == null
-                        ? '服务端封面'
-                        : _attempted || pending != null
-                        ? '上次服务端确认'
-                        : '服务端已确认',
-                  ),
-                  footer: _error == null
-                      ? null
-                      : Semantics(
-                          container: true,
-                          liveRegion: true,
-                          child: Text(
-                            _error!,
-                            key: const ValueKey('cover-error'),
-                            style: TextStyle(
-                              color: AppColors.error.resolveFrom(context),
+                    footer: _error == null
+                        ? null
+                        : Semantics(
+                            container: true,
+                            liveRegion: true,
+                            child: Text(
+                              _error!,
+                              key: const ValueKey('cover-error'),
+                              style: TextStyle(
+                                color: AppColors.error.resolveFrom(context),
+                              ),
                             ),
                           ),
-                        ),
-                  children: [
-                    if (_confirmed case final confirmed?)
-                      if (confirmed.cover case final cover?)
-                        CupertinoFormRow(
-                          padding: previewPadding,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              const Text('当前自定义封面'),
-                              const SizedBox(height: 8),
-                              previewFrame(
-                                (size) => CustomCover(
-                                  repository: widget.repository,
-                                  cover: cover,
-                                  width: size.width,
-                                  height: size.height,
-                                  fit: BoxFit.contain,
+                    children: [
+                      if (_confirmed case final confirmed?)
+                        if (confirmed.cover case final cover?)
+                          CupertinoFormRow(
+                            padding: previewPadding,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const Text('当前自定义封面'),
+                                const SizedBox(height: 8),
+                                previewFrame(
+                                  viewport.maxHeight,
+                                  (constraints) => CustomCover(
+                                    repository: widget.repository,
+                                    cover: cover,
+                                    constraints: constraints,
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else
+                              ],
+                            ),
+                          )
+                        else
+                          const CupertinoFormRow(
+                            child: Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text('未设置自定义封面'),
+                            ),
+                          )
+                      else if (!_busy)
                         const CupertinoFormRow(
                           child: Align(
                             alignment: AlignmentDirectional.centerStart,
-                            child: Text('未设置自定义封面'),
+                            child: Text('尚未读取服务端封面'),
                           ),
-                        )
-                    else if (!_busy)
-                      const CupertinoFormRow(
-                        child: Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: Text('尚未读取服务端封面'),
                         ),
-                      ),
-                    if (_operation case final operation?)
-                      Semantics(
-                        container: true,
-                        liveRegion: true,
-                        child: CupertinoFormRow(
-                          prefix: Expanded(
-                            child: Text(switch (operation) {
-                              _CoverOperation.load => '正在读取封面',
-                              _CoverOperation.pick => '正在读取所选图片',
-                              _CoverOperation.save => '正在等待服务端确认',
-                            }),
+                      if (_operation case final operation?)
+                        Semantics(
+                          container: true,
+                          liveRegion: true,
+                          child: CupertinoFormRow(
+                            prefix: Expanded(
+                              child: Text(switch (operation) {
+                                _CoverOperation.load => '正在读取封面',
+                                _CoverOperation.pick => '正在读取所选图片',
+                                _CoverOperation.save => '正在等待服务端确认',
+                              }),
+                            ),
+                            child: const CupertinoActivityIndicator(),
                           ),
-                          child: const CupertinoActivityIndicator(),
                         ),
-                      ),
-                    Semantics(
-                      enabled: editable,
-                      child: CupertinoButton(
-                        key: const ValueKey('cover-select-image'),
-                        alignment: AlignmentDirectional.centerStart,
-                        onPressed: editable ? _select : null,
-                        child: Text(
-                          _confirmed?.cover == null ? '选择图片' : '替换图片',
-                        ),
-                      ),
-                    ),
-                    if (_confirmed?.cover != null)
                       Semantics(
                         enabled: editable,
                         child: CupertinoButton(
-                          key: const ValueKey('cover-clear'),
+                          key: const ValueKey('cover-select-image'),
                           alignment: AlignmentDirectional.centerStart,
-                          foregroundColor: editable
-                              ? AppColors.error.resolveFrom(context)
-                              : null,
-                          onPressed: editable
-                              ? () => setState(() {
-                                  _selected = null;
-                                  _clearing = true;
-                                  _attempted = false;
-                                })
-                              : null,
-                          child: const Text('清除封面'),
+                          onPressed: editable ? _select : null,
+                          child: Text(
+                            _confirmed?.cover == null ? '选择图片' : '替换图片',
+                          ),
                         ),
                       ),
-                  ],
-                ),
-                if (preview != null || clearing)
-                  CupertinoFormSection.insetGrouped(
-                    header: Text(
-                      saving
-                          ? '正在提交的修改'
-                          : _attempted || pending != null
-                          ? '尚未确认的修改'
-                          : '待保存的修改',
-                    ),
-                    footer: Text(
-                      saving
-                          ? '收到服务端确认后更新封面。'
-                          : _blocked || pending?.retryable == false
-                          ? '当前会话保留原修改。请重新读取后再修改，不会覆盖新的远端版本。'
-                          : pending != null
-                          ? '当前会话保留原操作。重试不会更换图片或覆盖新的远端版本。'
-                          : '仅当前会话保留，保存并收到服务端确认后才更新封面。',
-                    ),
-                    children: [
-                      CupertinoFormRow(
-                        padding: clearing ? null : previewPadding,
-                        child: clearing
-                            ? const Align(
-                                alignment: AlignmentDirectional.centerStart,
-                                child: Text('清除自定义封面'),
-                              )
-                            : previewFrame(
-                                (size) => Image.memory(
-                                  preview!,
-                                  width: size.width,
-                                  height: size.height,
-                                  fit: BoxFit.contain,
-                                  semanticLabel: saving
-                                      ? '正在提交的封面预览'
-                                      : _attempted || pending != null
-                                      ? '尚未确认的封面预览'
-                                      : '待保存的封面预览',
-                                ),
-                              ),
-                      ),
+                      if (_confirmed?.cover != null)
+                        Semantics(
+                          enabled: editable,
+                          child: CupertinoButton(
+                            key: const ValueKey('cover-clear'),
+                            alignment: AlignmentDirectional.centerStart,
+                            foregroundColor: editable
+                                ? AppColors.error.resolveFrom(context)
+                                : null,
+                            onPressed: editable
+                                ? () => setState(() {
+                                    _selected = null;
+                                    _clearing = true;
+                                    _attempted = false;
+                                  })
+                                : null,
+                            child: const Text('清除封面'),
+                          ),
+                        ),
                     ],
                   ),
-                if (_blocked ||
-                    pending?.retryable == false ||
-                    _confirmed == null)
-                  CupertinoButton(
-                    onPressed: _busy ? null : _load,
-                    child: const Text('重新读取'),
-                  ),
+                  if (preview != null || clearing)
+                    CupertinoFormSection.insetGrouped(
+                      header: Text(
+                        saving
+                            ? '正在提交的修改'
+                            : _attempted || pending != null
+                            ? '尚未确认的修改'
+                            : '待保存的修改',
+                      ),
+                      footer: Text(
+                        saving
+                            ? '收到服务端确认后更新封面。'
+                            : _blocked || pending?.retryable == false
+                            ? '当前会话保留原修改。请重新读取后再修改，不会覆盖新的远端版本。'
+                            : pending != null
+                            ? '当前会话保留原操作。重试不会更换图片或覆盖新的远端版本。'
+                            : '仅当前会话保留，保存并收到服务端确认后才更新封面。',
+                      ),
+                      children: [
+                        CupertinoFormRow(
+                          padding: clearing ? null : previewPadding,
+                          child: clearing
+                              ? const Align(
+                                  alignment: AlignmentDirectional.centerStart,
+                                  child: Text('清除自定义封面'),
+                                )
+                              : previewFrame(
+                                  viewport.maxHeight,
+                                  (constraints) => ConstrainedBox(
+                                    constraints: constraints,
+                                    child: Image.memory(
+                                      preview!,
+                                      fit: BoxFit.contain,
+                                      semanticLabel: saving
+                                          ? '正在提交的封面预览'
+                                          : _attempted || pending != null
+                                          ? '尚未确认的封面预览'
+                                          : '待保存的封面预览',
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  if (_blocked ||
+                      pending?.retryable == false ||
+                      _confirmed == null)
+                    CupertinoButton(
+                      onPressed: _busy ? null : _load,
+                      child: const Text('重新读取'),
+                    ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

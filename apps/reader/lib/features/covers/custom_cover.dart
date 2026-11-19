@@ -10,8 +10,10 @@ class const CustomCover({
   super.key,
   required final CoverRepository repository,
   required final wire.CustomCover? cover,
-  final double width = 48,
-  final double height = 64,
+  final BoxConstraints constraints = const BoxConstraints.tightFor(
+    width: 48,
+    height: 64,
+  ),
   final BoxFit fit = BoxFit.cover,
 }) extends StatefulWidget {
   @override
@@ -52,12 +54,11 @@ class _CustomCoverState extends State<CustomCover> {
             padding: const EdgeInsets.all(8),
             child: const Icon(CupertinoIcons.refresh, semanticLabel: '重试读取封面'),
           )
-        : const Center(child: Icon(CupertinoIcons.book)),
+        : const Center(heightFactor: 1, child: Icon(CupertinoIcons.book)),
   );
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: widget.width,
-    height: widget.height,
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: widget.constraints,
     child: ClipRRect(
       borderRadius: BorderRadius.circular(6),
       child: FutureBuilder(
@@ -71,11 +72,13 @@ class _CustomCoverState extends State<CustomCover> {
             bytes,
             key: ValueKey(_identity),
             fit: widget.fit,
-            cacheHeight:
-                (widget.height * MediaQuery.devicePixelRatioOf(context))
-                    .ceil()
-                    .clamp(1, 1024)
-                    .toInt(),
+            cacheHeight: widget.constraints.hasBoundedHeight
+                ? (widget.constraints.maxHeight *
+                          MediaQuery.devicePixelRatioOf(context))
+                      .ceil()
+                      .clamp(1, 1024)
+                      .toInt()
+                : null,
             gaplessPlayback: false,
             excludeFromSemantics: true,
             errorBuilder: (context, error, stack) => _placeholder(failed: true),

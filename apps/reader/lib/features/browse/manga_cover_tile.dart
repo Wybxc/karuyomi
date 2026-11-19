@@ -45,8 +45,10 @@ class const MangaCoverTile({
                         CustomCover(
                           repository: repository,
                           cover: entry?.customCover,
-                          width: constraints.maxWidth,
-                          height: constraints.maxHeight,
+                          constraints: BoxConstraints.tightFor(
+                            width: constraints.maxWidth,
+                            height: constraints.maxHeight,
+                          ),
                         )
                       else
                         ColoredBox(

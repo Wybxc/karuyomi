@@ -543,8 +543,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
           child: CustomCover(
             repository: covers,
             cover: state?.hasCustomCover() == true ? state!.customCover : null,
-            width: 100,
-            height: 150,
+            constraints: const BoxConstraints.tightFor(width: 100, height: 150),
           ),
         ),
       const SizedBox(width: 16),

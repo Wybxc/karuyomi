@@ -38,8 +38,8 @@ final class _Picker extends FileSelectorPlatform {
   }) async => waiting != null ? waiting!.future : files.removeFirst();
 }
 
-XFile _imageFile([int color = 80]) {
-  final image = img.Image(width: 32, height: 48);
+XFile _imageFile({int color = 80, int width = 32, int height = 48}) {
+  final image = img.Image(width: width, height: height);
   img.fill(image, color: img.ColorRgb8(color, 70, 180));
   return XFile.fromData(
     img.encodePng(image),
@@ -63,6 +63,16 @@ Future<void> _tap(
   } else {
     await tester.pump(const Duration(milliseconds: 300));
   }
+}
+
+Future<void> _decodeImage(WidgetTester tester, Finder image) async {
+  await tester.runAsync(
+    () => precacheImage(
+      tester.widget<Image>(image).image,
+      tester.element(image),
+    ).timeout(const Duration(seconds: 5)),
+  );
+  await tester.pumpAndSettle();
 }
 
 Future<CatalogController> _details(
@@ -112,6 +122,70 @@ void main() {
   });
   tearDown(() {
     FileSelectorPlatform.instance = previous;
+  });
+
+  testWidgets('wide cover previews follow the image and fit a short sheet', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final server = TestBusinessServer();
+    final transport = TestCoverTransport(server);
+    final platform = TestPlatform(businessServer: server)..covers = transport;
+    final catalog = await _details(tester, platform);
+    await _tap(tester, find.byKey(const ValueKey('custom-cover-editor')));
+    final editor = find.byKey(const ValueKey('cover-editor'));
+    final select = find.byKey(const ValueKey('cover-select-image'));
+    picker.files.add(_imageFile(width: 300, height: 150));
+    await _tap(tester, select);
+    final draft = find.byWidgetPredicate(
+      (widget) => widget is Image && widget.semanticLabel == '待保存的封面预览',
+    );
+    await _decodeImage(tester, draft);
+    final draftSize = tester.getSize(draft);
+    expect(draftSize.width, greaterThan(200));
+    expect(draftSize.height, closeTo(draftSize.width / 2, 1));
+    expect(transport.uploads, isEmpty);
+
+    await _tap(tester, find.byKey(const ValueKey('cover-save')));
+    final confirmed = find.descendant(
+      of: editor,
+      matching: find.byType(CustomCover),
+    );
+    final image = find.descendant(of: confirmed, matching: find.byType(Image));
+    await _decodeImage(tester, image);
+    expect(tester.getSize(confirmed), draftSize);
+    expect(transport.uploads, hasLength(1));
+
+    tester.view.physicalSize = const Size(844, 390);
+    await tester.pumpAndSettle();
+    await _decodeImage(tester, image);
+    final scrollView = find.descendant(
+      of: editor,
+      matching: find.byType(SingleChildScrollView),
+    );
+    final scrollable = find
+        .descendant(of: scrollView, matching: find.byType(Scrollable))
+        .first;
+    final position = tester.state<ScrollableState>(scrollable).position;
+    position.jumpTo(position.minScrollExtent);
+    await tester.pumpAndSettle();
+    final shortPreview = tester.getRect(confirmed);
+    expect(
+      shortPreview.bottom,
+      lessThanOrEqualTo(tester.getRect(scrollView).bottom),
+    );
+    expect(shortPreview.center.dx, closeTo(tester.getCenter(editor).dx, 1));
+    final confirmedWrites = server.appliedMutations;
+    await _tap(tester, find.byKey(const ValueKey('cover-clear')));
+    expect(find.text('清除自定义封面'), findsOneWidget);
+    await _tap(tester, find.text('关闭'));
+    expect(editor, findsNothing);
+    expect(transport.uploads, hasLength(1));
+    expect(server.appliedMutations, confirmedWrites);
+    await _finish(tester, catalog);
   });
 
   for (final brightness in Brightness.values) {
@@ -397,25 +471,21 @@ void main() {
             of: control('cover-editor'),
             matching: find.byType(CustomCover),
           );
+          final confirmedImage = find.descendant(
+            of: editorPreview,
+            matching: find.byType(Image),
+          );
+          await _decodeImage(tester, confirmedImage);
           final portraitPreview = tester.getSize(editorPreview);
           expect(portraitPreview.width, greaterThan(200));
           expect(
             tester.getCenter(editorPreview).dx,
             closeTo(tester.getCenter(control('cover-editor')).dx, 1),
           );
-          expect(
-            tester
-                .widget<Image>(
-                  find.descendant(
-                    of: editorPreview,
-                    matching: find.byType(Image),
-                  ),
-                )
-                .fit,
-            BoxFit.contain,
-          );
+          expect(tester.widget<Image>(confirmedImage).fit, BoxFit.contain);
           tester.view.physicalSize = const Size(844, 390);
           await tester.pumpAndSettle();
+          await _decodeImage(tester, confirmedImage);
           expect(
             tester.getSize(editorPreview).height,
             lessThan(portraitPreview.height),
@@ -580,7 +650,7 @@ void main() {
       );
       await _tap(tester, find.text('真实源 DTO 测试'));
       await _tap(tester, find.byKey(const ValueKey('custom-cover-editor')));
-      picker.files.add(_imageFile(150));
+      picker.files.add(_imageFile(color: 150));
       await _tap(tester, find.byKey(const ValueKey('cover-select-image')));
       await _tap(tester, find.byKey(const ValueKey('cover-save')));
       final replaced = server.manga(key)!.customCover.assetId;
@@ -784,7 +854,7 @@ void main() {
         asset,
       );
       await _tap(tester, find.byKey(const ValueKey('custom-cover-editor')));
-      picker.files.add(_imageFile(180));
+      picker.files.add(_imageFile(color: 180));
       await _tap(tester, find.byKey(const ValueKey('cover-select-image')));
       final remote = BusinessStateClient(
         api: server,

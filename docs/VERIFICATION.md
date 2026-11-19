@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-20，`8dd507a` 正式深色 Web 复验竖屏章间缺页与就绪、短横屏重试和第 3319 章第 1 页的新文档续读，进入前六路读回完全一致。`4332503` 的正式深色 Web 复现了宽封面固定占高、横屏裁掉下沿。修正后 138 项 Flutter 定向回归通过，最新版正式 Web 继续待验。[章间量测](verification/mihon-cupertino-fidelity.md#画布内等待的信息间距与按钮) · [封面预览](verification/mihon-cupertino-fidelity.md#karuyomi-封面预览)
+
 2026-11-20，固定 Mihon 0.21.3 的刷新等待、章节失败、源空清单和筛选无匹配新增四组双主题实拍，累计 148/170（87.1%）。Karuyomi 详情的 Cupertino 下拉刷新保留原资料直到两段读取成功，增加失败重试和筛选清除。最新版的正式 Web 双主题继续待验。[详情刷新与章节空态](verification/mihon-cupertino-fidelity.md#mihon-详情刷新与章节空态)
 
 2026-11-20，`66be7cd` 正式 Web 双主题通过分页、连续和条漫的工具显隐、隐藏页码与恢复入口。三种模式均保留当前页位，连续的最远页随新露出的实际图片推进。153 项回归覆盖转场、快速切换和系统减弱动态，分支、PR CI 和 Wasm 通过。[阅读器显隐与页码](verification/mihon-cupertino-fidelity.md#阅读器显隐与页码)

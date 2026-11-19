@@ -71,9 +71,9 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 **当前视觉重构**按全部现有状态推进，统一 Cupertino 导航、控件、语义色与转场。Karuyomi 跨版本双主题主图为 168/169（99.4%），Mihon 新增详情刷新、章节请求失败和两类章节空态后达到 148/170（87.1%）。剩余未连接主状态，以及参考图补采、最终像素复核、变体、转换和生产验收。PR #8 为草稿。[交付计划](mihon-cupertino-fidelity.md) · [逐状态清单](../verification/mihon-state-coverage.md)
 
-阅读器双主题正式 Web 已核对工具显隐、单页重试及上一版画布内过渡。新增 Mihon 实拍区分已知页位加载、单页失败、画布内过渡加载与工具切章弹层。浅色 Web 已复核章间控件的新布局和实际切章。[单页与切章等待参考](../verification/mihon-cupertino-fidelity.md#mihon-单页与切章等待的双主题参考) · [画布内等待量测](../verification/mihon-cupertino-fidelity.md#画布内等待的信息间距与按钮)
+阅读器双主题正式 Web 已核对工具显隐和单页重试。章间布局在浅、深色的稳定缺页和就绪状态均完成量测，深色短横屏实测重试并从新文档续读目标第 1 页。深色稳定等待图继续补采。[单页与切章等待参考](../verification/mihon-cupertino-fidelity.md#mihon-单页与切章等待的双主题参考) · [画布内等待量测](../verification/mihon-cupertino-fidelity.md#画布内等待的信息间距与按钮)
 
-封面编辑改用居中的完整比例预览，组件回归覆盖浅深色、文字缩放和短横屏。Mihon 实拍补充系统选图取消、恢复默认封面及条漫覆盖与继承的实际结果。[封面和阅读模式参考](../verification/mihon-cupertino-fidelity.md#mihon-封面操作与阅读模式继承)
+封面编辑采用居中的完整比例预览。深色正式 Web 发现宽图固定占高导致留白及横屏裁下沿，组件已改用图片实际显示高度与弹层可用视区确定占位。修正后的正式 Web 双主题继续验收。[封面预览量测](../verification/mihon-cupertino-fidelity.md#karuyomi-封面预览)
 
 作品详情支持原位下拉刷新、失败重试及清除无结果的章节筛选。组件回归覆盖保留原简介和章节、晚到结果和真正空清单的重读。正式 Web 双主题继续验收。[详情刷新与章节空态](../verification/mihon-cupertino-fidelity.md#mihon-详情刷新与章节空态)
 
