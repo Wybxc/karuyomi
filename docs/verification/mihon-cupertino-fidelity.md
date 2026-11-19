@@ -1399,7 +1399,20 @@ flutter test --no-pub --concurrency=1 test/reader/reader_screen_test.dart test/r
 
 固定 Mihon `PagerPageHolder.kt` 和 `WebtoonPageHolder.kt` 在页字节加载及解码时显示指示，解码失败后在该页提供重试。`ReaderActivity.kt` 的工具栏切章单独进入不可取消的等待弹层。画布内的相邻章过渡由 `ReaderTransitionView.kt` 呈现。22.01、22.04、22.10 和 22.14 的 Mihon 双主题实拍继续待采。[逐状态清单](mihon-state-coverage.md#2225阅读器与图片)
 
-Karuyomi 单页读取时向辅助树提供页号，解码首帧期间继续显示旋转指示。错误和重试留在同一页的布局范围内，重试使用新的资源请求。工具切章使用带目标名称的 Cupertino 弹层，等待期间阻挡遮罩点击、Escape 和系统返回。测试验证请求失败后恢复原章和操作；成功时等待旧页会话确认关闭后才获取新章图片。强制卸载时仍清理迟到的目标会话。此节先登记组件证据，正式双主题画面继续复验。
+Karuyomi 单页读取时向辅助树提供页号，解码首帧期间继续显示旋转指示。错误和重试留在该页的范围内，重试使用新的资源请求。工具切章使用带目标名称的 Cupertino 弹层，等待期间阻挡遮罩点击、Escape 和系统返回。组件测试覆盖工具恢复、旧页会话确认关闭后才获取新章图片，以及强制卸载时清理迟到的目标会话。
+
+2026-11-20，`b4aef11` 的分支、PR 主检查与 Wasm 通过，部署跳过。正式 Web 归档 `14558514997` 为 16,317,917 字节，SHA-256 为 `84f70e4d0351f0e7ff27a3b8d907d767525e1005b311374b74503fe186ede7f4`。归档 39 项资源，两套 Wrangler 实际交付各 35 项清单，入口 `main.dart.a529c948.js` 和原运行时 host 字节均与 CI 一致。两套隔离 D1 使用同一英文 xkcd，分别保存显式浅、深色。验收入口对明确匹配的控制请求等待 19 秒并返回一次受控 Source 错误，重试交给原 host。[分支 CI](https://github.com/Wybxc/karuyomi/actions/runs/44580568052) · [PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44580578558)
+
+360×800 内置浏览器两主题从 3324 进入第 2 页。画布显示进度指示，辅助树为「正在加载第 2 页」，滑杆的 `aria-valuetext` 为 2。失败后同一画布显示「第 2 页未能加载」和「重试」。明确重试保持同一 runtime generation 与页身份，使用新 requestId，并得到原 Source 的实际文字图片。关闭原标签后，两色均在独立新文档从书架「继续阅读」回到第 2 页。
+
+两色点「上一章」时弹层列出 3325: Light-Day，等待中 Escape 保留弹层，后台工具从辅助树退出。受控失败均回到 3324 第 2 页。再次点击取得 3325 的实际页列表，首张图片显示并保存到服务端。八组六路独立读回表明单页失败时已保存续读坐标，第 2 页成功解码后才记录最远阅读位置。手动切章失败前后两组完整读回各自相等，成功切章后服务端指向 3325 第 1 页，3324 原记录仍可读取。两个临时服务与浏览器标签正常关闭。
+
+两色首次切章失败后，实拍均缺少错误文案。组件回归在 `b4aef11` 复现同一情况，后台预取启动后清除了手动错误。修正后独立维护手动错误和预取提示，回归确认预取开始和成功结束后均保留手动错误。Flutter 3.50.0 的 67 项阅读相关定向回归通过。新错误文案的正式 Web 双主题复验待做。跨版本主图与 Mihon 成对参考计数沿用逐状态清单。
+
+```sh
+cd apps/reader
+flutter test --no-pub --concurrency=1 test/reader/chapter_reader_route_test.dart test/reader/reader_access_recovery_test.dart test/reader/reading_progress_navigation_test.dart test/reader/reader_screen_test.dart
+```
 
 ## 仍需的证据
 

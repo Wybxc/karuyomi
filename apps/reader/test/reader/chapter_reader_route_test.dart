@@ -386,7 +386,7 @@ void main() {
 
   for (final exit in [false, true]) {
     testWidgets(
-      exit ? 'route exit closes a late next chapter without acquiring images' : 'a failed toolbar hop keeps the original chapter and restores its actions',
+      exit ? 'route exit closes a late next chapter without acquiring images' : 'a failed toolbar hop keeps the original chapter and its error during prefetch',
       (tester) async {
         final platform = TestPlatform();
         final catalog = CatalogController(
@@ -403,15 +403,19 @@ void main() {
           sourceId: sourceId,
           mangaUrl: manga.url,
           chapters: [
+            if (!exit) wire.Chapter(url: '/previous', name: '上一话'),
             wire.Chapter(url: '/one', name: '一'),
             wire.Chapter(url: '/two', name: '二'),
           ],
         );
+        final original = sequence.entries[exit ? 0 : 1];
+        final direction = exit ? '下一章' : '上一章';
+        final targetName = exit ? '二' : '上一话';
         final opened = await catalog.openChapter(
           manga,
-          ChapterEntry(sequence.entries.first.snapshot),
+          ChapterEntry(original.snapshot),
           reference: catalog.sourceReference,
-          logicalChapterKey: sequence.entries.first.key,
+          logicalChapterKey: original.key,
         );
         final delayed = Completer<wire.SourceResult>();
         platform.invokeHandler = (_) => delayed.future;
@@ -422,25 +426,25 @@ void main() {
               manga: manga,
               source: catalog.sourceReference,
               sequence: sequence,
-              initialChapter: sequence.entries.first,
+              initialChapter: original,
               initialOpened: opened!,
             ),
           ),
         );
         await tester.pumpAndSettle();
-        final nextLocation = tester.getCenter(find.text('下一章'));
-        await tester.tap(find.text('下一章'));
+        final chapterLocation = tester.getCenter(find.text(direction));
+        await tester.tap(find.text(direction));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
         final waiting = find.byType(CupertinoAlertDialog);
         expect(find.text('正在切换章节'), findsOneWidget);
         expect(
-          find.descendant(of: waiting, matching: find.text('二')),
+          find.descendant(of: waiting, matching: find.text(targetName)),
           findsOneWidget,
         );
         expect(find.text('一'), findsOneWidget);
-        expect(find.semantics.byLabel('下一章').evaluate(), isEmpty);
-        await tester.tapAt(nextLocation);
+        expect(find.semantics.byLabel(direction).evaluate(), isEmpty);
+        await tester.tapAt(chapterLocation);
         await tester.binding.handlePopRoute();
         await tester.sendKeyEvent(LogicalKeyboardKey.escape);
         await tester.pump();
@@ -456,8 +460,9 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(waiting, findsNothing);
-          expect(find.text('漫画源请求失败，请重试'), findsOneWidget);
-          expect(find.text('下一章').hitTestable(), findsOneWidget);
+          final error = find.text('漫画源请求失败，请重试');
+          expect(error, findsOneWidget);
+          expect(find.text(direction).hitTestable(), findsOneWidget);
           final reader = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
           expect(reader.provider, same(opened.provider));
           expect(
@@ -466,6 +471,28 @@ void main() {
             ),
             isEmpty,
           );
+          final prefetch = Completer<wire.SourceResult>();
+          platform.invokeHandler = (_) => prefetch.future;
+          reader.onViewportChanged!(
+            ReaderViewportState(
+              current: opened.manifest.positionAt(0),
+              observed: opened.manifest.positionAt(0, offset: 1),
+              atEnd: true,
+              windowReady: true,
+            ),
+          );
+          await tester.pump();
+          await tester.pump();
+          expect(platform.invocations.last.pages.chapter.url, '/two');
+          final visibleDuringPrefetch = error.evaluate().isNotEmpty;
+          prefetch.complete(
+            wire.SourceResult(
+              pageList: wire.PageList(pageSessionId: 'prefetched-next'),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(visibleDuringPrefetch, true);
+          expect(error, findsOneWidget);
           await tester.pumpApp(const SizedBox.shrink());
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);

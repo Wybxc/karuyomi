@@ -67,6 +67,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
   bool _closing = false;
   bool _viewAttached = false;
   String? _error;
+  String? _preparationError;
   Future<void>? _moving;
   late final _preparation = ChapterPreparation(_openChapter);
   ReaderViewportState? _viewport;
@@ -277,6 +278,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     setState(() {
       _recovering = true;
       _error = null;
+      _preparationError = null;
     });
     RecoveredReader? recovered;
     try {
@@ -543,20 +545,19 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
         _preparation.blocked) {
       return;
     }
+    final attempt = _preparationAttempt;
     final pending = _preparation.prepare(target);
-    setState(() => _error = null);
+    setState(() => _preparationError = null);
     try {
       await pending;
-      if (!_closing && mounted) {
+      if (!_closing && mounted && _preparationAttempt == attempt) {
         setState(() {
-          if (!_preparation.ready && widget.catalog.error != null) {
-            _error = widget.catalog.error;
-          }
+          _preparationError = _preparation.ready ? null : widget.catalog.error;
         });
       }
     } catch (_) {
-      if (!_closing && mounted) {
-        setState(() => _error = '下一章准备未完成，可进入时重试');
+      if (!_closing && mounted && _preparationAttempt == attempt) {
+        setState(() => _preparationError = '下一章准备未完成，可进入时重试');
       }
     }
   }
@@ -566,6 +567,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     setState(() {
       _order = order;
       _preparationAttempt = null;
+      _preparationError = null;
     });
     _recordViewport();
     unawaited(() async {
@@ -599,6 +601,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     setState(() {
       _busy = true;
       _error = null;
+      _preparationError = null;
     });
     final navigator = Navigator.of(context);
     final waiting = CupertinoDialogRoute<void>(
@@ -686,6 +689,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
         }
         _positionRequest.value = null;
         _preparationAttempt = null;
+        _preparationError = null;
         _visible = true;
       });
       next = null; // The route owns it until onAttached mounts the new leaf.
@@ -739,7 +743,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
         if (_busy && _moving == null) const CupertinoActivityIndicator(),
         if (_accessPaused) _accessNotice(),
         if (_preparation.busy && !_busy) const CupertinoActivityIndicator(),
-        if (_error case final error?)
+        if ((_error ?? _preparationError) case final error?)
           Padding(
             padding: const EdgeInsets.all(8),
             child: Text(
