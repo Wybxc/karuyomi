@@ -250,6 +250,7 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
             ),
           if (!_expired && draft.busy)
             Semantics(
+              container: true,
               enabled: !draft.pauseRequested,
               child: CupertinoButton(
                 onPressed: draft.pauseRequested ? null : draft.pause,
@@ -257,11 +258,14 @@ class _ChapterReadDialogState extends State<_ChapterReadDialog> {
               ),
             ),
           if (!_expired && draft.canContinue)
-            CupertinoButton(
-              onPressed: () {
-                if (_current) draft.finishRemaining();
-              },
-              child: const Text('结束剩余操作'),
+            Semantics(
+              container: true,
+              child: CupertinoButton(
+                onPressed: () {
+                  if (_current) draft.finishRemaining();
+                },
+                child: const Text('结束剩余操作'),
+              ),
             ),
         ],
       ),

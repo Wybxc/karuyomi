@@ -694,15 +694,18 @@ void main() {
       expect(_posts(platform), hasLength(3));
       expect(_posts(platform).last.body, uncertain);
       expect(find.text('已确认 2 / 4 章 · 未开始 2 章'), findsOneWidget);
-      final end = tester
-          .getSemantics(find.widgetWithText(CupertinoButton, '结束剩余操作'))
-          .getSemanticsData();
+      final endButton = find.widgetWithText(CupertinoButton, '结束剩余操作');
+      final endNode = tester.getSemantics(endButton);
+      final end = endNode.getSemanticsData();
       expect(end.label, '结束剩余操作');
       expect(end.hasAction(SemanticsAction.tap), isTrue);
+      expect(endNode.rect.size, tester.getSize(endButton));
       const retention = '当前会话保留原清单和未确认操作；关闭不会撤回已发请求。';
-      final note = tester.getSemantics(find.text(retention)).getSemanticsData();
+      final noteNode = tester.getSemantics(find.text(retention));
+      final note = noteNode.getSemanticsData();
       expect(note.label, retention);
       expect(note.hasAction(SemanticsAction.tap), isFalse);
+      expect(noteNode.parent, isNot(same(endNode)));
       expect(
         platform.businessServer.progress(
           _sequence.mangaKey,
@@ -909,11 +912,12 @@ void main() {
         () => received.future.timeout(const Duration(seconds: 5)),
       );
       expect(find.text('全部标记已由服务端确认。'), findsNothing);
-      final pause = tester
-          .getSemantics(find.widgetWithText(CupertinoButton, '暂停剩余操作'))
-          .getSemanticsData();
+      final pauseButton = find.widgetWithText(CupertinoButton, '暂停剩余操作');
+      final pauseNode = tester.getSemantics(pauseButton);
+      final pause = pauseNode.getSemanticsData();
       expect(pause.label, '暂停剩余操作');
       expect(pause.hasAction(SemanticsAction.tap), isTrue);
+      expect(pauseNode.rect.size, tester.getSize(pauseButton));
       final dismiss = find.widgetWithText(CupertinoButton, '稍后');
       expect(
         tester
