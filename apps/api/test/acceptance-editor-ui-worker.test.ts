@@ -980,6 +980,8 @@ test.each([
   ['delay-confirm', 'categories'],
   ['confirm-read-failure', 'classification'],
   ['confirm-next-loss', 'classification'],
+  ['confirm-next-loss', 'chapter-read'],
+  ['login-required', 'chapter-read'],
 ])(
   'unrelated progress is audited without %s faults in %s',
   async (mode, scope) => {
@@ -1033,6 +1035,66 @@ test.each([
     );
   },
 );
+
+test('chapter-read can lose an applied confirmation, retry it once, and pause the next chapter before dispatch', async () => {
+  const path = '/api/state/mutations';
+  const mark = (chapterKey: string, expectedRevision: number) =>
+    toJsonString(
+      StateMutationSchema,
+      create(StateMutationSchema, {
+        schemaVersion: businessSchemaVersion,
+        mutationId: crypto.randomUUID(),
+        mangaKey,
+        expectedRevision,
+        operation: {
+          case: 'setChapterRead',
+          value: { chapterKey, read: true },
+        },
+      }),
+    );
+  const first = mark('first', 0);
+  const second = mark('second', 1);
+  const third = mark('third', 2);
+
+  await setEditorUiMode(env.DB, 'confirm-next-loss', 'chapter-read');
+  expect((await request(path, first)).status).toBe(200);
+  expect((await request(path, second)).status).toBe(502);
+  const saved = mangaStateResponseSchema.parse(
+    await (await request(coverPath, undefined, false)).json(),
+  );
+  expect(saved.manga?.revision).toBe(2);
+
+  await setEditorUiMode(env.DB, 'pass', 'chapter-read');
+  const retry = await request(path, second);
+  expect(retry.status).toBe(200);
+  const confirmed = stateMutationResponseSchema.parse(await retry.json());
+  expect(confirmed.accountRevision).toBe(saved.accountRevision);
+  expect(confirmed.manga?.revision).toBe(2);
+  expect(confirmed.progress).toMatchObject({
+    chapterKey: 'second',
+    completed: true,
+  });
+
+  await setEditorUiMode(env.DB, 'login-required', 'chapter-read');
+  expect((await request(path, third)).status).toBe(401);
+  const blocked = mangaStateResponseSchema.parse(
+    await (await request(coverPath, undefined, false)).json(),
+  );
+  expect(blocked).toEqual(saved);
+  expect(
+    (await editorUiAttempts(env.DB)).map((row) => [
+      row.body,
+      row.mode,
+      row.worker_status,
+      row.client_status,
+    ]),
+  ).toEqual([
+    [first, 'confirm-next-loss', 200, 200],
+    [second, 'lose-confirm', 200, 502],
+    [second, 'pass', 200, 200],
+    [third, 'login-required', null, 401],
+  ]);
+});
 
 test.each([
   ['connection', '/api/bootstrap'],

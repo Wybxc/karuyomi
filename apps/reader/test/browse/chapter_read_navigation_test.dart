@@ -4,6 +4,7 @@ import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -266,6 +267,37 @@ void main() {
           await _tap(tester, _control('chapter-select-range'));
           await _tap(tester, _control('chapter-mark-read'));
           expect(find.text('确认清单：3 章'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: _control('chapter-read-review'),
+              matching: find.text(testManga.title),
+            ),
+            findsOneWidget,
+          );
+          final sequence = ChapterSequence(
+            packageName: 'eu.kanade.source.test',
+            sourceId: sourceId,
+            mangaUrl: testManga.url,
+            chapters: chapters,
+          );
+          final review = _control('chapter-read-review');
+          final scrollable = find.descendant(
+            of: review,
+            matching: find.byType(Scrollable),
+          );
+          for (final index in [0, 2]) {
+            final title = find.descendant(
+              of: find.byKey(
+                ValueKey(('chapter-read-item', sequence.entries[index].key)),
+              ),
+              matching: find.text(name),
+            );
+            await tester.scrollUntilVisible(title, 100, scrollable: scrollable);
+            expect(
+              tester.renderObject<RenderParagraph>(title).didExceedMaxLines,
+              false,
+            );
+          }
           expect(_posts(platform), isEmpty);
           await _tap(tester, find.text('取消'));
           final selection = find.text('已选 3 章 · 当前隐藏 0 章');
@@ -432,9 +464,20 @@ void main() {
         ],
       );
       for (final index in [2, 1, 0]) {
-        final item = tester.widget<CupertinoListTile>(_preview(index));
-        expect((item.title as Text).data, _chapters[index].name);
-        expect((item.subtitle! as Text).data, '来源第 ${index + 1} 项');
+        expect(
+          find.descendant(
+            of: _preview(index),
+            matching: find.text(_chapters[index].name),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: _preview(index),
+            matching: find.textContaining('来源第 ${index + 1} 项'),
+          ),
+          findsOneWidget,
+        );
       }
       expect(_posts(platform), isEmpty);
       await _tap(tester, find.text('取消'));
@@ -624,7 +667,23 @@ void main() {
       await _selectAll(tester);
       await _tap(tester, _control('chapter-mark-read'));
       await _tap(tester, find.text('开始'));
-      expect(find.text('已确认 1 / 4 章 · 未开始 2 章'), findsOneWidget);
+      expect(find.text('已确认 1 / 4 章 · 尚未确认 1 章 · 未开始 2 章'), findsOneWidget);
+      for (final (index, state) in [
+        (0, '已由服务端确认'),
+        (1, '尚未确认，需重试原操作'),
+        (2, '未开始'),
+      ]) {
+        final label = find.descendant(
+          of: _preview(index),
+          matching: find.text(state),
+        );
+        expect(label, findsOneWidget);
+        await tester.ensureVisible(label);
+        expect(
+          tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+          false,
+        );
+      }
       expect(find.text('全部标记已由服务端确认。'), findsNothing);
       expect(_posts(platform), hasLength(2));
       final uncertain = _posts(platform).last.body;
@@ -841,9 +900,21 @@ void main() {
         () => received.future.timeout(const Duration(seconds: 5)),
       );
       expect(find.text('全部标记已由服务端确认。'), findsNothing);
+      final dismiss = find.widgetWithText(CupertinoButton, '稍后');
+      expect(
+        tester
+            .getSemantics(dismiss)
+            .getSemanticsData()
+            .flagsCollection
+            .isEnabled,
+        Tristate.isFalse,
+      );
       await tester.runAsync(catalog.connect);
       await tester.pump(const Duration(milliseconds: 32));
       expect(find.textContaining('原窗口已停用'), findsOneWidget);
+      expect(find.text('关闭'), findsOneWidget);
+      expect(find.text('稍后'), findsNothing);
+      expect(find.text('重试'), findsNothing);
       platform.bootstrapSubject = 'another-subject';
       await tester.runAsync(catalog.connect);
       await tester.pump(const Duration(milliseconds: 32));

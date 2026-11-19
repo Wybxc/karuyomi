@@ -39,6 +39,7 @@ export const editorUiScopes = [
   'connection',
   'categories',
   'classification',
+  'chapter-read',
   'preferences',
   'extension-manifest',
 ] as const;
@@ -217,11 +218,12 @@ export async function withEditorUi(
   )
     return dispatch();
   const classificationSaving = stateCommand?.operation.case === 'setCategories';
-  // Audit bounded JSON state commands, including progress, while faulting only
-  // cover clears, migration and classification. Multipart upload stays real.
+  const chapterReadSaving = stateCommand?.operation.case === 'setChapterRead';
+  // Regular reading progress and multipart uploads keep their normal behavior.
   const forwardOnlyState =
     stateCommand !== undefined &&
     !classificationSaving &&
+    !chapterReadSaving &&
     stateCommand.operation.case !== 'migrateFrom' &&
     (stateCommand.operation.case !== 'setCustomCover' ||
       stateCommand.operation.value.cover !== undefined);
@@ -247,6 +249,7 @@ export async function withEditorUi(
     ((mangaReading || libraryReading) && control.scope === 'classification')
   )
     scope = 'classification';
+  else if (chapterReadSaving) scope = 'chapter-read';
   else if (bootstrapReading) scope = 'connection';
   else if (extensionManifestReading) scope = 'extension-manifest';
   else if (preferencesReading || preferencesCommand) scope = 'preferences';

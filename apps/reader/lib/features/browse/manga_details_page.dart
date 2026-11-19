@@ -654,6 +654,11 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         catalog: controller,
         progress: progress,
         draft: draft,
+        target: MangaEditContext(
+          title: manga.title,
+          sourceName: source.sourceName,
+          sourceLang: source.sourceLang,
+        ),
         isCurrent: isCurrent,
       );
       if (isCurrent() && remaining != null) {
