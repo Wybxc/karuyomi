@@ -1,6 +1,7 @@
 import '../../widgets/edit_sheet.dart';
 
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -230,6 +231,16 @@ class _CoverEditorState extends State<_CoverEditor> {
         pending == null &&
         !_blocked &&
         _confirmed != null;
+
+    const previewPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 8);
+    Widget previewFrame(Widget Function(Size) buildPreview) => LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final height = math.min(width, MediaQuery.sizeOf(context).height * .4);
+        return buildPreview(Size(width, height));
+      },
+    );
+
     return PopScope<bool>(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -310,22 +321,33 @@ class _CoverEditorState extends State<_CoverEditor> {
                         ),
                   children: [
                     if (_confirmed case final confirmed?)
-                      CupertinoFormRow(
-                        prefix: confirmed.cover == null
-                            ? null
-                            : Expanded(child: const Text('当前自定义封面')),
-                        child: confirmed.cover == null
-                            ? const Align(
-                                alignment: AlignmentDirectional.centerStart,
-                                child: Text('未设置自定义封面'),
-                              )
-                            : CustomCover(
-                                repository: widget.repository,
-                                cover: confirmed.cover,
-                                width: 120,
-                                height: 160,
+                      if (confirmed.cover case final cover?)
+                        CupertinoFormRow(
+                          padding: previewPadding,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text('当前自定义封面'),
+                              const SizedBox(height: 8),
+                              previewFrame(
+                                (size) => CustomCover(
+                                  repository: widget.repository,
+                                  cover: cover,
+                                  width: size.width,
+                                  height: size.height,
+                                  fit: BoxFit.contain,
+                                ),
                               ),
-                      )
+                            ],
+                          ),
+                        )
+                      else
+                        const CupertinoFormRow(
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Text('未设置自定义封面'),
+                          ),
+                        )
                     else if (!_busy)
                       const CupertinoFormRow(
                         child: Align(
@@ -400,21 +422,24 @@ class _CoverEditorState extends State<_CoverEditor> {
                     ),
                     children: [
                       CupertinoFormRow(
+                        padding: clearing ? null : previewPadding,
                         child: clearing
                             ? const Align(
                                 alignment: AlignmentDirectional.centerStart,
                                 child: Text('清除自定义封面'),
                               )
-                            : Image.memory(
-                                preview!,
-                                width: 120,
-                                height: 160,
-                                fit: BoxFit.cover,
-                                semanticLabel: saving
-                                    ? '正在提交的封面预览'
-                                    : _attempted || pending != null
-                                    ? '尚未确认的封面预览'
-                                    : '待保存的封面预览',
+                            : previewFrame(
+                                (size) => Image.memory(
+                                  preview!,
+                                  width: size.width,
+                                  height: size.height,
+                                  fit: BoxFit.contain,
+                                  semanticLabel: saving
+                                      ? '正在提交的封面预览'
+                                      : _attempted || pending != null
+                                      ? '尚未确认的封面预览'
+                                      : '待保存的封面预览',
+                                ),
                               ),
                       ),
                     ],

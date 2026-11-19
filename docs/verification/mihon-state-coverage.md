@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-20，Karuyomi 跨版本双主题主图为 168/169（99.4%），未连接（27.K1）仍缺两侧。固定 Mihon 参考补齐四种阅读等待与失败，141/170 行（82.9%）完成双主题主图核对。最终像素、各触发变体与完整转场继续验收。[阅读器瞬态参考](mihon-cupertino-fidelity.md#mihon-单页与切章等待的双主题参考) · [章节批量与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
+2026-11-20，Karuyomi 跨版本双主题主图为 168/169（99.4%），未连接（27.K1）仍缺两侧。固定 Mihon 参考补齐封面菜单、取消与恢复结果，以及阅读模式覆盖与继承，144/170 行（84.7%）完成双主题主图核对。最终像素、各触发变体与完整转场继续验收。[封面和阅读模式参考](mihon-cupertino-fidelity.md#mihon-封面操作与阅读模式继承) · [章节批量与恢复](mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -469,7 +469,7 @@ stateDiagram-v2
     state "18.02 已读及书签结果" as H7
     state "19.01 封面查看" as V0
     state "19.02 自定义封面操作" as V1
-    state "19.03 恢复或替换确认" as V2
+    state "19.03 替换取消或恢复结果" as V2
     state "20.01 迁移源加载" as Q0
     state "20.02 无待迁移作品" as Q1
     state "20.03 迁移源或作品列表" as Q2
@@ -515,8 +515,8 @@ stateDiagram-v2
     H6 --> H0: 取消
     M2 --> V0: 点封面
     V0 --> V1: 自定义操作
-    V1 --> V2: 恢复或替换
-    V2 --> V0: 确认或取消
+    V1 --> V2: 取消系统选图或删除自定义封面
+    V2 --> V0: 继续查看当前封面
     Q0 --> Q1: 无作品
     Q0 --> Q2: 有作品
     Q2 --> Q8: 选择迁移作品
@@ -547,7 +547,7 @@ stateDiagram-v2
     Q6 --> Q7: 完成
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class M1,M2,M3,M5,H0,H2,H3,H4,H6,H7,H8,V0,Q2,Q3,Q4,Q5,Q8,Q9,Q10,Q12 paired
+    class M1,M2,M3,M5,H0,H2,H3,H4,H6,H7,H8,V0,V1,V2,Q2,Q3,Q4,Q5,Q8,Q9,Q10,Q12 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                                          | 浅色                                                                                                                           | 深色                                                                                                                       |
@@ -569,8 +569,8 @@ stateDiagram-v2
 | 18.01   | 选中数量、选中行、退出/全选和底部动作                                                          | `s1801-chapter-selection-light`                                                                                                | `s1801-chapter-selection-dark`                                                                                             |
 | 18.02   | 已读/未读/书签三类结果各自可见，不能只凭点击记录                                               | `s1802-chapter-read-light`、`s1802-chapter-unread-light`、`s1802-chapter-bookmarked-light`、`s1802-chapter-unbookmarked-light` | `s1802-chapter-read-dark`、`s1802-chapter-unread-dark`、`s1802-chapter-bookmarked-dark`、`s1802-chapter-unbookmarked-dark` |
 | 19.01   | 实际大封面、关闭和操作；旧 `cover-view-default-dark` 不符合                                    | `s1901-cover-light`                                                                                                            | `s1901-cover-dark`                                                                                                         |
-| 19.02   | 当前封面、可用自定义/重置动作                                                                  | 待                                                                                                                             | 待                                                                                                                         |
-| 19.03   | 替换或恢复对象、影响、确认/取消；系统文件选择单列                                              | 待                                                                                                                             | 待                                                                                                                         |
+| 19.02   | 完整显示当前封面，底部编辑入口展开编辑与删除                                                   | `s1902-custom-cover-actions-light`                                                                                             | `s1902-custom-cover-actions-dark`                                                                                          |
+| 19.03   | 取消系统选图后保留原封面，删除后显示默认封面及更新反馈                                         | `s1903-cover-replace-cancel-light`、`s1903-cover-restored-light`                                                               | `s1903-cover-replace-cancel-dark`、`s1903-cover-restored-dark`                                                             |
 | 20.01   | 迁移标题和加载指示                                                                             | 待                                                                                                                             | 待                                                                                                                         |
 | 20.02   | 无作品说明及返回                                                                               | 待                                                                                                                             | 待                                                                                                                         |
 | 20.03   | 源名、语言、书架数量、排序入口及源内未选择作品列表；排序变更与空书架待                         | `s2003-migration-{sources,titles}-light`                                                                                       | `s2003-migration-{sources,titles}-dark`                                                                                    |
@@ -686,7 +686,7 @@ stateDiagram-v2
     A16 --> A1: 复位或关闭
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,A12,A14,A15,A16,A17,A18,A19,A20,A21,A22,A23,A24,A25 paired
+    class A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18,A19,A20,A21,A22,A23,A24,A25 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                          | 浅色                                                                                                     | 深色                                                                                                  |
@@ -711,7 +711,7 @@ stateDiagram-v2
 | 24.01   | 本作品范围、阅读模式、默认/显式值、输入选项；完整滚动段分项                    | `s2401-reader-settings-light`、`s2401-reader-settings-lower-light`、`s2401-reader-settings-bottom-light` | `s2401-reader-settings-dark`、`s2401-reader-settings-lower-dark`、`s2401-reader-settings-bottom-dark` |
 | 24.02   | 常规页签、当前图像适配/显示选项；完整滚动段分项                                | `s2402-reader-settings-light`、`s2402-reader-settings-lower-light`                                       | `s2402-reader-settings-dark`、`s2402-reader-settings-lower-dark`                                      |
 | 24.03   | 滤镜页签、亮度/色彩/灰度/反色关闭状态                                          | `s2403-reader-settings-light`                                                                            | `s2403-reader-settings-dark`                                                                          |
-| 24.04   | 切换继承/显式设置后实际阅读呈现；两种各一图                                    | 待                                                                                                       | 待                                                                                                    |
+| 24.04   | 同一章切换条漫与默认，实看条漫画布和继承的从右到左分页                         | `s2404-reader-webtoon-result-light`、`s2404-reader-inherit-result-light`                                 | `s2404-reader-webtoon-result-dark`、`s2404-reader-inherit-result-dark`                                |
 | 24.05   | 亮度开关启用、当前数值和滑杆；参考附加分支                                     | `s2405-reader-brightness-enabled-light`                                                                  | `s2405-reader-brightness-enabled-dark`                                                                |
 | 24.06   | 色彩开关、RGBA当前值、混合模式、灰度/反色；参考附加分支，RGB等未实现功能列后续 | `s2406-reader-color-filter-enabled-light`、`s2406-reader-color-filter-lower-light`                       | `s2406-reader-color-filter-enabled-dark`、`s2406-reader-color-filter-lower-dark`                      |
 | 25.01   | 当前图片上下文、设置封面/保存等真实动作                                        | `s2501-reader-image-actions-light`                                                                       | `s2501-reader-image-actions-dark`                                                                     |
@@ -735,6 +735,8 @@ stateDiagram-v2
 `e5ba265` 补充 Karuyomi 画布内的 22.07、22.10–22.13 正式 Web 实拍。两色覆盖首尾、真实页列表就绪、受控加载和空列表，重试进目标章后可独立续读。[画布内章间过渡](mihon-cupertino-fidelity.md#阅读画布内的章间过渡)
 
 2026-11-20 使用固定 Mihon 0.21.3 的同一英文 xkcd 章目补齐 22.01、22.04、22.10 和 22.14。隔离中继暂扣图片连接或目标章页列表连接，完整保留真实 Source 和图片处理。两主题核对画布内的指示、页位、同页重试、工具栏等待时按返回键、放行后的实际切章。深色重试后的第一张图仍在等待，浅色实际取得同页图片。工具弹层背后的图片不同页，弹层本身同状态配对。[参考画面与归一化量测](mihon-cupertino-fidelity.md#mihon-单页与切章等待的双主题参考)
+
+固定 Mihon 双主题补齐 19.02、19.03 和 24.04。封面预览从真实 3322 第 1 页设定，实际检查编辑菜单、取消系统选图和恢复来源默认封面。阅读设置记录本作条漫及默认两个选中态，并实拍关闭设置、收起点按区提示后的画布。两主题均恢复从右到左分页，两种条漫样本保留实际滚动位置。[封面和阅读模式双主题量测](mihon-cupertino-fidelity.md#mihon-封面操作与阅读模式继承)
 
 ## 26–30：设置、选择与通用弹层
 
@@ -807,7 +809,7 @@ stateDiagram-v2
 | 30.01   | 标题、必填/禁用提交、取消、键盘；关联05.03/10.02/14.04                            | `s0503-category-create-keyboard-light`（分类分项）                      | `s0503-category-create-empty-dark`（分类分项）                        |
 | 30.02   | 当前草稿、可用提交和取消；关联05.04/05.07/14.04                                   | `s0504-category-create-keyboard-light`（分类分项）                      | `s0504-category-create-keyboard-dark`（分类分项）                     |
 | 30.03   | 原输入、具体校验错误、修正/取消；关联05.05/10.03                                  | `s0505-category-create-duplicate-light`（分类分项）                     | `s0505-category-create-duplicate-dark`（分类分项）                    |
-| 30.04   | 对象、影响、确认/取消；逐操作关联04.02/05.08/09.03/10.06/19.03/21.01/25.02        | 待                                                                      | 待                                                                    |
+| 30.04   | 对象、影响、确认/取消；逐操作关联04.02/05.08/09.03/10.06/21.01/25.02              | 待                                                                      | 待                                                                    |
 
 2026-11-19，复核固定 Mihon 版本的六张分类原图和同名 XML，补登记 30.01–30.03 的空输入、可提交草稿和重名错误。两主题均实际显示键盘，应用输入框归一化边界均为 `[44,231,316,317]`，添加动作边界均为 `[258,341,316,389]`。XML 的可操作父节点分别报告禁用、启用、禁用。引用 05.03–05.05 的同一弹层原图，仓库、Source 输入及各确认动作继续分项复核。[分类参考基准](mihon-cupertino-fidelity.md#通用表单的分类参考复核)
 

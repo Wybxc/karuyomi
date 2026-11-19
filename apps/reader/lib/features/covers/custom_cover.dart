@@ -12,6 +12,7 @@ class const CustomCover({
   required final wire.CustomCover? cover,
   final double width = 48,
   final double height = 64,
+  final BoxFit fit = BoxFit.cover,
 }) extends StatefulWidget {
   @override
   State<CustomCover> createState() => _CustomCoverState();
@@ -69,7 +70,7 @@ class _CustomCoverState extends State<CustomCover> {
           return Image.memory(
             bytes,
             key: ValueKey(_identity),
-            fit: BoxFit.cover,
+            fit: widget.fit,
             cacheHeight:
                 (widget.height * MediaQuery.devicePixelRatioOf(context))
                     .ceil()

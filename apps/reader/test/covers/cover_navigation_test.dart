@@ -344,6 +344,11 @@ void main() {
           expect(find.text('待保存的修改'), findsOneWidget);
           expect(transport.uploads, isEmpty);
           expectContentBelowNavigation();
+          final draftPreview = find.byWidgetPredicate(
+            (widget) => widget is Image && widget.semanticLabel == '待保存的封面预览',
+          );
+          expect(tester.getSize(draftPreview).width, greaterThan(200));
+          expect(tester.widget<Image>(draftPreview).fit, BoxFit.contain);
           final saveGate = Completer<void>();
           addTearDown(() {
             if (!saveGate.isCompleted) saveGate.complete();
@@ -388,6 +393,35 @@ void main() {
           expect(find.text('服务端已确认'), findsOneWidget);
           expect(find.text('尚未确认的修改'), findsNothing);
           expect(control('cover-error'), findsNothing);
+          final editorPreview = find.descendant(
+            of: control('cover-editor'),
+            matching: find.byType(CustomCover),
+          );
+          final portraitPreview = tester.getSize(editorPreview);
+          expect(portraitPreview.width, greaterThan(200));
+          expect(
+            tester.getCenter(editorPreview).dx,
+            closeTo(tester.getCenter(control('cover-editor')).dx, 1),
+          );
+          expect(
+            tester
+                .widget<Image>(
+                  find.descendant(
+                    of: editorPreview,
+                    matching: find.byType(Image),
+                  ),
+                )
+                .fit,
+            BoxFit.contain,
+          );
+          tester.view.physicalSize = const Size(844, 390);
+          await tester.pumpAndSettle();
+          expect(
+            tester.getSize(editorPreview).height,
+            lessThan(portraitPreview.height),
+          );
+          tester.view.physicalSize = const Size(360, 800);
+          await tester.pumpAndSettle();
           final replacementPicker = Completer<XFile?>();
           addTearDown(() {
             if (!replacementPicker.isCompleted) {
