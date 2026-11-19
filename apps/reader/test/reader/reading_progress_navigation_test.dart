@@ -419,7 +419,10 @@ void main() {
       );
       await tester.tap(find.text('下一章'));
       await tester.pumpAndSettle();
-      expect(find.text('真实源 DTO 测试 · 第二章'), findsOneWidget);
+      expect(
+        find.semantics.byLabel('真实源 DTO 测试 · 第二章').evaluate(),
+        hasLength(1),
+      );
       expect(
         (await catalog.readingProgress!.loadChapter(
           mangaKey: mangaKey,

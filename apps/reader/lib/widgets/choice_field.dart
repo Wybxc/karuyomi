@@ -13,6 +13,9 @@ class const ChoiceField<T>({
   required final ValueChanged<T?>? onChanged,
   final Set<T?> disabledValues = const {},
   final bool inline = true,
+
+  /// Shows a compact button whose accessible name includes the current choice.
+  final IconData? icon,
 }) extends HookWidget {
   @override
   Widget build(BuildContext context) {
@@ -43,35 +46,39 @@ class const ChoiceField<T>({
       enabled: enabled,
       child: CupertinoButton(
         focusNode: focus,
-        padding: inline
-            ? const EdgeInsets.symmetric(horizontal: 8)
-            : EdgeInsets.zero,
+        padding: switch (icon) {
+          final IconData _ => const EdgeInsets.all(8),
+          null when inline => const EdgeInsets.symmetric(horizontal: 8),
+          null => EdgeInsets.zero,
+        },
         onPressed: enabled ? open : null,
-        child: inline
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('$label：', style: disabledStyle),
-                  Flexible(
-                    child: Text(
-                      valueLabel,
-                      style: disabledStyle,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(
-                    CupertinoIcons.chevron_down,
-                    size: 14,
-                    color: disabledStyle?.color,
-                  ),
-                ],
-              )
-            : CupertinoListTile(
-                title: tileLabel(label),
-                subtitle: tileLabel(valueLabel),
-                trailing: const CupertinoListTileChevron(),
+        child: switch (icon) {
+          final glyph? => Icon(glyph, semanticLabel: '$label： $valueLabel'),
+          null when inline => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('$label：', style: disabledStyle),
+              Flexible(
+                child: Text(
+                  valueLabel,
+                  style: disabledStyle,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 6),
+              Icon(
+                CupertinoIcons.chevron_down,
+                size: 14,
+                color: disabledStyle?.color,
+              ),
+            ],
+          ),
+          null => CupertinoListTile(
+            title: tileLabel(label),
+            subtitle: tileLabel(valueLabel),
+            trailing: const CupertinoListTileChevron(),
+          ),
+        },
       ),
     );
 

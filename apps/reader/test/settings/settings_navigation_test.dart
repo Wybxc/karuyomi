@@ -5,6 +5,7 @@ import 'package:karuyomi/features/settings/settings_controller.dart';
 
 import 'settings_probe.dart';
 import '../test_app.dart';
+import '../../test_support/cupertino.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -1008,12 +1009,8 @@ void main() {
         ReadingMode.rightToLeft,
       );
       expect(
-        tester
-            .widget<CupertinoSlidingSegmentedControl<int>>(
-              find.byType(CupertinoSlidingSegmentedControl<int>),
-            )
-            .groupValue,
-        2,
+        tester.widget<ChoiceField<bool>>(find.byType(ChoiceField<bool>)).value,
+        true,
       );
       await _leaveReader(tester, catalog);
       await _finish(tester, catalog);
@@ -1118,7 +1115,7 @@ void main() {
       final catalog = await _details(tester);
       await _tap(tester, find.text('第一章'));
       final leafBeforeFit = _reader(tester).key;
-      await _tap(tester, find.text('阅读设置'));
+      await _tap(tester, iconButton('阅读设置'));
       await _chooseField<wire.ReaderFit>(tester, '图像适配', '适宽');
       expect(find.text('修改尚未保存。'), findsOneWidget);
       expect(
@@ -1136,7 +1133,7 @@ void main() {
       );
       expect(untouched!.overrides!.hasFit(), false);
       expect(_reader(tester).key, leafBeforeFit);
-      await _tap(tester, find.text('阅读设置'));
+      await _tap(tester, iconButton('阅读设置'));
       await _chooseField<wire.ReaderFit>(tester, '图像适配', '适高');
       await _chooseField<bool>(tester, '裁白', '关闭');
       await _tap(tester, find.text('保存'));
@@ -1154,13 +1151,8 @@ void main() {
       expect(_reader(tester).key, leafBeforeFit);
       await _tap(tester, find.byType(ChoiceField<ReadingMode>));
       await _tap(tester, find.text('从左到右').last);
-      await _tap(
-        tester,
-        find.descendant(
-          of: find.byType(CupertinoSlidingSegmentedControl<int>),
-          matching: find.text('单页'),
-        ),
-      );
+      await _tap(tester, find.byType(ChoiceField<bool>));
+      await _tap(tester, find.widgetWithText(CupertinoMenuItem, '单页'));
       var snapshot = await tester.runAsync(
         () => catalog.settings!.loadManga(_mangaKey),
       );
@@ -1183,7 +1175,7 @@ void main() {
         snapshot.global.reader.pageLayout,
         wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
       );
-      await _tap(tester, find.text('阅读设置'));
+      await _tap(tester, iconButton('阅读设置'));
       expect(find.byType(MangaSettingsEditor), findsOneWidget);
       final leafBeforeAppearance = _reader(tester).key;
       await _chooseField<wire.ReaderFit>(tester, '图像适配', '完整显示');
@@ -1222,7 +1214,7 @@ void main() {
       await _closeModal(tester);
       expect(_reader(tester).initialMode, ReadingMode.rightToLeft);
       expect(_reader(tester).doublePage, false);
-      await _tap(tester, find.text('阅读设置'));
+      await _tap(tester, iconButton('阅读设置'));
       await _choose<wire.ReaderPageLayout>(tester, '跟随全局');
       await _tap(tester, find.text('保存'));
       snapshot = await tester.runAsync(
@@ -1232,13 +1224,8 @@ void main() {
       expect(snapshot.overrides!.hasPageLayout(), false);
       await _closeModal(tester);
       expect(_reader(tester).doublePage, true);
-      await _tap(
-        tester,
-        find.descendant(
-          of: find.byType(CupertinoSlidingSegmentedControl<int>),
-          matching: find.text('自动'),
-        ),
-      );
+      await _tap(tester, find.byType(ChoiceField<bool>));
+      await _tap(tester, find.widgetWithText(CupertinoMenuItem, '自动'));
       snapshot = await tester.runAsync(
         () => catalog.settings!.loadManga(_mangaKey),
       );
@@ -1267,12 +1254,8 @@ void main() {
       );
       expect(_reader(tester).doublePage, isNull);
       expect(
-        tester
-            .widget<CupertinoSlidingSegmentedControl<int>>(
-              find.byType(CupertinoSlidingSegmentedControl<int>),
-            )
-            .groupValue,
-        0,
+        tester.widget<ChoiceField<bool>>(find.byType(ChoiceField<bool>)).value,
+        isNull,
       );
       final writes = platform.businessServer.requests
           .where((request) => request.uri.path == '/api/settings/mutations')
@@ -1298,12 +1281,8 @@ void main() {
       expect(_reader(tester).initialMode, ReadingMode.rightToLeft);
       expect(_reader(tester).doublePage, isNull);
       expect(
-        tester
-            .widget<CupertinoSlidingSegmentedControl<int>>(
-              find.byType(CupertinoSlidingSegmentedControl<int>),
-            )
-            .groupValue,
-        0,
+        tester.widget<ChoiceField<bool>>(find.byType(ChoiceField<bool>)).value,
+        isNull,
       );
       await _leaveReader(tester, catalog);
       await _tap(tester, find.text('第一章'));
@@ -1311,12 +1290,8 @@ void main() {
       expect(_reader(tester).cropBorders, false);
       expect(_reader(tester).doublePage, isNull);
       expect(
-        tester
-            .widget<CupertinoSlidingSegmentedControl<int>>(
-              find.byType(CupertinoSlidingSegmentedControl<int>),
-            )
-            .groupValue,
-        0,
+        tester.widget<ChoiceField<bool>>(find.byType(ChoiceField<bool>)).value,
+        isNull,
       );
       expect(
         platform.businessServer.requests.where(
@@ -1324,7 +1299,7 @@ void main() {
         ),
         hasLength(writes),
       );
-      await _tap(tester, find.text('阅读设置'));
+      await _tap(tester, iconButton('阅读设置'));
       await _chooseField<wire.ReaderFit>(tester, '图像适配', '跟随全局');
       await _chooseField<bool>(tester, '裁白', '跟随全局');
       await _chooseField<wire.ReaderBackground>(tester, '阅读背景', '跟随全局');

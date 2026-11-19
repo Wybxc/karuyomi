@@ -158,29 +158,35 @@ class _ReaderPageNavigationState extends State<ReaderPageNavigation> {
     final chapters = widget.chapters;
     final hasSlider = widget.pageCount > 1;
     final rtl = widget.direction == TextDirection.rtl;
-    return Column(
+    return Row(
+      textDirection: widget.direction,
       children: [
-        if (hasSlider) ExcludeSemantics(child: count),
-        Row(
-          textDirection: widget.direction,
-          children: [
-            if (chapters != null)
-              Expanded(
-                child: Align(
-                  alignment: rtl ? Alignment.centerRight : Alignment.centerLeft,
-                  child: chapters.previous,
-                ),
-              ),
-            Expanded(flex: 2, child: hasSlider ? _slider(index) : count),
-            if (chapters != null)
-              Expanded(
-                child: Align(
-                  alignment: rtl ? Alignment.centerLeft : Alignment.centerRight,
-                  child: chapters.next,
-                ),
-              ),
-          ],
+        if (chapters != null)
+          Expanded(
+            child: Align(
+              alignment: rtl ? Alignment.centerRight : Alignment.centerLeft,
+              child: chapters.previous,
+            ),
+          ),
+        Expanded(
+          flex: 2,
+          child: hasSlider
+              ? Row(
+                  textDirection: widget.direction,
+                  children: [
+                    Expanded(child: ExcludeSemantics(child: count)),
+                    Expanded(flex: 2, child: _slider(index)),
+                  ],
+                )
+              : count,
         ),
+        if (chapters != null)
+          Expanded(
+            child: Align(
+              alignment: rtl ? Alignment.centerLeft : Alignment.centerRight,
+              child: chapters.next,
+            ),
+          ),
       ],
     );
   }

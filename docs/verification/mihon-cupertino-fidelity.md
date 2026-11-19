@@ -1357,6 +1357,17 @@ flutter test --no-pub --concurrency=1 test/reader/reader_screen_test.dart test/r
 
 同页实拍按 360×800 重采样。每行在 `x=5,13,21,339,347,355` 采样，至少四点的三个 RGB 通道均达到 240 时计入连续图片区。固定 Mihon 两主题约为 `y=[132,673)`，旧 Karuyomi 约为 `y=[74,619)`，新两主题为 `y=[47,582)`。新版下一章横坐标已向 Mihon 的 `x≈32` 靠近，纵坐标比参考 `y≈696` 上移约 69 点。标题、工具区占高与画布位置仍待对照收敛。
 
+## 阅读器工具区与画布
+
+2026-11-19，固定 Mihon 的 `reader_activity.xml` 将 `viewer_container` 和 `compose_overlay` 分层。`ReaderTopBar.kt` 显示作品、章节、书签和更多，`ReaderAppBars.kt` 将章节滑杆与常用工具放在底部。Karuyomi 使用 Cupertino 导航栏分两行显示标题，书签和阅读选项移到顶部。页码进入滑杆所在行，翻页、模式、分页、缩放和设置归到下方工具区。
+
+Flutter 3.50.0 的 122 项定向回归和 10 个文件的严格分析通过。360×844 含顶部和底部安全区的适屏图片在工具显隐时保持同一矩形，短屏图片仍全部位于可见画布。正式章节组件在 360×800 两主题、1×和 2×字号核对两行标题、顶部书签及更多、底部设置、边界禁用和原操作。原点按回归先发现当前页位数变化会横移滑杆，给计数分配稳定宽度后通过。画布位置、辅助焦点与真实图片需复验正式 Web。
+
+```sh
+cd apps/reader
+flutter test --no-pub --concurrency=1 test/reader/reader_screen_test.dart test/reader/chapter_reader_route_test.dart test/reader/reader_access_recovery_test.dart test/reader/reading_progress_navigation_test.dart test/browse/chapter_read_navigation_test.dart test/settings/settings_navigation_test.dart test/widgets/choice_field_test.dart
+```
+
 ## 仍需的证据
 
 全部 ID 的参考画面和像素基准、布局复刻前后叠图、配色对比、自然 Cupertino 调整、最终多视口/亮暗/文字/输入核对、完整工程检查和真实业务验收仍待完成。Mihon 参考模拟器与 Karuyomi 原生现场验收分开记录；不使用已停止的真机流程填补本轮 Web 证据。

@@ -183,12 +183,10 @@ final class OpenedChapter {
     required this.manifest,
     required this.provider,
     required this.generation,
-    required this.title,
   });
   final ChapterManifest manifest;
   final ChapterPageProvider provider;
   final String generation;
-  final String title;
 }
 
 String _readingKey(Object value) =>
@@ -2131,7 +2129,6 @@ final class CatalogController extends ChangeNotifier {
         ),
         provider: provider,
         generation: current.generation,
-        title: '${manga.title} · ${chapter.name}',
       );
       _openedChapters.add(opened);
       return opened;

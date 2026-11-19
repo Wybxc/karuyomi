@@ -703,11 +703,9 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     return (previous: button(-1, '上一章'), next: button(1, '下一章'));
   }
 
-  Widget _chapterControls() {
+  Widget _chapterStatus() {
     final progress = _progress;
     final bookmarks = _bookmarks;
-    final disabled =
-        _busy || _accessPaused || _recovering || _refreshingProgress;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -742,111 +740,105 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
             enabled: !_busy && !_accessPaused && !_recovering && !_initializing,
           ),
         ],
-        Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            if (bookmarks != null)
-              ChapterBookmarkButton(
-                controller: bookmarks,
-                chapterKey: _chapter.key,
-                chapterName: _chapter.name,
-                enabled: !disabled && !_initializing,
-              ),
-            if (_settings != null)
-              CupertinoButton(
-                padding: const EdgeInsets.all(8),
-                onPressed: _busy || _accessPaused || _recovering
+      ],
+    );
+  }
+
+  Widget _chapterActions() {
+    final progress = _progress;
+    final bookmarks = _bookmarks;
+    final disabled =
+        _busy || _accessPaused || _recovering || _refreshingProgress;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (bookmarks != null)
+          ChapterBookmarkButton(
+            controller: bookmarks,
+            chapterKey: _chapter.key,
+            chapterName: _chapter.name,
+            enabled: !disabled && !_initializing,
+          ),
+        CupertinoMenuAnchor(
+          menuChildren: [
+            if (progress != null) ...[
+              CupertinoMenuItem(
+                autofocus: true,
+                onPressed: disabled
                     ? null
-                    : _editSettings,
-                child: const Text('阅读设置'),
-              ),
-            CupertinoMenuAnchor(
-              menuChildren: [
-                if (progress != null) ...[
-                  CupertinoMenuItem(
-                    autofocus: true,
-                    onPressed: disabled
-                        ? null
-                        : progress.needsReopen(_chapter.key)
-                        ? () => unawaited(_move(_chapter, reopen: true))
-                        : () => unawaited(_refreshProgress()),
-                    child: Text(
-                      progress.needsReopen(_chapter.key) ? '重新打开本章' : '刷新进度',
-                    ),
-                  ),
-                  CupertinoMenuItem(
-                    onPressed:
-                        disabled ||
-                            progress.needsReopen(_chapter.key) ||
-                            _opened.manifest.pages.isEmpty
-                        ? null
-                        : () => unawaited(_resetChapter()),
-                    child: const Text('重新阅读本章'),
-                  ),
-                  CupertinoMenuItem(
-                    onPressed:
-                        disabled ||
-                            progress.needsReopen(_chapter.key) ||
-                            _viewport?.atEnd != true ||
-                            _viewport?.observed == null ||
-                            progress.chapter(_chapter.key)?.completed == true
-                        ? null
-                        : () => unawaited(_finishChapter()),
-                    child: const Text('读完本章'),
-                  ),
-                  if (progress.chapter(_chapter.key) case final saved?)
-                    if (!saved.furthestUnresolved(_opened.manifest))
-                      if (saved.furthest case final far?)
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Text(
-                            '最远：第 ${far.pageIndexHint + 1} 页${saved.completed ? ' · 本章已读完' : ''}',
-                          ),
-                        ),
-                ],
-                if (bookmarks != null)
-                  CupertinoMenuItem(
-                    autofocus: progress == null,
-                    onPressed:
-                        !disabled && !_initializing && bookmarks.canRefresh
-                        ? () => unawaited(bookmarks.refresh())
-                        : null,
-                    child: const Text('刷新书签'),
-                  ),
-                for (final (order, label) in [
-                  (ChapterOrder.source, '来源顺序'),
-                  (ChapterOrder.reversed, '反向来源顺序'),
-                ])
-                  CupertinoMenuItem(
-                    key: ValueKey(('reader-chapter-order', order)),
-                    autofocus:
-                        progress == null &&
-                        (bookmarks == null ||
-                            _initializing ||
-                            !bookmarks.canRefresh) &&
-                        _order == order,
-                    onPressed: disabled ? null : () => _changeOrder(order),
-                    trailing: _order == order
-                        ? Icon(
-                            CupertinoIcons.check_mark,
-                            color: AppColors.accent.resolveFrom(context),
-                          )
-                        : null,
-                    child: Text('章节排序 · $label'),
-                  ),
-              ],
-              builder: (context, menu, child) => CupertinoButton(
-                key: const ValueKey('reader-chapter-options'),
-                padding: const EdgeInsets.all(8),
-                onPressed: () => menu.isOpen ? menu.close() : menu.open(),
-                child: const Icon(
-                  CupertinoIcons.ellipsis,
-                  semanticLabel: '阅读选项',
+                    : progress.needsReopen(_chapter.key)
+                    ? () => unawaited(_move(_chapter, reopen: true))
+                    : () => unawaited(_refreshProgress()),
+                child: Text(
+                  progress.needsReopen(_chapter.key) ? '重新打开本章' : '刷新进度',
                 ),
               ),
-            ),
+              CupertinoMenuItem(
+                onPressed:
+                    disabled ||
+                        progress.needsReopen(_chapter.key) ||
+                        _opened.manifest.pages.isEmpty
+                    ? null
+                    : () => unawaited(_resetChapter()),
+                child: const Text('重新阅读本章'),
+              ),
+              CupertinoMenuItem(
+                onPressed:
+                    disabled ||
+                        progress.needsReopen(_chapter.key) ||
+                        _viewport?.atEnd != true ||
+                        _viewport?.observed == null ||
+                        progress.chapter(_chapter.key)?.completed == true
+                    ? null
+                    : () => unawaited(_finishChapter()),
+                child: const Text('读完本章'),
+              ),
+              if (progress.chapter(_chapter.key) case final saved?)
+                if (!saved.furthestUnresolved(_opened.manifest))
+                  if (saved.furthest case final far?)
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        '最远：第 ${far.pageIndexHint + 1} 页${saved.completed ? ' · 本章已读完' : ''}',
+                      ),
+                    ),
+            ],
+            if (bookmarks != null)
+              CupertinoMenuItem(
+                autofocus: progress == null,
+                onPressed: !disabled && !_initializing && bookmarks.canRefresh
+                    ? () => unawaited(bookmarks.refresh())
+                    : null,
+                child: const Text('刷新书签'),
+              ),
+            for (final (order, label) in [
+              (ChapterOrder.source, '来源顺序'),
+              (ChapterOrder.reversed, '反向来源顺序'),
+            ])
+              CupertinoMenuItem(
+                key: ValueKey(('reader-chapter-order', order)),
+                autofocus:
+                    progress == null &&
+                    (bookmarks == null ||
+                        _initializing ||
+                        !bookmarks.canRefresh) &&
+                    _order == order,
+                onPressed: disabled ? null : () => _changeOrder(order),
+                trailing: _order == order
+                    ? Icon(
+                        CupertinoIcons.check_mark,
+                        color: AppColors.accent.resolveFrom(context),
+                      )
+                    : null,
+                child: Text('章节排序 · $label'),
+              ),
           ],
+          builder: (context, menu, child) => CupertinoButton(
+            key: const ValueKey('reader-chapter-options'),
+            padding: const EdgeInsets.all(8),
+            onPressed: () => menu.isOpen ? menu.close() : menu.open(),
+            child: const Icon(CupertinoIcons.ellipsis, semanticLabel: '阅读选项'),
+          ),
         ),
       ],
     );
@@ -966,7 +958,9 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       manifest: opened.manifest,
       provider: opened.provider,
       generation: opened.generation,
-      title: opened.title,
+      title: _manga.title,
+      subtitle: _chapter.name,
+      chapterActions: _chapterActions(),
       onExit: () => unawaited(_exit()),
       initialPosition: _initialPosition,
       preserveInitialPlacement: _preserveInitialPlacement,
@@ -984,7 +978,16 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       positionRequest: _positionRequest,
       paused: _accessPaused || _recovering,
       chapterNavigation: _chapterNavigation(),
-      chapterControls: _chapterControls(),
+      chapterControls: _chapterStatus(),
+      readingSettings: _settings == null
+          ? null
+          : CupertinoButton(
+              padding: const EdgeInsets.all(8),
+              onPressed: _busy || _accessPaused || _recovering
+                  ? null
+                  : _editSettings,
+              child: const Icon(CupertinoIcons.gear, semanticLabel: '阅读设置'),
+            ),
       onViewportChanged: (viewport) {
         if (_closing || !identical(opened, _opened)) return;
         final changed =

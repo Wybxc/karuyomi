@@ -1,4 +1,5 @@
 import '../test_app.dart';
+import '../../test_support/cupertino.dart';
 
 import 'dart:async';
 import 'dart:ui' show Tristate;
@@ -87,7 +88,32 @@ void main() {
           await tester.pumpAndSettle();
           expect(
             tester.getSize(find.byType(InteractiveViewer).first).height,
-            greaterThan(scale == 1 ? 400 : 240),
+            greaterThan(scale == 1 ? 640 : 240),
+          );
+          final nav = tester.getRect(find.byType(CupertinoNavigationBar));
+          final workTitle = tester.getRect(find.text(manga.title));
+          final chapterTitle = tester.getRect(
+            find.text(sequence.entries.first.name),
+          );
+          expect(nav.contains(workTitle.center), isTrue);
+          expect(nav.contains(chapterTitle.center), isTrue);
+          expect(workTitle.bottom, lessThanOrEqualTo(chapterTitle.top + .1));
+          expect(
+            find.semantics
+                .byLabel('${manga.title} · ${sequence.entries.first.name}')
+                .evaluate(),
+            hasLength(1),
+          );
+          final bookmark = iconButton('标记章节书签 ${sequence.entries.first.name}');
+          expect(bookmark.hitTestable(), findsOneWidget);
+          expect(nav.contains(tester.getCenter(bookmark)), isTrue);
+          final settings = iconButton('阅读设置');
+          expect(settings.hitTestable(), findsOneWidget);
+          expect(
+            tester.getCenter(settings).dy,
+            greaterThan(
+              tester.getRect(find.byType(InteractiveViewer).first).bottom,
+            ),
           );
           for (final label in ['上一页', '下一页']) {
             final icon = find.byWidgetPredicate(
@@ -125,6 +151,7 @@ void main() {
           expect(find.text('刷新书签'), findsNothing);
           final options = find.byKey(const ValueKey('reader-chapter-options'));
           expect(options.hitTestable(), findsOneWidget);
+          expect(nav.contains(tester.getCenter(options)), isTrue);
           await catalog.flushReadingProgress();
           await tester.pumpAndSettle();
           final writes = platform.businessServer.requests
@@ -323,7 +350,10 @@ void main() {
         }
         await tester.pumpAndSettle();
         expect(find.byType(ReaderScreen), findsOneWidget);
-        expect(find.text('${manga.title} · 二'), findsOneWidget);
+        expect(
+          find.semantics.byLabel('${manga.title} · 二').evaluate(),
+          hasLength(1),
+        );
         expect(
           platform.invocations.where(
             (call) => call.whichRequest() == wire.SourceCall_Request.pages,

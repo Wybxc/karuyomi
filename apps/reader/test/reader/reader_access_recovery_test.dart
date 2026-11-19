@@ -440,10 +440,10 @@ void main() {
             .onChanged!(ReadingMode.rightToLeft);
         await tester.pumpAndSettle();
         tester
-            .widget<CupertinoSlidingSegmentedControl<int>>(
+            .widget<ChoiceField<bool>>(
               find.byKey(const ValueKey('reader-page-layout')),
             )
-            .onValueChanged(2);
+            .onChanged!(true);
         await tester.pumpAndSettle();
         final original = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
         final anchor = original.manifest.positionAt(1, offset: .4);

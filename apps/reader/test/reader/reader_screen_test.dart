@@ -160,17 +160,69 @@ void expectOriginalImageAnchor(
   );
 }
 
-bool? pageLayoutPreference(WidgetTester tester) => switch (tester
-    .widget<CupertinoSlidingSegmentedControl<int>>(
-      find.byKey(const ValueKey('reader-page-layout')),
-    )
-    .groupValue) {
-  1 => false,
-  2 => true,
-  _ => null,
-};
+final pageLayoutMenu = find.byKey(const ValueKey('reader-page-layout'));
+
+bool? pageLayoutPreference(WidgetTester tester) =>
+    tester.widget<ChoiceField<bool>>(pageLayoutMenu).value;
+
+Future<void> choosePageLayout(WidgetTester tester, String label) async {
+  await tester.tap(pageLayoutMenu);
+  await tester.pumpAndSettle();
+  await tester.tap(find.widgetWithText(CupertinoMenuItem, label));
+  await tester.pumpAndSettle();
+}
 
 void main() {
+  testWidgets(
+    'showing reader controls keeps a fully fitted page centered in the safe area',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 844);
+      tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetPadding);
+      await tester.pumpWidget(
+        screen(
+          provider: FixturePageProvider(),
+          manifest: fixtureChapter(),
+          doublePage: false,
+          imageBuilder: decodedImage(),
+          chapterControls: const Text('阅读进度已保存到服务端'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final viewport = find.byType(InteractiveViewer);
+      final image = find.byKey(const ValueKey('image-rect-page-0'));
+      final withControls = tester.getRect(image);
+      expect(withControls.center.dy, closeTo((24 + 844 - 34) / 2, 1));
+      expect(tester.getRect(viewport).contains(withControls.center), isTrue);
+      expect(withControls.bottom, lessThan(tester.getRect(viewport).bottom));
+      Future<void> toggleControls() async {
+        await tester.tapAt(tester.getCenter(viewport));
+        await tester.pump(kDoubleTapTimeout);
+        await tester.pumpAndSettle();
+      }
+
+      await toggleControls();
+      expect(tester.getRect(image), withControls);
+      expect(pageLayoutMenu, findsNothing);
+      await toggleControls();
+      expect(tester.getRect(image), withControls);
+      expect(pageLayoutMenu.hitTestable(), findsOneWidget);
+
+      tester.view.physicalSize = const Size(360, 420);
+      await tester.pumpAndSettle();
+      final shorter = tester.getRect(image);
+      final visible = tester.getRect(viewport);
+      expect(shorter.top, greaterThanOrEqualTo(visible.top - .1));
+      expect(shorter.bottom, lessThanOrEqualTo(visible.bottom + .1));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets(
     'default reader image pipeline trims actual file pixels and preserves original anchors',
     (tester) async {
@@ -674,8 +726,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(viewports.last.observed?.pageKey, 'long');
       expect(viewports.last.atEnd, false);
-      await tester.tap(find.text('单页'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '单页');
       expect(pageLayoutPreference(tester), false);
       expect(viewports.last.observed, isNotNull);
       expect(viewports.last.atEnd, false);
@@ -1894,8 +1945,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(pageLayoutPreference(tester), isNull);
-      await tester.tap(find.text('单页'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '单页');
       expect(pageLayoutPreference(tester), false);
       expect(find.text('51 / 51'), findsOneWidget);
       expect(find.byKey(const ValueKey('runtime-1-page-49')), findsNothing);
@@ -1953,18 +2003,15 @@ void main() {
       expect(pageLayoutPreference(tester), isNull);
       expect(find.byKey(const ValueKey('runtime-1-page-2')), findsOneWidget);
       expect(selections, isEmpty);
-      await tester.tap(find.text('单页'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '单页');
       expect(pageLayoutPreference(tester), false);
       expect(find.byKey(const ValueKey('runtime-1-page-2')), findsNothing);
       tester.view.physicalSize = const Size(800, 900);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('双页'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '双页');
       expect(pageLayoutPreference(tester), true);
       expect(find.byKey(const ValueKey('runtime-1-page-2')), findsOneWidget);
-      await tester.tap(find.text('自动'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '自动');
       expect(pageLayoutPreference(tester), isNull);
       expect(find.byKey(const ValueKey('runtime-1-page-2')), findsNothing);
       tester.view.physicalSize = const Size(1200, 900);
@@ -1992,8 +2039,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(pageLayoutPreference(tester), true);
-      await tester.tap(find.text('单页'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '单页');
       expect(pageLayoutPreference(tester), false);
       // Rebuilding an unchanged parent input must preserve the local choice.
       await tester.pumpWidget(
@@ -2010,8 +2056,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(pageLayoutPreference(tester), true);
-      await tester.tap(find.text('单页'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '单页');
       await tester.pumpWidget(screen(provider: provider, manifest: manifest));
       await tester.pumpAndSettle();
       expect(pageLayoutPreference(tester), isNull);
@@ -2039,8 +2084,7 @@ void main() {
     final manifest = fixtureChapter();
     await tester.pumpWidget(screen(provider: provider, manifest: manifest));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('单页'));
-    await tester.pumpAndSettle();
+    await choosePageLayout(tester, '单页');
     expect(pageLayoutPreference(tester), false);
     await tester.pumpWidget(
       screen(
@@ -2178,12 +2222,8 @@ void main() {
         isNull,
       );
       expect(
-        tester
-            .widget<CupertinoSlidingSegmentedControl<int>>(
-              find.byKey(const ValueKey('reader-page-layout')),
-            )
-            .disabledChildren,
-        {0, 1, 2},
+        tester.widget<ChoiceField<bool>>(pageLayoutMenu).onChanged,
+        isNull,
       );
       await tester.tap(iconLabel('下一页'));
       await tester.pumpAndSettle();
