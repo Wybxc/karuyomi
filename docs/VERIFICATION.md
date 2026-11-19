@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-19，`7db8551` 的正式 Web 双主题通过阅读器页码滑杆、从右到左方向、键盘操作和新标签续读。三个跳转动作各提交一次进度。100 项定向回归、分支与 PR CI 通过；同页画布纵向位置和工具区仍需对齐。[阅读页码与方向](verification/mihon-cupertino-fidelity.md#阅读页码滑杆与方向排列)
+
 2026-11-19，`4026db3` 的第 3324 章第一页完成与 Mihon 的同页量测。`21f23d6` 正式 Web 深浅色核对暂停确认后的独立结束节点、首次回车、页章边界禁用与 D1 续读位置第 2 页。两轮各只有一次章节标记，106 项 Flutter 回归通过。[键盘焦点](verification/mihon-cupertino-fidelity.md#章节批量动作名称与焦点范围) · [同页对照](verification/mihon-cupertino-fidelity.md#阅读器同页与边界的正式-web-双主题对照)
 
 2026-11-19，固定 Mihon 0.21.3 补齐空章反馈、相邻章过渡与失败、首章与末章边界五项双主题参考，累计 137/170（80.6%）。浅色缺页过渡通过原重试恢复并进入实际下一章。`b5998b0` 正式 Web 深色复现章节批量结束键盘失效，`4026db3` 调整辅助动作范围，59 项定向回归通过，正式 Web 复验待完成。[阅读参考及量测](verification/mihon-cupertino-fidelity.md#mihon-章节过渡与空页的双主题参考) · [章节焦点](verification/mihon-cupertino-fidelity.md#章节批量动作名称与焦点范围)

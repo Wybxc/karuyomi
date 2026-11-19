@@ -71,6 +71,8 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 **当前视觉重构**按全部现有状态推进，统一 Cupertino 导航、控件、语义色与转场。Karuyomi 跨版本双主题主图为 168/169（99.4%），Mihon 阅读器补齐五对参考后达到 137/170（80.6%）。剩余未连接主状态，以及参考图补采、最终像素复核、变体、转换和生产验收。PR #8 为草稿。[交付计划](mihon-cupertino-fidelity.md) · [逐状态清单](../verification/mihon-state-coverage.md)
 
+阅读器滑杆、从右到左方向和新标签续读已通过同章双主题 Web，画布位置与底部工具栏继续对齐。[阅读页码与方向](../verification/mihon-cupertino-fidelity.md#阅读页码滑杆与方向排列)
+
 `5f5d287` 正式 Web 双主题确认批量分类失效后保留原清单、末项未发送、关闭返回书架。`78f4c4b` 正式 Web 确认迁移选中超过 256 条时禁用提交，减少选择后可进入二次确认。[批量实拍](../verification/mihon-cupertino-fidelity.md#批量分类失效的正式-web-双主题验收) · [迁移实拍](../verification/mihon-cupertino-fidelity.md#章节映射超限的正式-web-双主题验收)
 
 源收藏布局、原对象和完整值已核对；[存储隔离修复](../verification/mihon-cupertino-fidelity.md#展开状态与滚动位置的存储隔离)的八项源/扩展回归先红后绿，四文件100项相关回归及集中检查通过。新正式产物中，原值展开/收起、确认清除、主题切换与再次重开均正常，控制台无错误/警告。旧`fe57f2c`失败保留，Source实际运行及扩展/仓库/搜索其它运行门继续验收。

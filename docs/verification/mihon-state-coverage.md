@@ -724,6 +724,8 @@ stateDiagram-v2
 
 同日，`4026db3` 正式 Web 深浅色对照 22.03 的同一 xkcd 3324 第一页及从右到左模式，保留图片区与两个方向按钮的实测坐标。Karuyomi 通过工具栏切章，实际核对无上一章与无下一章、保持原图以及重返 3324 第 2 页。`21f23d6` 正式 Web 双主题通过页与章首尾的可见说明及辅助禁用，方向排列和页码工具的布局差异继续核对。[产品画面与读回](mihon-cupertino-fidelity.md#阅读器同页与边界的正式-web-双主题对照)
 
+`7db8551` 在相同 3324 章和双主题复验 22.03 的方向几何，22.06 通过滑杆拖动、键盘、点按及新文档续读。主图计数保持 168/169 和 137/170，画布纵向位置及控制区仍有差距。[页码滑杆量测与读回](mihon-cupertino-fidelity.md#阅读页码滑杆与方向排列)
+
 ## 26–30：设置、选择与通用弹层
 
 依据：`presentation/more/settings/screen/SettingsMainScreen.kt`、`SettingsAppearanceScreen.kt`、`SettingsReaderScreen.kt`、`SettingsAdvancedScreen.kt`、`debug/DebugInfoScreen.kt`、`WorkerInfoScreen.kt`，以及官方 Preference 对应选择/编辑对话框。通用弹层复用前面已定义状态，不用另一个页面的常态代替。
