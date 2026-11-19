@@ -1380,12 +1380,20 @@ flutter test --no-pub --concurrency=1 test/reader/reader_screen_test.dart test/r
 
 固定 Mihon 的 `ReaderAppBars.kt` 用 200 毫秒滑动和 150 毫秒淡入淡出显示上下工具栏。`ReaderActivity.kt` 在隐藏时保留底部页码，参考 22.02 两色的 `1 / 2` 辅助范围归一化后都是 `[165.5,786,194.5,800]`。Karuyomi 此前同页隐藏工具时没有可见页码，连续与条漫缺中央显隐入口。
 
-Flutter 3.50.0 的 153 项定向回归和三个 Dart 文件的严格分析通过。组件测试在动画中间确认导航向上、底部工具向下、画布尺寸与适屏图片位置保持稳定，移动中的控件从触控与辅助树退出。测试覆盖隐藏页码的值和可点击范围、Tab 与回车恢复、快速反向切换、系统减弱动态与关闭动画。连续和条漫逐一核对单击显隐、双击查看及当前阅读锚点保持。旧连续模式用例暴露拆除图片的双击识别器时仍会交付待确认的单击；布局和拆除阶段忽略该迟到事件后复验通过。正式 Web 双主题待验。
+Flutter 3.50.0 的 153 项定向回归和三个 Dart 文件的严格分析通过。组件测试在动画中间确认导航向上、底部工具向下、画布尺寸与适屏图片位置保持稳定，移动中的控件从触控与辅助树退出。测试覆盖隐藏页码的值和可点击范围、Tab 与回车恢复、快速反向切换、系统减弱动态与关闭动画。连续和条漫逐一核对单击显隐、双击查看及当前阅读锚点保持。旧连续模式用例暴露拆除图片的双击识别器时仍会交付待确认的单击。布局和拆除阶段忽略该迟到事件后复验通过。
 
 ```sh
 cd apps/reader
 flutter test --no-pub --concurrency=1 test/reader/reader_screen_test.dart test/reader/chapter_reader_route_test.dart test/reader/reader_access_recovery_test.dart test/reader/reading_progress_navigation_test.dart test/browse/chapter_read_navigation_test.dart test/settings/settings_navigation_test.dart test/widgets/choice_field_test.dart test/widget_test.dart
 ```
+
+2026-11-20，`66be7cd` 的分支 CI、PR CI 和 Wasm 通过，部署跳过。正式 Web 归档 `14549702162` 为 16,317,639 字节，SHA-256 为 `af07f1f5a4fe37c86ee6d41683132106df64e2b8f496e4037b04fa08f601ba09`。核对归档资源 39 项、两套 Wrangler 各自交付的 35 项清单、入口 `main.dart.d8384f3e.js` 和原 host 字节。[分支 CI](https://github.com/Wybxc/karuyomi/actions/runs/44559854376) · [PR CI](https://github.com/Wybxc/karuyomi/actions/runs/44559874097)
+
+在 360×800 内置浏览器，以两套独立 `editor-ui` Wrangler/D1 显式设定浅、深色，打开英文 xkcd 3324 章。浅色按 T 隐藏，再按 Tab、回车恢复。深色中央点按隐藏，再点按底部 `1 / 2` 恢复。隐藏页码的触控范围两色均约 54×44，辅助名称包含动作和页位。按前节的六点采样，Karuyomi 从右到左分页显示、隐藏、复显的图片范围均为 `y=[128,673)`，Mihon 同页隐藏参考为 `y=[127,673)`。在 `x=126–234`、`y=760–799` 的区域，逐点取三个 RGB 通道均不低于 150 的文字像素。Mihon 页码为 `[167,788,193,798)`，Karuyomi 为 `[170,786,191,796)`。系统减弱动态与关闭动画的证据来自上述组件测试。
+
+两种主题的竖向连续和条漫均通过中央单击隐藏和复显，双击打开图片查看并返回原页。深色条漫另在 844×390 核对显示工具时图片高 239，隐藏时高 390，底部页码按钮可复显，图片恢复原尺寸。标签及验收服务正常关闭，浏览器默认视口已恢复。[验收入口](../../apps/api/test/README.md)
+
+浅色 60 次、深色 66 次分阶段 API 读回验证 360×800 的分页、连续和条漫中 `current` 都保持第 1 页原锚点。分页和条漫的两次显隐各自零写入。连续隐藏工具后第 2 页末端实际进入画布，两色的最远位置从约 0.833 推进到 1，各有一次确认写入，本章仍为未完成。深色改为短横屏时另保存一次第 1 页在视口中的新位置。53 条浅色、57 条深色审计均有终态，只有该章产生阅读进度写入。
 
 ## 仍需的证据
 

@@ -728,6 +728,8 @@ stateDiagram-v2
 
 `313bbc9` 正式 Web 双主题核对 22.02 与 22.03 的同页显隐。三种工具阶段的图像边界均为 `[128,673)`，Mihon 的同页显示工具参考约为 `[132,673)`。23.02 的阅读选项和 23.03 的书签入口移入顶部并通过原动作。底栏与其余阅读状态继续验收。[阅读器工具区与画布](mihon-cupertino-fidelity.md#阅读器工具区与画布)
 
+2026-11-20，`66be7cd` 补齐 22.02 隐藏后的可见页码，并在同一 3324 章双主题核对分页、连续、条漫显隐和页码恢复入口。连续和条漫双击查看仍可回到同页。短横屏的页码可触达，分页显示、隐藏、复显的图片边界一致。已知页位加载、图片失败、过渡加载和工具切章等待仍需同范围参考和复验。[阅读器显隐与页码](mihon-cupertino-fidelity.md#阅读器显隐与页码)
+
 ## 26–30：设置、选择与通用弹层
 
 依据：`presentation/more/settings/screen/SettingsMainScreen.kt`、`SettingsAppearanceScreen.kt`、`SettingsReaderScreen.kt`、`SettingsAdvancedScreen.kt`、`debug/DebugInfoScreen.kt`、`WorkerInfoScreen.kt`，以及官方 Preference 对应选择/编辑对话框。通用弹层复用前面已定义状态，不用另一个页面的常态代替。

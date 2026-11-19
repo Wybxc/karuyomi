@@ -71,7 +71,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 **当前视觉重构**按全部现有状态推进，统一 Cupertino 导航、控件、语义色与转场。Karuyomi 跨版本双主题主图为 168/169（99.4%），Mihon 阅读器补齐五对参考后达到 137/170（80.6%）。剩余未连接主状态，以及参考图补采、最终像素复核、变体、转换和生产验收。PR #8 为草稿。[交付计划](mihon-cupertino-fidelity.md) · [逐状态清单](../verification/mihon-state-coverage.md)
 
-阅读器双主题正式 Web 核对同页画布上下边界、顶部书签、工具显隐、键盘菜单和新标签续读；底栏和剩余阅读状态继续对照。[阅读器工具区与画布](../verification/mihon-cupertino-fidelity.md#阅读器工具区与画布)
+阅读器双主题正式 Web 核对同页画布、顶部书签、键盘菜单和新标签续读。分页、连续和条漫的工具显隐与隐藏页码均已实测。其余阅读状态和转场继续对照。[阅读器工具区与画布](../verification/mihon-cupertino-fidelity.md#阅读器工具区与画布) · [阅读器显隐与页码](../verification/mihon-cupertino-fidelity.md#阅读器显隐与页码)
 
 `5f5d287` 正式 Web 双主题确认批量分类失效后保留原清单、末项未发送、关闭返回书架。`78f4c4b` 正式 Web 确认迁移选中超过 256 条时禁用提交，减少选择后可进入二次确认。[批量实拍](../verification/mihon-cupertino-fidelity.md#批量分类失效的正式-web-双主题验收) · [迁移实拍](../verification/mihon-cupertino-fidelity.md#章节映射超限的正式-web-双主题验收)
 
