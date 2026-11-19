@@ -69,9 +69,9 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 2026-11-16，调整PR #8的推进顺序：先收敛同类最终界面实现并提交，再集中验收正式产物；不再为已知即将修改的中间布局反复补拍全套主图。停止使用没有固定权重的“约50%”，改为报告“最终界面代码、最终版本逐状态验收、合并发布与生产闭环”三项实绩和剩余门槛，详见[当前交付表](mihon-cupertino-fidelity.md#目标与当前状态)。状态覆盖和双主题验收范围保持不变。
 
-**当前视觉重构**按全部现有状态推进，统一 Cupertino 导航、控件、语义色与转场。Karuyomi 跨版本双主题主图为 168/169（99.4%），Mihon 阅读器补齐五对参考后达到 137/170（80.6%）。剩余未连接主状态，以及参考图补采、最终像素复核、变体、转换和生产验收。PR #8 为草稿。[交付计划](mihon-cupertino-fidelity.md) · [逐状态清单](../verification/mihon-state-coverage.md)
+**当前视觉重构**按全部现有状态推进，统一 Cupertino 导航、控件、语义色与转场。Karuyomi 跨版本双主题主图为 168/169（99.4%），Mihon 阅读器补齐四对等待与失败参考后达到 141/170（82.9%）。剩余未连接主状态，以及参考图补采、最终像素复核、变体、转换和生产验收。PR #8 为草稿。[交付计划](mihon-cupertino-fidelity.md) · [逐状态清单](../verification/mihon-state-coverage.md)
 
-阅读器双主题正式 Web 已核对工具显隐、单页重试及画布内章间过渡。首尾、加载、缺页和继续后的真实续读均有证据。参考瞬态、像素差异和业务变体继续对照。[阅读器显隐与页码](../verification/mihon-cupertino-fidelity.md#阅读器显隐与页码) · [画布内章间过渡](../verification/mihon-cupertino-fidelity.md#阅读画布内的章间过渡)
+阅读器双主题正式 Web 已核对工具显隐、单页重试及上一版画布内过渡。新增 Mihon 实拍区分已知页位加载、单页失败、画布内过渡加载与工具切章弹层。章间控件的新布局待正式 Web 复核。[画布内章间过渡](../verification/mihon-cupertino-fidelity.md#阅读画布内的章间过渡) · [单页与切章等待参考](../verification/mihon-cupertino-fidelity.md#mihon-单页与切章等待的双主题参考)
 
 `5f5d287` 正式 Web 双主题确认批量分类失效后保留原清单、末项未发送、关闭返回书架。`78f4c4b` 正式 Web 确认迁移选中超过 256 条时禁用提交，减少选择后可进入二次确认。[批量实拍](../verification/mihon-cupertino-fidelity.md#批量分类失效的正式-web-双主题验收) · [迁移实拍](../verification/mihon-cupertino-fidelity.md#章节映射超限的正式-web-双主题验收)
 

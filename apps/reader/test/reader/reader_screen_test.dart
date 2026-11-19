@@ -181,6 +181,70 @@ Future<void> choosePageLayout(WidgetTester tester, String label) async {
 }
 
 void main() {
+  testWidgets(
+    'chapter transition stacks loading feedback and fits the two chapter actions',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      var continued = false;
+
+      Future<void> showTransition({required bool loading}) async {
+        await tester.pumpWidget(
+          CupertinoApp(
+            home: ReaderChapterTransition(
+              edge: ReaderChapterEdge.next,
+              currentChapter: (name: '3320', scanlator: ''),
+              targetChapter: (name: '3319', scanlator: ''),
+              background: ReaderBackground.black,
+              dimPercent: 0,
+              loading: loading,
+              error: null,
+              onContinue: loading ? null : () => continued = true,
+              onRetry: null,
+              onReturn: () {},
+            ),
+          ),
+        );
+        await tester.pump();
+      }
+
+      await showTransition(loading: true);
+      final current = find.text('本章');
+      final next = find.text('下一章');
+      final spinner = tester.getRect(find.byType(CupertinoActivityIndicator));
+      final caption = tester.getRect(find.text('正在加载章节页面'));
+      expect(spinner.top, greaterThan(tester.getBottomLeft(next).dy));
+      expect(caption.top, greaterThan(spinner.bottom));
+      expect(caption.center.dx, closeTo(spinner.center.dx, 1));
+      final portraitGap =
+          tester.getTopLeft(next).dy - tester.getTopLeft(current).dy;
+      expect(portraitGap, inInclusiveRange(92, 112));
+
+      await showTransition(loading: false);
+      final back = find.widgetWithText(CupertinoButton, '返回本章');
+      final forward = find.widgetWithText(CupertinoButton, '进入下一章');
+      expect(
+        tester.getCenter(back).dy,
+        closeTo(tester.getCenter(forward).dy, 1),
+      );
+      expect(
+        tester.getSize(forward).height,
+        greaterThanOrEqualTo(kMinInteractiveDimensionCupertino),
+      );
+
+      tester.view.physicalSize = const Size(844, 390);
+      await tester.pump();
+      final landscapeGap =
+          tester.getTopLeft(next).dy - tester.getTopLeft(current).dy;
+      expect(landscapeGap, lessThan(portraitGap));
+      await tester.tap(forward);
+      expect(continued, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final mode in [ReadingMode.continuous, ReadingMode.webtoon]) {
     testWidgets(
       '$mode only opens a chapter boundary after a drag beyond the scroll extent',

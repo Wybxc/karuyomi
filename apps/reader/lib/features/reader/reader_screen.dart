@@ -75,6 +75,7 @@ class const ReaderChapterTransition({
     final theme = CupertinoTheme.of(context).textTheme;
     final body = theme.textStyle.copyWith(color: foreground);
     final caption = theme.actionSmallTextStyle.copyWith(color: secondary);
+    const actionTarget = Size.square(kMinInteractiveDimensionCupertino);
 
     Widget chapter(String label, ({String name, String scanlator}) entry) =>
         Column(
@@ -106,6 +107,10 @@ class const ReaderChapterTransition({
             12.0,
             64.0,
           );
+          final chapterSpacing = (bounds.maxHeight * .07 / scale).clamp(
+            24.0,
+            56.0,
+          );
           return Center(
             child: SingleChildScrollView(
               primary: false,
@@ -121,24 +126,28 @@ class const ReaderChapterTransition({
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (previous) neighbor else chapter('本章', currentChapter),
-                      const SizedBox(height: 28),
+                      SizedBox(height: chapterSpacing),
                       if (previous) chapter('本章', currentChapter) else neighbor,
                       if (loading) ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 8),
                         Semantics(
                           liveRegion: true,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               CupertinoActivityIndicator(color: secondary),
-                              const SizedBox(width: 8),
-                              Flexible(child: Text('正在加载章节页面', style: caption)),
+                              const SizedBox(height: 8),
+                              Text(
+                                '正在加载章节页面',
+                                style: caption,
+                                textAlign: TextAlign.center,
+                              ),
                             ],
                           ),
                         ),
                       ],
                       if (error case final message?) ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 8),
                         Semantics(
                           liveRegion: true,
                           child: Text(
@@ -150,23 +159,30 @@ class const ReaderChapterTransition({
                           ),
                         ),
                       ],
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       Wrap(
                         alignment: WrapAlignment.center,
                         spacing: 8,
+                        runSpacing: 8,
                         children: [
                           CupertinoButton(
+                            sizeStyle: CupertinoButtonSize.medium,
+                            minimumSize: actionTarget,
                             autofocus: onReturn != null,
                             onPressed: onReturn,
                             child: const Text('返回本章'),
                           ),
                           if (onRetry != null)
                             CupertinoButton.filled(
+                              sizeStyle: CupertinoButtonSize.medium,
+                              minimumSize: actionTarget,
                               onPressed: onRetry,
                               child: const Text('重试'),
                             )
                           else if (onContinue != null)
                             CupertinoButton.filled(
+                              sizeStyle: CupertinoButtonSize.medium,
+                              minimumSize: actionTarget,
                               onPressed: onContinue,
                               child: Text('进入$direction'),
                             ),
