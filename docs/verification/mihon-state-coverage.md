@@ -730,6 +730,8 @@ stateDiagram-v2
 
 2026-11-20，`66be7cd` 补齐 22.02 隐藏后的可见页码，并在同一 3324 章双主题核对分页、连续、条漫显隐和页码恢复入口。连续和条漫双击查看仍可回到同页。短横屏的页码可触达，分页显示、隐藏、复显的图片边界一致。已知页位加载、图片失败、过渡加载和工具切章等待仍需同范围参考和复验。[阅读器显隐与页码](mihon-cupertino-fidelity.md#阅读器显隐与页码)
 
+`e5ba265` 补充 Karuyomi 画布内的 22.07、22.10–22.13 正式 Web 实拍。两色覆盖首尾、真实页列表就绪、受控加载和空列表，重试进目标章后可独立续读。本次验收覆盖已有矩阵分项，Mihon 22.10 的参考实拍仍待补采。[画布内章间过渡](mihon-cupertino-fidelity.md#阅读画布内的章间过渡)
+
 ## 26–30：设置、选择与通用弹层
 
 依据：`presentation/more/settings/screen/SettingsMainScreen.kt`、`SettingsAppearanceScreen.kt`、`SettingsReaderScreen.kt`、`SettingsAdvancedScreen.kt`、`debug/DebugInfoScreen.kt`、`WorkerInfoScreen.kt`，以及官方 Preference 对应选择/编辑对话框。通用弹层复用前面已定义状态，不用另一个页面的常态代替。
