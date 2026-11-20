@@ -1197,8 +1197,12 @@ void main() {
     'failed pagination keeps the original query and exposes an exact retry at the bottom of a long listing',
     (tester) async {
       var failed = false;
+      final entered = Completer<void>();
+      final release = Completer<void>();
       platform.invokeHandler = (call) async {
         if (call.search.page == 2 && !failed) {
+          entered.complete();
+          await release.future;
           failed = true;
           throw const RuntimeException(
             RuntimeErrorCode.sourceError,
@@ -1253,15 +1257,35 @@ void main() {
       await tester.ensureVisible(more);
       await tester.pumpAndSettle();
       expect(more.hitTestable(), findsOneWidget);
+      final lastCover = find.byKey(const ValueKey(('migration-result', 17)));
+      final coverBefore = tester.getRect(lastCover);
       await tester.tap(more);
-      await tester.pumpAndSettle();
+      try {
+        await tester.pump();
+        await tester.runAsync(
+          () => entered.future.timeout(const Duration(seconds: 5)),
+        );
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('正在加载更多“原查询”的搜索结果'), findsOneWidget);
+        expect(tester.getRect(lastCover), coverBefore);
+      } finally {
+        release.complete();
+        await tester.pumpAndSettle();
+      }
       expect(failed, isTrue);
+      expect(tester.getRect(lastCover), coverBefore);
       final error = find.byKey(const ValueKey('migration-error'));
       expect(error.hitTestable(), findsOneWidget);
       expect(find.text('加载更多“原查询”的搜索结果'), findsOneWidget);
       expect(find.text('目标源 · zh · 第 2 页'), findsOneWidget);
       expect(find.text('候选 17'), findsOneWidget);
       final retry = find.text('重试读取第 2 页');
+      expect(retry.hitTestable(), findsOneWidget);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(retry, 250, scrollable: scrollable);
+      await tester.pumpAndSettle();
       expect(retry.hitTestable(), findsOneWidget);
       await tester.tap(retry);
       await tester.pumpAndSettle();
@@ -1295,12 +1319,9 @@ void main() {
           await release.future;
           return wire.SourceResult(
             mangaPage: wire.MangaPage(
-              mangas: [
-                if (call.popular.page == 1)
-                  _target
-                else
-                  wire.Manga(url: '/another', title: '第二页作品'),
-              ],
+              mangas: call.popular.page == 1
+                  ? []
+                  : [_target, wire.Manga(url: '/another', title: '第二页作品')],
               hasNextPage: call.popular.page == 1,
             ),
           );
@@ -1364,7 +1385,8 @@ void main() {
         release.complete();
         await tester.pumpAndSettle();
       }
-      expect(find.text('目标作品'), findsOneWidget);
+      final emptyPopular = find.text('目标源的热门列表没有作品。');
+      expect(emptyPopular, findsOneWidget);
       await tester.enterText(
         find.byKey(const ValueKey('migration-search')),
         '尚未提交的新查询',
@@ -1384,12 +1406,14 @@ void main() {
         await tester.ensureVisible(find.byType(CupertinoActivityIndicator));
         await tester.pump();
         expect(find.text('正在加载更多目标源热门作品'), findsOneWidget);
+        expect(emptyPopular, findsOneWidget);
         expect(posts(), hasLength(before));
       } finally {
         release.complete();
         await tester.pumpAndSettle();
       }
       expect(find.text('第二页作品'), findsOneWidget);
+      expect(emptyPopular, findsNothing);
       final popular = platform.invocations.where((call) => call.hasPopular());
       expect(popular.map((call) => call.popular.page), [1, 2]);
       expect(popular.every((call) => call.sourceId == _targetId), true);

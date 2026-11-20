@@ -423,12 +423,14 @@ class _MigrationPageState extends State<MigrationPage> {
     required String label,
     required bool enabled,
     required VoidCallback read,
+    EdgeInsetsGeometry? padding,
   }) => Semantics(
     container: true,
     enabled: enabled,
     child: CupertinoButton(
       key: ValueKey(id),
       alignment: AlignmentDirectional.centerStart,
+      padding: padding,
       onPressed: enabled ? read : null,
       child: Text(label),
     ),
@@ -471,9 +473,79 @@ class _MigrationPageState extends State<MigrationPage> {
         ],
       );
 
+  Widget _candidatePagination(BuildContext context) {
+    if (!controller.hasTargetPaginationFeedback) {
+      return _readButton(
+        id: 'migration-search-more',
+        label: '加载更多目标结果',
+        enabled: controller.canChange,
+        read: () => unawaited(controller.loadMore()),
+      );
+    }
+    final secondary = TextStyle(
+      color: AppColors.secondaryLabel.resolveFrom(context),
+      fontSize: 13,
+    );
+    final retry = controller.targetRetryLabel;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (controller.busy)
+          Semantics(
+            container: true,
+            liveRegion: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Row(
+                children: [
+                  const CupertinoActivityIndicator(),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('正在${controller.operationLabel}')),
+                ],
+              ),
+            ),
+          )
+        else if (controller.error case final error?)
+          Wrap(
+            spacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Semantics(
+                container: true,
+                liveRegion: true,
+                child: Text(
+                  error,
+                  key: const ValueKey('migration-error'),
+                  style: secondary.copyWith(
+                    color: AppColors.error.resolveFrom(context),
+                  ),
+                ),
+              ),
+              if (retry != null)
+                _readButton(
+                  id: 'migration-retry-target',
+                  label: retry,
+                  enabled: controller.canChange,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 16,
+                  ),
+                  read: () => unawaited(controller.retryTargetRead()),
+                ),
+            ],
+          ),
+        if (retry != null) Text(controller.operationLabel, style: secondary),
+        if (controller.targetReadContext case final target?)
+          Text(target, style: secondary),
+      ],
+    );
+  }
+
   List<Widget> _candidateSlivers(BuildContext context) {
     final candidates = controller.results;
-    final empty = controller.busy ? null : controller.emptyResultsMessage;
+    final empty = controller.busy && !controller.hasTargetPaginationFeedback
+        ? null
+        : controller.emptyResultsMessage;
     if (candidates.isEmpty && empty == null) return const [];
     const spacing = 12.0;
     const minimumCoverWidth = 128.0;
@@ -537,12 +609,7 @@ class _MigrationPageState extends State<MigrationPage> {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: spacing),
-            child: _readButton(
-              id: 'migration-search-more',
-              label: '加载更多目标结果',
-              enabled: controller.canChange,
-              read: () => unawaited(controller.loadMore()),
-            ),
+            child: _candidatePagination(context),
           ),
         ),
     ];
@@ -578,7 +645,9 @@ class _MigrationPageState extends State<MigrationPage> {
     final available = controller.available;
     final pending = controller.pending;
     final selectedKey = controller.selectedSource?.key;
-    final pinFeedback = available && controller.hasTargetReadFeedback;
+    final paginationFeedback = controller.hasTargetPaginationFeedback;
+    final pinFeedback =
+        available && controller.hasTargetReadFeedback && !paginationFeedback;
     final target =
         pending?.request.migrateFrom.targetMetadata ??
         controller.targetMetadata;
@@ -614,6 +683,7 @@ class _MigrationPageState extends State<MigrationPage> {
                   )
                 else ...[
                   if (!pinFeedback &&
+                      !paginationFeedback &&
                       (controller.busy || controller.error != null))
                     _operationFeedback(context),
                   CupertinoFormSection.insetGrouped(

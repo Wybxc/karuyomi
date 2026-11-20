@@ -106,6 +106,7 @@ final class MigrationController extends ChangeNotifier {
   String operationLabel = '读取迁移输入';
   _TargetRead? _targetRead;
   bool get hasTargetReadFeedback => _targetRead != null;
+  bool get hasTargetPaginationFeedback => (_targetRead?.page ?? 0) > 1;
   String? get targetReadContext {
     final target = _targetRead;
     final page = target?.page;
