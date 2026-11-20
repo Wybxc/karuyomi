@@ -108,7 +108,10 @@ final class ExtensionsController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  Future<void> refresh({bool catalogToo = false}) async {
+  Future<void> refresh({
+    bool catalogToo = false,
+    bool reportCatalogCheck = true,
+  }) async {
     if (!available || busy) return;
     await _run(() async {
       final refreshed = await _settingsCommands.refresh();
@@ -127,6 +130,7 @@ final class ExtensionsController extends ChangeNotifier {
       cache = await catalog.runtime.extensionCache();
       if (available &&
           catalogToo &&
+          reportCatalogCheck &&
           refreshed &&
           catalog.repositoryErrors.isEmpty &&
           (catalog.builds.isNotEmpty || installed.isNotEmpty)) {

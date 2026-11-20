@@ -563,6 +563,7 @@ void main() {
         );
         expect(install, findsOneWidget);
         expect(unavailable, findsNothing);
+        expect(find.text('已检查当前目录，账户构建选择未改变。'), findsOneWidget);
 
         platform.beforeApiFetch = (path) async {
           if (path == catalogPath) throw StateError('Repository unavailable');
@@ -1464,6 +1465,92 @@ void main() {
 
   for (final appearance in Brightness.values) {
     testWidgets(
+      'extension details keep long identity and Source names readable in $appearance',
+      (tester) async {
+        final name = '${'跨端阅读测试扩展资料目录' * 5}末尾';
+        final index = wire.decodeProtoJson(
+          wire.ExtensionIndex(),
+          platform.inventory,
+        );
+        final build = index.builds.single;
+        build.sources.single.name = name;
+        platform.inventory = wire.encodeProtoJson(index);
+        await tester.runAsync(catalog.refreshCatalog);
+        await tester.runAsync(() => manager.install(catalog.builds.single));
+        expect(manager.installed.single.packageName, build.packageName);
+        final writes = platform.businessServer.requests
+            .where((request) => request.method == 'POST')
+            .length;
+
+        await show(
+          tester,
+          appearance: appearance,
+          size: const Size(360, 480),
+          textScale: 2,
+        );
+        expect(find.byKey(const ValueKey('extensions-message')), findsNothing);
+        await tap(
+          tester,
+          find.byKey(
+            ValueKey((
+              'extension-details',
+              catalog.catalogUrl,
+              build.packageName,
+            )),
+          ),
+        );
+        final details = find.byType(ExtensionDetailsPage);
+        final summary = find
+            .descendant(
+              of: details,
+              matching: find.byType(CupertinoFormSection),
+            )
+            .first;
+        for (final value in [
+          name,
+          build.packageName,
+          '${build.version} · zh · 已安装 · 本机就绪',
+          catalog.repositories.single.name,
+        ]) {
+          final field = find.descendant(
+            of: summary,
+            matching: find.text(value),
+          );
+          expect(field, findsOneWidget, reason: value);
+          await tester.ensureVisible(field);
+          await tester.pumpAndSettle();
+          expect(field.hitTestable(), findsOneWidget);
+          expect(
+            tester.renderObject<RenderParagraph>(field).didExceedMaxLines,
+            isFalse,
+          );
+        }
+
+        final source = find.byKey(ValueKey(('extension-source', sourceId)));
+        await tester.scrollUntilVisible(source, 200);
+        final sourceName = find.descendant(
+          of: source,
+          matching: find.text(name),
+        );
+        expect(
+          tester.renderObject<RenderParagraph>(sourceName).didExceedMaxLines,
+          isFalse,
+        );
+        expect(tester.widget<CupertinoButton>(source).enabled, isTrue);
+        await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+        await tester.pumpAndSettle();
+        expect(details, findsNothing);
+        expect(
+          platform.businessServer.requests.where(
+            (request) => request.method == 'POST',
+          ),
+          hasLength(writes),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
       'many languages keep the extension version and status visible in $appearance',
       (tester) async {
         final index = wire.decodeProtoJson(
@@ -1510,14 +1597,11 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        final status = find.ancestor(
-          of: find.text('扩展状态'),
-          matching: find.byType(CupertinoListTile),
+        final status = find.descendant(
+          of: find.byType(ExtensionDetailsPage),
+          matching: find.text(expected),
         );
-        expect(
-          (tester.widget<CupertinoListTile>(status).subtitle! as Text).data,
-          expected,
-        );
+        expect(status, findsOneWidget);
         expect(find.text('lang60'), findsOneWidget);
         expect(
           platform.businessServer.requests.where(

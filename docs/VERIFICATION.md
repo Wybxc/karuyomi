@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-20，对照 Mihon 扩展详情的双主题原图，把 Karuyomi 的名称、包名、精确版本和仓库放入可滚动的 Cupertino 分组。360×480 与两倍字号的双主题组件复验确认长名称和源名称完整可读。首次自动检查成功后直接展示列表，手动检查保留完成反馈。965 项 Flutter 测试和严格 Dart 分析通过，正式 Web 待验。[扩展详情的身份与字号](verification/mihon-cupertino-fidelity.md#扩展详情的身份与字号)
+
 2026-11-20，固定 Mihon 在隔离设备上取得 Komga 1.6.76 排队态的浅深两色实拍，参考主图达到 167/170（98.2%）。Karuyomi 修正短屏大字号下准备状态的名称截断，取消可见并等待原操作的确认。292 项相关 Flutter 回归与严格 Dart 分析通过，正式 Web 待验。[扩展排队与短屏取消](verification/mihon-cupertino-fidelity.md#扩展排队与短屏取消)
 
 2026-11-20，固定 Mihon 在同一隔离测试书架取得迁移源加载的浅深两色实拍，参考主图达到 166/170（97.6%）。Karuyomi 修正减弱动态下的底页位移和已打开 Sheet 的偏好切换。963 项 Flutter 回归与严格 Dart 分析通过，正式 Web 和原生现场转场待验。[迁移源加载](verification/mihon-cupertino-fidelity.md#mihon-迁移源加载的双主题实拍) · [底页转场](verification/mihon-cupertino-fidelity.md#cupertino-转场的底页位置)

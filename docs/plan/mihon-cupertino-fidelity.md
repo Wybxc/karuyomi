@@ -20,6 +20,8 @@
 
 ## 推进与待办
 
+- [x] 按 Mihon 09.01 浅深原图复核扩展详情的身份、元数据和操作顺序。Karuyomi 的正文采用可换行的 Cupertino 摘要和源列表，大字号下可滚动读完长名称。首次自动读取成功后直接呈现列表，手动检查保留回执。正式 Web 待验。[扩展详情的身份与字号](../verification/mihon-cupertino-fidelity.md#扩展详情的身份与字号)
+
 - [x] 固定 Mihon 补齐 Komga 扩展排队 08.07 的双主题主图，并实测受控等待中的取消转换。Karuyomi 准备反馈在短屏两倍字号下显示完整名称和版本，滚动时取消保持可达。292 项相关 Flutter 回归通过，正式 Web 待验。[扩展排队与短屏取消](../verification/mihon-cupertino-fidelity.md#扩展排队与短屏取消)
 
 - [x] 以同一测试书架配齐 Mihon 迁移源加载 20.01，浅深两色均实拍迁移选中和加载环。Karuyomi 的页面和 Sheet 底页修正通过 963 项 Flutter 回归，正式 Web 与原生现场转场待验。[迁移加载](../verification/mihon-cupertino-fidelity.md#mihon-迁移源加载的双主题实拍) · [底页转场](../verification/mihon-cupertino-fidelity.md#cupertino-转场的底页位置)

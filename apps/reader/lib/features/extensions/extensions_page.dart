@@ -50,7 +50,11 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
       isCurrent: () => mounted && ModalRoute.of(context)?.isActive == true,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_controller.refresh(catalogToo: true));
+      if (mounted) {
+        unawaited(
+          _controller.refresh(catalogToo: true, reportCatalogCheck: false),
+        );
+      }
     });
   }
 
@@ -868,9 +872,10 @@ class const ExtensionDetailsPage({
       installed: installed,
       candidate: candidate,
     );
+    const navigationBar = CupertinoNavigationBar(middle: Text('扩展详情'));
     if (installed == null && candidate == null) {
       return CupertinoPageScaffold(
-        navigationBar: CupertinoNavigationBar(middle: const Text('扩展')),
+        navigationBar: navigationBar,
         child: SafeArea(
           child: ListView(
             padding: const EdgeInsets.all(16),
@@ -886,8 +891,9 @@ class const ExtensionDetailsPage({
     final version = (installed == null ? candidate : exact)?.version;
     final canOpenSource =
         installed != null && item.blockedReason == null && !controller.busy;
+    final textTheme = CupertinoTheme.of(context).textTheme;
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(middle: Text(item.name)),
+      navigationBar: navigationBar,
       child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -904,15 +910,37 @@ class const ExtensionDetailsPage({
                     ? null
                     : const Text('卸载保留书架、阅读进度、收藏源及漫画源数据。'),
                 children: [
-                  CupertinoListTile(
-                    title: const Text('扩展状态'),
-                    subtitle: Text(
-                      [
-                        ?version,
-                        item.languageSummary,
-                        item.status(controller.cache),
-                      ].join(' · '),
-                      maxLines: 3,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: CupertinoListTile(
+                      leading: Icon(
+                        CupertinoIcons.cube_box,
+                        color: AppColors.accent.resolveFrom(context),
+                      ),
+                      title: DefaultTextStyle(
+                        style: textTheme.navTitleTextStyle,
+                        child: Semantics(header: true, child: Text(item.name)),
+                      ),
+                      subtitle: DefaultTextStyle(
+                        style: textTheme.textStyle.copyWith(
+                          fontSize: 12,
+                          color: AppColors.secondaryLabel.resolveFrom(context),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(packageName),
+                            Text(
+                              [
+                                ?version,
+                                item.languageSummary,
+                                item.status(controller.cache),
+                              ].join(' · '),
+                            ),
+                            Text(item.repositoryName),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                   if (installed != null &&
@@ -1014,7 +1042,16 @@ class const ExtensionDetailsPage({
             ),
             CupertinoListSection.insetGrouped(
               hasLeading: false,
-              header: Semantics(header: true, child: const Text('包含的漫画源')),
+              header: Semantics(
+                header: true,
+                child: Text(
+                  '包含的漫画源',
+                  style: textTheme.textStyle.copyWith(
+                    fontSize: 13,
+                    color: AppColors.secondaryLabel.resolveFrom(context),
+                  ),
+                ),
+              ),
               children: [
                 if (installed != null && exact == null)
                   const CupertinoListTile(
@@ -1051,7 +1088,10 @@ class const ExtensionDetailsPage({
                                 }
                               },
                         child: CupertinoListTile(
-                          title: Text(source.name, maxLines: 2),
+                          title: DefaultTextStyle(
+                            style: textTheme.textStyle,
+                            child: Text(source.name),
+                          ),
                           subtitle: Text(
                             sourceLanguage(source.lang),
                             maxLines: 2,
