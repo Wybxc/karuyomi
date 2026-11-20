@@ -257,7 +257,6 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
       ),
       ('可安装', visible.where((item) => item.installed == null).toList()),
     ];
-    final preparationFailure = _controller.preparationFailure;
     final list = CustomScrollView(
       key: const PageStorageKey('extensions-scroll'),
       slivers: [
@@ -413,33 +412,9 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
           ),
       ],
     );
-    final preparationStatus = switch (_controller.preparationBuild) {
-      final build? => _ExtensionPreparationStatus(
-        controller: _controller,
-        target: build,
-      ),
-      null when preparationFailure != null =>
-        _ExtensionPreparationFailureStatus(
-          controller: _controller,
-          failure: preparationFailure,
-        ),
-      null => null,
-    };
-    final content = LayoutBuilder(
-      builder: (context, constraints) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (preparationStatus != null)
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: constraints.maxHeight / 2),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: preparationStatus,
-              ),
-            ),
-          Expanded(child: list),
-        ],
-      ),
+    final content = _ExtensionPreparationLayout(
+      controller: _controller,
+      child: list,
     );
     return widget.embedded
         ? content
@@ -704,6 +679,43 @@ class const ExtensionOperationStatus({
             child: const Text('重新读取账户和缓存'),
           ),
       ],
+    );
+  }
+}
+
+class const _ExtensionPreparationLayout({
+  required final ExtensionsController controller,
+  required final Widget child,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final failure = controller.preparationFailure;
+    final status = switch (controller.preparationBuild) {
+      final build? => _ExtensionPreparationStatus(
+        controller: controller,
+        target: build,
+      ),
+      null when failure != null => _ExtensionPreparationFailureStatus(
+        controller: controller,
+        failure: failure,
+      ),
+      null => null,
+    };
+    return LayoutBuilder(
+      builder: (context, constraints) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (status != null)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: constraints.maxHeight / 2),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: status,
+              ),
+            ),
+          Expanded(child: child),
+        ],
+      ),
     );
   }
 }
@@ -1028,280 +1040,273 @@ class const ExtensionDetailsPage({
     final canOpenSource =
         installed != null && item.blockedReason == null && !controller.busy;
     final textTheme = CupertinoTheme.of(context).textTheme;
-    return CupertinoPageScaffold(
-      navigationBar: navigationBar,
-      child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ExtensionOperationStatus(controller: controller),
-            ),
-            Semantics(
-              container: true,
-              explicitChildNodes: true,
-              child: CupertinoFormSection.insetGrouped(
-                footer: installed == null
-                    ? null
-                    : const Text('卸载保留书架、阅读进度、收藏源及漫画源数据。'),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: CupertinoListTile(
-                      leading: Icon(
-                        CupertinoIcons.cube_box,
-                        color: AppColors.accent.resolveFrom(context),
-                      ),
-                      title: DefaultTextStyle(
-                        style: textTheme.navTitleTextStyle,
-                        child: Semantics(header: true, child: Text(item.name)),
-                      ),
-                      subtitle: DefaultTextStyle(
-                        style: textTheme.textStyle.copyWith(
-                          fontSize: 12,
-                          color: AppColors.secondaryLabel.resolveFrom(context),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(packageName),
-                            Text(
-                              [
-                                ?version,
-                                item.languageSummary,
-                                item.status(controller.cache),
-                              ].join(' · '),
-                            ),
-                            Text(item.repositoryName),
-                          ],
-                        ),
-                      ),
-                    ),
+    final list = ListView(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: ExtensionOperationStatus(
+            controller: controller,
+            showPreparation: false,
+          ),
+        ),
+        Semantics(
+          container: true,
+          explicitChildNodes: true,
+          child: CupertinoFormSection.insetGrouped(
+            footer: installed == null
+                ? null
+                : const Text('卸载保留书架、阅读进度、收藏源及漫画源数据。'),
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: CupertinoListTile(
+                  leading: Icon(
+                    CupertinoIcons.cube_box,
+                    color: AppColors.accent.resolveFrom(context),
                   ),
-                  if (installed != null &&
-                      candidate != null &&
-                      (candidate!.catalogUrl != installed.catalogUrl ||
-                          candidate!.repoId != installed.repoId)) ...[
-                    Text(
-                      '另一个来源：${extensionName(candidate!.packageName, candidate!.sources)} · ${Uri.parse(candidate!.catalogUrl).host}',
-                    ),
-                    CupertinoButton.filled(
-                      onPressed: controller.canEdit
-                          ? () => unawaited(
-                              installExtension(context, controller, candidate!),
-                            )
-                          : null,
-                      child: const Text('替换来源'),
-                    ),
-                  ],
-                  if (installed != null) ...[
-                    MergeSemantics(
-                      child: CupertinoFormRow(
-                        prefix: Expanded(flex: 3, child: const Text('启用')),
-                        child: CupertinoSwitch(
-                          key: ValueKey(('extension-enabled', packageName)),
-                          value: installed.enabled,
-                          onChanged: controller.canEdit
-                              ? (value) => unawaited(
-                                  controller.setEnabled(installed, value),
-                                )
-                              : null,
-                        ),
-                      ),
-                    ),
-                    if (exact != null &&
-                        controller.cache != null &&
-                        !controller.cache!.artifacts.any(
-                          (artifact) =>
-                              artifact.sha256 == installed.bundleSha256,
-                        ))
-                      CupertinoButton(
-                        key: ValueKey(('extension-prepare', packageName)),
-                        onPressed: !controller.available || controller.busy
-                            ? null
-                            : () => unawaited(
-                                controller.prepareInstalled(installed),
-                              ),
-                        child: const Text('下载本机副本'),
-                      ),
-                    if (item.needsUpdate)
-                      CupertinoButton.filled(
-                        key: ValueKey(('extension-update', packageName)),
-                        onPressed: controller.canEdit
-                            ? () => unawaited(
-                                installExtension(
-                                  context,
-                                  controller,
-                                  item.latest!,
-                                ),
-                              )
-                            : null,
-                        child: const Text('更新'),
-                      ),
-                    if (!item.registered)
-                      CupertinoButton(
-                        onPressed: () => Navigator.of(context).push<void>(
-                          AppPageRoute(
-                            builder: (_) => ExtensionRepositoriesPage(
-                              controller: controller,
-                            ),
-                          ),
-                        ),
-                        child: const Text('管理仓库'),
-                      ),
-                    CupertinoButton(
-                      key: ValueKey(('extension-uninstall', packageName)),
-                      onPressed: controller.canEdit
-                          ? () => unawaited(_confirmUninstall(context, item))
-                          : null,
-                      child: Text(
-                        '卸载扩展',
-                        style: TextStyle(
-                          color: controller.canEdit
-                              ? AppColors.error.resolveFrom(context)
-                              : AppColors.secondaryLabel.resolveFrom(context),
-                        ),
-                      ),
-                    ),
-                  ] else if (candidate != null)
-                    CupertinoButton.filled(
-                      onPressed: controller.canEdit
-                          ? () => unawaited(
-                              installExtension(context, controller, candidate!),
-                            )
-                          : null,
-                      child: const Text('安装'),
-                    ),
-                ],
-              ),
-            ),
-            CupertinoListSection.insetGrouped(
-              hasLeading: false,
-              header: Semantics(
-                header: true,
-                child: Text(
-                  '包含的漫画源',
-                  style: textTheme.textStyle.copyWith(
-                    fontSize: 13,
-                    color: AppColors.secondaryLabel.resolveFrom(context),
+                  title: DefaultTextStyle(
+                    style: textTheme.navTitleTextStyle,
+                    child: Semantics(header: true, child: Text(item.name)),
                   ),
-                ),
-              ),
-              children: [
-                if (installed != null && exact == null)
-                  const CupertinoListTile(
-                    title: Text('所选构建的源资料不可用，请先处理扩展。', maxLines: 3),
-                  )
-                else
-                  for (final source
-                      in (exact ?? candidate)?.sources ??
-                          <wire.CatalogSource>[])
-                    Semantics(
-                      container: true,
-                      enabled: canOpenSource,
-                      child: CupertinoButton(
-                        key: ValueKey(('extension-source', source.id)),
-                        padding: EdgeInsets.zero,
-                        onPressed: !canOpenSource
-                            ? null
-                            : () {
-                                final open = onOpenSource;
-                                if (open != null) {
-                                  unawaited(open(item, source));
-                                } else {
-                                  unawaited(
-                                    Navigator.of(context).push<void>(
-                                      AppPageRoute(
-                                        builder: (_) => SourceBrowsePage(
-                                          catalog: controller.catalog,
-                                          build: exact!,
-                                          source: source,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                        child: CupertinoListTile(
-                          title: DefaultTextStyle(
-                            style: textTheme.textStyle,
-                            child: Text(source.name),
-                          ),
-                          subtitle: Text(
-                            sourceLanguage(source.lang),
-                            maxLines: 2,
-                          ),
-                          trailing: canOpenSource
-                              ? const CupertinoListTileChevron()
-                              : null,
-                        ),
-                      ),
+                  subtitle: DefaultTextStyle(
+                    style: textTheme.textStyle.copyWith(
+                      fontSize: 12,
+                      color: AppColors.secondaryLabel.resolveFrom(context),
                     ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              hasLeading: false,
-              children: [
-                Expansible(
-                  key: const PageStorageKey('extension-details-diagnostics'),
-                  controller: diagnostics,
-                  animationStyle:
-                      MediaQuery.reduceMotionOf(context) ||
-                          MediaQuery.disableAnimationsOf(context)
-                      ? AnimationStyle.noAnimation
-                      : null,
-                  headerBuilder: (context, animation) => Semantics(
-                    container: true,
-                    expanded: diagnostics.isExpanded,
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () => diagnostics.isExpanded
-                          ? diagnostics.collapse()
-                          : diagnostics.expand(),
-                      child: CupertinoListTile(
-                        title: const Text('诊断信息'),
-                        trailing: RotationTransition(
-                          turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
-                          child: Icon(
-                            CupertinoIcons.chevron_right,
-                            size: 16,
-                            color: AppColors.accent.resolveFrom(context),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  bodyBuilder: (context, animation) => Padding(
-                    padding: const EdgeInsets.all(16),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SelectableRegion(
-                          selectionControls: cupertinoTextSelectionControls,
-                          contextMenuBuilder: (context, state) =>
-                              CupertinoAdaptiveTextSelectionToolbar.buttonItems(
-                                buttonItems: state.contextMenuButtonItems,
-                                anchors: state.contextMenuAnchors,
-                              ),
-                          child: Text(
-                            '包名：$packageName\n仓库：${item.reference.catalogUrl}\n身份：${item.reference.repoId}\n账户构建：${installed?.buildId ?? '未安装'}\n目录版本：${item.latest?.version ?? '不可用'}\n目录构建：${item.latest?.id ?? '不可用'}\n摘要：${installed?.bundleSha256 ?? '未下载'}',
-                          ),
+                        Text(packageName),
+                        Text(
+                          [
+                            ?version,
+                            item.languageSummary,
+                            item.status(controller.cache),
+                          ].join(' · '),
                         ),
-                        if (controller.catalog.activeBuild?.packageName ==
-                            packageName)
-                          Text(
-                            '当前运行：${controller.catalog.activeBuild!.id}',
-                            key: const ValueKey('extensions-running'),
-                          ),
+                        Text(item.repositoryName),
                       ],
                     ),
                   ),
                 ),
+              ),
+              if (installed != null &&
+                  candidate != null &&
+                  (candidate!.catalogUrl != installed.catalogUrl ||
+                      candidate!.repoId != installed.repoId)) ...[
+                Text(
+                  '另一个来源：${extensionName(candidate!.packageName, candidate!.sources)} · ${Uri.parse(candidate!.catalogUrl).host}',
+                ),
+                CupertinoButton.filled(
+                  onPressed: controller.canEdit
+                      ? () => unawaited(
+                          installExtension(context, controller, candidate!),
+                        )
+                      : null,
+                  child: const Text('替换来源'),
+                ),
               ],
+              if (installed != null) ...[
+                MergeSemantics(
+                  child: CupertinoFormRow(
+                    prefix: Expanded(flex: 3, child: const Text('启用')),
+                    child: CupertinoSwitch(
+                      key: ValueKey(('extension-enabled', packageName)),
+                      value: installed.enabled,
+                      onChanged: controller.canEdit
+                          ? (value) => unawaited(
+                              controller.setEnabled(installed, value),
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+                if (exact != null &&
+                    controller.cache != null &&
+                    !controller.cache!.artifacts.any(
+                      (artifact) => artifact.sha256 == installed.bundleSha256,
+                    ))
+                  CupertinoButton(
+                    key: ValueKey(('extension-prepare', packageName)),
+                    onPressed: !controller.available || controller.busy
+                        ? null
+                        : () =>
+                              unawaited(controller.prepareInstalled(installed)),
+                    child: const Text('下载本机副本'),
+                  ),
+                if (item.needsUpdate)
+                  CupertinoButton.filled(
+                    key: ValueKey(('extension-update', packageName)),
+                    onPressed: controller.canEdit
+                        ? () => unawaited(
+                            installExtension(context, controller, item.latest!),
+                          )
+                        : null,
+                    child: const Text('更新'),
+                  ),
+                if (!item.registered)
+                  CupertinoButton(
+                    onPressed: () => Navigator.of(context).push<void>(
+                      AppPageRoute(
+                        builder: (_) =>
+                            ExtensionRepositoriesPage(controller: controller),
+                      ),
+                    ),
+                    child: const Text('管理仓库'),
+                  ),
+                CupertinoButton(
+                  key: ValueKey(('extension-uninstall', packageName)),
+                  onPressed: controller.canEdit
+                      ? () => unawaited(_confirmUninstall(context, item))
+                      : null,
+                  child: Text(
+                    '卸载扩展',
+                    style: TextStyle(
+                      color: controller.canEdit
+                          ? AppColors.error.resolveFrom(context)
+                          : AppColors.secondaryLabel.resolveFrom(context),
+                    ),
+                  ),
+                ),
+              ] else if (candidate != null)
+                CupertinoButton.filled(
+                  onPressed: controller.canEdit
+                      ? () => unawaited(
+                          installExtension(context, controller, candidate!),
+                        )
+                      : null,
+                  child: const Text('安装'),
+                ),
+            ],
+          ),
+        ),
+        CupertinoListSection.insetGrouped(
+          hasLeading: false,
+          header: Semantics(
+            header: true,
+            child: Text(
+              '包含的漫画源',
+              style: textTheme.textStyle.copyWith(
+                fontSize: 13,
+                color: AppColors.secondaryLabel.resolveFrom(context),
+              ),
+            ),
+          ),
+          children: [
+            if (installed != null && exact == null)
+              const CupertinoListTile(
+                title: Text('所选构建的源资料不可用，请先处理扩展。', maxLines: 3),
+              )
+            else
+              for (final source
+                  in (exact ?? candidate)?.sources ?? <wire.CatalogSource>[])
+                Semantics(
+                  container: true,
+                  enabled: canOpenSource,
+                  child: CupertinoButton(
+                    key: ValueKey(('extension-source', source.id)),
+                    padding: EdgeInsets.zero,
+                    onPressed: !canOpenSource
+                        ? null
+                        : () {
+                            final open = onOpenSource;
+                            if (open != null) {
+                              unawaited(open(item, source));
+                            } else {
+                              unawaited(
+                                Navigator.of(context).push<void>(
+                                  AppPageRoute(
+                                    builder: (_) => SourceBrowsePage(
+                                      catalog: controller.catalog,
+                                      build: exact!,
+                                      source: source,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                    child: CupertinoListTile(
+                      title: DefaultTextStyle(
+                        style: textTheme.textStyle,
+                        child: Text(source.name),
+                      ),
+                      subtitle: Text(sourceLanguage(source.lang), maxLines: 2),
+                      trailing: canOpenSource
+                          ? const CupertinoListTileChevron()
+                          : null,
+                    ),
+                  ),
+                ),
+          ],
+        ),
+        CupertinoListSection.insetGrouped(
+          hasLeading: false,
+          children: [
+            Expansible(
+              key: const PageStorageKey('extension-details-diagnostics'),
+              controller: diagnostics,
+              animationStyle:
+                  MediaQuery.reduceMotionOf(context) ||
+                      MediaQuery.disableAnimationsOf(context)
+                  ? AnimationStyle.noAnimation
+                  : null,
+              headerBuilder: (context, animation) => Semantics(
+                container: true,
+                expanded: diagnostics.isExpanded,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => diagnostics.isExpanded
+                      ? diagnostics.collapse()
+                      : diagnostics.expand(),
+                  child: CupertinoListTile(
+                    title: const Text('诊断信息'),
+                    trailing: RotationTransition(
+                      turns: animation.drive(Tween(begin: 0.0, end: 0.25)),
+                      child: Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 16,
+                        color: AppColors.accent.resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              bodyBuilder: (context, animation) => Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SelectableRegion(
+                      selectionControls: cupertinoTextSelectionControls,
+                      contextMenuBuilder: (context, state) =>
+                          CupertinoAdaptiveTextSelectionToolbar.buttonItems(
+                            buttonItems: state.contextMenuButtonItems,
+                            anchors: state.contextMenuAnchors,
+                          ),
+                      child: Text(
+                        '包名：$packageName\n仓库：${item.reference.catalogUrl}\n身份：${item.reference.repoId}\n账户构建：${installed?.buildId ?? '未安装'}\n目录版本：${item.latest?.version ?? '不可用'}\n目录构建：${item.latest?.id ?? '不可用'}\n摘要：${installed?.bundleSha256 ?? '未下载'}',
+                      ),
+                    ),
+                    if (controller.catalog.activeBuild?.packageName ==
+                        packageName)
+                      Text(
+                        '当前运行：${controller.catalog.activeBuild!.id}',
+                        key: const ValueKey('extensions-running'),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
+      ],
+    );
+    return CupertinoPageScaffold(
+      navigationBar: navigationBar,
+      child: SafeArea(
+        child: _ExtensionPreparationLayout(controller: controller, child: list),
       ),
     );
   }

@@ -839,6 +839,95 @@ void main() {
     );
 
     testWidgets(
+      'extension details keep preparation actions visible while scrolling sources in $appearance',
+      (tester) async {
+        final index = wire.decodeProtoJson(
+          wire.ExtensionIndex(),
+          platform.inventory,
+        );
+        final build = index.builds.single;
+        for (var i = 1; i <= 30; i++) {
+          build.sourceIds.add('$i');
+          build.sources.add(
+            wire.CatalogSource(id: '$i', name: '测试漫画源 $i', lang: 'zh'),
+          );
+        }
+        platform.inventory = wire.encodeProtoJson(index);
+        await tester.runAsync(catalog.refreshCatalog);
+        final release = Completer<void>();
+        platform.beforePrepare = (_) => release.future;
+        platform.preparationFailure = wire.RuntimeError(
+          code: wire
+              .RuntimeErrorCode
+              .RUNTIME_ERROR_CODE_EXTENSION_ASSET_UNAVAILABLE,
+          message: 'Manifest unavailable',
+        );
+        try {
+          await show(
+            tester,
+            appearance: appearance,
+            size: const Size(844, 390),
+          );
+          await tap(
+            tester,
+            find.byKey(
+              ValueKey((
+                'extension-details',
+                catalog.catalogUrl,
+                build.packageName,
+              )),
+            ),
+          );
+          final install = find.widgetWithText(CupertinoButton, '安装');
+          await tester.ensureVisible(install);
+          await tester.tap(install);
+          await tester.pump();
+          final cancel = find.byKey(
+            const ValueKey('extensions-cancel-prepare'),
+          );
+          expect(cancel.hitTestable(), findsOneWidget);
+
+          final sources = find.descendant(
+            of: find.byType(ExtensionDetailsPage),
+            matching: find.byType(ListView),
+          );
+          final scroll = tester.state<ScrollableState>(
+            find
+                .descendant(of: sources, matching: find.byType(Scrollable))
+                .first,
+          );
+          await tester.drag(sources, const Offset(0, -580));
+          await tester.pump(const Duration(milliseconds: 600));
+          expect(scroll.position.pixels, greaterThan(300));
+          expect(install.hitTestable(), findsNothing);
+          expect(cancel.hitTestable(), findsOneWidget);
+
+          release.complete();
+          await tester.pumpAndSettle();
+          final retry = find.byKey(const ValueKey('extensions-retry-prepare'));
+          expect(retry.hitTestable(), findsOneWidget);
+          expect(scroll.position.pixels, greaterThan(300));
+          expect(find.text('无法从仓库读取扩展材料。').hitTestable(), findsOneWidget);
+          expect(platform.businessServer.appliedMutations, 0);
+
+          platform.preparationFailure = null;
+          await tester.tap(retry);
+          await tester.pumpAndSettle();
+          expect(retry, findsNothing);
+          expect(
+            platform.preparations.map((request) => request.build.buildId),
+            [build.buildId, build.buildId],
+          );
+          expect(platform.businessServer.appliedMutations, 1);
+        } finally {
+          if (!release.isCompleted) release.complete();
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        }
+      },
+    );
+
+    testWidgets(
       'storage retains the exact failed copy and retries it without an account write in $appearance',
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(360, 800));
