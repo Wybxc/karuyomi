@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-20，Mihon 关闭设备动画后，在同一次首次进入流程补齐图源、插件和作品详情的浅深加载画面（07.01、08.01、16.01），双主题主图为 165/170（97.1%）。Karuyomi 跨版本双主题主图为 168/171（98.2%）。准备失败、卸载确认和原生未连接仍缺双主题主图。[首次加载与页面转场](mihon-cupertino-fidelity.md#首次加载参考与-cupertino-页面转场)
+2026-11-20，Mihon 已补齐迁移源加载 20.01 的浅深画面，双主题主图为 166/170（97.6%）。Karuyomi 跨版本双主题主图为 168/171（98.2%），准备失败、卸载确认和原生未连接仍缺双主题主图。[迁移源加载实拍](mihon-cupertino-fidelity.md#mihon-迁移源加载的双主题实拍) · [图源、插件和作品详情加载](mihon-cupertino-fidelity.md#首次加载参考与-cupertino-页面转场)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -558,7 +558,7 @@ stateDiagram-v2
     Q7 --> M2: 返回英文原作
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class M0,M1,M2,M3,M4,M5,M6,H0,H1,H2,H3,H4,H5,H6,H7,H8,V0,V1,V2,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10,Q11,Q12,Q13,Q14 paired
+    class M0,M1,M2,M3,M4,M5,M6,H0,H1,H2,H3,H4,H5,H6,H7,H8,V0,V1,V2,Q0,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10,Q11,Q12,Q13,Q14 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                                          | 浅色                                                                                                                           | 深色                                                                                                                       |
@@ -582,7 +582,7 @@ stateDiagram-v2
 | 19.01   | 实际大封面、关闭和操作；旧 `cover-view-default-dark` 不符合                                    | `s1901-cover-light`                                                                                                            | `s1901-cover-dark`                                                                                                         |
 | 19.02   | 完整显示当前封面，底部编辑入口展开编辑与删除                                                   | `s1902-custom-cover-actions-light`                                                                                             | `s1902-custom-cover-actions-dark`                                                                                          |
 | 19.03   | 取消系统选图后保留原封面，删除后显示默认封面及更新反馈                                         | `s1903-cover-replace-cancel-light`、`s1903-cover-restored-light`                                                               | `s1903-cover-replace-cancel-dark`、`s1903-cover-restored-dark`                                                             |
-| 20.01   | 迁移标题和加载指示                                                                             | 待                                                                                                                             | 待                                                                                                                         |
+| 20.01   | 迁移标签选中、右上帮助与居中的加载环，同一测试书架冷读取                                       | `s2001-migration-source-loading-light`                                                                                         | `s2001-migration-source-loading-dark`                                                                                      |
 | 20.02   | 浏览的迁移页签显示书架为空，切回图源后漫画源可见                                               | `s2002-migration-empty-light`                                                                                                  | `s2002-migration-empty-dark`                                                                                               |
 | 20.03   | 源名、语言、书架数量、排序入口及源内未选择作品列表；排序变更待验，空书架见 20.02               | `s2003-migration-{sources,titles}-light`                                                                                       | `s2003-migration-{sources,titles}-dark`                                                                                    |
 | 20.04   | 目标源已选分组、名称/语言、排序把手、全选/全不选与继续；更多菜单入口                           | `s2004-migration-config-light`、`migration-config-restored-light`                                                              | `s2004-migration-config-dark`、`migration-config-restored-dark`                                                            |

@@ -1611,6 +1611,27 @@ Mihon 的单文件删除函数记录异常并返回失败，清理入口按成�
 
 Karuyomi 从扩展菜单打开「本机存储」，360×800 和两倍字号下的两色组件回归均在旧版复现长名称截断和 256 字节显示为 `0.0 MiB`。Cupertino 列表行的标题随字号换行，总量、明细与诊断容量按实际大小选用单位。复验确认完整名称、`256 B`、可点击的清理按钮和浏览存储时的零账户写入。固定 Flutter 3.50.0 的 157 项定向回归、客户端严格 Dart 分析与本机 Web JavaScript／Wasm 编译通过。内置浏览器控制端仍无活动页面，最新正式 Web 的主图和转场待验。[存储界面](../../apps/reader/lib/features/extensions/extensions_page.dart) · [扩展回归](../../apps/reader/test/extensions/extensions_controller_test.dart)
 
+`a8ca2ba` 的分支、PR 与分支 Wasm 构建均通过。[分支检查](https://github.com/Wybxc/karuyomi/actions/runs/44694184573) · [PR 检查](https://github.com/Wybxc/karuyomi/actions/runs/44694192620)
+
+## Cupertino 转场的底页位置
+
+2026-11-20，用固定 Flutter 3.50.0 的应用首页在 800×600 视口复现底页位移。开启减弱动态后，进入设置详情的第 60ms，旧版首页从 `[0,0,800,600)` 移到 `[-83,0,717,600)`。已打开的 Sheet 开启减弱动态后，首页仍为 `[33.4,42,766.6,591.9)`。从减弱动态切回常规设置时，原本静止的首页仍保持全宽。
+
+底页现在在构建转场时读取系统偏好。首页在减弱动态的页面进入与返回中保持原位。Sheet 打开后，两种方向切换偏好均更新底页，Sheet 的位置保持稳定，减弱动态退出过程中底页保持原位。常规页面的底页过渡继续使用 Cupertino 组件，普通手势的底页位移与前景侧滑成比例。浅深色 Sheet 顶部空隙的背景色也通过复验。963 项 Flutter 回归与严格 Dart 分析通过。正式 Web 和 Karuyomi 原生的现场转场待验。[共享路由](../../apps/reader/lib/widgets/app_routes.dart) · [底页回归](../../apps/reader/test/theme/app_backdrop_test.dart)
+
+## Mihon 迁移源加载的双主题实拍
+
+2026-11-20，固定 Mihon 0.21.3（`feadad5e`，versionCode 39）在 Android API 36、720×1600、320dpi 的隔离副本中使用显式 DEFAULT 浅深色，三项系统动画倍率均设为 0。在原有小书架连续点击「浏览」及「迁移」时，两色先拍到迁移帮助图标与短加载弧，当时选中线仍在「图源」。清除隔离系统的内核页缓存后，浅色还取得选中线和加载环同帧的画面。
+
+为配齐同数据的两色主图，在停止应用后的隔离 SQLite 副本，用原有已收藏样本的源 ID、状态等字段生成 48,000 条唯一 URL 的测试收藏，全部放入同一个已有非默认分类。两个原收藏保留，`quick_check` 返回 `ok`。关闭隔离设备的 Wi-Fi 和移动数据。每次冷启动到书架后执行 `sync` 并清除隔离设备的内核页缓存，再用系统录屏和真实触控，从 `[504,1460]` 的浏览入口切到 `[600,312]` 的迁移标签。选中的浅色和深色录屏在两次输入命令间分别加入 25ms、65ms 的等待。
+
+| 主题 | 录屏帧与相对时间 | 加载指示逻辑边界    | 空白内容背景与环色采样 |
+| ---- | ---------------- | ------------------- | ---------------------- |
+| 浅色 | 第 4 帧，0.572s  | `[160,420,200,460)` | `#FDFAFE` / `#0056C9`  |
+| 深色 | 第 6 帧，0.702s  | `[160,420,200,460)` | `#191B1D` / `#B0C3FF`  |
+
+两张主图均显示迁移标签选中、右上帮助和中间加载环。像素由原录屏解码量测，环色取有色区域内出现频率最高的 RGB。随后两色均出现 MangaDex 与 xkcd 列表，xkcd 的计数均为 48,001。20.01 登记为浅深主图，Mihon 覆盖达到 **166/170（97.6%）**。Karuyomi 跨版本主图为 **168/171（98.2%）**。隔离副本和专用 ADB 已关闭。当前内置浏览器控制端仍无活动页面，正式 Web 待验。[逐状态清单](mihon-state-coverage.md) · [迁移状态](../../vendor/mihon/app/src/main/java/eu/kanade/tachiyomi/ui/browse/migration/sources/MigrateSourceViewModel.kt) · [源计数查询](../../vendor/mihon/data/src/main/sqldelight/tachiyomi/data/manga.sq)
+
 ## Mihon 源浏览追加
 
 2026-11-20，固定 Mihon 0.21.3 在 720×1600、320dpi 的只读参考模拟器中，两种显式主题均从相同 MangaDex 热门列表滑到第一页末尾。暂扣实际 MangaDex API 的下一页 CONNECT 时，「Bakebeta!」和「Kurenai-san wa Yoru wo Kurenai」等原封面留在列表内，旋转进度出现在最后一行下方。进度的双主题辅助边界均为 `[160,712,200,752)` 逻辑像素。放行后继续滚动，两色均出现新的「Seifuku Kanojo」与「Honey Creep」。原图/XML 成对登记在 12.08。[逐状态清单](mihon-state-coverage.md)

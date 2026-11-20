@@ -29,18 +29,31 @@ class _AppPageRoute<T> extends AppPageRoute<T> {
 /// Keep the application's reduced-motion policy across all business routes.
 class AppPageRoute<T> extends CupertinoPageRoute<T> with _RouteMotion<T> {
   AppPageRoute({required super.builder, super.settings, super.title});
+
+  static final _backdrop = _motionAwareBackdrop((
+    context,
+    _,
+    secondary,
+    _,
+    child,
+  ) {
+    if (child == null) return null;
+    return CupertinoPageTransition(
+      primaryRouteAnimation: const AlwaysStoppedAnimation<double>(1),
+      secondaryRouteAnimation: secondary,
+      linearTransition: Navigator.of(context).userGestureInProgress,
+      child: child,
+    );
+  });
+
+  @override
+  DelegatedTransitionBuilder get delegatedTransition => _backdrop;
 }
 
 mixin _RouteMotion<T> on ModalRoute<T> {
   bool get _animationsDisabled {
     final context = navigator?.context;
     return context != null && MediaQuery.disableAnimationsOf(context);
-  }
-
-  bool get _reduced {
-    final context = navigator?.context;
-    return _animationsDisabled ||
-        (context != null && MediaQuery.reduceMotionOf(context));
   }
 
   @override
@@ -53,10 +66,6 @@ mixin _RouteMotion<T> on ModalRoute<T> {
     controller!.reverseDuration = reverseTransitionDuration;
     return super.didPop(result);
   }
-
-  @override
-  DelegatedTransitionBuilder? get delegatedTransition =>
-      _reduced ? null : super.delegatedTransition;
 
   @override
   Widget buildTransitions(
@@ -97,6 +106,33 @@ Future<T?> showAppSheet<T>({
 
 class _AppSheetRoute<T> extends CupertinoSheetRoute<T> with _RouteMotion<T> {
   _AppSheetRoute({required super.scrollableBuilder, required super.enableDrag});
+
+  static final _backdrop = _motionAwareBackdrop(
+    CupertinoSheetTransition.delegateTransition,
+  );
+
+  @override
+  DelegatedTransitionBuilder get delegatedTransition => _backdrop;
+}
+
+DelegatedTransitionBuilder _motionAwareBackdrop(
+  DelegatedTransitionBuilder transition,
+) {
+  // Navigator retains the builder on the route underneath. Read the preference
+  // during build so both routes respond when the system setting changes.
+  return (context, animation, secondaryAnimation, allowSnapshotting, child) {
+    if (MediaQuery.reduceMotionOf(context) ||
+        MediaQuery.disableAnimationsOf(context)) {
+      return child;
+    }
+    return transition(
+      context,
+      animation,
+      secondaryAnimation,
+      allowSnapshotting,
+      child,
+    );
+  };
 }
 
 Future<T?> showAppDialog<T>({
