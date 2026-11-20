@@ -1,6 +1,7 @@
 import 'widgets/app_routes.dart';
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -609,6 +610,65 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
+  Widget _navigationBar() => LayoutBuilder(
+    builder: (context, constraints) {
+      final bar = CupertinoTabBar(
+        key: const ValueKey('app-navigation'),
+        backgroundColor: AppColors.toolbar.resolveFrom(context),
+        inactiveColor: AppColors.secondaryLabel.resolveFrom(context),
+        currentIndex: _index,
+        onTap: _select,
+        items: [
+          for (var i = 0; i < _labels.length; i++)
+            BottomNavigationBarItem(
+              icon: Icon(_icons[i], key: ValueKey(('app-destination', i))),
+              label: _labels[i],
+            ),
+        ],
+      );
+      final labelStyle = CupertinoTheme.of(context).textTheme.tabLabelTextStyle;
+      final textScaler = MediaQuery.textScalerOf(context);
+      final effectiveStyle = labelStyle.copyWith(
+        fontWeight: MediaQuery.boldTextOf(context) ? FontWeight.bold : null,
+        height: MediaQuery.maybeLineHeightScaleFactorOverrideOf(context),
+        letterSpacing: MediaQuery.maybeLetterSpacingOverrideOf(context),
+        wordSpacing: MediaQuery.maybeWordSpacingOverrideOf(context),
+      );
+      final fontSize = labelStyle.fontSize!;
+      if (effectiveStyle == labelStyle &&
+          textScaler.scale(fontSize) <= fontSize) {
+        return bar;
+      }
+      final painter = TextPainter(
+        textDirection: Directionality.of(context),
+        locale: Localizations.maybeLocaleOf(context),
+        textHeightBehavior: DefaultTextHeightBehavior.maybeOf(context),
+      );
+      final labelWidth = constraints.maxWidth / _labels.length;
+
+      double largestLabelHeight(TextStyle style, TextScaler scaler) {
+        painter.textScaler = scaler;
+        var height = 0.0;
+        for (final label in _labels) {
+          painter.text = TextSpan(text: label, style: style);
+          painter.layout(maxWidth: labelWidth);
+          height = math.max(height, painter.height);
+        }
+        return height;
+      }
+
+      // Keep the same icon space as the default Cupertino bar when labels grow.
+      try {
+        final extra =
+            largestLabelHeight(effectiveStyle, textScaler) -
+            largestLabelHeight(labelStyle, TextScaler.noScaling);
+        return bar.copyWith(height: bar.height + math.max(0.0, extra));
+      } finally {
+        painter.dispose();
+      }
+    },
+  );
+
   @override
   Widget build(BuildContext context) {
     _originField = useTextEditingController(text: _defaultOrigin);
@@ -658,23 +718,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 ),
               ),
             Expanded(key: const ValueKey('app-content'), child: _page()),
-            CupertinoTabBar(
-              key: const ValueKey('app-navigation'),
-              backgroundColor: AppColors.toolbar.resolveFrom(context),
-              inactiveColor: AppColors.secondaryLabel.resolveFrom(context),
-              currentIndex: _index,
-              onTap: _select,
-              items: [
-                for (var i = 0; i < _labels.length; i++)
-                  BottomNavigationBarItem(
-                    icon: Icon(
-                      _icons[i],
-                      key: ValueKey(('app-destination', i)),
-                    ),
-                    label: _labels[i],
-                  ),
-              ],
-            ),
+            _navigationBar(),
           ],
         ),
       ),

@@ -273,6 +273,68 @@ void main() {
     }
 
     testWidgets(
+      'Cupertino tabs fit their icons and scaled labels in $brightness',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        tester.view.devicePixelRatio = 1;
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 20);
+        tester.view.viewPadding = tester.view.padding;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetPadding);
+        addTearDown(tester.view.resetViewPadding);
+        await tester.pumpApp(const KaruyomiApp());
+        await tester.pumpAndSettle();
+
+        final navigation = find.byKey(const ValueKey('app-navigation'));
+        const labels = ['书架', '浏览', '设置'];
+        for (final viewport in [
+          const Size(360, 480),
+          const Size(800, 360),
+          const Size(768, 1024),
+        ]) {
+          tester.view.physicalSize = viewport;
+          tester.platformDispatcher.textScaleFactorTestValue = 1;
+          await tester.pumpAndSettle();
+          final defaultHeight = tester.getSize(navigation).height;
+          final selection = tester
+              .widget<CupertinoTabBar>(navigation)
+              .currentIndex;
+          for (final scale in [2.0, 3.0]) {
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            await tester.pumpAndSettle();
+            final bar = tester.widget<CupertinoTabBar>(navigation);
+            final barBounds = tester.getRect(navigation);
+            expect(bar.currentIndex, selection);
+            expect(barBounds.height, greaterThan(defaultHeight));
+            for (var index = 0; index < labels.length; index++) {
+              final icon = find.byKey(ValueKey(('app-destination', index)));
+              final label = find.descendant(
+                of: navigation,
+                matching: find.text(labels[index]),
+              );
+              final iconBounds = tester.getRect(icon);
+              final labelBounds = tester.getRect(label);
+              expect(iconBounds.height, bar.iconSize);
+              expect(iconBounds.bottom, lessThanOrEqualTo(labelBounds.top));
+              expect(labelBounds.bottom, lessThanOrEqualTo(barBounds.bottom));
+              expect(label.hitTestable(), findsOneWidget);
+            }
+          }
+          final next = (selection + 1) % labels.length;
+          await tester.tap(
+            find.descendant(of: navigation, matching: find.text(labels[next])),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.widget<CupertinoTabBar>(navigation).currentIndex, next);
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
+
+    testWidgets(
       'Cupertino navigation keeps focus and drafts across $brightness changes',
       (tester) async {
         tester.platformDispatcher.platformBrightnessTestValue = brightness;
