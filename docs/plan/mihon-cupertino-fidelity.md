@@ -56,7 +56,7 @@
 
 - [x] 固定 Mihon 补齐 07.03 图源空态的浅深原图。两色进入插件页签并返回空态。Karuyomi 空态居中，短屏两倍字号仍可点按「前往扩展」，当前正式 Web 已复拍两色并验证往返。[图源空态与扩展入口](../verification/mihon-cupertino-fidelity.md#图源空态与扩展入口)
 
-- [x] 对照 Mihon 22.01、22.04 复拍 Karuyomi 单页等待、失败与原页重试。白画布调暗后，提示与动作采用可读的 Cupertino 色，分页、连续和放大的透明 PNG 通过像素采样。正式 Web 待验。[单页反馈与透明图片的调暗](../verification/mihon-cupertino-fidelity.md#单页反馈与透明图片的调暗)
+- [x] 对照 Mihon 22.01、22.04 复拍 Karuyomi 单页等待、失败与原页重试。白画布调暗后，提示与动作采用可读的 Cupertino 色，分页、连续和放大的透明 PNG 通过组件像素采样。`71bc54e` 正式 Web 两色已核对同一 xkcd 3321 的短屏重试、原图复位、续读和连续阅读图片查看器。其它 Source、透明原图、系统大字和原生继续验收。[单页反馈与透明图片的调暗](../verification/mihon-cupertino-fidelity.md#单页反馈与透明图片的调暗) · [正式 Web 复验](../verification/mihon-cupertino-fidelity.md#双主题正式-web-的单页失败与图片查看)
 
 - [x] 对照 Mihon 22.10，正式 Web 双主题复验同一 xkcd 章间稳定等待。白画布调暗 80% 后标题、说明与返回可读，等待中点按返回保留原图与七路账户状态。明确进入上一章并在新文档续读 3319 第 1 页。[正式 Web 双主题复验](../verification/mihon-cupertino-fidelity.md#双主题正式-web-的稳定章间等待)
 

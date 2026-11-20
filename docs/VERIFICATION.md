@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，`71bc54e` 的正式 Web 浅深两色在白画布调暗 80% 时实测 xkcd 3321 同页等待、受控失败、短屏重试及新文档续读。失败文字采样对比约 12.63∶1，等待与失败的七路读回完全相同。两色连续阅读的图片查看器通过放大、复位和短横屏同页关闭。73 项 Flutter 定向回归通过。[单页与图片查看证据](verification/mihon-cupertino-fidelity.md#双主题正式-web-的单页失败与图片查看)
+
 2026-11-21，`7925a84` 的正式 Web 浅深两色在 844×390 下从 MangaDex 详情的源列表末端完成取消准备、清单 503 后原构建重试和安装。独立 D1 核对取消及失败期间账户零提交，重试成功后各确认一次，新文档可读回。990 项 Flutter 测试、改动文件严格 Dart 分析和正常 Web release 构建通过。[扩展详情短屏](verification/mihon-cupertino-fidelity.md#扩展详情短屏的准备取消与重试)
 
 2026-11-21，固定 Mihon 原 APK 补齐受控签名数据缺失的拒绝加载面板和外层清理异常，两色实拍后均复核恢复。已安装 xkcd 的 APK 摘要相同，清理失败保留原六个文件，撤去故障后重试删除六个。Mihon 状态表主图达到 170/170（100%）。[签名数据缺失](verification/mihon-cupertino-fidelity.md#mihon-插件签名数据缺失的双主题实拍) · [清理异常](verification/mihon-cupertino-fidelity.md#mihon-外层清理失败与重试)
