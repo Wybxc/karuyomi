@@ -77,7 +77,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 封面编辑采用居中的完整比例预览。两色受控本地 Web 已核对短横屏选图和取消后自动显示新图四边与草稿说明。关闭并重开保留已确认封面；清除确认后可在新文档读回。实际系统选图与替换上传故障仍待。[草稿落点与确认](../verification/mihon-cupertino-fidelity.md#替换封面后自动显示草稿)
 
-作品详情支持原位下拉刷新、失败重试及清除无结果的章节筛选。组件回归覆盖保留原简介和章节、晚到结果和真正空清单的重读。正式 Web 双主题继续验收。[详情刷新与章节空态](../verification/mihon-cupertino-fidelity.md#mihon-详情刷新与章节空态)
+作品详情支持原位下拉刷新、失败重试及清除无结果的章节筛选。两色正常 Web 验证了章节区按钮刷新，隔离 Web 用鼠标拖动在两色验到下拉失败与重试。组件回归覆盖模拟触控、禁用语义、晚到结果和空清单重读，真机触屏验收仍待。[详情刷新故障](../verification/mihon-cupertino-fidelity.md#详情刷新故障的双主题正式-web) · [下拉手势对照](../verification/mihon-cupertino-fidelity.md#下拉刷新的双主题手势对照)
 
 迁移候选网格已通过正式 Web 双主题验收。Komiic 热门、动漫屋搜索均验证原末排位置、精确重试和追加，搜索等待时旧候选报告禁用。长列表中的预览与失败重读可直接定位。[迁移热门及预览](../verification/mihon-cupertino-fidelity.md#修正版迁移网格的双主题正式-web) · [搜索分页](../verification/mihon-cupertino-fidelity.md#搜索第二页的双主题恢复与禁用语义)
 

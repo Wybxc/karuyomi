@@ -5,6 +5,7 @@ import 'package:karuyomi/widgets/choice_field.dart';
 import '../test_app.dart';
 
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -299,6 +300,72 @@ void main() {
       expect(reads, 3);
       expect(chapterScroll.pixels, 1200);
       expect(platform.businessServer.appliedMutations, before);
+      await _finish(tester, catalog);
+    },
+  );
+
+  testWidgets(
+    'a touch refresh disables the chapter control and keeps one progress indicator',
+    (tester) async {
+      final platform = _platform();
+      final catalog = await _details(tester, platform);
+      final original = platform.invokeHandler!;
+      final reached = Completer<void>();
+      final response = Completer<wire.SourceResult>();
+      platform.invokeHandler = (call) async {
+        if (call.hasChapters() && !reached.isCompleted) {
+          reached.complete();
+          return response.future;
+        }
+        return original(call);
+      };
+      final reload = find.byKey(const ValueKey('details-source-refresh'));
+      final retry = find.byKey(const ValueKey('details-source-retry'));
+      Tristate enabled(Finder control) => tester
+          .getSemantics(control)
+          .getSemanticsData()
+          .flagsCollection
+          .isEnabled;
+      final semantics = tester.ensureSemantics();
+      try {
+        final pull = await tester.startGesture(
+          const Offset(26, 162),
+          kind: PointerDeviceKind.touch,
+        );
+        await pull.moveBy(const Offset(0, 380));
+        await tester.pump();
+        await pull.up();
+        await tester.pump(const Duration(milliseconds: 250));
+        await tester.runAsync(
+          () => reached.future.timeout(const Duration(seconds: 5)),
+        );
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('正在刷新作品资料和章节'), findsOneWidget);
+        expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+        expect(find.text('第一版'), findsOneWidget);
+        expect(enabled(reload), Tristate.isFalse);
+
+        response.completeError(
+          const RuntimeException(RuntimeErrorCode.sourceError, '章节暂不可用'),
+        );
+        await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+        await tester.pumpAndSettle();
+        expect(find.text('第一版'), findsOneWidget);
+        expect(enabled(reload), Tristate.isFalse);
+        expect(enabled(retry), Tristate.isTrue);
+      } finally {
+        semantics.dispose();
+        if (!response.isCompleted) {
+          response.complete(
+            wire.SourceResult(chapters: wire.ChapterList(chapters: _chapters)),
+          );
+          await tester.pumpAndSettle();
+        }
+      }
+
+      await _tap(tester, retry);
+      expect(retry, findsNothing);
+      expect(find.text('第一版'), findsOneWidget);
       await _finish(tester, catalog);
     },
   );

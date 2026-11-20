@@ -993,16 +993,24 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
     ];
   }
 
-  Widget _sourceRefreshButton({bool retry = false}) => CupertinoButton(
-    key: ValueKey(retry ? 'details-source-retry' : 'details-source-refresh'),
-    padding: const EdgeInsets.all(8),
-    onPressed: _canRefreshSource && (retry || _sourceRefreshError == null)
-        ? () => unawaited(_refreshSource(_DetailsRefresh.action))
-        : null,
-    child: retry
-        ? const Text('重试刷新')
-        : const Icon(CupertinoIcons.refresh, semanticLabel: '刷新作品资料和章节'),
-  );
+  Widget _sourceRefreshButton({bool retry = false}) {
+    final enabled = _canRefreshSource && (retry || _sourceRefreshError == null);
+    return Semantics(
+      enabled: enabled,
+      child: CupertinoButton(
+        key: ValueKey(
+          retry ? 'details-source-retry' : 'details-source-refresh',
+        ),
+        padding: const EdgeInsets.all(8),
+        onPressed: enabled
+            ? () => unawaited(_refreshSource(_DetailsRefresh.action))
+            : null,
+        child: retry
+            ? const Text('重试刷新')
+            : const Icon(CupertinoIcons.refresh, semanticLabel: '刷新作品资料和章节'),
+      ),
+    );
+  }
 
   Widget _sourceRefreshFeedback() {
     final error = _sourceRefreshError;

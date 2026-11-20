@@ -1118,7 +1118,9 @@ stateDiagram-v2
 | 18.K3   | 六章完整名称/来源序号、逐章提交与失败暂停影响、取消/确认    | `karuyomi-0c4da11-range-preview-light.jpg`            | `karuyomi-0c4da11-range-preview-dark.jpg`            |
 | 18.K4   | 书签图标/移除名称、对应首章、未读保持；API核对仅此章        | `karuyomi-b6bc240-chapter-bookmarked-light.jpg`       | `karuyomi-b6bc240-chapter-bookmarked-dark.jpg`       |
 
-`1e6b1ba` 的两色详情分别经过资料失败及章节失败。两种故障均保留原内容，滚动时可直接从底部重试，四轮原源和代次一致。已恢复的深色首章打开了真实图像。正式触控下拉及其它变体继续验收。[详情刷新故障](mihon-cupertino-fidelity.md#详情刷新故障的双主题正式-web)
+`1e6b1ba` 的两色详情分别经过资料失败及章节失败。两种故障均保留原内容，滚动时可直接从底部重试，四轮原源和代次一致。已恢复的深色首章打开了真实图像。[详情刷新故障](mihon-cupertino-fidelity.md#详情刷新故障的双主题正式-web)
+
+16.K2/K3 的下拉变体补采两色隔离 Web 等待、失败和恢复画面。鼠标长拖触发真实章节刷新，等待时章节区刷新报告禁用，失败后可用独立重试。深色滚动后保持同一章位置。触控有组件回归，真机触屏及其它变体继续验收。[下拉手势对照](mihon-cupertino-fidelity.md#下拉刷新的双主题手势对照)
 
 历史`b6bc240`两主题实际选择来源第1→2项、预览两章并用Enter取消，再明确退出；单章书签由Tab聚焦后Return标记，未进入阅读器，随后明确移除。该轮独立API最终accountRevision8，仅含三次主题、一次安装和四次书签增删；两主题预览取消零附写。搜索匹配、已选范围两图滚动锚点有差异，不计同位置像素对齐。
 
