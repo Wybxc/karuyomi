@@ -1315,8 +1315,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(more.hitTestable(), findsOneWidget);
       final lastCover = find.byKey(const ValueKey(('migration-result', 17)));
+      Tristate lastCoverEnabled() => tester
+          .getSemantics(lastCover)
+          .getSemanticsData()
+          .flagsCollection
+          .isEnabled;
       final coverBefore = tester.getRect(lastCover);
       await tester.tap(more);
+      final semantics = tester.ensureSemantics();
       try {
         await tester.pump();
         await tester.runAsync(
@@ -1325,9 +1331,16 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         expect(find.text('正在加载更多“原查询”的搜索结果'), findsOneWidget);
         expect(tester.getRect(lastCover), coverBefore);
-      } finally {
+        expect(lastCoverEnabled(), Tristate.isFalse);
         release.complete();
         await tester.pumpAndSettle();
+        expect(lastCoverEnabled(), Tristate.isTrue);
+      } finally {
+        semantics.dispose();
+        if (!release.isCompleted) {
+          release.complete();
+          await tester.pumpAndSettle();
+        }
       }
       expect(failed, isTrue);
       expect(tester.getRect(lastCover), coverBefore);

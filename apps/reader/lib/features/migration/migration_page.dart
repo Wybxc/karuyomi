@@ -614,12 +614,16 @@ class _MigrationPageState extends State<MigrationPage> {
               itemCount: candidates.length,
               itemBuilder: (context, index) {
                 final manga = candidates[index];
-                return MangaCoverTile(
+                final enabled = controller.canChange;
+                return Semantics(
                   key: ValueKey(('migration-result', index)),
-                  title: manga.title,
-                  onPressed: controller.canChange
-                      ? () => unawaited(_chooseCandidate(manga))
-                      : null,
+                  enabled: enabled,
+                  child: MangaCoverTile(
+                    title: manga.title,
+                    onPressed: enabled
+                        ? () => unawaited(_chooseCandidate(manga))
+                        : null,
+                  ),
                 );
               },
             ),

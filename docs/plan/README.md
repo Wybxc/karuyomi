@@ -79,7 +79,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 作品详情支持原位下拉刷新、失败重试及清除无结果的章节筛选。组件回归覆盖保留原简介和章节、晚到结果和真正空清单的重读。正式 Web 双主题继续验收。[详情刷新与章节空态](../verification/mihon-cupertino-fidelity.md#mihon-详情刷新与章节空态)
 
-迁移候选网格已在正式深色 Web 用 Komiic 验证封面尺寸、精确重试与只读预览。实拍发现分页反馈挤动封面，改到候选末尾后 72 项定向 Flutter 回归通过。修正版正式 Web 的浅、深色画面待验。[迁移参考](../verification/mihon-cupertino-fidelity.md#mihon-迁移搜索与共存) · [正式深色网格与分页反馈](../verification/mihon-cupertino-fidelity.md#正式深色网格与分页反馈)
+迁移候选网格已通过正式 Web 双主题验收。Komiic 热门、动漫屋搜索均验证原末排位置、精确重试和追加，搜索等待时旧候选报告禁用。长列表中的预览与失败重读可直接定位。[迁移热门及预览](../verification/mihon-cupertino-fidelity.md#修正版迁移网格的双主题正式-web) · [搜索分页](../verification/mihon-cupertino-fidelity.md#搜索第二页的双主题恢复与禁用语义)
 
 `5f5d287` 正式 Web 双主题确认批量分类失效后保留原清单、末项未发送、关闭返回书架。`78f4c4b` 正式 Web 确认迁移选中超过 256 条时禁用提交，减少选择后可进入二次确认。[批量实拍](../verification/mihon-cupertino-fidelity.md#批量分类失效的正式-web-双主题验收) · [迁移实拍](../verification/mihon-cupertino-fidelity.md#章节映射超限的正式-web-双主题验收)
 

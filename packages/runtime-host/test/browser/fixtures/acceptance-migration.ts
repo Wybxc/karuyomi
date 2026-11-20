@@ -85,7 +85,7 @@ export function migrationAcceptanceControl(
       payload?.case === 'mangaPage' ? payload.value.mangas.length : 0;
     const rejected = page === 2 && items > 0 && !rejectedPages.has(call.case);
     if (rejected) rejectedPages.add(call.case);
-    audit({
+    const identity = {
       operation: call.case,
       requestId,
       generation,
@@ -93,9 +93,15 @@ export function migrationAcceptanceControl(
       page,
       query: call.case === 'search' ? call.value.query : undefined,
       items,
+      hasNextPage:
+        payload?.case === 'mangaPage' ? payload.value.hasNextPage : undefined,
       hostResult: result.case,
-      outcome: rejected ? 'rejected' : result.case,
-    });
+    };
+    if (rejected && call.case === 'search') {
+      audit({ ...identity, outcome: 'held' });
+      await new Promise<void>((resolve) => setTimeout(resolve, 3500));
+    }
+    audit({ ...identity, outcome: rejected ? 'rejected' : result.case });
     return rejected ? reject(request) : response;
   };
 }
