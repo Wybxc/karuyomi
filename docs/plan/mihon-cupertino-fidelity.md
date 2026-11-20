@@ -60,9 +60,11 @@
 
 - [x] 对照 Mihon 22.10，正式 Web 双主题复验同一 xkcd 章间稳定等待。白画布调暗 80% 后标题、说明与返回可读，等待中点按返回保留原图与七路账户状态。明确进入上一章并在新文档续读 3319 第 1 页。[正式 Web 双主题复验](../verification/mihon-cupertino-fidelity.md#双主题正式-web-的稳定章间等待)
 
-- [x] 按 Mihon 09.01 浅深原图复核扩展详情的身份、元数据和操作顺序。Karuyomi 的正文采用可换行的 Cupertino 摘要和源列表，大字号下可滚动读完长名称。首次自动读取成功后直接呈现列表，手动检查保留回执。正式 Web 待验。[扩展详情的身份与字号](../verification/mihon-cupertino-fidelity.md#扩展详情的身份与字号)
+- [x] 按 Mihon 09.01 浅深原图复核扩展详情的身份、元数据和操作顺序。Karuyomi 采用可换行的 Cupertino 摘要和源列表，大字号下可滚动读完长名称。首次自动读取成功后直接呈现列表，手动检查保留回执。`7925a84` 的正式 Web 已复拍默认字号下的候选和安装两色。[扩展详情的身份与字号](../verification/mihon-cupertino-fidelity.md#扩展详情的身份与字号) · [正式 Web](../verification/mihon-cupertino-fidelity.md#扩展详情短屏的准备取消与重试)
 
 - [x] 固定 Mihon 补齐 Komga 扩展排队 08.07 的双主题主图，并实测受控等待中的取消转换。Karuyomi 准备反馈在短屏两倍字号下显示完整名称和版本，滚动时取消保持可达。292 项相关 Flutter 回归通过，正式 Web 待验。[扩展排队与短屏取消](../verification/mihon-cupertino-fidelity.md#扩展排队与短屏取消)
+
+- [x] `7925a84` 将准备和失败操作区固定在扩展详情的源列表上方。844×390 正式 Web 浅深两色均实测滚动后直接取消、503 后在原处重试，以及账户只确认一次安装。扩展目录短屏、系统字号和原生继续验收。[扩展详情短屏](../verification/mihon-cupertino-fidelity.md#扩展详情短屏的准备取消与重试)
 
 - [x] 以同一测试书架配齐 Mihon 迁移源加载 20.01，浅深两色均实拍迁移选中和加载环。Karuyomi 的页面和 Sheet 底页修正通过 963 项 Flutter 回归，正式 Web 与原生现场转场待验。[迁移加载](../verification/mihon-cupertino-fidelity.md#mihon-迁移源加载的双主题实拍) · [底页转场](../verification/mihon-cupertino-fidelity.md#cupertino-转场的底页位置)
 

@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，`7925a84` 的正式 Web 浅深两色在 844×390 下从 MangaDex 详情的源列表末端完成取消准备、清单 503 后原构建重试和安装。独立 D1 核对取消及失败期间账户零提交，重试成功后各确认一次，新文档可读回。990 项 Flutter 测试、改动文件严格 Dart 分析和正常 Web release 构建通过。[扩展详情短屏](verification/mihon-cupertino-fidelity.md#扩展详情短屏的准备取消与重试)
+
 2026-11-21，固定 Mihon 原 APK 补齐受控签名数据缺失的拒绝加载面板和外层清理异常，两色实拍后均复核恢复。已安装 xkcd 的 APK 摘要相同，清理失败保留原六个文件，撤去故障后重试删除六个。Mihon 状态表主图达到 170/170（100%）。[签名数据缺失](verification/mihon-cupertino-fidelity.md#mihon-插件签名数据缺失的双主题实拍) · [清理异常](verification/mihon-cupertino-fidelity.md#mihon-外层清理失败与重试)
 
 2026-11-21，`539ec0c` 的双主题正式 Web 通过可控的浏览器媒体查询复验设置、真实 xkcd 详情、分类 Sheet 和卸载确认。切换减弱动态后四类标记首个采样均在最终位置，详情仍可左缘返回，已打开的弹层按新偏好关闭。七路账户读回一致，211 项定向 Flutter 测试通过。实际系统偏好和原生现场待验。[减弱动态媒体查询](verification/mihon-cupertino-fidelity.md#正式-web-的减弱动态媒体查询复验)
