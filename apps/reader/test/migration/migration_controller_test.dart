@@ -1138,6 +1138,63 @@ void main() {
     }
   }
 
+  for (final readFails in [false, true]) {
+    testWidgets(
+      'long candidate lists reveal the selected preview (read fails: $readFails)',
+      (tester) async {
+        final invoke = platform.invokeHandler!;
+        platform.invokeHandler = (call) async => call.hasSearch()
+            ? wire.SourceResult(
+                mangaPage: wire.MangaPage(
+                  mangas: [
+                    for (var index = 0; index < 100; index++)
+                      wire.Manga(url: '/candidate-$index', title: '候选 $index'),
+                  ],
+                ),
+              )
+            : invoke(call);
+        await tester.binding.setSurfaceSize(const Size(360, 640));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpApp(
+          CupertinoApp(
+            home: MigrationPage(
+              catalog: catalog,
+              client: catalog.library!.client,
+              seed: seed,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final writes = posts().length;
+        await tester.tap(find.byKey(const ValueKey('migration-source')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('目标源 · zh · eu.kanade.source.test').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('migration-search-submit')));
+        await tester.pumpAndSettle();
+        final first = find.byKey(const ValueKey(('migration-result', 0)));
+        await tester.ensureVisible(first);
+        await tester.pumpAndSettle();
+        expect(first.hitTestable(), findsOneWidget);
+        if (readFails) failOriginalRead();
+        await tester.tap(first);
+        await tester.pumpAndSettle();
+
+        final heading = find.text(readFails ? '迁移预览尚未取得' : '迁移预览');
+        expect(heading.hitTestable(), findsOneWidget);
+        expect(Focus.of(tester.element(heading)).hasPrimaryFocus, isTrue);
+        expect(
+          find.textContaining('候选 0 · 目标源 · zh').hitTestable(),
+          findsOneWidget,
+        );
+        expect(posts(), hasLength(writes));
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
   testWidgets(
     'retiring a scrolled migration starts with the full warning visible',
     (tester) async {

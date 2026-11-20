@@ -28,6 +28,7 @@ class _MigrationPageState extends State<MigrationPage> {
   late final MigrationController controller;
   late TextEditingController _search;
   late FocusNode _confirmFocus;
+  late FocusNode _previewHeadingFocus;
   int _mappingPage = 0;
   bool _showMarkedOnly = false;
 
@@ -44,6 +45,29 @@ class _MigrationPageState extends State<MigrationPage> {
       if (mounted) unawaited(controller.refreshSources());
     });
   }
+
+  Future<void> _chooseCandidate(MangaEntry manga) async {
+    _mappingPage = 0;
+    await controller.chooseManga(manga);
+    if (!mounted) return;
+    final target = controller.targetMetadata;
+    if (target == null) return;
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted ||
+        !identical(controller.targetMetadata, target) ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    final heading = _previewHeadingFocus.context;
+    if (heading == null || !heading.mounted) return;
+    _previewHeadingFocus.requestFocus();
+    await Scrollable.ensureVisible(heading);
+  }
+
+  Widget _previewHeading(String title) => Focus(
+    focusNode: _previewHeadingFocus,
+    child: Semantics(header: true, child: Text(title)),
+  );
 
   Future<void> _confirm() async {
     final target = controller.targetMetadata;
@@ -226,7 +250,7 @@ class _MigrationPageState extends State<MigrationPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           CupertinoFormSection.insetGrouped(
-            header: const Text('迁移预览'),
+            header: _previewHeading('迁移预览'),
             footer: const Text('目标将加入书架，原作品保留；目标已有分类、章节状态、书签、封面与阅读位置保留。'),
             children: [
               CupertinoFormRow(
@@ -594,10 +618,7 @@ class _MigrationPageState extends State<MigrationPage> {
                   key: ValueKey(('migration-result', index)),
                   title: manga.title,
                   onPressed: controller.canChange
-                      ? () {
-                          _mappingPage = 0;
-                          unawaited(controller.chooseManga(manga));
-                        }
+                      ? () => unawaited(_chooseCandidate(manga))
                       : null,
                 );
               },
@@ -641,6 +662,7 @@ class _MigrationPageState extends State<MigrationPage> {
   Widget build(BuildContext context) {
     _search = useTextEditingController(text: widget.seed.metadata.manga.title);
     _confirmFocus = useFocusNode();
+    _previewHeadingFocus = useFocusNode(skipTraversal: true);
     useListenable(controller);
     final available = controller.available;
     final pending = controller.pending;
@@ -899,7 +921,7 @@ class _MigrationPageState extends State<MigrationPage> {
                   when controller.targetSequence != null)
                 SliverToBoxAdapter(
                   child: CupertinoFormSection.insetGrouped(
-                    header: const Text('迁移预览尚未取得'),
+                    header: _previewHeading('迁移预览尚未取得'),
                     footer: const Text('尚未提交迁移。重新读取当前资料后，才能检查复制范围并确认。'),
                     children: [
                       CupertinoFormRow(
