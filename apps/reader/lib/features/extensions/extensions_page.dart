@@ -876,6 +876,7 @@ class const _ExtensionCleanupStatus({
   Widget build(BuildContext context) {
     final canRetry =
         controller.available && !controller.busy && !controller.catalog.busy;
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
     return Semantics(
       key: const ValueKey('extension-cleanup-status'),
       container: true,
@@ -887,16 +888,6 @@ class const _ExtensionCleanupStatus({
           child: Text(cleaning ? '正在清理本机副本' : '清理未完成'),
         ),
         children: [
-          if (copy case final target?)
-            CupertinoListTile(
-              title: Text(target.name, maxLines: 2),
-              subtitle: Text(
-                target.sha256,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: cleaning ? const CupertinoActivityIndicator() : null,
-            ),
           if (error case final failure? when !cleaning) ...[
             CupertinoFormRow(
               child: Align(
@@ -907,23 +898,44 @@ class const _ExtensionCleanupStatus({
                 ),
               ),
             ),
-            CupertinoButton(
-              alignment: AlignmentDirectional.centerStart,
-              onPressed: canRetry
-                  ? () => unawaited(controller.retryCleanup())
-                  : null,
-              child: const Text('重试资源清理'),
-            ),
-            if (controller.catalog.canRebuildUnavailableExtension)
-              CupertinoButton(
-                key: const ValueKey('extensions-rebuild-cleanup'),
+            SizedBox(
+              width: double.infinity,
+              child: CupertinoButton(
                 alignment: AlignmentDirectional.centerStart,
                 onPressed: canRetry
-                    ? () => unawaited(controller.rebuildForCleanup())
+                    ? () => unawaited(controller.retryCleanup())
                     : null,
-                child: const Text('重建运行时并恢复清理'),
+                child: const Text('重试资源清理'),
+              ),
+            ),
+            if (controller.catalog.canRebuildUnavailableExtension)
+              SizedBox(
+                width: double.infinity,
+                child: CupertinoButton(
+                  key: const ValueKey('extensions-rebuild-cleanup'),
+                  alignment: AlignmentDirectional.centerStart,
+                  onPressed: canRetry
+                      ? () => unawaited(controller.rebuildForCleanup())
+                      : null,
+                  child: const Text('重建运行时并恢复清理'),
+                ),
               ),
           ],
+          if (copy case final target?)
+            CupertinoListTile(
+              title: DefaultTextStyle(
+                style: textStyle,
+                child: Text(target.name),
+              ),
+              subtitle: DefaultTextStyle(
+                style: textStyle.copyWith(
+                  fontSize: 13,
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+                child: Text(target.sha256),
+              ),
+              trailing: cleaning ? const CupertinoActivityIndicator() : null,
+            ),
         ],
       ),
     );
@@ -1617,8 +1629,20 @@ class const ExtensionStoragePage({
   @override
   Widget build(BuildContext context) {
     useListenable(controller);
+    final scroll = useScrollController();
     final diagnostics = useMemoized(ExpansibleController.new);
     useEffect(() => diagnostics.dispose, [diagnostics]);
+    final cleanupTarget = controller.cleanupTarget;
+    useEffect(() {
+      if (cleanupTarget != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted && scroll.hasClients) {
+            scroll.jumpTo(scroll.position.minScrollExtent);
+          }
+        });
+      }
+      return null;
+    }, [cleanupTarget, controller.cleanupError]);
     final cache = controller.cache;
     final canRefresh = controller.available && !controller.busy;
     final canForget = canRefresh && !controller.catalog.busy;
@@ -1630,155 +1654,173 @@ class const ExtensionStoragePage({
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(middle: const Text('本机存储')),
       child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: ExtensionOperationStatus(
-                controller: controller,
-                showStorageAction: false,
-                showProgress: !checking,
+        child: CustomScrollView(
+          controller: scroll,
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: ExtensionOperationStatus(
+                  controller: controller,
+                  showStorageAction: false,
+                  showProgress: !checking,
+                ),
               ),
             ),
-            CupertinoFormSection.insetGrouped(
-              footer: const Text('清理副本后仍是账户已安装状态，重新打开时会再次下载。书架与阅读记录保留。'),
-              children: [
-                CupertinoListTile(
-                  title: Text(
-                    checking
-                        ? '正在检查本机副本'
-                        : cache == null
-                        ? '尚未读取本机副本'
-                        : '扩展副本占用',
-                  ),
-                  subtitle: cache == null
-                      ? null
-                      : Text(
-                          '${cache.artifacts.length} 个副本 · ${FileSize.fromBytes(cache.totalBytes)}',
-                          key: const ValueKey('extensions-cache-usage'),
-                        ),
-                  trailing: checking
-                      ? const CupertinoActivityIndicator()
-                      : null,
-                ),
-                if (cache != null && cache.artifacts.isEmpty)
-                  const CupertinoListTile(title: Text('本机没有扩展副本')),
-              ],
-            ),
-            if (cache != null) ...[
-              if (cache.artifacts.isNotEmpty)
-                CupertinoListSection.insetGrouped(
-                  hasLeading: false,
-                  children: [
-                    for (final artifact in cache.artifacts)
-                      CupertinoListTile(
-                        title: DefaultTextStyle(
-                          style: CupertinoTheme.of(context).textTheme.textStyle,
-                          child: Text(controller.artifactName(artifact.sha256)),
-                        ),
-                        subtitle: Text(
-                          FileSize.fromBytes(artifact.byteLength).toString(),
-                        ),
-                        trailing: Semantics(
-                          container: true,
-                          enabled: canForget,
-                          child: CupertinoButton(
-                            key: ValueKey((
-                              'extension-forget',
-                              artifact.sha256,
-                            )),
-                            onPressed: canForget
-                                ? () => unawaited(
-                                    controller.forget(artifact.sha256),
-                                  )
-                                : null,
-                            child: Text(
-                              '清理副本',
-                              semanticsLabel:
-                                  '清理副本：${controller.artifactName(artifact.sha256)}',
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              CupertinoListSection.insetGrouped(
-                hasLeading: false,
+            SliverPadding(
+              padding: const EdgeInsets.only(bottom: 16),
+              sliver: SliverList.list(
                 children: [
-                  Expansible(
-                    key: const PageStorageKey('extension-storage-diagnostics'),
-                    controller: diagnostics,
-                    animationStyle:
-                        MediaQuery.reduceMotionOf(context) ||
-                            MediaQuery.disableAnimationsOf(context)
-                        ? AnimationStyle.noAnimation
-                        : null,
-                    headerBuilder: (context, animation) => Semantics(
-                      container: true,
-                      expanded: diagnostics.isExpanded,
-                      child: CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: () => diagnostics.isExpanded
-                            ? diagnostics.collapse()
-                            : diagnostics.expand(),
-                        child: CupertinoListTile(
-                          title: const Text('诊断信息'),
-                          trailing: RotationTransition(
-                            turns: animation.drive(
-                              Tween(begin: 0.0, end: 0.25),
+                  CupertinoFormSection.insetGrouped(
+                    footer: const Text('清理副本后仍是账户已安装状态，重新打开时会再次下载。书架与阅读记录保留。'),
+                    children: [
+                      CupertinoListTile(
+                        title: Text(
+                          checking
+                              ? '正在检查本机副本'
+                              : cache == null
+                              ? '尚未读取本机副本'
+                              : '扩展副本占用',
+                        ),
+                        subtitle: cache == null
+                            ? null
+                            : Text(
+                                '${cache.artifacts.length} 个副本 · ${FileSize.fromBytes(cache.totalBytes)}',
+                                key: const ValueKey('extensions-cache-usage'),
+                              ),
+                        trailing: checking
+                            ? const CupertinoActivityIndicator()
+                            : null,
+                      ),
+                      if (cache != null && cache.artifacts.isEmpty)
+                        const CupertinoListTile(title: Text('本机没有扩展副本')),
+                    ],
+                  ),
+                  if (cache != null) ...[
+                    if (cache.artifacts.isNotEmpty)
+                      CupertinoListSection.insetGrouped(
+                        hasLeading: false,
+                        children: [
+                          for (final artifact in cache.artifacts)
+                            CupertinoListTile(
+                              title: DefaultTextStyle(
+                                style: CupertinoTheme.of(context)
+                                    .textTheme
+                                    .textStyle,
+                                child: Text(
+                                  controller.artifactName(artifact.sha256),
+                                ),
+                              ),
+                              subtitle: Text(
+                                FileSize.fromBytes(artifact.byteLength)
+                                    .toString(),
+                              ),
+                              trailing: Semantics(
+                                container: true,
+                                enabled: canForget,
+                                child: CupertinoButton(
+                                  key: ValueKey((
+                                    'extension-forget',
+                                    artifact.sha256,
+                                  )),
+                                  onPressed: canForget
+                                      ? () => unawaited(
+                                          controller.forget(artifact.sha256),
+                                        )
+                                      : null,
+                                  child: Text(
+                                    '清理副本',
+                                    semanticsLabel:
+                                        '清理副本：${controller.artifactName(artifact.sha256)}',
+                                  ),
+                                ),
+                              ),
                             ),
-                            child: Icon(
-                              CupertinoIcons.chevron_right,
-                              size: 16,
-                              color: AppColors.accent.resolveFrom(context),
+                        ],
+                      ),
+                    CupertinoListSection.insetGrouped(
+                      hasLeading: false,
+                      children: [
+                        Expansible(
+                          key: const PageStorageKey(
+                            'extension-storage-diagnostics',
+                          ),
+                          controller: diagnostics,
+                          animationStyle:
+                              MediaQuery.reduceMotionOf(context) ||
+                                  MediaQuery.disableAnimationsOf(context)
+                              ? AnimationStyle.noAnimation
+                              : null,
+                          headerBuilder: (context, animation) => Semantics(
+                            container: true,
+                            expanded: diagnostics.isExpanded,
+                            child: CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: () => diagnostics.isExpanded
+                                  ? diagnostics.collapse()
+                                  : diagnostics.expand(),
+                              child: CupertinoListTile(
+                                title: const Text('诊断信息'),
+                                trailing: RotationTransition(
+                                  turns: animation.drive(
+                                    Tween(begin: 0.0, end: 0.25),
+                                  ),
+                                  child: Icon(
+                                    CupertinoIcons.chevron_right,
+                                    size: 16,
+                                    color: AppColors.accent.resolveFrom(
+                                      context,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          bodyBuilder: (context, animation) => Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: SelectableRegion(
+                              selectionControls: cupertinoTextSelectionControls,
+                              contextMenuBuilder: (context, state) =>
+                                  CupertinoAdaptiveTextSelectionToolbar.buttonItems(
+                                    buttonItems: state.contextMenuButtonItems,
+                                    anchors: state.contextMenuAnchors,
+                                  ),
+                              child: Text(
+                                [
+                                  '${cache.artifacts.length} / ${cache.maxArtifacts} 个产物 · '
+                                      '${FileSize.fromBytes(cache.totalBytes)} / '
+                                      '${FileSize.fromBytes(cache.maxBytes)}',
+                                  for (final artifact in cache.artifacts)
+                                    '${controller.artifactName(artifact.sha256)} · ${artifact.sha256}',
+                                ].join('\n'),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                    bodyBuilder: (context, animation) => Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: SelectableRegion(
-                        selectionControls: cupertinoTextSelectionControls,
-                        contextMenuBuilder: (context, state) =>
-                            CupertinoAdaptiveTextSelectionToolbar.buttonItems(
-                              buttonItems: state.contextMenuButtonItems,
-                              anchors: state.contextMenuAnchors,
-                            ),
-                        child: Text(
-                          [
-                            '${cache.artifacts.length} / ${cache.maxArtifacts} 个产物 · '
-                                '${FileSize.fromBytes(cache.totalBytes)} / '
-                                '${FileSize.fromBytes(cache.maxBytes)}',
-                            for (final artifact in cache.artifacts)
-                              '${controller.artifactName(artifact.sha256)} · ${artifact.sha256}',
-                          ].join('\n'),
+                  ],
+                  CupertinoListSection.insetGrouped(
+                    hasLeading: false,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Semantics(
+                        enabled: canRefresh,
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: CupertinoButton(
+                            alignment: AlignmentDirectional.centerStart,
+                            onPressed: canRefresh
+                                ? () => unawaited(controller.refresh())
+                                : null,
+                            child: const Text('重新读取本机副本'),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
-            ],
-            CupertinoListSection.insetGrouped(
-              hasLeading: false,
-              clipBehavior: Clip.none,
-              children: [
-                Semantics(
-                  enabled: canRefresh,
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: CupertinoButton(
-                      alignment: AlignmentDirectional.centerStart,
-                      onPressed: canRefresh
-                          ? () => unawaited(controller.refresh())
-                          : null,
-                      child: const Text('重新读取本机副本'),
-                    ),
-                  ),
-                ),
-              ],
             ),
           ],
         ),

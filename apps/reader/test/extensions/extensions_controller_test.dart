@@ -1288,7 +1288,7 @@ void main() {
     );
 
     testWidgets(
-      'storage reads the complete copy name and byte size at twice text size in $appearance',
+      'storage reads the complete copy identity and recovery at twice text size in $appearance',
       (tester) async {
         final name = '${'跨端阅读测试扩展资料目录' * 4}末尾';
         final index = wire.decodeProtoJson(
@@ -1308,7 +1308,7 @@ void main() {
         await show(
           tester,
           appearance: appearance,
-          size: const Size(360, 800),
+          size: const Size(360, 480),
           textScale: 2,
         );
         await tap(tester, find.byKey(const ValueKey('extensions-more')));
@@ -1332,9 +1332,49 @@ void main() {
           find.descendant(of: row, matching: find.text('256 B')),
           findsOneWidget,
         );
-        final clear = find.byKey(ValueKey(('extension-forget', 'a' * 64)));
+        final checksum = 'a' * 64;
+        final clear = find.byKey(ValueKey(('extension-forget', checksum)));
         await tester.ensureVisible(clear);
+        await tester.pumpAndSettle();
         expect(clear.hitTestable(), findsOneWidget);
+        final attempts = <String>[];
+        platform.beforeForgetArtifact = (sha256) async {
+          attempts.add(sha256);
+          return attempts.length == 1
+              ? wire.RuntimeError(
+                  code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_STORAGE_BUSY,
+                  message: 'An active runtime has the artifact in use',
+                )
+              : null;
+        };
+        await tap(tester, clear);
+        final status = find.byKey(const ValueKey('extension-cleanup-status'));
+        final retry = find.text('重试资源清理');
+        final reason = find.textContaining('关闭正在使用此扩展的标签页或窗口');
+        final failedName = find.descendant(of: status, matching: label);
+        final failedChecksum = find.descendant(
+          of: status,
+          matching: find.text(checksum),
+        );
+        expect(status, findsOneWidget);
+        expect(retry.hitTestable(), findsOneWidget);
+        expect(
+          tester.renderObject<RenderParagraph>(failedName).didExceedMaxLines,
+          isFalse,
+        );
+        expect(
+          tester
+              .renderObject<RenderParagraph>(failedChecksum)
+              .didExceedMaxLines,
+          isFalse,
+        );
+        expect(
+          tester.getBottomLeft(reason).dy,
+          lessThan(tester.getTopLeft(retry).dy),
+        );
+        await tap(tester, retry);
+        expect(attempts, [checksum, checksum]);
+        expect(find.text('本机没有扩展副本'), findsOneWidget);
         expect(
           platform.businessServer.requests.where(
             (request) => request.method == 'POST',

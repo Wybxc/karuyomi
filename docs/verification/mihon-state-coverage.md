@@ -1617,6 +1617,8 @@ stateDiagram-v2
 | 11.K5   | 失败原因、未完成资源、精确重试/必要重建                    | `karuyomi-0a28f6a-storage-spacing-light`                 | `karuyomi-0a28f6a-storage-spacing-dark`                 |
 | 11.K6   | 容量/数量限额、完整副本哈希、滚动与收起                    | `karuyomi-76309ed-storage-diagnostics-light.jpg`         | `karuyomi-76309ed-storage-diagnostics-dark.jpg`         |
 
+2026-11-21，新版 Web 两色从 11.K2 展开诊断，在短横屏实际遇到同一 xkcd 副本被另一个标签占用（11.K5）。关闭占用页并重试原摘要，等待期保留两项并报告禁用（11.K3），确认后新文档只有 Komiic。再次明确清理后显示零副本（11.K4），旧安装可重新下载 xkcd。大字号换行和触发后回到反馈使用组件复验。[本机副本占用与恢复](mihon-cupertino-fidelity.md#本机副本占用与恢复的双主题正式-web)
+
 ### 08–09：Karuyomi 最终 Cupertino 扩展管理
 
 以下记录产品当前的账户安装关系与可丢弃本机副本，不照搬Android安装权限或系统卸载框。行内容与尾部主操作采用并列官方按钮，分别进入详情和执行维护；启用只由详情开关修改，读取列表和展开诊断不提交账户。业务冲突、身份/Access失效、取消准备与清理失败仍按独有状态表逐项验收。

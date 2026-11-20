@@ -20,6 +20,8 @@
 
 ## 推进与待办
 
+- [x] 修复本机存储在短屏大字号下清理反馈滑出视口。定位到新的 Cupertino 反馈，完整名称和摘要随宽度换行。两色正式 Web 实测同源标签持有 xkcd 的真实锁、释放后精确重试、空态和重新下载。每色七路权威读回相等，988 项 Flutter 测试通过。[本机副本占用与恢复](../verification/mihon-cupertino-fidelity.md#本机副本占用与恢复的双主题正式-web)
+
 - [x] 模拟触控的组件回归验证详情下拉只显示一个进度指示，刷新按钮禁用且失败后独立重试。隔离 Web 允许用鼠标拖动，同一 Cupertino 下拉流程在两色均经真实 xkcd 章节故障并恢复，深色保持章节锚点，七路账户读回一致。988 项 Flutter 测试通过，真机触屏仍待。[下拉手势对照](../verification/mihon-cupertino-fidelity.md#下拉刷新的双主题手势对照)
 
 - [x] 详情刷新在正式 Web 两色分别复验资料和章节失败。反馈固定在底部，等待和失败都保持章节位置，滚动后可直接重试。七路账户读回一致，深色恢复后实际打开同一首章。新增已实现的 16.K2/K3 两色主图，61 项定向测试通过。[详情刷新故障](../verification/mihon-cupertino-fidelity.md#详情刷新故障的双主题正式-web)
@@ -60,7 +62,7 @@
 
 - [x] 以同一测试书架配齐 Mihon 迁移源加载 20.01，浅深两色均实拍迁移选中和加载环。Karuyomi 的页面和 Sheet 底页修正通过 963 项 Flutter 回归，正式 Web 与原生现场转场待验。[迁移加载](../verification/mihon-cupertino-fidelity.md#mihon-迁移源加载的双主题实拍) · [底页转场](../verification/mihon-cupertino-fidelity.md#cupertino-转场的底页位置)
 
-- [x] Mihon 浅深色实测六个缓存文件无法删除时仍报删除 0 个，恢复权限后重试释放。Karuyomi 本机存储支持长名称换行，容量按实际字节数选单位。11.04 的外层失败提示和新版正式 Web 待验。[本机存储复验](../verification/mihon-cupertino-fidelity.md#本机存储的名称容量与清理反馈)
+- [x] Mihon 浅深色实测六个缓存文件无法删除时仍报删除 0 个，恢复权限后重试释放。Karuyomi 本机存储支持长名称换行，容量按实际字节数选单位。Mihon 11.04 的外层失败提示继续待验。[本机存储复验](../verification/mihon-cupertino-fidelity.md#本机存储的名称容量与清理反馈)
 
 - [x] 卸载确认和书架分类管理通过减弱动态及关闭动画的组件回归。确认框与编辑 Sheet 共用页面路由的系统动画设置。系统减弱动态下的正式 Web 现场待验。[Cupertino 弹层转场](../verification/mihon-cupertino-fidelity.md#cupertino-确认框与编辑-sheet-转场)
 
