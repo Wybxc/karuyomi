@@ -1,3 +1,4 @@
+import '../../widgets/app_routes.dart';
 import '../../widgets/edit_sheet.dart';
 import '../../theme/app_theme.dart';
 
@@ -26,7 +27,7 @@ Future<Set<String>?> showLibraryBatchDialog({
     return Future.value(null);
   }
   FocusManager.instance.primaryFocus?.unfocus();
-  return showCupertinoSheet<Set<String>>(
+  return showAppSheet<Set<String>>(
     context: context,
     enableDrag: false,
     scrollableBuilder: (context, _) => _LibraryBatchDialog(

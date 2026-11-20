@@ -1,4 +1,5 @@
 import '../../theme/app_theme.dart';
+import '../../widgets/app_routes.dart';
 import '../../widgets/edit_sheet.dart';
 
 import 'dart:async';
@@ -40,7 +41,7 @@ Future<void> showLibraryCategoryManager({
   if (pending?.entry != null) {
     return _showCommand(context, controller, lifecycle, isCurrent, pending!);
   }
-  return showCupertinoSheet<void>(
+  return showAppSheet<void>(
     context: context,
     enableDrag: false,
     scrollableBuilder: (context, _) => _CategoryManager(
@@ -100,7 +101,7 @@ Future<void> _showCommand(
   Listenable lifecycle,
   bool Function() isCurrent,
   _CategoryDraft draft,
-) => showCupertinoSheet<void>(
+) => showAppSheet<void>(
   context: context,
   enableDrag: false,
   scrollableBuilder: (context, _) => _CategoryCommand(

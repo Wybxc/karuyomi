@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/theme/app_theme.dart';
+import 'package:karuyomi/widgets/app_routes.dart';
 
 import '../browse/fakes.dart';
 import '../test_app.dart';
@@ -31,8 +32,9 @@ void main() {
       final context = tester.element(find.byType(AppShell));
       final expected = AppColors.background.resolveFrom(context);
       unawaited(
-        showCupertinoSheet<void>(
+        showAppSheet<void>(
           context: context,
+          enableDrag: false,
           scrollableBuilder: (_, _) =>
               const CupertinoPageScaffold(child: Center(child: Text('漫画源设置'))),
         ),

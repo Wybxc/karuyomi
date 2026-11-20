@@ -1,4 +1,4 @@
-import '../../widgets/app_page_route.dart';
+import '../../widgets/app_routes.dart';
 
 import 'dart:async';
 
@@ -52,7 +52,7 @@ class const CatalogPage({
     final catalog = controller;
     final repository = catalog?.sourcePreferences;
     if (catalog == null || repository == null || catalog.busy) return;
-    await showCupertinoSheet<void>(
+    await showAppSheet<void>(
       context: context,
       enableDrag: false,
       scrollableBuilder: (context, _) => SourcePreferencesSheet(
@@ -78,7 +78,7 @@ class const CatalogPage({
     try {
       service = catalog.createSourceSearch();
     } catch (error) {
-      showCupertinoDialog<void>(
+      showAppDialog<void>(
         context: context,
         builder: (context) => CupertinoAlertDialog(
           title: const Text('无法搜索'),

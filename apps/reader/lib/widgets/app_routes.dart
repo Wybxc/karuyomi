@@ -27,27 +27,29 @@ class _AppPageRoute<T> extends AppPageRoute<T> {
 }
 
 /// Keep the application's reduced-motion policy across all business routes.
-class AppPageRoute<T> extends CupertinoPageRoute<T> {
+class AppPageRoute<T> extends CupertinoPageRoute<T> with _RouteMotion<T> {
   AppPageRoute({required super.builder, super.settings, super.title});
+}
+
+mixin _RouteMotion<T> on ModalRoute<T> {
+  bool get _animationsDisabled {
+    final context = navigator?.context;
+    return context != null && MediaQuery.disableAnimationsOf(context);
+  }
 
   bool get _reduced {
     final context = navigator?.context;
-    return context != null &&
-        (MediaQuery.reduceMotionOf(context) ||
-            MediaQuery.disableAnimationsOf(context));
+    return _animationsDisabled ||
+        (context != null && MediaQuery.reduceMotionOf(context));
   }
 
   @override
-  Duration get transitionDuration {
-    final context = navigator?.context;
-    return context != null && MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : super.transitionDuration;
-  }
+  Duration get transitionDuration =>
+      _animationsDisabled ? Duration.zero : super.transitionDuration;
 
   @override
   bool didPop(T? result) {
-    // A page can outlive a change in the system motion preference.
+    // The system motion preference can change while a route is open.
     controller!.reverseDuration = reverseTransitionDuration;
     return super.didPop(result);
   }
@@ -65,7 +67,7 @@ class AppPageRoute<T> extends CupertinoPageRoute<T> {
   ) {
     final disabled = MediaQuery.disableAnimationsOf(context);
     if (disabled || MediaQuery.reduceMotionOf(context)) {
-      // Keep the native edge-back recognizer while removing page displacement.
+      // Keep the native resting geometry and gesture handling.
       return super.buildTransitions(
         context,
         const AlwaysStoppedAnimation<double>(1),
@@ -80,4 +82,54 @@ class AppPageRoute<T> extends CupertinoPageRoute<T> {
       child,
     );
   }
+}
+
+Future<T?> showAppSheet<T>({
+  required BuildContext context,
+  required ScrollableWidgetBuilder scrollableBuilder,
+  required bool enableDrag,
+}) => Navigator.of(context, rootNavigator: true).push<T>(
+  _AppSheetRoute<T>(
+    scrollableBuilder: scrollableBuilder,
+    enableDrag: enableDrag,
+  ),
+);
+
+class _AppSheetRoute<T> extends CupertinoSheetRoute<T> with _RouteMotion<T> {
+  _AppSheetRoute({required super.scrollableBuilder, required super.enableDrag});
+}
+
+Future<T?> showAppDialog<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+}) => Navigator.of(
+  context,
+  rootNavigator: true,
+).push<T>(AppDialogRoute<T>(context: context, builder: builder));
+
+class AppDialogRoute<T> extends CupertinoDialogRoute<T> with _RouteMotion<T> {
+  AppDialogRoute({required super.context, required super.builder})
+    : super(barrierDismissible: false);
+
+  @override
+  Simulation createSimulation({required bool forward}) {
+    // The platform dialog's spring also drives its barrier and route lifetime.
+    if (_animationsDisabled) return _ImmediateSimulation(forward ? 1 : 0);
+    return super.createSimulation(forward: forward);
+  }
+}
+
+class _ImmediateSimulation extends Simulation {
+  _ImmediateSimulation(this.value);
+
+  final double value;
+
+  @override
+  double x(double time) => value;
+
+  @override
+  double dx(double time) => 0;
+
+  @override
+  bool isDone(double time) => true;
 }

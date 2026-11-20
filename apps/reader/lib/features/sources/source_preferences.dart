@@ -1,4 +1,5 @@
 import '../../theme/app_theme.dart';
+import '../../widgets/app_routes.dart';
 import '../../widgets/edit_sheet.dart';
 import '../../widgets/choice_field.dart';
 
@@ -48,7 +49,7 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
       ModalRoute.of(context)?.isActive == true;
 
   Future<void> _text(wire.PreferenceNode node, List<int> path) async {
-    final result = await showCupertinoDialog<String>(
+    final result = await showAppDialog<String>(
       context: context,
       builder: (_) =>
           _PreferenceTextDialog(node: node, controller: _controller),
@@ -65,7 +66,7 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
         .toSet();
     final missing = selected.difference(available);
     var closing = false;
-    final result = await showCupertinoSheet<List<String>>(
+    final result = await showAppSheet<List<String>>(
       context: context,
       enableDrag: false,
       scrollableBuilder: (context, _) => StatefulBuilder(

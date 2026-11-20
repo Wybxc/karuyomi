@@ -1591,6 +1591,16 @@ Karuyomi 旧布局的失败提示只显示原因，并会在长列表滚动区�
 
 Karuyomi 的页面回归复现关闭动画后仍在推进的路由计时和退出残留，以及减弱动态时无法触发的侧滑。共享 Cupertino 路由现将禁用动画的入栈和退出设为零时长，退出读取当前偏好。减弱动态时借用原生返回手势，页面在侧滑中保持原位并按手势进度淡出。组件测试覆盖普通页面入栈、侧滑、从运行中切换偏好、设置声明式详情的系统返回及零写入。279 项导航、设置、选项控件、源浏览、扩展、迁移与阅读器的 Flutter 回归通过。正式 Web 和原生实拍仍待，弹层和 Sheet 按各自路径继续验收。[页面路由回归](../../apps/reader/test/widget_test.dart) · [设置导航回归](../../apps/reader/test/settings/settings_widgets_test.dart)
 
+`b7d5068` 的分支和 PR 检查通过。[分支检查](https://github.com/Wybxc/karuyomi/actions/runs/44680561494) · [PR 检查](https://github.com/Wybxc/karuyomi/actions/runs/44680570426)
+
+## Cupertino 确认框与编辑 Sheet 转场
+
+2026-11-20，固定 Flutter 3.50.0 从扩展详情点击「卸载」，从书架选项打开「管理分类」。在开启减弱动态的基线上，卸载确认的整屏容器在首帧及 60ms 时分别是 1.30 倍和约 1.18 倍，分类 Sheet 上沿在同一间隔从视口下缘移动至约 575 逻辑像素。两项原位回归均先失败。
+
+正式调用现共用 Cupertino 路由的系统动画策略，常规转场沿用组件库实现，两类弹层在减弱动态时于各自最终位置淡入淡出。弹层打开后切换到关闭动画，键盘取消卸载和点击完成关闭分类在下一测试帧均移除弹层，模拟时间无需推进。关闭动画时重新打开卸载确认，首帧即到最终状态。取消确认无账户 POST，关闭分类无目录 revision 变化，重新打开并明确卸载后只写一次。浅深主题测试复查了 Sheet 顶部露出的背景色。Flutter 全套 957 项回归通过，入口为 `apps/reader` 中的 `flutter test`。[共享转场](../../apps/reader/lib/widgets/app_routes.dart) · [卸载回归](../../apps/reader/test/extensions/extensions_controller_test.dart) · [分类回归](../../apps/reader/test/library/category_page_test.dart) · [背景回归](../../apps/reader/test/theme/app_backdrop_test.dart)
+
+同日用既有 Mihon 0.21.3 隔离参考环境将三项设备动画倍率设为 0。两色分别冷启动书架，进入「浏览」后直接点「迁移」。深色、浅色视频分别逐帧核对 12 帧及 14 帧。迁移列表在约 1.87 秒开始出现时已显示 MangaDex 和 xkcd，未拍到 20.01 单独加载帧。参考主图为 **165/170（97.1%）**，Karuyomi 跨版本双主题主图为 **168/171（98.2%）**。隔离模拟器和专用 ADB 已关闭。Codex 内置浏览器控制未取得当前聊天的活动页面，本轮正式 Web 与 Karuyomi 原生均未采图。[逐状态清单](mihon-state-coverage.md)
+
 ## Mihon 源浏览追加
 
 2026-11-20，固定 Mihon 0.21.3 在 720×1600、320dpi 的只读参考模拟器中，两种显式主题均从相同 MangaDex 热门列表滑到第一页末尾。暂扣实际 MangaDex API 的下一页 CONNECT 时，「Bakebeta!」和「Kurenai-san wa Yoru wo Kurenai」等原封面留在列表内，旋转进度出现在最后一行下方。进度的双主题辅助边界均为 `[160,712,200,752)` 逻辑像素。放行后继续滚动，两色均出现新的「Seifuku Kanojo」与「Honey Creep」。原图/XML 成对登记在 12.08。[逐状态清单](mihon-state-coverage.md)

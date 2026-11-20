@@ -1,3 +1,4 @@
+import '../../widgets/app_routes.dart';
 import '../../widgets/edit_sheet.dart';
 
 import 'dart:async';
@@ -23,7 +24,7 @@ Future<bool?> showCustomCoverEditor({
   required MangaEditContext target,
   required Listenable lifecycle,
   required bool Function() isCurrent,
-}) => showCupertinoSheet<bool>(
+}) => showAppSheet<bool>(
   context: context,
   enableDrag: false,
   scrollableBuilder: (context, _) => _CoverEditor(

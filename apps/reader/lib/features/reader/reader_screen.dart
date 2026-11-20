@@ -1,4 +1,5 @@
 import '../../theme/app_theme.dart';
+import '../../widgets/app_routes.dart';
 import '../../widgets/choice_field.dart';
 
 import 'dart:async';
@@ -1397,7 +1398,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final scheduler = _scheduler;
     final pin = pool.pin(resource.id);
     unawaited(
-      showCupertinoDialog<void>(
+      showAppDialog<void>(
         context: context,
         builder: (dialogContext) => NotificationListener<ReaderImageDecoded>(
           onNotification: (notification) {

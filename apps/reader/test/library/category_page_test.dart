@@ -1009,6 +1009,61 @@ void main() {
   );
 
   testWidgets(
+    'category management fades at its resting position and closes without animation',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(reduceMotion: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await create(tester);
+      await show(tester);
+      final before = server.catalog().revision;
+      await tap(tester, iconLabel('书架选项'));
+      final manage = find.widgetWithText(CupertinoMenuItem, '管理分类');
+      await tester.ensureVisible(manage);
+      await tester.runAsync(() async {
+        await tester.tap(manage);
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pump();
+      await tester.pump();
+      final sheet = find.byType(EditSheet, skipOffstage: false);
+      final initialRect = tester.getRect(sheet);
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(tester.getRect(sheet), initialRect);
+      expect(
+        find.ancestor(
+          of: sheet,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is FadeTransition &&
+                widget.opacity.value > 0 &&
+                widget.opacity.value < 1,
+          ),
+        ),
+        findsWidgets,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(sheet), initialRect);
+      expect(categoryTitle('想读'), findsOneWidget);
+
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      await tester.pump();
+      await tester.tap(find.text('完成'));
+      await tester.pump();
+      expect(find.byType(EditSheet, skipOffstage: false), findsNothing);
+      expect(server.catalog().revision, before);
+      await hide(tester);
+    },
+  );
+
+  testWidgets(
     'category management remains usable on a narrow display with long names',
     (tester) async {
       tester.view.devicePixelRatio = 1;

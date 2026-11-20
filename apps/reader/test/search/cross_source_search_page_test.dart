@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show Tristate;
 
-import 'package:karuyomi/widgets/app_page_route.dart';
+import 'package:karuyomi/widgets/app_routes.dart';
 
 import '../test_app.dart';
 

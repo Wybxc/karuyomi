@@ -14,7 +14,7 @@ import 'package:karuyomi/data/settings_repository.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/theme/app_theme.dart';
-import 'package:karuyomi/widgets/app_page_route.dart';
+import 'package:karuyomi/widgets/app_routes.dart';
 import 'package:karuyomi/widgets/edit_sheet.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 

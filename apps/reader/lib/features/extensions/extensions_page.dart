@@ -1,4 +1,4 @@
-import '../../widgets/app_page_route.dart';
+import '../../widgets/app_routes.dart';
 import '../../widgets/choice_field.dart';
 import '../../theme/app_theme.dart';
 
@@ -464,7 +464,7 @@ Future<void> installExtension(
       (previous.catalogUrl != build.catalogUrl ||
           previous.repoId != build.repoId);
   if (replacing) {
-    final accepted = await showCupertinoDialog<bool>(
+    final accepted = await showAppDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('确认替换扩展来源'),
@@ -813,7 +813,7 @@ class const ExtensionDetailsPage({
     if (installed == null || !controller.canEdit) return;
     final name = item.name;
     final origin = [?item.exact?.version, item.repositoryName].join(' · ');
-    final accepted = await showCupertinoDialog<bool>(
+    final accepted = await showAppDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: Text('卸载“$name”？'),
@@ -1121,7 +1121,7 @@ class const ExtensionRepositoriesPage({
     BuildContext context,
     ({String url, String name}) draft,
     String? failure,
-  ) => showCupertinoDialog(
+  ) => showAppDialog(
     context: context,
     builder: (context) => HookBuilder(
       builder: (context) {
@@ -1202,7 +1202,7 @@ class const ExtensionRepositoriesPage({
       if (preview == null && failure == null) return;
     } while (preview == null);
     final candidate = preview;
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showAppDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('确认添加仓库'),
@@ -1249,7 +1249,7 @@ class const ExtensionRepositoriesPage({
           ).name,
         )
         .toList();
-    final accepted = await showCupertinoDialog<bool>(
+    final accepted = await showAppDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('移除仓库'),

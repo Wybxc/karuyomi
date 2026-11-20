@@ -1,6 +1,6 @@
 import '../test_support/cupertino.dart';
 
-import 'package:karuyomi/widgets/app_page_route.dart';
+import 'package:karuyomi/widgets/app_routes.dart';
 import 'package:karuyomi/widgets/choice_field.dart';
 
 import 'test_app.dart';

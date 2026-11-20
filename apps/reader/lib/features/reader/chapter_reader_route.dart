@@ -10,6 +10,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/reading_progress.dart';
 import '../../diagnostics/reader_baseline.dart';
+import '../../widgets/app_routes.dart';
 import '../../widgets/edit_sheet.dart';
 import '../browse/catalog_controller.dart';
 import '../bookmarks/chapter_bookmarks_controller.dart';
@@ -193,7 +194,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       sourceName: _source.sourceName,
       sourceLang: _source.sourceLang,
     );
-    await showCupertinoSheet<void>(
+    await showAppSheet<void>(
       context: context,
       enableDrag: false,
       scrollableBuilder: (context, _) => settings_ui.MangaSettingsEditor(
@@ -660,9 +661,8 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     final navigator = Navigator.of(context);
     final waiting = fromCanvas
         ? null
-        : CupertinoDialogRoute<void>(
+        : AppDialogRoute<void>(
             context: context,
-            barrierDismissible: false,
             builder: (context) => PopScope<void>(
               canPop: false,
               child: CupertinoAlertDialog(

@@ -1,6 +1,6 @@
 import '../../theme/app_theme.dart';
 import '../../widgets/choice_field.dart';
-import '../../widgets/app_page_route.dart';
+import '../../widgets/app_routes.dart';
 
 import 'dart:async';
 
@@ -54,7 +54,7 @@ class _MigrationPageState extends State<MigrationPage> {
         : '选中 ${controller.selectedChapters.length} 条章节映射；'
               '已读：${controller.copyRead ? '补充缺失标记' : '不复制'}；'
               '书签：${controller.copyBookmarks ? '补充缺失标记' : '不复制'}。';
-    final accepted = await showCupertinoDialog<bool>(
+    final accepted = await showAppDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('确认迁移到目标作品'),
@@ -127,7 +127,7 @@ class _MigrationPageState extends State<MigrationPage> {
   }
 
   Future<void> _showOriginalDetails(MigrationDraft pending) =>
-      showCupertinoDialog<void>(
+      showAppDialog<void>(
         context: context,
         builder: (context) => CupertinoAlertDialog(
           title: const Text('原迁移操作详情'),

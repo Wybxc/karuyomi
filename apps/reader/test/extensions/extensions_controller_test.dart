@@ -1608,8 +1608,31 @@ void main() {
       final before = submissions();
       tester.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(reduceMotion: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
       await tester.pumpAndSettle();
-      await tap(tester, uninstall);
+      await tester.ensureVisible(uninstall);
+      await tester.tap(uninstall);
+      await tester.pump();
+      final initialRect = tester.getRect(dialog);
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(tester.getRect(dialog), initialRect);
+      expect(
+        find.ancestor(
+          of: dialog,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is FadeTransition &&
+                widget.opacity.value > 0 &&
+                widget.opacity.value < 1,
+          ),
+        ),
+        findsWidgets,
+      );
+      await tester.pumpAndSettle();
       expect(dialog, findsOneWidget);
       expect(find.text('卸载“${testCatalogSource.name}”？'), findsOneWidget);
       expect(find.textContaining('书架、分类、阅读进度'), findsOneWidget);
@@ -1622,6 +1645,9 @@ void main() {
         of: dialog,
         matching: find.widgetWithText(CupertinoButton, '取消'),
       );
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
       expect(
@@ -1630,10 +1656,20 @@ void main() {
         tester.widget<CupertinoButton>(cancel),
       );
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await tester.pumpAndSettle();
-      expect(dialog, findsNothing);
+      await tester.pump();
+      expect(
+        find.byType(CupertinoAlertDialog, skipOffstage: false),
+        findsNothing,
+      );
       expect(catalog.installedExtensions.single.enabled, false);
       expect(submissions(), before);
+      await tester.tap(uninstall);
+      await tester.pump();
+      expect(ModalRoute.of(tester.element(dialog))!.animation!.value, 1);
+      await tester.tap(cancel);
+      await tester.pump();
+      tester.platformDispatcher.clearAccessibilityFeaturesTestValue();
+      await tester.pumpAndSettle();
       await tap(tester, uninstall);
       await tap(tester, confirm);
       expect(submissions(), before + 1);

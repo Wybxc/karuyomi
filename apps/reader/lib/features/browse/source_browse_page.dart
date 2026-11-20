@@ -1,5 +1,5 @@
 import '../../theme/app_theme.dart';
-import '../../widgets/app_page_route.dart';
+import '../../widgets/app_routes.dart';
 
 import 'dart:async';
 
@@ -265,7 +265,7 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
   }
 
   Future<void> _filters() async {
-    final applied = await showCupertinoSheet<bool>(
+    final applied = await showAppSheet<bool>(
       context: context,
       enableDrag: false,
       scrollableBuilder: (context, _) =>
@@ -284,7 +284,7 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
     final target = recovery ?? catalog.currentPreferencesTarget,
         repository = catalog.sourcePreferences;
     if (target == null || repository == null) return;
-    await showCupertinoSheet<void>(
+    await showAppSheet<void>(
       context: context,
       enableDrag: false,
       scrollableBuilder: (context, _) => SourcePreferencesSheet(

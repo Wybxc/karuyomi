@@ -1,3 +1,4 @@
+import '../../widgets/app_routes.dart';
 import '../../widgets/edit_sheet.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -18,7 +19,7 @@ Future<Set<String>?> showChapterReadDialog({
   required bool Function() isCurrent,
 }) {
   FocusManager.instance.primaryFocus?.unfocus();
-  return showCupertinoSheet<Set<String>>(
+  return showAppSheet<Set<String>>(
     context: context,
     enableDrag: false,
     scrollableBuilder: (context, _) => _ChapterReadDialog(

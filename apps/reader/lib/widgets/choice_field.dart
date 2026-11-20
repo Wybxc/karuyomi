@@ -1,7 +1,7 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
-import 'app_page_route.dart';
+import 'app_routes.dart';
 import '../theme/app_theme.dart';
 
 /// Small sets use a menu; Source and language catalogs need searchable choices.

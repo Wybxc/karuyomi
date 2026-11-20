@@ -1,4 +1,5 @@
 import '../../theme/app_theme.dart';
+import '../../widgets/app_routes.dart';
 import '../../widgets/choice_field.dart';
 
 import 'dart:async';
@@ -333,7 +334,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                           'cross-search-error-details',
                           group.target.key,
                         )),
-                        onPressed: () => showCupertinoDialog<void>(
+                        onPressed: () => showAppDialog<void>(
                           context: context,
                           builder: (context) => CupertinoAlertDialog(
                             title: Text('${group.target.source.name} · 错误详情'),
