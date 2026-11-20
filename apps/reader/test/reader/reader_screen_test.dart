@@ -245,6 +245,76 @@ void main() {
     },
   );
 
+  testWidgets(
+    'chapter transition keeps its feedback and actions readable on the dimmed canvas',
+    (tester) async {
+      final canvasCases = [
+        (Brightness.light, ReaderBackground.white, 80, const Color(0xFF333333)),
+        (Brightness.dark, ReaderBackground.white, 50, const Color(0xFF808080)),
+        (Brightness.dark, ReaderBackground.white, 0, CupertinoColors.white),
+        (Brightness.light, ReaderBackground.black, 80, CupertinoColors.black),
+      ];
+      final transition = find.byType(ReaderChapterTransition);
+      for (final (appearance, background, dim, canvas) in canvasCases) {
+        for (final loading in [true, false]) {
+          var retried = false;
+          await tester.pumpWidget(
+            CupertinoApp(
+              theme: readerAppTheme(appearance),
+              home: ReaderChapterTransition(
+                edge: ReaderChapterEdge.previous,
+                currentChapter: (name: '3320', scanlator: ''),
+                targetChapter: (name: '3319', scanlator: ''),
+                background: background,
+                dimPercent: dim,
+                loading: loading,
+                error: loading ? null : '目标章节没有页面',
+                onContinue: null,
+                onRetry: loading ? null : () => retried = true,
+                onReturn: () {},
+              ),
+            ),
+          );
+          expect(
+            find.descendant(
+              of: transition,
+              matching: find.byKey(const ValueKey('reader-content-dimming')),
+            ),
+            findsNothing,
+          );
+          final chapter = find.text('3319');
+          final surface = find
+              .ancestor(of: chapter, matching: find.byType(ColoredBox))
+              .first;
+          final canvasColor = tester.widget<ColoredBox>(surface).color;
+          expect(canvasColor.toARGB32(), canvas.toARGB32());
+          final text = find.text(loading ? '正在加载章节页面' : '目标章节没有页面');
+          final back = find.widgetWithText(CupertinoButton, '返回本章');
+          for (final color in [
+            tester.widget<Text>(chapter).style!.color!,
+            tester.widget<Text>(text).style!.color!,
+            DefaultTextStyle.of(tester.element(find.text('返回本章'))).style.color!,
+          ]) {
+            final luminances = [
+              Color.alphaBlend(color, canvasColor).computeLuminance(),
+              canvasColor.computeLuminance(),
+            ]..sort();
+            expect(
+              (luminances.last + .05) / (luminances.first + .05),
+              greaterThanOrEqualTo(4.5),
+            );
+          }
+          expect(back.hitTestable(), findsOneWidget);
+          if (!loading) {
+            await tester.tap(find.widgetWithText(CupertinoButton, '重试'));
+            expect(retried, isTrue);
+          }
+        }
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final mode in [ReadingMode.continuous, ReadingMode.webtoon]) {
     testWidgets(
       '$mode only opens a chapter boundary after a drag beyond the scroll extent',

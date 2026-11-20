@@ -67,12 +67,61 @@ class const ReaderChapterTransition({
   required final VoidCallback? onRetry,
   required final VoidCallback? onReturn,
 }) extends StatelessWidget {
+  static const _minimumTextContrast = 4.5;
+
   @override
   Widget build(BuildContext context) {
+    final canvas = Color.alphaBlend(
+      CupertinoColors.black.withValues(alpha: dimPercent / 100),
+      _readerBackgroundColor(context, background),
+    );
+    final brightness =
+        _contrast(CupertinoColors.black, canvas) >= _minimumTextContrast
+        ? Brightness.light
+        : Brightness.dark;
+    return CupertinoTheme(
+      data: readerAppTheme(brightness),
+      child: ColoredBox(
+        color: canvas,
+        child: LayoutBuilder(
+          builder: (context, bounds) => _buildPanel(context, bounds, canvas),
+        ),
+      ),
+    );
+  }
+
+  static double _contrast(Color ink, Color canvas) {
+    final surface = canvas.computeLuminance();
+    final painted = Color.alphaBlend(ink, canvas).computeLuminance();
+    return (math.max(surface, painted) + .05) /
+        (math.min(surface, painted) + .05);
+  }
+
+  Widget _buildPanel(
+    BuildContext context,
+    BoxConstraints bounds,
+    Color canvas,
+  ) {
     final previous = edge == ReaderChapterEdge.previous;
     final direction = previous ? '上一章' : '下一章';
-    final foreground = _readerForegroundColor(context, background);
-    final secondary = foreground.withValues(alpha: .75);
+    final foreground = AppColors.label.resolveFrom(context);
+    final muted = foreground.withValues(alpha: .75);
+    final secondary = _contrast(muted, canvas) >= _minimumTextContrast
+        ? muted
+        : foreground;
+
+    Color roleOnCanvas(CupertinoDynamicColor role) {
+      final color = role.resolveFrom(context);
+      if (_contrast(color, canvas) >= _minimumTextContrast) return color;
+      final highContrast =
+          CupertinoTheme.brightnessOf(context) == Brightness.dark
+          ? role.darkHighContrastColor
+          : role.highContrastColor;
+      return _contrast(highContrast, canvas) >= _minimumTextContrast
+          ? highContrast
+          : foreground;
+    }
+
     final theme = CupertinoTheme.of(context).textTheme;
     final body = theme.textStyle.copyWith(color: foreground);
     final caption = theme.actionSmallTextStyle.copyWith(color: secondary);
@@ -98,104 +147,96 @@ class const ReaderChapterTransition({
             textAlign: TextAlign.center,
           )
         : chapter(direction, target);
-    return _ReaderContent(
-      background: background,
-      dimPercent: dimPercent,
-      child: LayoutBuilder(
-        builder: (context, bounds) {
-          final scale = MediaQuery.textScalerOf(context).scale(17) / 17;
-          final inset = (bounds.maxWidth * (scale > 1.5 ? .08 : .18)).clamp(
-            12.0,
-            64.0,
-          );
-          final chapterSpacing = (bounds.maxHeight * .07 / scale).clamp(
-            24.0,
-            56.0,
-          );
-          return Center(
-            child: SingleChildScrollView(
-              primary: false,
-              padding: EdgeInsets.symmetric(horizontal: inset, vertical: 16),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: Semantics(
-                  container: true,
-                  label: '章节过渡',
-                  explicitChildNodes: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (previous) neighbor else chapter('本章', currentChapter),
-                      SizedBox(height: chapterSpacing),
-                      if (previous) chapter('本章', currentChapter) else neighbor,
-                      if (loading) ...[
+    final scale = MediaQuery.textScalerOf(context).scale(17) / 17;
+    final inset = (bounds.maxWidth * (scale > 1.5 ? .08 : .18)).clamp(
+      12.0,
+      64.0,
+    );
+    final chapterSpacing = (bounds.maxHeight * .07 / scale).clamp(24.0, 56.0);
+    return Center(
+      child: SingleChildScrollView(
+        primary: false,
+        padding: EdgeInsets.symmetric(horizontal: inset, vertical: 16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Semantics(
+            container: true,
+            label: '章节过渡',
+            explicitChildNodes: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (previous) neighbor else chapter('本章', currentChapter),
+                SizedBox(height: chapterSpacing),
+                if (previous) chapter('本章', currentChapter) else neighbor,
+                if (loading) ...[
+                  const SizedBox(height: 8),
+                  Semantics(
+                    liveRegion: true,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CupertinoActivityIndicator(color: secondary),
                         const SizedBox(height: 8),
-                        Semantics(
-                          liveRegion: true,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              CupertinoActivityIndicator(color: secondary),
-                              const SizedBox(height: 8),
-                              Text(
-                                '正在加载章节页面',
-                                style: caption,
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
+                        Text(
+                          '正在加载章节页面',
+                          style: caption,
+                          textAlign: TextAlign.center,
                         ),
                       ],
-                      if (error case final message?) ...[
-                        const SizedBox(height: 8),
-                        Semantics(
-                          liveRegion: true,
-                          child: Text(
-                            message,
-                            style: caption.copyWith(
-                              color: AppColors.error.resolveFrom(context),
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          CupertinoButton(
-                            sizeStyle: CupertinoButtonSize.medium,
-                            minimumSize: actionTarget,
-                            autofocus: onReturn != null,
-                            onPressed: onReturn,
-                            child: const Text('返回本章'),
-                          ),
-                          if (onRetry != null)
-                            CupertinoButton.filled(
-                              sizeStyle: CupertinoButtonSize.medium,
-                              minimumSize: actionTarget,
-                              onPressed: onRetry,
-                              child: const Text('重试'),
-                            )
-                          else if (onContinue != null)
-                            CupertinoButton.filled(
-                              sizeStyle: CupertinoButtonSize.medium,
-                              minimumSize: actionTarget,
-                              onPressed: onContinue,
-                              child: Text('进入$direction'),
-                            ),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
+                ],
+                if (error case final message?) ...[
+                  const SizedBox(height: 8),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      message,
+                      style: caption.copyWith(
+                        color: roleOnCanvas(AppColors.error),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    CupertinoButton(
+                      sizeStyle: CupertinoButtonSize.medium,
+                      minimumSize: actionTarget,
+                      autofocus: onReturn != null,
+                      foregroundColor: onReturn == null
+                          ? null
+                          : roleOnCanvas(AppColors.accent),
+                      onPressed: onReturn,
+                      child: const Text('返回本章'),
+                    ),
+                    if (onRetry != null)
+                      CupertinoButton.filled(
+                        sizeStyle: CupertinoButtonSize.medium,
+                        minimumSize: actionTarget,
+                        onPressed: onRetry,
+                        child: const Text('重试'),
+                      )
+                    else if (onContinue != null)
+                      CupertinoButton.filled(
+                        sizeStyle: CupertinoButtonSize.medium,
+                        minimumSize: actionTarget,
+                        onPressed: onContinue,
+                        child: Text('进入$direction'),
+                      ),
+                  ],
                 ),
-              ),
+              ],
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
