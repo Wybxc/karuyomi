@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-20，Karuyomi 底栏通过浅深主题的 Tab 焦点、键盘激活及鼠标和触屏接续复验。974 项 Flutter 测试和严格 Dart 分析通过。`ba3b31f` 的正式 Web 归档在隔离 Worker 中交付原始客户端字节，xkcd 清单实测 200 → 503 → 200。预览面板排队，正式 Web 主图待验。[底栏键盘复验](verification/mihon-cupertino-fidelity.md#底栏键盘焦点与切换) · [清单 HTTP 复验](verification/mihon-cupertino-fidelity.md#扩展准备失败的-http-复验)
+
 2026-11-20，复看 Mihon 浅深横竖屏底栏参考。Karuyomi 底栏按标签行高增高，两倍和三倍字号恢复完整图标并可点按三个入口。四组常规字号的前后组件 PNG 相同。972 项 Flutter 测试通过，正式 Web 和真机继续待验。[底栏大字号复验](verification/mihon-cupertino-fidelity.md#底栏大字号的横竖屏复验)
 
 2026-11-20，Mihon 下载失败与卸载参考逐图复看。Karuyomi 在浅深主题、360×480 两倍字号下，从「浏览 → 扩展」复验准备失败和卸载确认。安装重试核对同一构建与一次账户提交，本机副本重试和取消卸载均无新增提交。970 项 Flutter 测试通过，正式 Web 主图待验。[失败重试与卸载确认的短屏复验](verification/mihon-cupertino-fidelity.md#失败重试与卸载确认的短屏复验)

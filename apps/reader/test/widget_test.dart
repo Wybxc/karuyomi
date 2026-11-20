@@ -6,9 +6,10 @@ import 'package:karuyomi/widgets/choice_field.dart';
 import 'test_app.dart';
 
 import 'dart:async';
-import 'dart:ui' show SemanticsAction, Tristate;
+import 'dart:ui' show PointerDeviceKind, SemanticsAction, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/semantics.dart' show SemanticsData;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
@@ -331,6 +332,97 @@ void main() {
           expect(tester.widget<CupertinoTabBar>(navigation).currentIndex, next);
           expect(tester.takeException(), isNull);
         }
+      },
+    );
+
+    testWidgets(
+      'Cupertino navigation switches all destinations with the keyboard in $brightness',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        tester.view.physicalSize = const Size(360, 480);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpApp(const KaruyomiApp());
+        await tester.pumpAndSettle();
+
+        final bar = find.byKey(const ValueKey('app-navigation'));
+        Finder destination(int index) =>
+            find.byKey(ValueKey(('app-destination', index)));
+        SemanticsData tabSemantics(int index) =>
+            tester.getSemantics(destination(index)).getSemanticsData();
+        bool isFocused(int index) =>
+            tabSemantics(index).flagsCollection.isFocused == Tristate.isTrue;
+        void expectSelected(int current) {
+          expect(tester.widget<CupertinoTabBar>(bar).currentIndex, current);
+          expect(
+            tabSemantics(current).flagsCollection.isSelected,
+            Tristate.isTrue,
+          );
+        }
+
+        Future<void> key(LogicalKeyboardKey key) async {
+          await tester.sendKeyEvent(key);
+          await tester.pumpAndSettle();
+        }
+
+        for (var step = 0; step < 8 && !isFocused(1); step++) {
+          await key(LogicalKeyboardKey.tab);
+        }
+        expect(isFocused(1), isTrue);
+        expect(tabSemantics(1).label, contains('浏览'));
+        expect(tabSemantics(1).hasAction(SemanticsAction.tap), isTrue);
+        expectSelected(0);
+        await key(LogicalKeyboardKey.enter);
+        expect(find.text('连接漫画服务'), findsOneWidget);
+        expectSelected(1);
+        expect(isFocused(1), isTrue);
+
+        await key(LogicalKeyboardKey.tab);
+        expect(isFocused(2), isTrue);
+        tester.view.physicalSize = const Size(800, 360);
+        await tester.pumpAndSettle();
+        expect(isFocused(2), isTrue);
+        await key(LogicalKeyboardKey.space);
+        expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
+        expectSelected(2);
+        expect(isFocused(2), isTrue);
+
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        try {
+          await key(LogicalKeyboardKey.tab);
+          expect(isFocused(1), isTrue);
+          await key(LogicalKeyboardKey.tab);
+          expect(isFocused(0), isTrue);
+        } finally {
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        }
+        await key(LogicalKeyboardKey.numpadEnter);
+        expect(find.text('书架还是空的'), findsOneWidget);
+        expectSelected(0);
+        expect(isFocused(0), isTrue);
+
+        await tester.tapAt(
+          tester.getCenter(destination(2)),
+          kind: PointerDeviceKind.mouse,
+        );
+        await tester.pumpAndSettle();
+        expectSelected(2);
+        expect(isFocused(2), isTrue);
+        await key(LogicalKeyboardKey.space);
+        expectSelected(2);
+        await tester.tap(destination(1));
+        await tester.pumpAndSettle();
+        expectSelected(1);
+        expect([
+          isFocused(0),
+          isFocused(1),
+          isFocused(2),
+        ], everyElement(isFalse));
+        expect(tester.takeException(), isNull);
       },
     );
 

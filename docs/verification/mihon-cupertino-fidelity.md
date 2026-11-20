@@ -1722,6 +1722,18 @@ Karuyomi 在 macOS Flutter 3.50.0 中从真实应用壳层点按书架、浏览�
 
 内置浏览器控制端仍未取得活动页面，本轮证据来自 Flutter 组件。正式 Web、真机呈现、未取得的主图与最终像素验收仍待完成。Mihon 双主题参考 **168/170（98.8%）**，Karuyomi 跨版本双主题主图 **168/171（98.2%）**。[逐状态清单](mihon-state-coverage.md)
 
+## 底栏键盘焦点与切换
+
+2026-11-20，在 macOS Flutter 3.50.0 组件中从真实应用壳层进入书架、浏览和设置。`b08d698` 在两倍字号、浅深主题下分别连续按 Tab 12 次，三页的任一底栏入口都未获得焦点。修正后可从正文 Tab 到带有名称、点击动作及选中语义的底栏项。焦点落在「浏览」而书架仍为当前页时，光环出现在浏览图标外，书架保留选中色。[应用壳层](../../apps/reader/lib/main.dart)
+
+360×480 竖屏的浅深组件图使用 Arial Unicode 测试字形和应用打包的 Cupertino 图标。焦点环范围均为 `[158,396,202,429)`，图标布局为 30×30。实际按 Enter 进入浏览，按 Tab 前往设置，改为 800×360 后按空格打开设置，再以 Shift+Tab 和数字键盘 Enter 返回书架。焦点跨激活及视口变化保持可用。已聚焦时用鼠标点设置，焦点和选择一同移动，随后空格仍在设置。触屏点浏览后焦点环收起。正式 Web 键盘和画面待验。[键盘与触控回归](../../apps/reader/test/widget_test.dart)
+
+## 扩展准备失败的 HTTP 复验
+
+2026-11-20，取 `ba3b31f` 分支 CI 的正式 Web 归档 `14634052318`，在下载边界校验 16,328,071 字节和 SHA-256 `dd9c27c5e13da914051e6de084cbed6aa470f443565ebbe3f2fa49bcdabe68f6`。在临时目录用 Vite 装配既有扩展快照，启动官方 Wrangler harness 与独立 D1。HTTP 实际取得页面、扩展索引中的两个构建及 bootstrap JSON。交付的 `main.dart.59f3fcda.js` 与原 CI 归档逐字节相同。[分支 CI](https://github.com/Wybxc/karuyomi/actions/runs/44746445435) · [验收入口](../../apps/api/test/README.md)
+
+同一 xkcd 构建清单先返回 200。由 harness 标准输入执行 `editor fail-read extension-manifest` 后返回 503，执行 `editor pass extension-manifest` 后恢复 200 且清单逐字节一致。服务正常退出，审计中的三条记录均为 GET。把仍可用的本地预览交给当前 Codex 聊天时，面板请求排队，控制端仍无活动页面。08.K9 和 09.K6 正式双主题主图待验。Mihon 双主题参考 **168/170（98.8%）**，Karuyomi 跨版本双主题主图 **168/171（98.2%）**。[逐状态清单](mihon-state-coverage.md)
+
 ## Mihon 确认面板与扩展卸载
 
 2026-11-20，复核固定 Mihon 0.21.3（`feadad5e`，versionCode 39）的六组双主题参考原图和对应 UI 层级，补计通用确认节点 30.04。原图为 720×1600、320dpi，以下把面板连续纯色区域的边界归一为 360×800 逻辑坐标。每组两色边界相同。五种应用内面板的表面为浅 `#FCF7FF`、深 `#292730`，系统卸载框两色均为 `#EEEDF4`。[逐状态清单](mihon-state-coverage.md)

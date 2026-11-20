@@ -20,6 +20,8 @@
 
 ## 推进与待办
 
+- [x] 底栏浅深主题补齐键盘聚焦与激活。三处入口共用现有页面切换，大字号下的横竖屏和鼠标接续通过组件回归。扩展准备失败的官方 Web 夹具已经通过真实 HTTP 故障与恢复复验，内置浏览器预览排队，双主题主图待验。[底栏键盘复验](../verification/mihon-cupertino-fidelity.md#底栏键盘焦点与切换) · [清单 HTTP 复验](../verification/mihon-cupertino-fidelity.md#扩展准备失败的-http-复验)
+
 - [x] 对照 Mihon 浅深横竖屏底栏，在 Karuyomi 复现大字号挤压图标。Cupertino 底栏按标签实测行高增高，两倍、三倍字号下图标完整，三个入口均可点按。正式 Web 与真机待验。[底栏大字号复验](../verification/mihon-cupertino-fidelity.md#底栏大字号的横竖屏复验)
 
 - [x] 对照 Mihon 下载失败重试和卸载确认，在 Karuyomi 的浅深主题组件中将失败原因和账户卸载影响放到长名称之前。两倍字号下可核对原构建并直接重试，也可阅读数据保留范围后取消或确认卸载。两个状态的正式 Web 主图待验。[失败重试与卸载确认的短屏复验](../verification/mihon-cupertino-fidelity.md#失败重试与卸载确认的短屏复验)

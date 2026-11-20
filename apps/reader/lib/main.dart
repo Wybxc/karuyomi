@@ -118,10 +118,28 @@ class _AppShellState extends ConsumerState<AppShell> {
     CupertinoIcons.compass,
     CupertinoIcons.slider_horizontal_3,
   ];
+  final _tabFocusNodes = [
+    for (final label in _labels) FocusNode(debugLabel: label),
+  ];
 
   void _select(int index) {
     setState(() => _index = index);
     if (index == 2) unawaited(_settings?.refresh());
+  }
+
+  void _tapTab(int index) {
+    final focusedTab = _tabFocusNodes
+        .where((node) => node.hasFocus)
+        .firstOrNull;
+    if (focusedTab != null) {
+      if (FocusManager.instance.highlightMode ==
+          FocusHighlightMode.traditional) {
+        _tabFocusNodes[index].requestFocus();
+      } else {
+        focusedTab.unfocus();
+      }
+    }
+    _select(index);
   }
 
   void _applyTheme(Brightness? value) {
@@ -610,6 +628,37 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
+  BottomNavigationBarItem _navigationItem(int index) => BottomNavigationBarItem(
+    label: _labels[index],
+    // The selected item gains theme wrappers in CupertinoTabBar. Keep the
+    // focus node attached to the same destination across those changes.
+    icon: CupertinoFocusHalo.withRoundedSuperellipse(
+      key: GlobalObjectKey(_tabFocusNodes[index]),
+      borderRadius: const BorderRadius.all(Radius.circular(10)),
+      child: FocusableActionDetector(
+        focusNode: _tabFocusNodes[index],
+        actions: {
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              _select(index);
+              return null;
+            },
+          ),
+        },
+        child: SizedBox(
+          width: kMinInteractiveDimensionCupertino,
+          height: double.infinity,
+          child: Center(
+            child: Icon(
+              _icons[index],
+              key: ValueKey(('app-destination', index)),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
   Widget _navigationBar() => LayoutBuilder(
     builder: (context, constraints) {
       final bar = CupertinoTabBar(
@@ -617,14 +666,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         backgroundColor: AppColors.toolbar.resolveFrom(context),
         inactiveColor: AppColors.secondaryLabel.resolveFrom(context),
         currentIndex: _index,
-        onTap: _select,
-        items: [
-          for (var i = 0; i < _labels.length; i++)
-            BottomNavigationBarItem(
-              icon: Icon(_icons[i], key: ValueKey(('app-destination', i))),
-              label: _labels[i],
-            ),
-        ],
+        onTap: _tapTab,
+        items: [for (var i = 0; i < _labels.length; i++) _navigationItem(i)],
       );
       final labelStyle = CupertinoTheme.of(context).textTheme.tabLabelTextStyle;
       final textScaler = MediaQuery.textScalerOf(context);
@@ -727,6 +770,9 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   void dispose() {
+    for (final node in _tabFocusNodes) {
+      node.dispose();
+    }
     final catalog = _catalog;
     final platform = _platform;
     final retired = _retiredProgress.toList();
