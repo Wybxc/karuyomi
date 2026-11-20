@@ -100,6 +100,7 @@ enum RuntimeErrorCode {
   protocolError,
   integrityError,
   limitExceeded,
+  extensionAssetUnavailable,
 }
 
 final class const RuntimeEvent({

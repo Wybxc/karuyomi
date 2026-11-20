@@ -622,6 +622,8 @@ final class ExtensionsController extends ChangeNotifier {
       '当前应用不支持此扩展材料，请更新应用。',
     RuntimeException(code: RuntimeErrorCode.integrityError) =>
       '扩展下载校验失败，请检查更新后重试。',
+    RuntimeException(code: RuntimeErrorCode.extensionAssetUnavailable) =>
+      '无法从仓库读取扩展材料。',
     FormatException(:final message) => message,
     StateError(:final message) => message.toString(),
     _ => '操作未完成，请重试。',

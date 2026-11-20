@@ -988,6 +988,7 @@ final class CatalogController extends ChangeNotifier {
           RuntimeErrorCode.runtimeLost => _runtimeReconnectMessage,
           RuntimeErrorCode.unsupportedCapability => '这个漫画源功能暂未支持',
           RuntimeErrorCode.integrityError => '构建校验失败，请重新加载',
+          RuntimeErrorCode.extensionAssetUnavailable => '无法从仓库读取扩展材料，请重试',
           RuntimeErrorCode.sourceError => '漫画源请求失败，请重试',
           RuntimeErrorCode.storageBusy => '这个漫画源已在其他标签页或窗口运行，请先关闭后再连接',
           RuntimeErrorCode.protocolError => '漫画源返回的数据与当前版本不兼容',

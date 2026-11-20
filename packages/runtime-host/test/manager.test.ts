@@ -1497,7 +1497,10 @@ test('preparation uses only static delivery, shares verified bytes, and leaves a
         build: descriptor,
       }),
     ),
-  ).rejects.toMatchObject({ code: 'runtime_lost' });
+  ).rejects.toMatchObject({
+    code: 'extension_asset_unavailable',
+    retryable: true,
+  });
   expect(workers[0]?.terminated).toBe(false);
   await expect(
     manager.invoke(call('after-preparation-failure', session.generation)),

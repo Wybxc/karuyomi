@@ -290,6 +290,44 @@ void main() {
     expect(platform.openedBuilds, isEmpty);
   });
 
+  test(
+    'unavailable extension materials keep the same build ready to retry',
+    () async {
+      final candidate = catalog.builds.single;
+      platform.preparationFailure = wire.RuntimeError(
+        code: wire
+            .RuntimeErrorCode
+            .RUNTIME_ERROR_CODE_EXTENSION_ASSET_UNAVAILABLE,
+        message: 'Static extension asset returned HTTP 503',
+        retryable: true,
+      );
+
+      await manager.install(candidate);
+
+      final failure = manager.preparationFailure!;
+      expect(failure.reason, '无法从仓库读取扩展材料。');
+      expect(failure.build, same(candidate));
+      expect(catalog.status, ServiceStatus.ready);
+      expect(manager.repository.pendingGlobal(), isNull);
+      expect(platform.businessServer.appliedMutations, 0);
+
+      platform.preparationFailure = null;
+      await manager.install(failure.build);
+
+      expect(manager.preparationFailure, isNull);
+      expect(platform.preparations.map((request) => request.build), [
+        candidate.toProto(),
+        candidate.toProto(),
+      ]);
+      expect(platform.preparations.map((request) => request.catalog), [
+        candidate.catalog,
+        candidate.catalog,
+      ]);
+      expect(manager.installed.single.buildId, candidate.id);
+      expect(platform.businessServer.appliedMutations, 1);
+    },
+  );
+
   test('explicit cancellation discards a late preparation without changing account settings', () async {
     final entered = Completer<void>();
     final release = Completer<void>();

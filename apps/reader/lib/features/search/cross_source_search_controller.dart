@@ -437,6 +437,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       RuntimeErrorCode.runtimeLost => '漫画源连接已失效，请重试。',
       RuntimeErrorCode.unsupportedCapability => '漫画源暂不支持这个操作。',
       RuntimeErrorCode.integrityError => '扩展文件校验失败，请重新加载。',
+      RuntimeErrorCode.extensionAssetUnavailable => '无法从仓库读取扩展材料，请重试。',
       RuntimeErrorCode.sourceError => '漫画源请求失败，请重试。',
       RuntimeErrorCode.storageBusy => '漫画源正在其他标签页或窗口运行，请关闭后重试。',
       RuntimeErrorCode.protocolError => '漫画源返回的数据无法读取，请重新加载。',

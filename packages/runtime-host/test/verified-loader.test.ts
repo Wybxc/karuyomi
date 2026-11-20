@@ -235,21 +235,41 @@ test('static index accepts more than 64KiB, validates current package uniqueness
 });
 
 test.each([
-  { status: 401, code: 'runtime_lost' },
-  { status: 403, code: 'runtime_lost' },
-  { status: 302, code: 'protocol_error' },
+  { status: 401, code: 'extension_asset_unavailable', retryable: false },
+  { status: 403, code: 'extension_asset_unavailable', retryable: false },
+  { status: 503, code: 'extension_asset_unavailable', retryable: true },
+  { status: 302, code: 'protocol_error', retryable: false },
 ])(
   'static delivery failures never fall back to Access APIs: $status',
-  async ({ status, code }) => {
+  async ({ status, code, retryable }) => {
     const loader = new VerifiedLoader(
       origin,
       (async () => new Response('', { status })) as typeof fetch,
     );
     await expect(
       loader.artifact(catalog, await artifact(), signal(), true),
-    ).rejects.toMatchObject({ code });
+    ).rejects.toMatchObject({ code, retryable });
   },
 );
+
+test('static manifest fetch failure preserves explicit cancellation', async () => {
+  const loader = new VerifiedLoader(origin, async () => {
+    throw new TypeError('Network unavailable');
+  });
+  const manifestPath = '/extensions/builds/test-build/manifest.json';
+  await expect(
+    loader.manifest(catalog, manifestPath, signal()),
+  ).rejects.toMatchObject({
+    code: 'extension_asset_unavailable',
+    retryable: true,
+  });
+
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    loader.manifest(catalog, manifestPath, controller.signal),
+  ).rejects.toBe(controller.signal.reason);
+});
 
 test('login HTML is never executed as a bundle, even with HTTP 200', async () => {
   const loader = new VerifiedLoader(
