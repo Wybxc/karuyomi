@@ -52,6 +52,7 @@ class const _CoverEditor({
 enum _CoverOperation { load, pick, save }
 
 class _CoverEditorState extends State<_CoverEditor> {
+  final _draftKey = GlobalKey();
   CoverSnapshot? _confirmed;
   Uint8List? _selected;
   bool _clearing = false;
@@ -123,12 +124,20 @@ class _CoverEditorState extends State<_CoverEditor> {
     });
     try {
       final bytes = await selectCoverImage();
-      if (!_current || bytes == null) return;
+      if (!mounted || !_current) return;
+      if (bytes == null) {
+        _revealDraft();
+        return;
+      }
+      // The first layout needs the decoded aspect ratio to reveal the preview.
+      await precacheImage(MemoryImage(bytes), context);
+      if (!_current) return;
       setState(() {
         _selected = bytes;
         _clearing = false;
         _attempted = false;
       });
+      _revealDraft();
     } on FormatException catch (error) {
       if (_current) setState(() => _error = error.message);
     } catch (_) {
@@ -136,6 +145,18 @@ class _CoverEditorState extends State<_CoverEditor> {
     } finally {
       if (mounted) setState(() => _operation = null);
     }
+  }
+
+  void _revealDraft() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final draft = _draftKey.currentContext;
+      if (draft == null ||
+          !_current ||
+          ModalRoute.of(draft)?.isCurrent != true) {
+        return;
+      }
+      unawaited(Scrollable.ensureVisible(draft));
+    });
   }
 
   Future<void> _save({bool retry = false}) async {
@@ -401,11 +422,14 @@ class _CoverEditorState extends State<_CoverEditor> {
                                 ? AppColors.error.resolveFrom(context)
                                 : null,
                             onPressed: editable
-                                ? () => setState(() {
-                                    _selected = null;
-                                    _clearing = true;
-                                    _attempted = false;
-                                  })
+                                ? () {
+                                    setState(() {
+                                      _selected = null;
+                                      _clearing = true;
+                                      _attempted = false;
+                                    });
+                                    _revealDraft();
+                                  }
                                 : null,
                             child: const Text('清除封面'),
                           ),
@@ -414,6 +438,7 @@ class _CoverEditorState extends State<_CoverEditor> {
                   ),
                   if (preview != null || clearing)
                     CupertinoFormSection.insetGrouped(
+                      key: _draftKey,
                       header: Text(
                         saving
                             ? '正在提交的修改'

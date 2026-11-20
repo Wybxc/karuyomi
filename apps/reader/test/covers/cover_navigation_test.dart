@@ -179,8 +179,30 @@ void main() {
     );
     expect(shortPreview.center.dx, closeTo(tester.getCenter(editor).dx, 1));
     final confirmedWrites = server.appliedMutations;
+
+    picker.files.add(_imageFile(color: 160, width: 300, height: 150));
+    await _tap(tester, select);
+    await _decodeImage(tester, draft);
+    final viewport = tester.getRect(scrollView);
+    final shortDraft = tester.getRect(draft);
+    expect(shortDraft.top, greaterThanOrEqualTo(viewport.top));
+    expect(shortDraft.bottom, lessThanOrEqualTo(viewport.bottom));
+    expect(shortDraft.center.dx, closeTo(tester.getCenter(editor).dx, 1));
+    final guidance = find.text('仅当前会话保留，保存并收到服务端确认后才更新封面。');
+    expect(tester.getRect(guidance).bottom, lessThanOrEqualTo(viewport.bottom));
+    expect(transport.uploads, hasLength(1));
+
+    position.jumpTo(position.minScrollExtent);
+    await tester.pumpAndSettle();
+    picker.files.add(null);
+    await _tap(tester, select);
+    expect(tester.getRect(draft).bottom, lessThanOrEqualTo(viewport.bottom));
+    expect(tester.getRect(guidance).bottom, lessThanOrEqualTo(viewport.bottom));
+
     await _tap(tester, find.byKey(const ValueKey('cover-clear')));
-    expect(find.text('清除自定义封面'), findsOneWidget);
+    final clear = find.text('清除自定义封面');
+    expect(clear, findsOneWidget);
+    expect(viewport.contains(tester.getCenter(clear)), isTrue);
     await _tap(tester, find.text('关闭'));
     expect(editor, findsNothing);
     expect(transport.uploads, hasLength(1));
