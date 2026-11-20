@@ -38,6 +38,21 @@ class AppPageRoute<T> extends CupertinoPageRoute<T> {
   }
 
   @override
+  Duration get transitionDuration {
+    final context = navigator?.context;
+    return context != null && MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : super.transitionDuration;
+  }
+
+  @override
+  bool didPop(T? result) {
+    // A page can outlive a change in the system motion preference.
+    controller!.reverseDuration = reverseTransitionDuration;
+    return super.didPop(result);
+  }
+
+  @override
   DelegatedTransitionBuilder? get delegatedTransition =>
       _reduced ? null : super.delegatedTransition;
 
@@ -48,9 +63,15 @@ class AppPageRoute<T> extends CupertinoPageRoute<T> {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    if (MediaQuery.disableAnimationsOf(context)) return child;
-    if (MediaQuery.reduceMotionOf(context)) {
-      return FadeTransition(opacity: animation, child: child);
+    final disabled = MediaQuery.disableAnimationsOf(context);
+    if (disabled || MediaQuery.reduceMotionOf(context)) {
+      // Keep the native edge-back recognizer while removing page displacement.
+      return super.buildTransitions(
+        context,
+        const AlwaysStoppedAnimation<double>(1),
+        const AlwaysStoppedAnimation<double>(0),
+        disabled ? child : FadeTransition(opacity: animation, child: child),
+      );
     }
     return super.buildTransitions(
       context,

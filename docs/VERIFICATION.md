@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-20，Mihon 在关闭设备动画的隔离参考副本取得图源、插件和作品详情首次加载的浅深实拍，主图达到 165/170（97.1%）。Karuyomi 共享页面路由的减弱动态保留侧滑淡出，关闭动画时首帧完成入栈和退出。279 项 Flutter 回归通过，正式转场实拍待验。[首次加载参考与 Cupertino 页面转场](verification/mihon-cupertino-fidelity.md#首次加载参考与-cupertino-页面转场)
+
 2026-11-20，固定 Mihon 完成 08.14 双主题类加载错误、堆栈复制与卸载落点复验，主图达到 162/170（95.3%）。08.13 的三种原因已拍，未签名仍待。Karuyomi 准备失败提示保留扩展、版本、仓库及原因，140 项定向回归通过。新增 08.K9 后跨版本主图为 168/171（98.2%），该状态正式 Web 待验。[插件无法加载的双主题复验](verification/mihon-cupertino-fidelity.md#mihon-插件无法加载的双主题复验)
 
 2026-11-20，Mihon 核对六种确认面板的浅深原图，并实测从同一 MangaDex 详情取消卸载。Karuyomi 补齐 Cupertino 卸载确认，138 项定向 Flutter 回归通过。Mihon 双主题 161/170（94.7%），Karuyomi 新登记 09.K6 后为 168/170（98.8%），卸载确认正式 Web 尚待。[确认面板与扩展卸载](verification/mihon-cupertino-fidelity.md#mihon-确认面板与扩展卸载)

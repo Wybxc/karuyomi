@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-20，Mihon 补齐类加载失败诊断 08.14，双主题主图为 162/170（95.3%）。08.13 已实拍内容过滤、不支持的库版本和缺失清单字段，未签名分项继续待验。Karuyomi 单列准备失败（08.K9），跨版本双主题主图为 168/171（98.2%）。准备失败、卸载确认和原生未连接缺正式双主题主图。[插件无法加载的双主题复验](mihon-cupertino-fidelity.md#mihon-插件无法加载的双主题复验)
+2026-11-20，Mihon 关闭设备动画后，在同一次首次进入流程补齐图源、插件和作品详情的浅深加载画面（07.01、08.01、16.01），双主题主图为 165/170（97.1%）。Karuyomi 跨版本双主题主图为 168/171（98.2%）。准备失败、卸载确认和原生未连接仍缺双主题主图。[首次加载与页面转场](mihon-cupertino-fidelity.md#首次加载参考与-cupertino-页面转场)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -259,19 +259,19 @@ stateDiagram-v2
     T3 --> T0: 反馈结束后可重试
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class E0,E2,E12 partial
-    class S1,S3,S4,S5,E1,E3,E5,E7,E8,E9,E10,E11,E13,E14,D0,D1,D2,D3,R0,R1,R2,R3,R4,R5,R6,T0,T2 paired
+    class E2,E12 partial
+    class S0,S1,S3,S4,S5,E0,E1,E3,E5,E7,E8,E9,E10,E11,E13,E14,D0,D1,D2,D3,R0,R1,R2,R3,R4,R5,R6,T0,T2 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                                | 浅色                                                                                                       | 深色                                                                                                    |
 | ------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| 07.01   | 漫画源标题及加载指示；冷启动进入源页                                                 | 待                                                                                                         | 待                                                                                                      |
+| 07.01   | 「浏览」标题、「图源」选中和中央加载指示，冷启动后的首次进入                         | `s0701-first-loading-light`（关闭设备动画的实拍帧）                                                        | `s0701-first-loading-dark`（关闭设备动画的实拍帧）                                                      |
 | 07.02   | 源名、语言、最近使用、可执行尾部操作                                                 | `s0702-source-list-light`                                                                                  | `s0702-source-list-dark`                                                                                |
 | 07.03   | 无可用源说明与扩展入口；关闭在线语言仍有Local source，普通UI触发未取得               | 待                                                                                                         | 待（Local source 项与真正空态分开）                                                                     |
 | 07.04   | Mihon 置顶分组与普通分组、取消置顶入口；对照 Karuyomi 收藏分组                       | `s0704-source-pinned-light`                                                                                | `s0704-source-pinned-dark`                                                                              |
 | 07.05   | 语言列表及当前启用项；两侧只启用多语言/English                                       | `s0705-source-language-light`（上段）；下段待补                                                            | `s0705-source-language-dark`（上段）；下段待补                                                          |
 | 07.06   | 当前源及置顶/隐藏等可用动作                                                          | `s0706-source-actions-light`                                                                               | `s0706-source-actions-dark`                                                                             |
-| 08.01   | 首次加载指示及禁用刷新，下拉刷新已成对记录                                           | 待首次加载                                                                                                 | 待首次加载                                                                                              |
+| 08.01   | 「插件」选中和目录首次加载指示，源码在该阶段禁用下拉刷新                             | `s0801-first-loading-light`（关闭设备动画的实拍帧）                                                        | `s0801-first-loading-dark`（关闭设备动画的实拍帧）                                                      |
 | 08.02   | 无仓库、无已装扩展、无查询的空目录，插件商店入口及返回                               | `s0802-extension-directory-empty-light`                                                                    | `s0802-extension-directory-empty-dark`                                                                  |
 | 08.03   | 未加载/已安装/可安装/更新分组、名称、语言、版本、主操作；更新仍待                    | `s0803-extensions-installed-light`、`s0803-extension-catalog-light`、`s0803-extensions-untrusted-light`    | `s0803-extensions-installed-dark`、`s0803-extension-catalog-dark`、`s0803-extensions-untrusted-dark`    |
 | 08.04   | 查询、无匹配说明、清空/返回；清空后恢复列表                                          | `s0804-extension-empty-light`；恢复 `s0804-extension-clear-light`                                          | `s0804-extension-empty-dark`；恢复 `s0804-extension-clear-dark`                                         |
@@ -309,7 +309,7 @@ stateDiagram-v2
 
 11.01 清理前两主题均为 165 kB；浅色清理删除 3 个文件，稳定占用为 1.37 kB，深色再次清理删除 0 个文件，占用保持 1.37 kB。上游明确保留 cache journal，非零值不表示清理失败。反馈图截到 toast 淡入，只用于确认内容，不能作稳定合成色/字形基准；失败反馈仍待。备份/导出等未实现功能只作为本页背景，不扩大本轮产品范围。
 
-08.02 关闭查询后从真正空目录进入空插件商店，两主题都有落点。08.01 两种主题的下拉视频只记录已打开空目录上的刷新。08.08–08.10 用同一 Komga 1.6.76 样本，已核对就地重试、下载取消、实际「安装中」短帧及返回前的 Android 系统提示。08.07 排队和 08.09 完成安装继续待验。10.07 两主题用同一地址触发连接错误，保留输入并直接重试成功。[同条件量测](mihon-cupertino-fidelity.md#mihon-扩展目录与仓库错误)
+08.02 关闭查询后从真正空目录进入空插件商店，两主题都有落点。08.01 的冷加载帧来自关闭设备动画的独立实拍，下拉视频仍用于已打开空目录的刷新。08.08–08.10 用同一 Komga 1.6.76 样本，已核对就地重试、下载取消、实际「安装中」短帧及返回前的 Android 系统提示。08.07 排队和 08.09 完成安装继续待验。10.07 两主题用同一地址触发连接错误，保留输入并直接重试成功。[首次加载量测](mihon-cupertino-fidelity.md#首次加载参考与-cupertino-页面转场) · [目录复验](mihon-cupertino-fidelity.md#mihon-扩展目录与仓库错误)
 
 ## 12–15：源内浏览、筛选、偏好与跨源搜索
 
@@ -556,12 +556,12 @@ stateDiagram-v2
     Q7 --> M2: 返回英文原作
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class M1,M2,M3,M4,M5,M6,H0,H1,H2,H3,H4,H5,H6,H7,H8,V0,V1,V2,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10,Q11,Q12,Q13,Q14 paired
+    class M0,M1,M2,M3,M4,M5,M6,H0,H1,H2,H3,H4,H5,H6,H7,H8,V0,V1,V2,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10,Q11,Q12,Q13,Q14 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                                          | 浅色                                                                                                                           | 深色                                                                                                                       |
 | ------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| 16.01   | 本地读取前的全屏加载指示；源码此分支没有独立标题或返回按钮，系统返回另验                       | 待                                                                                                                             | 待                                                                                                                         |
+| 16.01   | 打开已有 xkcd 的全屏加载指示，系统返回在加载期间的转换待验                                     | `s1601-first-loading-light`（关闭设备动画的实拍帧）                                                                            | `s1601-first-loading-dark`（关闭设备动画的实拍帧）                                                                         |
 | 16.02   | One Piece / MangaDex ALL 的完整未收藏详情、作者、状态、摘要和添加入口                          | `s1602-one-piece-ready-light`                                                                                                  | `s1602-one-piece-ready-dark`                                                                                               |
 | 16.03   | 已在书架状态、分类/续读入口及同一元数据                                                        | `s1603-details-light`                                                                                                          | `s1603-details-dark`                                                                                                       |
 | 16.04   | 同一 One Piece 的长简介、完整标签及收起；分首屏与末段，并核对收起后回原详情                    | `s1604-one-piece-expanded-{top,tail}-light`、`s1602-one-piece-ready-light`                                                     | `s1604-one-piece-expanded-{top,tail}-dark`、`s1602-one-piece-ready-dark`                                                   |

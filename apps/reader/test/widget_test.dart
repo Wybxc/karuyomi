@@ -135,16 +135,16 @@ void main() {
         expect(MediaQuery.disableAnimationsOf(context), disableAnimations);
         const pageKey = ValueKey('motion-test-page');
         final navigator = Navigator.of(context);
-        unawaited(
-          navigator.push<void>(
-            AppPageRoute<void>(
-              builder: (_) => const SizedBox.expand(key: pageKey),
-            ),
-          ),
+        final route = AppPageRoute<void>(
+          builder: (_) => const SizedBox.expand(key: pageKey),
         );
+        unawaited(navigator.push<void>(route));
         await tester.pump();
+        if (disableAnimations) {
+          expect(route.animation!.status, AnimationStatus.completed);
+        }
         await tester.pump(const Duration(milliseconds: 60));
-        final page = find.byKey(pageKey);
+        final page = find.byKey(pageKey, skipOffstage: false);
         expect(tester.getTopLeft(page), Offset.zero);
         final fades = tester.widgetList<FadeTransition>(
           find.ancestor(of: page, matching: find.byType(FadeTransition)),
@@ -161,12 +161,57 @@ void main() {
         }
         await tester.pumpAndSettle();
         expect(tester.getTopLeft(page), Offset.zero);
-        navigator.pop();
+        if (disableAnimations) {
+          navigator.pop();
+          await tester.pump();
+          expect(page, findsNothing);
+        } else {
+          final bounds = tester.getRect(page);
+          final gesture = await tester.startGesture(
+            Offset(bounds.left + 1, bounds.center.dy),
+          );
+          try {
+            await gesture.moveBy(const Offset(30, 0));
+            await tester.pump();
+            await gesture.moveBy(Offset(bounds.width * 0.6, 0));
+            await tester.pump();
+            expect(route.popGestureInProgress, isTrue);
+            expect(tester.getTopLeft(page), Offset.zero);
+            expect(route.animation!.value, lessThan(1));
+          } finally {
+            await gesture.up();
+          }
+        }
         await tester.pumpAndSettle();
+        expect(page, findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
   }
+
+  testWidgets('a page pop uses the latest disabled-animation preference', (
+    tester,
+  ) async {
+    await tester.pumpApp(const KaruyomiApp());
+    await tester.pumpAndSettle();
+    final navigator = Navigator.of(tester.element(find.byType(AppShell)));
+    const pageKey = ValueKey('motion-preference-page');
+    unawaited(
+      navigator.push<void>(
+        AppPageRoute<void>(builder: (_) => const SizedBox.expand(key: pageKey)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await tester.pump();
+    navigator.pop();
+    await tester.pump();
+    expect(find.byKey(pageKey, skipOffstage: false), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final brightness in Brightness.values) {
     for (final size in [

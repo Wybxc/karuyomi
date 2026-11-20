@@ -444,6 +444,13 @@ void main() {
         );
         await tester.pumpAndSettle();
         await tester.binding.handlePopRoute();
+        await tester.pump();
+        if (disabled) {
+          expect(
+            find.byKey(const ValueKey('global-mode'), skipOffstage: false),
+            findsNothing,
+          );
+        }
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('global-mode')), findsNothing);
         expect(
