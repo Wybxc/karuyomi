@@ -251,6 +251,7 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
       ),
       ('可安装', visible.where((item) => item.installed == null).toList()),
     ];
+    final preparationFailed = _controller.hasPreparationFailure;
     final list = CustomScrollView(
       key: const PageStorageKey('extensions-scroll'),
       slivers: [
@@ -345,11 +346,12 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
                       ),
                   ],
                 ),
-                ExtensionOperationStatus(
-                  controller: _controller,
-                  showPreparation: false,
-                  showProgress: !readingEmptyDirectory,
-                ),
+                if (!preparationFailed)
+                  ExtensionOperationStatus(
+                    controller: _controller,
+                    showPreparation: false,
+                    showProgress: !readingEmptyDirectory,
+                  ),
                 if (settings.snapshot == null &&
                     canCheck &&
                     settings.error == null)
@@ -406,19 +408,33 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
           ),
       ],
     );
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (_controller.preparationBuild case final build?)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: _ExtensionPreparationStatus(
-              controller: _controller,
-              target: build,
+    final content = LayoutBuilder(
+      builder: (context, constraints) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_controller.preparationBuild case final build?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: _ExtensionPreparationStatus(
+                controller: _controller,
+                target: build,
+              ),
+            )
+          else if (preparationFailed)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: constraints.maxHeight / 2),
+              child: SingleChildScrollView(
+                primary: false,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: ExtensionOperationStatus(
+                  controller: _controller,
+                  showPreparation: false,
+                ),
+              ),
             ),
-          ),
-        Expanded(child: list),
-      ],
+          Expanded(child: list),
+        ],
+      ),
     );
     return widget.embedded
         ? content
@@ -554,10 +570,14 @@ class const ExtensionOperationStatus({
         if (controller.message case final message?)
           Text(message, key: const ValueKey('extensions-message')),
         if (controller.error case final error?)
-          Text(
-            error,
-            key: const ValueKey('extensions-error'),
-            style: errorStyle,
+          Semantics(
+            container: true,
+            liveRegion: true,
+            child: Text(
+              error,
+              key: const ValueKey('extensions-error'),
+              style: errorStyle,
+            ),
           ),
         if (controller.settings.error case final error?)
           Text(error, style: errorStyle),

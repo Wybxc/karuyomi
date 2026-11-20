@@ -581,6 +581,81 @@ void main() {
 
   for (final appearance in Brightness.values) {
     testWidgets(
+      'preparation failure identifies its build until an explicit retry in $appearance',
+      (tester) async {
+        platform.preparationFailure = wire.RuntimeError(
+          code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_UNSUPPORTED_CAPABILITY,
+          message: 'Fixture rejected this build',
+        );
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await show(tester, appearance: appearance, size: const Size(360, 800));
+        final install = find.widgetWithText(CupertinoButton, '安装');
+        final error = find.byKey(const ValueKey('extensions-error'));
+        final candidate = catalog.builds.single;
+        final repository = catalog.repositories.single;
+        await tap(tester, install);
+        final message = tester.widget<Text>(error).data!;
+        expect(
+          message,
+          contains(
+            '${testCatalogSource.name} · ${candidate.version} · ${repository.name}',
+          ),
+        );
+        expect(message, contains('当前应用不支持此扩展材料'));
+        expect(error.hitTestable(), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(const PageStorageKey('extensions-scroll')),
+            matching: error,
+          ),
+          findsNothing,
+        );
+        final semantics = tester.ensureSemantics();
+        try {
+          await tester.pump();
+          expect(
+            tester
+                .getSemantics(error)
+                .getSemanticsData()
+                .flagsCollection
+                .isLiveRegion,
+            isTrue,
+          );
+        } finally {
+          semantics.dispose();
+        }
+        expect(
+          find.byKey(const ValueKey('extension-preparation-status')),
+          findsNothing,
+        );
+        expect(catalog.installedExtensions, isEmpty);
+        expect(
+          platform.businessServer.requests.where(
+            (request) => request.method == 'POST',
+          ),
+          isEmpty,
+        );
+
+        platform.preparationFailure = null;
+        await tap(tester, install);
+        expect(error, findsNothing);
+        expect(platform.preparations.map((request) => request.build.buildId), [
+          candidate.id,
+          candidate.id,
+        ]);
+        expect(catalog.installedExtensions.single.buildId, candidate.id);
+        expect(
+          platform.businessServer.requests.where(
+            (request) => request.method == 'POST',
+          ),
+          hasLength(1),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
       'preparation names its build and remains visible until cancellation is acknowledged in $appearance',
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(360, 800));

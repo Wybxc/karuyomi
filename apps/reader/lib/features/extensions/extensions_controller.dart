@@ -46,7 +46,14 @@ final class ExtensionsController extends ChangeNotifier {
   SettingsController get _settingsCommands =>
       container.read(settingsControllerProvider(catalog, repository).notifier);
   wire.ExtensionCacheState? cache;
-  String? error;
+  ({String message, bool duringPreparation})? _failure;
+  String? get error => _failure?.message;
+  set error(String? value) {
+    _failure = value == null
+        ? null
+        : (message: value, duringPreparation: false);
+  }
+
   String? message;
   String? _preparationId;
   CatalogBuild? _preparationBuild;
@@ -70,6 +77,8 @@ final class ExtensionsController extends ChangeNotifier {
   bool get canEdit => available && !busy && !catalog.busy && settings.canEdit;
   bool get preparing => available && _preparationId != null;
   CatalogBuild? get preparationBuild => available ? _preparationBuild : null;
+  bool get hasPreparationFailure =>
+      available && _failure?.duringPreparation == true;
   ExtensionLocalCopy? get cleanupTarget => available ? _cleanupTarget : null;
   String? get cleanupError => available ? _cleanupError : null;
   List<wire.InstalledExtension> get installed =>
@@ -564,7 +573,17 @@ final class ExtensionsController extends ChangeNotifier {
     } catch (failure) {
       if (available) {
         operationFailure = failure is RuntimeException ? failure.code : null;
-        error = _operationError(failure);
+        final reason = _operationError(failure);
+        if (_preparationBuild case final build?) {
+          final item = ExtensionListing(catalog: catalog, candidate: build);
+          _failure = (
+            message:
+                '${item.name} · ${build.version} · ${item.repositoryName}\n$reason',
+            duringPreparation: true,
+          );
+        } else {
+          error = reason;
+        }
       }
     } finally {
       if (_preparationCancellation case final cancellation?) await cancellation;
