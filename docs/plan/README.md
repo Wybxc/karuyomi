@@ -71,6 +71,8 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 **当前视觉重构**按全部现有状态推进，统一 Cupertino 导航、控件、语义色与转场。Mihon 双主题参考为 168/170（98.8%）。Karuyomi 跨版本双主题主图为 172/173（99.4%），原生未连接仍缺主图。常规转场、图源空态、迁移候选分页和预览落点、详情刷新故障已通过两色正式 Web。减弱动态的 Web 与原生现场、最终像素、其余变体和生产继续验收。PR #8 为草稿。[交付计划](mihon-cupertino-fidelity.md) · [逐状态清单](../verification/mihon-state-coverage.md)
 
+设置、作品详情、分类 Sheet 和卸载确认通过两色正式 Web 的可控减弱动态媒体查询，含运行中切换和详情左缘返回。实际系统偏好和原生现场继续验收。[减弱动态媒体查询](../verification/mihon-cupertino-fidelity.md#正式-web-的减弱动态媒体查询复验)
+
 本机存储可从短屏列表定位到清理反馈，长名称及摘要随字号换行。两色正式 Web 通过真实跨标签占用、原副本重试、空态和重新下载。Mihon 在单文件删除受阻时实拍到删除 0 个，11.04 的外层异常提示待补。[本机存储复验](../verification/mihon-cupertino-fidelity.md#本机存储的名称容量与清理反馈) · [真实占用与恢复](../verification/mihon-cupertino-fidelity.md#本机副本占用与恢复的双主题正式-web)
 
 阅读器双主题正式 Web 已核对工具显隐、单页重试、画布内章节缺页与就绪。稳定等待补齐浅深主图，80% 调暗时可读并能返回原页，两色明确切章后均在新文档续读。深色短横屏已通过缺页重试。[双主题稳定等待](../verification/mihon-cupertino-fidelity.md#双主题正式-web-的稳定章间等待)
