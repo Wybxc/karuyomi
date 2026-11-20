@@ -20,6 +20,8 @@
 
 ## 推进与待办
 
+- [x] Mihon 浅深色实测六个缓存文件无法删除时仍报删除 0 个，恢复权限后重试释放。Karuyomi 本机存储支持长名称换行，容量按实际字节数选单位。11.04 的外层失败提示和新版正式 Web 待验。[本机存储复验](../verification/mihon-cupertino-fidelity.md#本机存储的名称容量与清理反馈)
+
 - [x] 卸载确认和书架分类管理通过减弱动态及关闭动画的组件回归。确认框与编辑 Sheet 共用页面路由的系统动画设置。固定 Mihon 从冷启动直接进入迁移，两色首个列表帧均已加载，20.01 继续补采。正式 Web 转场待验。[Cupertino 弹层转场](../verification/mihon-cupertino-fidelity.md#cupertino-确认框与编辑-sheet-转场)
 
 - [x] 关闭设备动画的固定 Mihon 录屏补齐图源、插件和作品详情三个首次加载的双主题主图。Karuyomi 共享页面在减弱动态时保留侧滑并淡出，关闭动画时入栈和退出零时长。279 项 Flutter 回归通过，正式页面与弹层转场继续核对。[首次加载参考与 Cupertino 页面转场](../verification/mihon-cupertino-fidelity.md#首次加载参考与-cupertino-页面转场)

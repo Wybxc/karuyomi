@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 import 'package:karuyomi/data/business_state_client.dart';
@@ -1185,6 +1186,64 @@ void main() {
       },
     );
 
+    testWidgets(
+      'storage reads the complete copy name and byte size at twice text size in $appearance',
+      (tester) async {
+        final name = '${'跨端阅读测试扩展资料目录' * 4}末尾';
+        final index = wire.decodeProtoJson(
+          wire.ExtensionIndex(),
+          platform.inventory,
+        );
+        index.builds.single.sources.single.name = name;
+        platform.inventory = wire.encodeProtoJson(index);
+        await tester.runAsync(() async {
+          await catalog.refreshCatalog();
+          await manager.install(catalog.builds.single);
+        });
+        expect(manager.installed, hasLength(1));
+        final writes = platform.businessServer.requests
+            .where((request) => request.method == 'POST')
+            .length;
+        await show(
+          tester,
+          appearance: appearance,
+          size: const Size(360, 800),
+          textScale: 2,
+        );
+        await tap(tester, find.byKey(const ValueKey('extensions-more')));
+        await tap(tester, find.widgetWithText(CupertinoMenuItem, '本机存储'));
+
+        final label = find.text(name);
+        await tester.ensureVisible(label);
+        final usage = find.byKey(const ValueKey('extensions-cache-usage'));
+        expect(
+          (
+            tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+            tester.widget<Text>(usage).data,
+          ),
+          (false, '1 个副本 · 256 B'),
+        );
+        final row = find.ancestor(
+          of: label,
+          matching: find.byType(CupertinoListTile),
+        );
+        expect(
+          find.descendant(of: row, matching: find.text('256 B')),
+          findsOneWidget,
+        );
+        final clear = find.byKey(ValueKey(('extension-forget', 'a' * 64)));
+        await tester.ensureVisible(clear);
+        expect(clear.hitTestable(), findsOneWidget);
+        expect(
+          platform.businessServer.requests.where(
+            (request) => request.method == 'POST',
+          ),
+          hasLength(writes),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     for (final scale in [1.0, 2.0]) {
       testWidgets(
         'storage exposes keyboard diagnostics and clears only the local copy at $appearance / $scale',
@@ -1243,6 +1302,7 @@ void main() {
             await tester.sendKeyEvent(LogicalKeyboardKey.enter);
             await tester.pumpAndSettle();
             expect(find.textContaining('a' * 64), findsOneWidget);
+            expect(find.textContaining('256 B / '), findsOneWidget);
             expect(tester.takeException(), isNull);
             await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
             await tester.sendKeyEvent(LogicalKeyboardKey.tab);

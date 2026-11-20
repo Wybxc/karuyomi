@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:proper_filesize/proper_filesize.dart' show FileSize;
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
 
@@ -1418,8 +1419,6 @@ class const ExtensionRepositoriesPage({
   }
 }
 
-String _bytes(int value) => '${(value / (1024 * 1024)).toStringAsFixed(1)} MiB';
-
 class const ExtensionStoragePage({
   super.key,
   required final ExtensionsController controller,
@@ -1465,7 +1464,7 @@ class const ExtensionStoragePage({
                   subtitle: cache == null
                       ? null
                       : Text(
-                          '${cache.artifacts.length} 个副本 · ${_bytes(cache.totalBytes)}',
+                          '${cache.artifacts.length} 个副本 · ${FileSize.fromBytes(cache.totalBytes)}',
                           key: const ValueKey('extensions-cache-usage'),
                         ),
                   trailing: checking
@@ -1483,11 +1482,13 @@ class const ExtensionStoragePage({
                   children: [
                     for (final artifact in cache.artifacts)
                       CupertinoListTile(
-                        title: Text(
-                          controller.artifactName(artifact.sha256),
-                          maxLines: 2,
+                        title: DefaultTextStyle(
+                          style: CupertinoTheme.of(context).textTheme.textStyle,
+                          child: Text(controller.artifactName(artifact.sha256)),
                         ),
-                        subtitle: Text(_bytes(artifact.byteLength)),
+                        subtitle: Text(
+                          FileSize.fromBytes(artifact.byteLength).toString(),
+                        ),
                         trailing: Semantics(
                           container: true,
                           enabled: canForget,
@@ -1556,7 +1557,9 @@ class const ExtensionStoragePage({
                             ),
                         child: Text(
                           [
-                            '${cache.artifacts.length} / ${cache.maxArtifacts} 个产物 · ${_bytes(cache.totalBytes)} / ${_bytes(cache.maxBytes)}',
+                            '${cache.artifacts.length} / ${cache.maxArtifacts} 个产物 · '
+                                '${FileSize.fromBytes(cache.totalBytes)} / '
+                                '${FileSize.fromBytes(cache.maxBytes)}',
                             for (final artifact in cache.artifacts)
                               '${controller.artifactName(artifact.sha256)} · ${artifact.sha256}',
                           ].join('\n'),

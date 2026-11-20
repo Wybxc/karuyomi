@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-20，固定 Mihon 浅深色实测六个缓存文件无法删除时仍显示删除 0 个，占用 134 kB。恢复权限后从同一入口删除六个文件，占用降至 3.20 kB。Karuyomi 本机存储支持长名称换行，容量按实际大小选用单位。Mihon 11.04 外层提示与 Karuyomi 正式 Web 待验。[本机存储的名称容量与清理反馈](verification/mihon-cupertino-fidelity.md#本机存储的名称容量与清理反馈)
+
 2026-11-20，Karuyomi 确认框与编辑 Sheet 共用 Cupertino 路由的动画设置。实际卸载和分类入口的组件回归核对原位淡入、关闭动画后首帧移除与取消零写入，Flutter 全套 957 项回归通过。固定 Mihon 直接进入迁移标签仍未拍到独立加载帧。正式 Web 转场待验。[Cupertino 确认框与编辑 Sheet 转场](verification/mihon-cupertino-fidelity.md#cupertino-确认框与编辑-sheet-转场)
 
 2026-11-20，Mihon 在关闭设备动画的隔离参考副本取得图源、插件和作品详情首次加载的浅深实拍，主图达到 165/170（97.1%）。Karuyomi 共享页面路由的减弱动态保留侧滑淡出，关闭动画时首帧完成入栈和退出。279 项 Flutter 回归通过，正式转场实拍待验。[首次加载参考与 Cupertino 页面转场](verification/mihon-cupertino-fidelity.md#首次加载参考与-cupertino-页面转场)

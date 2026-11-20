@@ -303,6 +303,8 @@ stateDiagram-v2
 
 原 11.02“清理确认”是未经调用点核对的假设，现已移除。Mihon 的 `SettingsDataScreen.getDataGroup()` 直接调用 `chapterCache.clear()`，只在完成/失败时显示 toast，没有独立确认框或可见忙碌分支；Karuyomi 的 `ExtensionStoragePage` 同样直接调用 `controller.forget(sha256)`。Karuyomi 的取消 ACK、资源清理失败和身份约束仍须另验，不因此省略。
 
+11.04 的双主题复验均记录六次单文件删除失败，实际提示删除 0 个文件，占用保留。恢复权限后重试成功，外层异常提示待实拍。[缓存清理复验](mihon-cupertino-fidelity.md#本机存储的名称容量与清理反馈)
+
 08.06 对应 `Reason.Untrusted` 的风险提示。08.13 的三种已采原因共用关闭与卸载结构。未签名测试包被 Android 安装器拒绝，Mihon 发行版的 `Unsigned` 面板待采。08.14 的等宽错误、复制完整堆栈与卸载落点均通过实测。08.15 继续记录 Android 安装权限横幅。[错误面板量测与复验步骤](mihon-cupertino-fidelity.md#mihon-插件无法加载的双主题复验)
 
 09.04 的开关关闭后，`ExtensionDetailsViewModel.subscribeToSources()` 按 `!enabled` 排序，将 Afrikaans 移到末尾；两主题都已拍到真正关闭的行，再重新启用回到首行。`s0901-mangadex-disabled-sorted-top-*` 只记录原位置移走，不作为关闭开关主图。09.03 的系统弹层两次均为 Android English 浅色，应用主题不控制其颜色；浅色从未信任列表发起，取消返回列表，深色从详情发起，取消返回详情，底层不同不计同状态像素叠图。`s0903-extension-uninstall-cancel-stale-dark` 的 XML 已返回详情，但 PNG 与确认图完全相同，已排除；另拍并实看稳定 `s0903-extension-uninstall-return-dark`。

@@ -1601,6 +1601,16 @@ Karuyomi 的页面回归复现关闭动画后仍在推进的路由计时和退�
 
 同日用既有 Mihon 0.21.3 隔离参考环境将三项设备动画倍率设为 0。两色分别冷启动书架，进入「浏览」后直接点「迁移」。深色、浅色视频分别逐帧核对 12 帧及 14 帧。迁移列表在约 1.87 秒开始出现时已显示 MangaDex 和 xkcd，未拍到 20.01 单独加载帧。参考主图为 **165/170（97.1%）**，Karuyomi 跨版本双主题主图为 **168/171（98.2%）**。隔离模拟器和专用 ADB 已关闭。Codex 内置浏览器控制未取得当前聊天的活动页面，本轮正式 Web 与 Karuyomi 原生均未采图。[逐状态清单](mihon-state-coverage.md)
 
+`39af158` 的分支、PR 与分支 Wasm 构建均通过。[分支检查](https://github.com/Wybxc/karuyomi/actions/runs/44683066119) · [PR 检查](https://github.com/Wybxc/karuyomi/actions/runs/44683070381)
+
+## 本机存储的名称容量与清理反馈
+
+2026-11-20，固定 Mihon 0.21.3（`feadad5e`）在 Android API 36、720×1600、320dpi 的隔离参考副本中打开「数据与存储」。浅深两色均使用 DEFAULT 主题。用调试 ADB 临时撤去已初始化的章节缓存目录的写权限，分别点击「清除章节缓存」。两个主题各记录六次文件删除 `IOException`，六个缓存文件的 SHA-256 在两次操作前后逐一相等。实拍均显示「已清除缓存，删除了 0 个文件」，用量仍是 134 kB。两色入口和用量的逻辑边界分别为 `[16,540,112,568)` 与 `[16,568,104.5,586)`。恢复原权限后，在浅色点击同一入口，实拍删除六个文件，占用降到 3.20 kB。
+
+Mihon 的单文件删除函数记录异常并返回失败，清理入口按成功数显示完成提示。11.04 所列的外层异常提示仍待实拍。隔离模拟器及专用 ADB 已关闭。[缓存源码](../../vendor/mihon/app/src/main/java/eu/kanade/tachiyomi/data/cache/ChapterCache.kt) · [存储入口](../../vendor/mihon/app/src/main/java/eu/kanade/presentation/more/settings/screen/SettingsDataScreen.kt) · [逐状态清单](mihon-state-coverage.md)
+
+Karuyomi 从扩展菜单打开「本机存储」，360×800 和两倍字号下的两色组件回归均在旧版复现长名称截断和 256 字节显示为 `0.0 MiB`。Cupertino 列表行的标题随字号换行，总量、明细与诊断容量按实际大小选用单位。复验确认完整名称、`256 B`、可点击的清理按钮和浏览存储时的零账户写入。固定 Flutter 3.50.0 的 157 项定向回归、客户端严格 Dart 分析与本机 Web JavaScript／Wasm 编译通过。内置浏览器控制端仍无活动页面，最新正式 Web 的主图和转场待验。[存储界面](../../apps/reader/lib/features/extensions/extensions_page.dart) · [扩展回归](../../apps/reader/test/extensions/extensions_controller_test.dart)
+
 ## Mihon 源浏览追加
 
 2026-11-20，固定 Mihon 0.21.3 在 720×1600、320dpi 的只读参考模拟器中，两种显式主题均从相同 MangaDex 热门列表滑到第一页末尾。暂扣实际 MangaDex API 的下一页 CONNECT 时，「Bakebeta!」和「Kurenai-san wa Yoru wo Kurenai」等原封面留在列表内，旋转进度出现在最后一行下方。进度的双主题辅助边界均为 `[160,712,200,752)` 逻辑像素。放行后继续滚动，两色均出现新的「Seifuku Kanojo」与「Honey Creep」。原图/XML 成对登记在 12.08。[逐状态清单](mihon-state-coverage.md)
