@@ -67,34 +67,15 @@ class const ReaderChapterTransition({
   required final VoidCallback? onRetry,
   required final VoidCallback? onReturn,
 }) extends StatelessWidget {
-  static const _minimumTextContrast = 4.5;
-
   @override
   Widget build(BuildContext context) {
-    final canvas = Color.alphaBlend(
-      CupertinoColors.black.withValues(alpha: dimPercent / 100),
-      _readerBackgroundColor(context, background),
-    );
-    final brightness =
-        _contrast(CupertinoColors.black, canvas) >= _minimumTextContrast
-        ? Brightness.light
-        : Brightness.dark;
-    return CupertinoTheme(
-      data: readerAppTheme(brightness),
-      child: ColoredBox(
-        color: canvas,
-        child: LayoutBuilder(
-          builder: (context, bounds) => _buildPanel(context, bounds, canvas),
-        ),
+    final canvas = _readerCanvasColor(context, background, dimPercent);
+    return _ReaderCanvas(
+      color: canvas,
+      child: LayoutBuilder(
+        builder: (context, bounds) => _buildPanel(context, bounds, canvas),
       ),
     );
-  }
-
-  static double _contrast(Color ink, Color canvas) {
-    final surface = canvas.computeLuminance();
-    final painted = Color.alphaBlend(ink, canvas).computeLuminance();
-    return (math.max(surface, painted) + .05) /
-        (math.min(surface, painted) + .05);
   }
 
   Widget _buildPanel(
@@ -106,18 +87,18 @@ class const ReaderChapterTransition({
     final direction = previous ? '上一章' : '下一章';
     final foreground = AppColors.label.resolveFrom(context);
     final muted = foreground.withValues(alpha: .75);
-    final secondary = _contrast(muted, canvas) >= _minimumTextContrast
+    final secondary = _readerContrast(muted, canvas) >= _readerTextContrast
         ? muted
         : foreground;
 
     Color roleOnCanvas(CupertinoDynamicColor role) {
       final color = role.resolveFrom(context);
-      if (_contrast(color, canvas) >= _minimumTextContrast) return color;
+      if (_readerContrast(color, canvas) >= _readerTextContrast) return color;
       final highContrast =
           CupertinoTheme.brightnessOf(context) == Brightness.dark
           ? role.darkHighContrastColor
           : role.highContrastColor;
-      return _contrast(highContrast, canvas) >= _minimumTextContrast
+      return _readerContrast(highContrast, canvas) >= _readerTextContrast
           ? highContrast
           : foreground;
     }
@@ -1302,7 +1283,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
     WidgetsBinding.instance.ensureVisualUpdate();
   }
 
-  Widget _image(ReaderPage page, {BoxFit fit = BoxFit.contain}) {
+  Widget _image(
+    BuildContext context,
+    ReaderPage page, {
+    BoxFit fit = BoxFit.contain,
+  }) {
     final snapshot = _scheduler.snapshot;
     final resource = snapshot.resources[page.key];
     final number = _reader.manifest.pages.indexOf(page) + 1;
@@ -1358,8 +1343,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
               }
               return true;
             },
-            child: ReaderImageCropScope(
-              enabled: widget.cropBorders,
+            child: ReaderImageAppearance(
+              cropBorders: widget.cropBorders,
+              dimPercent: widget.dimPercent,
               child: NotificationListener<ReaderImageCrop>(
                 onNotification: (notification) {
                   _afterImageNotification(
@@ -1424,7 +1410,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
               container: true,
               label: '正在加载第 $number 页',
               child: CupertinoActivityIndicator(
-                color: _readerForegroundColor(context, widget.background),
+                color: DefaultTextStyle.of(context).style.color,
               ),
             ),
           )
@@ -1564,7 +1550,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
               },
               onMoved: _onHorizontalScroll,
               onDoubleTap: () => _openZoom(page),
-              child: _image(page),
+              child: _image(context, page),
             ),
           );
         },
@@ -1572,7 +1558,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     ),
   );
 
-  Widget _paged() {
+  Widget _paged(BuildContext context) {
     final spread = _reader.spreads[_reader.spreadIndex];
     final scene = _pagedScene;
     final pannable =
@@ -1622,7 +1608,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     rect: scene.images[page.key]!,
                     child: SizedBox(
                       key: ValueKey('image-rect-${page.key}'),
-                      child: _image(page),
+                      child: _image(context, page),
                     ),
                   ),
               ],
@@ -1721,12 +1707,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
-  Widget _readingCanvas(double centerY) {
+  Widget _readingCanvas(double centerY, Color canvas) {
     final needsPositionNotice = _reader.requiresPositionNotice;
-    return DefaultTextStyle.merge(
-      style: TextStyle(
-        color: _readerForegroundColor(context, widget.background),
-      ),
+    return _ReaderCanvas(
+      color: canvas,
       child: Column(
         children: [
           if (needsPositionNotice) const Text('页面清单发生变化，已定位到最接近的页码。'),
@@ -1768,13 +1752,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         excluding: transition != null,
                         child: IgnorePointer(
                           ignoring: transition != null,
-                          child: _ReaderContent(
-                            background: widget.background,
-                            dimPercent: widget.dimPercent,
-                            child: _reader.isContinuous
-                                ? _continuous()
-                                : _paged(),
-                          ),
+                          child: _reader.isContinuous
+                              ? _continuous()
+                              : _paged(context),
                         ),
                       ),
                     ),
@@ -1883,6 +1863,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
       CurveTween(curve: Curves.easeInOutCubic),
     );
     final chapterTransition = widget.chapterTransition;
+    final canvas = _readerCanvasColor(
+      context,
+      widget.background,
+      widget.dimPercent,
+    );
     final navigationBar = toolbarMounted
         ? _ReaderNavigationBar(
             progress: toolbarProgress,
@@ -1929,7 +1914,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       child: Focus(
         autofocus: true,
         child: CupertinoPageScaffold(
-          backgroundColor: _readerBackgroundColor(context, widget.background),
+          backgroundColor: canvas,
           navigationBar: navigationBar,
           child: SafeArea(
             child: LayoutBuilder(
@@ -1943,7 +1928,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   children: [
                     Column(
                       children: [
-                        Expanded(child: _readingCanvas(centerY)),
+                        Expanded(child: _readingCanvas(centerY, canvas)),
                         if (toolbarMounted)
                           _ReaderToolbarTransition(
                             progress: toolbarProgress,
@@ -2430,52 +2415,52 @@ bool _sameAnchor(ReadingPosition first, ReadingPosition second) =>
     (first.viewportX - second.viewportX).abs() < 0.000001 &&
     (first.viewportY - second.viewportY).abs() < 0.000001;
 
-Color _readerBackgroundColor(
+Color _readerCanvasColor(
   BuildContext context,
   ReaderBackground background,
-) => switch (background) {
-  ReaderBackground.black => CupertinoColors.black,
-  ReaderBackground.white => CupertinoColors.white,
-  ReaderBackground.theme => CupertinoTheme.of(context).scaffoldBackgroundColor,
-};
+  int dimPercent,
+) => Color.alphaBlend(
+  CupertinoColors.black.withValues(alpha: dimPercent / 100),
+  switch (background) {
+    ReaderBackground.black => CupertinoColors.black,
+    ReaderBackground.white => CupertinoColors.white,
+    ReaderBackground.theme => CupertinoTheme.of(
+      context,
+    ).scaffoldBackgroundColor,
+  },
+);
 
-Color _readerForegroundColor(
-  BuildContext context,
-  ReaderBackground background,
-) => switch (background) {
-  ReaderBackground.black => CupertinoColors.white,
-  ReaderBackground.white => CupertinoColors.black,
-  ReaderBackground.theme => AppColors.label.resolveFrom(context),
-};
+const _readerTextContrast = 4.5;
 
-/// Applies appearance only to reading content, preserving input and controls.
-class const _ReaderContent({
-  required final ReaderBackground background,
-  required final int dimPercent,
+double _readerContrast(Color ink, Color canvas) {
+  final surface = canvas.computeLuminance();
+  final painted = Color.alphaBlend(ink, canvas).computeLuminance();
+  return (math.max(surface, painted) + .05) /
+      (math.min(surface, painted) + .05);
+}
+
+/// Resolves Cupertino feedback against the displayed reading surface.
+class const _ReaderCanvas({
+  required final Color color,
   required final Widget child,
 }) extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: _readerBackgroundColor(context, background),
-    child: DefaultTextStyle.merge(
-      style: TextStyle(color: _readerForegroundColor(context, background)),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          child,
-          if (dimPercent > 0)
-            IgnorePointer(
-              child: ColoredBox(
-                key: const ValueKey('reader-content-dimming'),
-                color: CupertinoColors.black.withValues(
-                  alpha: dimPercent / 100,
-                ),
-              ),
-            ),
-        ],
+  Widget build(BuildContext context) {
+    final dark =
+        _readerContrast(CupertinoColors.black, color) < _readerTextContrast;
+    return CupertinoTheme(
+      data: readerAppTheme(dark ? Brightness.dark : Brightness.light),
+      child: ColoredBox(
+        color: color,
+        child: DefaultTextStyle.merge(
+          style: TextStyle(
+            color: dark ? CupertinoColors.white : CupertinoColors.black,
+          ),
+          child: child,
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class const _ZoomImageDialog({
@@ -2606,8 +2591,9 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
           children: [
             Positioned.fromRect(
               rect: rect,
-              child: ReaderImageCropScope(
-                enabled: appearance.cropBorders,
+              child: ReaderImageAppearance(
+                cropBorders: appearance.cropBorders,
+                dimPercent: appearance.dimPercent,
                 child: _CroppedImage(
                   bounds: crop,
                   child: NotificationListener<ReaderImageDecoded>(
@@ -2645,9 +2631,14 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
   Widget build(BuildContext context) {
     _transform = useTransformationController();
     final appearance = useValueListenable(widget.appearance);
+    final canvas = _readerCanvasColor(
+      context,
+      appearance.background,
+      appearance.dimPercent,
+    );
     return CupertinoPageScaffold(
       key: const ValueKey('reader-image-viewer'),
-      backgroundColor: _readerBackgroundColor(context, appearance.background),
+      backgroundColor: canvas,
       navigationBar: CupertinoNavigationBar(
         automaticBackgroundVisibility: false,
         leading: CupertinoButton(
@@ -2681,9 +2672,8 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
         ),
       ),
       child: SafeArea(
-        child: _ReaderContent(
-          background: appearance.background,
-          dimPercent: appearance.dimPercent,
+        child: _ReaderCanvas(
+          color: canvas,
           child: LayoutBuilder(
             builder: (context, constraints) =>
                 _content(appearance, constraints),

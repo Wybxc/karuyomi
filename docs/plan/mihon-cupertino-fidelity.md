@@ -20,6 +20,8 @@
 
 ## 推进与待办
 
+- [x] 对照 Mihon 22.01、22.04 复拍 Karuyomi 单页等待、失败与原页重试。白画布调暗后，提示与动作采用可读的 Cupertino 色，分页、连续和放大的透明 PNG 通过像素采样。正式 Web 待验。[单页反馈与透明图片的调暗](../verification/mihon-cupertino-fidelity.md#单页反馈与透明图片的调暗)
+
 - [x] 对照 Mihon 22.10 补拍 Karuyomi 浅深组件的稳定章间等待，沿用实际阅读入口和独立页列表等待。调暗后的画布继续保持原颜色，章节与动作恢复可读，点按返回可继续原页。深色稳定等待的正式 Web 待验。[章间稳定等待与调暗](../verification/mihon-cupertino-fidelity.md#章间稳定等待与调暗)
 
 - [x] 按 Mihon 09.01 浅深原图复核扩展详情的身份、元数据和操作顺序。Karuyomi 的正文采用可换行的 Cupertino 摘要和源列表，大字号下可滚动读完长名称。首次自动读取成功后直接呈现列表，手动检查保留回执。正式 Web 待验。[扩展详情的身份与字号](../verification/mihon-cupertino-fidelity.md#扩展详情的身份与字号)

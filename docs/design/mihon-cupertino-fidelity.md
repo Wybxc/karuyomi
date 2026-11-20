@@ -155,6 +155,8 @@ Mihon 的更新/日历、历史、下载队列及下载设置、统计、tracker
 
 章间过渡保留调暗后的画布颜色，正文、旋转进度和 Cupertino 操作直接绘在底色上。正文按实际明暗使用系统标签色，次级说明、错误和返回优先取相应 Cupertino 颜色，对比度不足时使用更清晰的系统色。明确返回继续原章原页，确认进入后才切换章节。[章间稳定等待与调暗](../verification/mihon-cupertino-fidelity.md#章间稳定等待与调暗)
 
+单页沿用同一画布颜色，资源等待与首帧解码使用居中的 Cupertino 旋转指示。失败与重试留在原页范围内，重试取得新资源并在真实图片出现后确认观察位置。调暗分别作用于画布底色和已解码图片，保留透明边缘，并让等待、错误和操作按实际底色绘制。[单页反馈与透明图片的调暗](../verification/mihon-cupertino-fidelity.md#单页反馈与透明图片的调暗)
+
 Access 暂停时，已经打开的界面沿用当前身份最后一次经服务端确认的主题。暂停快照只提供配色，设置编辑和业务写入仍由身份状态控制。重新核对身份时，界面使用系统主题直至读取到相应身份的设置；切换服务或账号后使用新快照。
 
 惰性Sliver中的搜索采用CupertinoTextField的官方前缀/清空能力，避免CupertinoSearchTextField在滚动重布局时读取dirty RenderObject的问题。固定Mihon的`ListPreferenceWidget.kt`采用可滚动单选列表，不提供查询；语言筛选的`SourcesFilterScreen.kt`和`ExtensionFilterScreen.kt`采用开关列表。Karuyomi的可搜索长选项和无匹配状态因此单列为产品独有状态29.K1/29.K2，不能伪造对应的Mihon参考图。

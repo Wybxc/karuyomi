@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-20，对照 Mihon 单页等待和失败的浅深参考，复拍 Karuyomi 页等待、失败和同页重试。白画布调暗 80% 的失败文字实测从 1.66∶1 提高到 12.63∶1。分页、连续及放大核对三种透明度的 PNG，967 项 Flutter 测试通过，正式 Web 待验。[单页反馈与透明图片的调暗](verification/mihon-cupertino-fidelity.md#单页反馈与透明图片的调暗)
+
 2026-11-20，Karuyomi 章间等待的浅深组件实拍补齐稳定帧，章节标签间距 103，Mihon 参考为 104。80% 调暗的白画布保留原底色，标题实测对比度从 1.66∶1 提高到 12.63∶1，返回保持原页。966 项 Flutter 测试与严格 Dart 分析通过，深色稳定等待的正式 Web 待验。[章间稳定等待与调暗](verification/mihon-cupertino-fidelity.md#章间稳定等待与调暗)
 
 2026-11-20，对照 Mihon 扩展详情的双主题原图，把 Karuyomi 的名称、包名、精确版本和仓库放入可滚动的 Cupertino 分组。360×480 与两倍字号的双主题组件复验确认长名称和源名称完整可读。首次自动检查成功后直接展示列表，手动检查保留完成反馈。965 项 Flutter 测试和严格 Dart 分析通过，正式 Web 待验。[扩展详情的身份与字号](verification/mihon-cupertino-fidelity.md#扩展详情的身份与字号)

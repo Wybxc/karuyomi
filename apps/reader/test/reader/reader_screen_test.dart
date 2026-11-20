@@ -4,12 +4,13 @@ import 'package:karuyomi/widgets/choice_field.dart';
 
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' show Tristate;
+import 'dart:ui' show ImageByteFormat, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:karuyomi/features/reader/reader_screen.dart';
@@ -254,7 +255,6 @@ void main() {
         (Brightness.dark, ReaderBackground.white, 0, CupertinoColors.white),
         (Brightness.light, ReaderBackground.black, 80, CupertinoColors.black),
       ];
-      final transition = find.byType(ReaderChapterTransition);
       for (final (appearance, background, dim, canvas) in canvasCases) {
         for (final loading in [true, false]) {
           var retried = false;
@@ -274,13 +274,6 @@ void main() {
                 onReturn: () {},
               ),
             ),
-          );
-          expect(
-            find.descendant(
-              of: transition,
-              matching: find.byKey(const ValueKey('reader-content-dimming')),
-            ),
-            findsNothing,
           );
           final chapter = find.text('3319');
           final surface = find
@@ -2042,20 +2035,19 @@ void main() {
         expect(
           tester
               .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
-              .backgroundColor,
-          CupertinoColors.white,
+              .backgroundColor!
+              .toARGB32(),
+          0xFF333333,
         );
-        expect(textColor, CupertinoColors.black);
+        expect(textColor, CupertinoColors.white);
         expectTitleContrast();
-        final dimmer = find.byKey(const ValueKey('reader-content-dimming'));
-        expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.8, .001));
+        final imageAppearance = find.byType(ReaderImageAppearance);
+        expect(imageAppearance, findsWidgets);
         expect(
-          tester.getRect(dimmer),
-          tester.getRect(find.byType(InteractiveViewer)),
-        );
-        expect(
-          tester.getRect(dimmer).overlaps(tester.getRect(iconLabel('下一页'))),
-          false,
+          tester
+              .widgetList<ReaderImageAppearance>(imageAppearance)
+              .map((scope) => scope.dimPercent),
+          everyElement(80),
         );
         expect(viewports.last.current.pageKey, anchor.pageKey);
         expect(
@@ -2075,9 +2067,17 @@ void main() {
               .backgroundColor,
           CupertinoTheme.of(readerContext).scaffoldBackgroundColor,
         );
-        expect(textColor, AppColors.label.resolveFrom(readerContext));
+        expect(
+          textColor!.toARGB32(),
+          AppColors.label.resolveFrom(readerContext).toARGB32(),
+        );
         expectTitleContrast();
-        expect(dimmer, findsNothing);
+        expect(
+          tester
+              .widgetList<ReaderImageAppearance>(imageAppearance)
+              .map((scope) => scope.dimPercent),
+          everyElement(0),
+        );
         expect(provider.acquired.map((page) => page.pageKey), acquired);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
@@ -2085,6 +2085,114 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'image dimming preserves transparency in the reader and zoom viewer',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final directory = Directory.systemTemp.createTempSync('karuyomi.');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final png = img.Image(width: 60, height: 20, numChannels: 4);
+      for (final pixel in png) {
+        pixel.setRgba(255, 0, 0, switch (pixel.x) {
+          < 20 => 255,
+          < 40 => 128,
+          _ => 0,
+        });
+      }
+      final file = File('${directory.path}/page.png')
+        ..writeAsBytesSync(img.encodePng(png));
+      final provider = FixturePageProvider(location: file.uri);
+      final chapter = ChapterManifest(
+        chapterKey: 'transparent',
+        version: '1',
+        pages: [ReaderPage(key: 'page-0', width: 60, height: 20)],
+      );
+      const captureKey = ValueKey('transparency-capture');
+      Widget configured(int dimPercent, ReadingMode mode) => RepaintBoundary(
+        key: captureKey,
+        child: screen(
+          provider: provider,
+          manifest: chapter,
+          mode: mode,
+          background: ReaderBackground.white,
+          dimPercent: dimPercent,
+          imageBuilder: buildResourceImage,
+        ),
+      );
+      final image = find.byWidgetPredicate(
+        (widget) => widget is RawImage && widget.image != null,
+      );
+
+      Future<List<int>> sample(Finder frame) async {
+        final rect = tester.getRect(frame);
+        final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byKey(captureKey),
+        );
+        return (await tester.runAsync(() async {
+          final raster = await boundary.toImage();
+          try {
+            final bytes = (await raster.toByteData(
+              format: ImageByteFormat.rawRgba,
+            ))!;
+            final y = rect.center.dy.floor();
+            return [
+              for (final column in [1, 3, 5])
+                bytes.getUint32(
+                  4 *
+                      (y * raster.width +
+                          (rect.left + column * rect.width / 6).floor()),
+                ),
+            ];
+          } finally {
+            raster.dispose();
+          }
+        }))!;
+      }
+
+      await tester.pumpWidget(configured(0, ReadingMode.leftToRight));
+      final wait = Stopwatch()..start();
+      while (image.evaluate().isEmpty &&
+          wait.elapsed < const Duration(seconds: 5)) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      expect(image, findsOneWidget);
+      await tester.pumpAndSettle();
+      final undimmed = await sample(image);
+      expect(undimmed, [0xFF0000FF, 0xFF7F7FFF, 0xFFFFFFFF]);
+      final acquired = List.of(provider.acquired);
+      await tester.pumpWidget(configured(80, ReadingMode.leftToRight));
+      await tester.pumpAndSettle();
+      final dimmed = await sample(image);
+      expect(dimmed.first, 0x330000FF);
+      expect(dimmed[1], anyOf(0x331919FF, 0x331A1AFF));
+      expect(dimmed.last, 0x333333FF);
+      expect(provider.acquired, acquired);
+
+      await tester.pumpWidget(configured(80, ReadingMode.continuous));
+      await tester.pumpAndSettle();
+      expect(await sample(image), dimmed);
+      await tester.tap(iconLabel('放大当前图片'));
+      await tester.pumpAndSettle();
+      final zoomImage = find.descendant(
+        of: find.byKey(const ValueKey('reader-image-viewer')),
+        matching: image,
+      );
+      expect(await sample(zoomImage), dimmed);
+      await tester.tap(iconLabel('关闭图片'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 1'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'continuous zoom follows live content appearance while controls and scrolling remain usable',
@@ -2126,17 +2234,26 @@ void main() {
       await tester.pumpAndSettle();
       final dialog = find.byKey(const ValueKey('reader-image-viewer'));
       expect(
-        tester.widget<CupertinoPageScaffold>(dialog).backgroundColor,
-        CupertinoColors.white,
+        tester
+            .widget<CupertinoPageScaffold>(dialog)
+            .backgroundColor!
+            .toARGB32(),
+        0xFF333333,
       );
-      final dimmer = find.descendant(
+      final imageAppearance = find.descendant(
         of: dialog,
-        matching: find.byKey(const ValueKey('reader-content-dimming')),
+        matching: find.byType(ReaderImageAppearance),
       );
-      expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.8, .001));
       expect(
-        tester.getRect(dimmer).overlaps(tester.getRect(iconLabel('放大'))),
-        false,
+        tester.widget<ReaderImageAppearance>(imageAppearance).dimPercent,
+        80,
+      );
+      expect(
+        find.ancestor(
+          of: iconLabel('放大'),
+          matching: find.byType(ReaderImageAppearance),
+        ),
+        findsNothing,
       );
       await tester.tap(iconLabel('放大'));
       await tester.pumpAndSettle();
@@ -2644,6 +2761,8 @@ void main() {
         screen(
           provider: provider,
           manifest: fixtureChapter(),
+          background: ReaderBackground.white,
+          dimPercent: 80,
           onViewport: viewports.add,
           imageBuilder: (context, resource, fit) {
             if (resource.id == 'runtime-1-page-0') imageContext = context;
@@ -2652,7 +2771,23 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.semantics.byLabel('正在加载第 1 页').evaluate(), hasLength(1));
+      final loading = find.semantics.byLabel('正在加载第 1 页');
+      expect(loading.evaluate(), hasLength(1));
+      expect(
+        tester
+            .widget<CupertinoActivityIndicator>(
+              find.descendant(
+                of: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Semantics &&
+                      widget.properties.label == '正在加载第 1 页',
+                ),
+                matching: find.byType(CupertinoActivityIndicator),
+              ),
+            )
+            .color,
+        CupertinoColors.white,
+      );
       expect(viewports.where((viewport) => viewport.observed != null), isEmpty);
       acquireGate.complete();
       await tester.pumpAndSettle();
@@ -2677,7 +2812,12 @@ void main() {
       expect(viewports.last.observed, isNull);
       expect(viewports.last.windowReady, false);
       expect(viewports.last.atEnd, false);
-      expect(find.text('第 1 页未能加载'), findsOneWidget);
+      final failure = find.text('第 1 页未能加载');
+      expect(failure, findsOneWidget);
+      expect(
+        DefaultTextStyle.of(tester.element(failure)).style.color,
+        CupertinoColors.white,
+      );
       expect(provider.released, contains('runtime-1-page-0'));
       await tester.tap(find.text('重试'));
       await tester.pump(kDoubleTapTimeout);
