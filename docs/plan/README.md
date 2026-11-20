@@ -73,7 +73,7 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 本机存储的长名称支持随字号换行，小容量按实际字节数显示。Mihon 在单文件删除受阻时实拍到删除 0 个，11.04 的外层异常提示待补。[本机存储复验](../verification/mihon-cupertino-fidelity.md#本机存储的名称容量与清理反馈)
 
-阅读器双主题正式 Web 已核对工具显隐和单页重试。章间布局在浅、深色的稳定缺页和就绪状态均完成量测，深色短横屏实测重试并从新文档续读目标第 1 页。深色稳定等待图继续补采。[单页与切章等待参考](../verification/mihon-cupertino-fidelity.md#mihon-单页与切章等待的双主题参考) · [画布内等待量测](../verification/mihon-cupertino-fidelity.md#画布内等待的信息间距与按钮)
+阅读器双主题正式 Web 已核对工具显隐、单页重试、画布内章节缺页与就绪。稳定等待补齐浅深主图，80% 调暗时可读并能返回原页，两色明确切章后均在新文档续读。深色短横屏已通过缺页重试。[双主题稳定等待](../verification/mihon-cupertino-fidelity.md#双主题正式-web-的稳定章间等待)
 
 封面编辑采用居中的完整比例预览。深色正式 Web 发现宽图固定占高导致留白及横屏裁下沿，组件已改用图片实际显示高度与弹层可用视区确定占位。修正后的正式 Web 双主题继续验收。[封面预览量测](../verification/mihon-cupertino-fidelity.md#karuyomi-封面预览)
 

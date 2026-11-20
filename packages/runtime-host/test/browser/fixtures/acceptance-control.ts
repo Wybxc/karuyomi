@@ -17,6 +17,7 @@ import { detailsRefreshAcceptanceControl } from './acceptance-details-refresh.js
 import { filterAcceptanceControl } from './acceptance-filters.js';
 import { migrationAcceptanceControl } from './acceptance-migration.js';
 import { preferenceGroupAcceptanceControl } from './acceptance-preference-groups.js';
+import { readerBoundaryAcceptanceControl } from './acceptance-reader-boundary.js';
 import { searchRetirementAcceptanceControl } from './acceptance-search-retirement.js';
 
 interface BrowserRuntime {
@@ -79,6 +80,13 @@ if (profile === 'preference-groups') {
   browser.karuyomiRuntime = {
     ...host,
     control: preferenceGroupAcceptanceControl((input) => host.control(input)),
+  };
+}
+
+if (profile === 'reader-boundary') {
+  browser.karuyomiRuntime = {
+    ...host,
+    control: readerBoundaryAcceptanceControl((input) => host.control(input)),
   };
 }
 

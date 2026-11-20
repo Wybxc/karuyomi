@@ -66,6 +66,8 @@ ACCEPTANCE_FIXTURE=runtime-control pnpm acceptance:serve
 
 `?acceptance-runtime=details-refresh&details-refresh-stage=chapters` 用于英文 xkcd 的 `SINGLE`。先从热门列表打开作品，首次资料和章节均由原宿主交付。点详情刷新时，夹具等待真实章节结果并暂扣 2.4 秒，再返回一次 `SOURCE_ERROR`。另开文档用 `details-refresh-stage=details` 复验资料阶段。两轮均核对等待、失败和重试时的旧资料、原清单及同一阅读入口，按 `ACCEPTANCE_RUNTIME_CONTROL` 核对源、作品、代次和阅读阶段。在进入阅读器前用独立账户读回检查刷新产生的写入。
 
+`?acceptance-runtime=reader-boundary` 暂扣英文 xkcd 3319 的首份真实非空页列表 18 秒，随后原样交付。选择单页、从右到左及反向来源顺序，从详情打开 3320。待第 1 页加载且服务端确认进度后，按 T 隐藏工具，再按 Page Up 转向 3319。采集稳定等待并在交付前点「返回本章」。用 `ACCEPTANCE_RUNTIME_CONTROL` 区分暂扣和交付，用独立 API 读回核对进度。再次显示过渡，确认进入后核对目标的真实图片和保存位置。
+
 `?acceptance-runtime=preference-groups` 将真实 Komiic 的两个设置放进受控的启用、禁用和空分组。先在普通文档保存可用镜像，再在夹具文档打开漫画源设置。验证子组仍显示、镜像继承禁用、可编辑的章节选项能完成实际保存。夹具保留 snapshotId 与 generation，将客户端提交的嵌套路径还原到同一真实设置的原始路径，再交付原监听器结果。核对 `ACCEPTANCE_RUNTIME_CONTROL` 的两条路径、确认值和同一隔离账户的读回。
 
 `?acceptance-runtime=retire-search` 用正式跨源搜索选择 Komiic 并查找「航海王」。先在普通文档用漫画源设置选通 `.cc`。夹具取得真实搜索结果后交付 `ACCESS_REQUIRED`，在同一执行槽将真实关闭确认暂扣八秒并模拟丢失，再丢弃两次真实重置确认。失效页应保留关闭状态和精确重试，隐藏旧查询与结果。显式重试第三次重置确认后才返回原浏览入口。用请求 ID、generation 和 slot 核对审计；重新连接后手动发起同一查询应从新代次取得真实结果。
