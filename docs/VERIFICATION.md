@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，`b7c581f` 本地正式 Web 在内置浏览器补验设置、xkcd 作品详情、分类 Sheet 和卸载确认的两色常规转场。详情按钮和侧滑均实际回到原热门列表，取消卸载前后三路读回一致。图源空态 07.K2 更新两色主图并验证扩展往返。164 项定向 Flutter 回归通过。系统减弱动态的 Web 实拍和原生现场仍待验。[常规转场](verification/mihon-cupertino-fidelity.md#正式-web-的常规-cupertino-转场) · [图源空态](verification/mihon-cupertino-fidelity.md#图源空态与扩展入口)
+
 2026-11-21，`423639a` 的本地正式 Web 在内置浏览器取得扩展准备失败的浅深主图。两次 xkcd 清单 503 均显示读取扩展材料失败，账户仍未安装。恢复 200 后点原重试，确认同一构建只安装一次。Karuyomi 跨版本主图为 170/171（99.4%）。协议生成校验、10 项协议测试、237 项宿主测试、87 项 Dart Source runtime 测试、984 项 Flutter 测试和严格 Dart 分析通过。[扩展材料读取失败](verification/mihon-cupertino-fidelity.md#扩展材料读取失败的正式-web-复验)
 
 同版正式 Web 补验浅深两色仓库表单。Tab 可从地址移到名称，非法地址保留两项输入，取消无仓库写入。实机软键盘与新版有效地址确认转换待验。[仓库录入与短屏键盘](verification/mihon-cupertino-fidelity.md#仓库录入与短屏键盘)

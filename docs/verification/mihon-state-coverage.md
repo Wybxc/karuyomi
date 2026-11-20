@@ -1495,7 +1495,7 @@ stateDiagram-v2
 | 状态 ID | 最小必要信息                                  | 浅色正式Web                                                           | 深色正式Web                                                          |
 | ------- | --------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | 07.K1   | 正在读取、原筛选与可用恢复入口                | `karuyomi-1bc3c70-source-pending-formal-sources-reading-light.jpg`    | `karuyomi-1bc3c70-source-pending-formal-sources-reading-dark.jpg`    |
-| 07.K2   | 无已安装源、原因与扩展入口                    | `karuyomi-1e50a82-sources-empty-light.jpg`                            | `karuyomi-1e50a82-sources-empty-dark.jpg`                            |
+| 07.K2   | 无已安装源、原因与扩展入口                    | `karuyomi-b7c581f-sources-empty-light.jpg`                            | `karuyomi-b7c581f-sources-empty-dark.jpg`                            |
 | 07.K3   | 分组、源名、语言、独立打开与收藏动作          | `karuyomi-76309ed-sources-list-light.jpg`                             | `karuyomi-76309ed-sources-list-dark.jpg`                             |
 | 07.K4   | 收藏分组、确认后的星标与取消入口              | `karuyomi-76309ed-sources-favorite-light.jpg`                         | `karuyomi-76309ed-sources-favorite-dark.jpg`                         |
 | 07.K5   | 正在保存的源、等待标记、禁止重复提交          | `karuyomi-1bc3c70-source-pending-formal-favorite-waiting-light.jpg`   | `karuyomi-1bc3c70-source-pending-formal-favorite-waiting-dark.jpg`   |
@@ -1509,6 +1509,8 @@ stateDiagram-v2
 `1bc3c70`新正式产物的双主题独立批次已补齐07.K1/K5/K9三对。真实加载/等待文案、原取消对象、刷新/重开、完整原值展开/收起与原文重试均核对；此前失败的深色重开及确认清除后的再次重开成功，控制台无错误/警告。16组六路快照、十个相等区间及73条终态审计核对两次准备、五次UI原操作（含一次主题保存）与两次零重复重试。07.K8、真实CAS/身份等变体、Mihon参考和最终像素门继续待验，见[正式双主题记录](mihon-cupertino-fidelity.md#源收藏与存储隔离的正式-web-双主题验收)。
 
 `2512c51`完整CI与正式Web已补齐07.K8双主题：保留收藏的xkcd未安装时显示原源名、语言与受阻原因，实际点击转到扩展管理，不执行Source。与扩展共享的原卸载/安装对象及已确认读取恢复也已跨页复验；41张图、22组六路完整快照及113条审计的范围与首条人工挂起无终态限制见[正式记录](mihon-cupertino-fidelity.md#扩展与共享设置恢复的正式-web-双主题验收)。真实CAS/身份等全部变体、Mihon参考和最终像素门继续待验。
+
+`b7c581f` 两色正式 Web 已复拍居中的 07.K2。实际进入扩展目录再返回，中心空态保持原位。本次替换 `1e50a82` 几何的旧主图，覆盖计数不变。[图源空态与扩展入口](mihon-cupertino-fidelity.md#图源空态与扩展入口)
 
 ```mermaid
 stateDiagram-v2
