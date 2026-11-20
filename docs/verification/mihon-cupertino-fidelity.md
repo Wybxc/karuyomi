@@ -1598,6 +1598,8 @@ Flutter 长列表回归在 360×640 下也复现了等待时的偏移，末张�
 
 复验可用 Android SDK 生成三个仅含清单的测试 APK。声明 `tachiyomi.extension` 功能，使用独立测试密钥签名和安装。分别使用上表的版本、缺字段和缺类条件，按插件列表打开真实失败面。未签名副本的普通安装返回 `INSTALL_PARSE_FAILED_NO_CERTIFICATES`，08.13 的 `Unsigned` 面继续待验。08.14 成对通过后，Mihon 主图为 **162/170（95.3%）**。[逐状态清单](mihon-state-coverage.md)
 
+随后在同一固定发行版的隔离 Android API 36 参考副本复验私有插件扫描。两份无代码归档均声明扩展功能和版本 1.6.1，有签名的测试项实际出现在「未加载」，标为「未信任」。未签名归档在 Android 的 `getPackageArchiveInfo` 解析处失败，应用日志记录对应文件，插件目录没有该项。`Unsigned` 提示仍待实拍。复验结束移除两份归档。[固定版本的扫描入口](../../vendor/mihon/app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionLoader.kt)
+
 Karuyomi 旧布局的失败提示只显示原因，并会在长列表滚动区顶部离开视口。准备失败后现保留原区域，显示扩展名、版本、仓库和原因，内容可独立滚动，并报告状态更新。两种主题、两倍字号下的组件回归确认，可看到提示并使用原安装入口重试同一构建，失败时零账户提交，明确重试成功后只提交一次。140 项扩展、目录、收藏源 Flutter 回归通过。准备失败独立登记为 08.K9，Karuyomi 跨版本主图为 **168/171（98.2%）**，正式 Web 双主题待验。[准备失败回归](../../apps/reader/test/extensions/extensions_controller_test.dart)
 
 `77ff240` 的分支和 PR 检查通过。[分支检查](https://github.com/Wybxc/karuyomi/actions/runs/44676528286) · [PR 检查](https://github.com/Wybxc/karuyomi/actions/runs/44676536593)
@@ -1666,6 +1668,16 @@ Karuyomi 从扩展菜单打开「本机存储」，360×800 和两倍字号下�
 两张 08.07 主图及对应 UI 树均显示 Komga、Keiyoushi、1.6.76、图标上的旋转进度、「等待中」与「取消」。双主题的等待文字逻辑边界均为 `[126.5,322,161,338)`，取消节点为 `[308,300,332,324)`。两轮在检查完成前约 1.1 秒点第一次取消，同一行先恢复安装入口，检查返回后又显示「下载中」。第二次取消后，Komga 搜索行全部回到可安装，系统包列表无 Komga。该转换的证据来自受控延迟条件。隔离模拟器和专用 ADB 已关闭。Mihon 双主题主图为 **167/170（98.2%）**。[逐状态清单](mihon-state-coverage.md)
 
 Karuyomi 的扩展目录组件回归在浅深两色、360×480 和两倍字号下复现长扩展名称被截断。修正后名称自然换行，名称和版本可在反馈区内滚动，滚动前后均可点取消。发出取消时回到阶段标题，准确反馈「正在取消准备」，同一构建的安装入口等到取消确认才恢复。测试核对原准备 ID、迟到的准备响应和零账户提交。292 项相关 Flutter 回归通过，最终改动文件通过严格 Dart 分析。Karuyomi 跨版本双主题主图为 **168/171（98.2%）**，正式 Web 待验。[扩展目录界面](../../apps/reader/lib/features/extensions/extensions_page.dart) · [准备与取消回归](../../apps/reader/test/extensions/extensions_controller_test.dart)
+
+## 图源空态与扩展入口
+
+2026-11-20，在只读 Android API 36 参考副本运行原 Mihon 0.21.3 安装包（`feadad5e`，versionCode 39），720×1600、320dpi，系统动画倍率均设为 0。先把隔离应用的 `source_languages` 设为空集合，实际仍看到本地图源。再在同样数据的 `hidden_catalogues` 加入本地图源 ID 0，固定发行版在浅、深 DEFAULT 主题均从「浏览」进入真正的图源空态。两个 UI 树均只有一条「没有图源」，其逻辑边界均为 `[151.5,460.5,209,480.5)`，页面背景分别采样为 `#FEFBFF`、`#1B1B1F`。表情为该画面的原有装饰，位置比较使用固定文案。[图源分支](../../vendor/mihon/app/src/main/java/eu/kanade/presentation/browse/SourcesScreen.kt) · [筛选顺序](../../vendor/mihon/app/src/main/java/eu/kanade/domain/source/interactor/GetEnabledSources.kt)
+
+两种主题点按同一「插件」页签均实际进入含 MangaDex 与 xkcd 的目录，点回「图源」稳定返回空态。测试偏好逐字节还原后，原目录重新出现本地图源、MangaDex 和 xkcd。专用 ADB 与模拟器均已关闭。主图 07.03 登记成对，Mihon 参考覆盖为 **168/170（98.8%）**。[逐状态清单](mihon-state-coverage.md)
+
+Karuyomi 的历史正式 Web `1e50a82` 已取得 07.K2 两色原图。用固定 Flutter 3.50.0、原 `CatalogPage` 和空安装夹具，在两种主题复现旧版说明紧接筛选区。360×800 组件中，语言筛选下缘为 200，原 `1beb148` 的空态标题上缘为 296。修正以可用内容区居中，标题上缘为 477.5，两色一致。量测使用 Arial Unicode 测试字体，组件窗口直接包含 Cupertino 页标题，Mihon 则包含 Android 系统区与底部标签栏。
+
+360×480 和两倍字号的两色复验中，滚动后的「前往扩展」边界均为 `[92.8,370,267.2,448)`，实际点按进入扩展。组件回归核对安装后回到同一漫画源分段可看到新目录，筛选无匹配继续提供清除，未解析的已安装版本继续提供恢复入口。27 项相关 Flutter 回归通过。Karuyomi 跨版本双主题主图维持 **168/171（98.2%）**，改版正式 Web 待验。[目录布局](../../apps/reader/lib/features/sources/source_directory.dart) · [入口与布局回归](../../apps/reader/test/sources/catalog_language_filter_test.dart)
 
 ## Mihon 源浏览追加
 

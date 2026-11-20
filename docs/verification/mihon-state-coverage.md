@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-20，Mihon 已补齐扩展排队 08.07 的浅深画面，双主题主图为 167/170（98.2%）。仍缺无可用图源、未签名扩展提示和外层清理失败提示。Karuyomi 跨版本双主题主图为 168/171（98.2%），准备失败、卸载确认和原生未连接仍缺双主题主图。[扩展排队实拍](mihon-cupertino-fidelity.md#扩展排队与短屏取消) · [迁移源加载实拍](mihon-cupertino-fidelity.md#mihon-迁移源加载的双主题实拍)
+2026-11-20，Mihon 已补齐图源空态 07.03 的浅深画面，双主题主图为 168/170（98.8%）。仍缺未签名扩展提示和外层清理失败提示。Karuyomi 跨版本双主题主图为 168/171（98.2%），准备失败、卸载确认和原生未连接仍缺双主题主图。[图源空态实拍](mihon-cupertino-fidelity.md#图源空态与扩展入口) · [扩展排队实拍](mihon-cupertino-fidelity.md#扩展排队与短屏取消)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -260,14 +260,14 @@ stateDiagram-v2
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
     class E2,E12 partial
-    class S0,S1,S3,S4,S5,E0,E1,E3,E5,E6,E7,E8,E9,E10,E11,E13,E14,D0,D1,D2,D3,R0,R1,R2,R3,R4,R5,R6,T0,T2 paired
+    class S0,S1,S2,S3,S4,S5,E0,E1,E3,E5,E6,E7,E8,E9,E10,E11,E13,E14,D0,D1,D2,D3,R0,R1,R2,R3,R4,R5,R6,T0,T2 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                                | 浅色                                                                                                       | 深色                                                                                                    |
 | ------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | 07.01   | 「浏览」标题、「图源」选中和中央加载指示，冷启动后的首次进入                         | `s0701-first-loading-light`（关闭设备动画的实拍帧）                                                        | `s0701-first-loading-dark`（关闭设备动画的实拍帧）                                                      |
 | 07.02   | 源名、语言、最近使用、可执行尾部操作                                                 | `s0702-source-list-light`                                                                                  | `s0702-source-list-dark`                                                                                |
-| 07.03   | 无可用源说明与扩展入口；关闭在线语言仍有Local source，普通UI触发未取得               | 待                                                                                                         | 待（Local source 项与真正空态分开）                                                                     |
+| 07.03   | 「没有图源」与插件页签；隔离偏好关闭在线语言并禁用本地图源                           | `s0703-sources-empty-light`                                                                                | `s0703-sources-empty-dark`                                                                              |
 | 07.04   | Mihon 置顶分组与普通分组、取消置顶入口；对照 Karuyomi 收藏分组                       | `s0704-source-pinned-light`                                                                                | `s0704-source-pinned-dark`                                                                              |
 | 07.05   | 语言列表及当前启用项；两侧只启用多语言/English                                       | `s0705-source-language-light`（上段）；下段待补                                                            | `s0705-source-language-dark`（上段）；下段待补                                                          |
 | 07.06   | 当前源及置顶/隐藏等可用动作                                                          | `s0706-source-actions-light`                                                                               | `s0706-source-actions-dark`                                                                             |
@@ -305,7 +305,9 @@ stateDiagram-v2
 
 11.04 的双主题复验均记录六次单文件删除失败，实际提示删除 0 个文件，占用保留。恢复权限后重试成功，外层异常提示待实拍。[缓存清理复验](mihon-cupertino-fidelity.md#本机存储的名称容量与清理反馈)
 
-08.06 对应 `Reason.Untrusted` 的风险提示。08.13 的三种已采原因共用关闭与卸载结构。未签名测试包被 Android 安装器拒绝，Mihon 发行版的 `Unsigned` 面板待采。08.14 的等宽错误、复制完整堆栈与卸载落点均通过实测。08.15 继续记录 Android 安装权限横幅。[错误面板量测与复验步骤](mihon-cupertino-fidelity.md#mihon-插件无法加载的双主题复验)
+07.03 两色均可由「插件」页签查看原有 MangaDex、xkcd，回到「图源」仍显示空态。对照副本只关闭在线语言时实际仍显示本地图源。[图源空态与扩展入口](mihon-cupertino-fidelity.md#图源空态与扩展入口)
+
+08.06 对应 `Reason.Untrusted` 的风险提示。08.13 的三种已采原因共用关闭与卸载结构。Android 安装器拒绝未签名包，私有扩展扫描也在 Android 解析归档时拒绝它。有签名的无代码归档出现在「未加载」，标为「未信任」。Mihon 的 `Unsigned` 面板仍待采。08.14 的等宽错误、复制完整堆栈与卸载落点均通过实测。08.15 继续记录 Android 安装权限横幅。[错误面板量测与复验步骤](mihon-cupertino-fidelity.md#mihon-插件无法加载的双主题复验)
 
 09.04 的开关关闭后，`ExtensionDetailsViewModel.subscribeToSources()` 按 `!enabled` 排序，将 Afrikaans 移到末尾；两主题都已拍到真正关闭的行，再重新启用回到首行。`s0901-mangadex-disabled-sorted-top-*` 只记录原位置移走，不作为关闭开关主图。09.03 的系统弹层两次均为 Android English 浅色，应用主题不控制其颜色；浅色从未信任列表发起，取消返回列表，深色从详情发起，取消返回详情，底层不同不计同状态像素叠图。`s0903-extension-uninstall-cancel-stale-dark` 的 XML 已返回详情，但 PNG 与确认图完全相同，已排除；另拍并实看稳定 `s0903-extension-uninstall-return-dark`。
 

@@ -123,7 +123,7 @@ void main() {
   Future<void> reveal(WidgetTester tester, Finder target) async {
     final scrollable = find
         .descendant(
-          of: find.byType(ListView).first,
+          of: find.byKey(const PageStorageKey('source-directory-scroll')),
           matching: find.byType(Scrollable),
         )
         .first;
