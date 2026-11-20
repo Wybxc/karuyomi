@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-20，Karuyomi 在浅深横竖屏组件中暂扣首次连接响应。连接等待、403 拒绝与重试确认均在原设置详情显示，测试观察到零次账户业务写入。977 项 Flutter 测试和严格 Dart 分析通过，正式 Web 与原生主图待验。[首次连接的等待和恢复](verification/mihon-cupertino-fidelity.md#首次连接的等待和恢复)
+
 2026-11-20，复看 Mihon 空书架与设置的浅深参考。Karuyomi 在两倍字号的浅深横竖屏从书架进入浏览并填写服务地址，三个入口均在首屏可点。非法地址保留草稿，修正后确认测试身份。977 项 Flutter 测试和严格 Dart 分析通过，原生双主题主图待验。[首次连接的短屏复验](verification/mihon-cupertino-fidelity.md#首次连接的短屏复验)
 
 2026-11-20，Karuyomi 底栏通过浅深主题的 Tab 焦点、键盘激活及鼠标和触屏接续复验。974 项 Flutter 测试和严格 Dart 分析通过。`ba3b31f` 的正式 Web 归档在隔离 Worker 中交付原始客户端字节，xkcd 清单实测 200 → 503 → 200。预览面板排队，正式 Web 主图待验。[底栏键盘复验](verification/mihon-cupertino-fidelity.md#底栏键盘焦点与切换) · [清单 HTTP 复验](verification/mihon-cupertino-fidelity.md#扩展准备失败的-http-复验)

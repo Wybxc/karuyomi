@@ -190,6 +190,7 @@ class const GlobalSettingsPanel({
   super.key,
   required super.catalog,
   super.connection,
+  super.openConnectionOnMount,
 }) extends _SettingsEditor {}
 
 enum _SettingsSection {
@@ -270,6 +271,7 @@ class const _SettingsEditor({
   final String? mangaKey,
   final MangaEditContext? mangaContext,
   final Widget? connection,
+  final bool openConnectionOnMount = false,
 }) extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -283,7 +285,9 @@ class const _SettingsEditor({
     final owner = ref.watch(confirmedAccountProvider(catalog))?.settings;
     final edit = useRef<_FormDraft?>(null);
     final revision = useState(0);
-    final selected = useState<_SettingsSection?>(null);
+    final selected = useState<_SettingsSection?>(
+      openConnectionOnMount ? _SettingsSection.connection : null,
+    );
     final detailScroll = useScrollController();
     final navigator = useMemoized(GlobalKey<NavigatorState>.new);
     final manga = mangaKey != null;

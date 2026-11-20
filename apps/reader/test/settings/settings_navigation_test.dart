@@ -405,15 +405,67 @@ void main() {
         );
         expect(platform.businessServer.requests, isEmpty);
 
+        final bootstrapStarted = Completer<void>();
+        final releaseBootstrap = Completer<void>();
+        addTearDown(() {
+          if (!releaseBootstrap.isCompleted) releaseBootstrap.complete();
+        });
+        platform.beforeApiFetch = (path) async {
+          if (path != '/api/bootstrap') return;
+          if (!bootstrapStarted.isCompleted) bootstrapStarted.complete();
+          await releaseBootstrap.future;
+        };
         await tester.enterText(origin, platform.origin.toString());
-        await _tap(tester, connect);
-        await _tap(
-          tester,
-          find.byKey(const ValueKey('settings-section-connection')),
+        await tester.tap(connect.hitTestable());
+        await tester.pump();
+        await tester.runAsync(
+          () => bootstrapStarted.future.timeout(const Duration(seconds: 5)),
         );
-        expect(find.text('已连接，身份已确认'), findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 400));
+
+        expectVisible(find.text('正在连接服务'));
+        expect(
+          find.byType(CupertinoActivityIndicator).hitTestable(),
+          findsOneWidget,
+        );
+        expectVisible(origin);
+        expect(
+          tester.widget<CupertinoTextField>(origin).controller!.text,
+          platform.origin.toString(),
+        );
+        expect(tester.widget<CupertinoTextField>(origin).readOnly, isTrue);
+        expect(tester.widget<CupertinoButton>(connect).enabled, isFalse);
+        expect(find.text('owner@example.com'), findsNothing);
+        expect(
+          find.byKey(const ValueKey('settings-section-connection')),
+          findsNothing,
+        );
+
+        platform.bootstrapStatus = 403;
+        await tester.runAsync(() async {
+          releaseBootstrap.complete();
+          await Future<void>.delayed(Duration.zero);
+        });
+        await tester.pumpAndSettle();
+        expectVisible(find.text('访问被拒绝'));
+        expectVisible(origin);
+        expect(tester.widget<CupertinoTextField>(origin).readOnly, isFalse);
+        expect(find.text('owner@example.com'), findsNothing);
+
+        platform.bootstrapStatus = 200;
+        platform.beforeApiFetch = null;
+        await _tap(tester, connect);
+        expectVisible(find.text('已连接，身份已确认'));
         expect(find.text('owner@example.com'), findsOneWidget);
         expect(platform.businessServer.appliedMutations, 0);
+
+        await _tap(tester, _navigation('浏览'));
+        await _tap(tester, _navigation('设置'));
+        expect(
+          find.byKey(const ValueKey('settings-section-connection')),
+          findsOneWidget,
+        );
+        expect(origin, findsNothing);
         expect(tester.takeException(), isNull);
         await tester.pumpApp(const SizedBox.shrink());
         await tester.pumpAndSettle();

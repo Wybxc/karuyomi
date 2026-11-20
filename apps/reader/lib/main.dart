@@ -108,6 +108,8 @@ class _AppShellState extends ConsumerState<AppShell> {
   bool _retryingProgress = false;
   bool _changingService = false;
   bool _restoringOrigin = false;
+  bool _openSettingsConnectionOnMount = false;
+  final _connectionStatusKey = GlobalKey();
   String? _originPersistenceError;
   static const _defaultOrigin = String.fromEnvironment('APP_ORIGIN');
   static const _originKey = 'native_service_origin';
@@ -123,7 +125,10 @@ class _AppShellState extends ConsumerState<AppShell> {
   ];
 
   void _select(int index) {
-    setState(() => _index = index);
+    setState(() {
+      _index = index;
+      if (index != 2) _openSettingsConnectionOnMount = false;
+    });
     if (index == 2) unawaited(_settings?.refresh());
   }
 
@@ -384,6 +389,23 @@ class _AppShellState extends ConsumerState<AppShell> {
     return authenticated;
   }
 
+  void _revealConnectionStatus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final status = _connectionStatusKey.currentContext;
+      if (!mounted ||
+          status == null ||
+          ModalRoute.of(status)?.isCurrent != true) {
+        return;
+      }
+      unawaited(
+        Scrollable.ensureVisible(
+          status,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+        ),
+      );
+    });
+  }
+
   Future<void> _changeService() async {
     if (_changingService || _restoringOrigin) return;
     setState(() {
@@ -400,6 +422,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       // Reconnecting the same service keeps identity-bound pending commands.
       // Bootstrap still verifies the current subject before they can be retried.
       if (platform != null && (kIsWeb || sameService)) {
+        _revealConnectionStatus();
         await platform.rebuild();
         if (mounted) {
           setState(() {
@@ -441,6 +464,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         setState(() {
           adopted = true;
           _configure(candidate);
+          _openSettingsConnectionOnMount = _index == 2;
         });
         if (_catalog != null) await _rememberOrigin(candidate.origin);
       } finally {
@@ -481,6 +505,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       final catalog? => GlobalSettingsPanel(
         catalog: catalog,
         connection: _connectionSettings(),
+        openConnectionOnMount: _openSettingsConnectionOnMount,
       ),
       null => CupertinoPageScaffold(
         navigationBar: const CupertinoNavigationBar(middle: Text('服务连接')),
@@ -539,7 +564,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           child: CupertinoTextField(
             key: const ValueKey('service-origin'),
             controller: _originField,
-            readOnly: kIsWeb || _restoringOrigin || _changingService,
+            readOnly: kIsWeb || _restoringOrigin || connecting,
             autofillHints: null,
             keyboardType: TextInputType.url,
             autocorrect: false,
@@ -608,6 +633,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 ),
               ),
             CupertinoFormRow(
+              key: _connectionStatusKey,
               prefix: const Text('状态'),
               child: Semantics(
                 liveRegion: true,

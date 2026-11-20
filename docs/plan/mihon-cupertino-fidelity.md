@@ -20,6 +20,8 @@
 
 ## 推进与待办
 
+- [x] 在首次连接的浅深横竖屏组件中，等待、403 和重试成功均在提交地址的详情页显示。两倍字号的横屏滚动重试后，状态重新进入可见范围。27.K1 原生主图待验。[首次连接的等待和恢复](../verification/mihon-cupertino-fidelity.md#首次连接的等待和恢复)
+
 - [x] 对照 Mihon 空书架的居中布局和设置层级，收敛 Karuyomi 的书架空态、浏览连接入口和首次连接页。两倍字号下浅深横竖屏可依次点按三个入口，并可更正非法地址后确认测试身份。27.K1 原生主图待验。[首次连接的短屏复验](../verification/mihon-cupertino-fidelity.md#首次连接的短屏复验)
 
 - [x] 底栏浅深主题补齐键盘聚焦与激活。三处入口共用现有页面切换，大字号下的横竖屏和鼠标接续通过组件回归。扩展准备失败的官方 Web 夹具已经通过真实 HTTP 故障与恢复复验，内置浏览器预览排队，双主题主图待验。[底栏键盘复验](../verification/mihon-cupertino-fidelity.md#底栏键盘焦点与切换) · [清单 HTTP 复验](../verification/mihon-cupertino-fidelity.md#扩展准备失败的-http-复验)
