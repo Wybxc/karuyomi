@@ -195,6 +195,8 @@ void main() {
       final reload = find.byKey(const ValueKey('details-source-refresh'));
       expect(reload, findsOneWidget);
       await _reveal(tester, reload);
+      final oldHeading = find.text('章节（2）');
+      final headingY = tester.getTopLeft(oldHeading).dy;
       final before = platform.businessServer.appliedMutations;
       await tester.runAsync(() async {
         await tester.tap(reload);
@@ -204,7 +206,7 @@ void main() {
       expect(chapterReads, 1);
       expect(find.text('正在刷新作品资料和章节'), findsOneWidget);
       expect(find.text('作者：作者'), findsOneWidget);
-      expect(find.text('章节（2）'), findsOneWidget);
+      expect(tester.getTopLeft(oldHeading).dy, headingY);
       expect(find.text('作者：资料更新后的作者'), findsNothing);
       expect(tester.widget<CupertinoButton>(reload).onPressed, isNull);
 
@@ -216,7 +218,7 @@ void main() {
       });
       await tester.pumpAndSettle();
       expect(find.text('作者：作者'), findsOneWidget);
-      expect(find.text('章节（2）'), findsOneWidget);
+      expect(tester.getTopLeft(oldHeading).dy, headingY);
       expect(find.textContaining('未能刷新作品资料和章节'), findsOneWidget);
       expect(find.text('这个漫画源没有返回章节'), findsNothing);
       expect(platform.businessServer.appliedMutations, before);
@@ -228,6 +230,74 @@ void main() {
       expect(find.textContaining('未能刷新作品资料和章节'), findsNothing);
       await _reveal(tester, find.text('新章节'));
       expect(find.text('新章节'), findsOneWidget);
+      expect(platform.businessServer.appliedMutations, before);
+      await _finish(tester, catalog);
+    },
+  );
+
+  testWidgets(
+    'refresh retry stays visible while the chapter list is scrolled',
+    (tester) async {
+      final platform = _platform();
+      final originalInvoke = platform.invokeHandler!;
+      final chapters = [
+        for (var index = 0; index < 40; index++)
+          wire.Chapter(url: '/chapter-$index', name: '章节 $index'),
+      ];
+      final result = wire.SourceResult(
+        chapters: wire.ChapterList(chapters: chapters),
+      );
+      final refresh = Completer<wire.SourceResult>();
+      addTearDown(() {
+        if (!refresh.isCompleted) refresh.complete(result);
+      });
+      var reads = 0;
+      platform.invokeHandler = (call) async {
+        if (!call.hasChapters()) return originalInvoke(call);
+        return ++reads == 2 ? refresh.future : result;
+      };
+      final catalog = await _details(tester, platform);
+      tester.view.physicalSize = const Size(360, 480);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+
+      final reload = find.byKey(const ValueKey('details-source-refresh'));
+      await _reveal(tester, reload);
+      final before = platform.businessServer.appliedMutations;
+      await tester.runAsync(() async {
+        await tester.tap(reload);
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pump();
+      expect(reads, 2);
+      final chapterScroll = tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(CustomScrollView),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position;
+      chapterScroll.jumpTo(1200);
+      await tester.pump();
+      expect(find.text('正在刷新作品资料和章节').hitTestable(), findsOneWidget);
+
+      await tester.runAsync(() async {
+        refresh.completeError(
+          const RuntimeException(RuntimeErrorCode.sourceError, 'test failure'),
+        );
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pumpAndSettle();
+      expect(chapterScroll.pixels, 1200);
+      final retry = find.text('重试刷新');
+      expect(retry.hitTestable(), findsOneWidget);
+      await _tap(tester, retry);
+      expect(reads, 3);
+      expect(chapterScroll.pixels, 1200);
       expect(platform.businessServer.appliedMutations, before);
       await _finish(tester, catalog);
     },

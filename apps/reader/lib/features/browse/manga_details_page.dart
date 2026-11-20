@@ -994,14 +994,79 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
   }
 
   Widget _sourceRefreshButton({bool retry = false}) => CupertinoButton(
-    key: const ValueKey('details-source-refresh'),
+    key: ValueKey(retry ? 'details-source-retry' : 'details-source-refresh'),
     padding: const EdgeInsets.all(8),
-    onPressed: _canRefreshSource
+    onPressed: _canRefreshSource && (retry || _sourceRefreshError == null)
         ? () => unawaited(_refreshSource(_DetailsRefresh.action))
         : null,
     child: retry
         ? const Text('重试刷新')
         : const Icon(CupertinoIcons.refresh, semanticLabel: '刷新作品资料和章节'),
+  );
+
+  Widget _sourceRefreshFeedback() {
+    final error = _sourceRefreshError;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.toolbar.resolveFrom(context),
+        border: Border(
+          top: BorderSide(color: AppColors.separator.resolveFrom(context)),
+        ),
+      ),
+      child: SingleChildScrollView(
+        primary: false,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Semantics(
+          container: true,
+          explicitChildNodes: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                container: true,
+                liveRegion: true,
+                child: error == null
+                    ? Row(
+                        children: [
+                          if (_sourceRefresh == _DetailsRefresh.action) ...[
+                            const CupertinoActivityIndicator(),
+                            const SizedBox(width: 8),
+                          ],
+                          const Flexible(child: Text('正在刷新作品资料和章节')),
+                        ],
+                      )
+                    : Text(
+                        '未能刷新作品资料和章节。$error',
+                        style: TextStyle(
+                          color: AppColors.error.resolveFrom(context),
+                        ),
+                      ),
+              ),
+              if (error != null) _sourceRefreshButton(retry: true),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailsScrollView({required List<Widget> slivers}) => LayoutBuilder(
+    builder: (context, constraints) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: slivers,
+          ),
+        ),
+        if (_sourceRefresh != null || _sourceRefreshError != null)
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: constraints.maxHeight / 2),
+            child: _sourceRefreshFeedback(),
+          ),
+      ],
+    ),
   );
 
   List<Widget> _chapterList() {
@@ -1045,7 +1110,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
               semanticLabel: _chapterOptions ? '收起章节选项' : '章节选项',
             ),
           ),
-          if (_sourceRefreshError == null) _sourceRefreshButton(),
+          _sourceRefreshButton(),
         ],
       ),
       const SizedBox(height: 12),
@@ -1301,8 +1366,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
             : Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 900),
-                  child: CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
+                  child: _detailsScrollView(
                     slivers: [
                       CupertinoSliverRefreshControl(
                         onRefresh: () => _refreshSource(_DetailsRefresh.pull),
@@ -1317,38 +1381,6 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
                               const SizedBox(height: 16),
                             ] else
                               _mangaInformation(null),
-                            if (_sourceRefresh != null)
-                              Semantics(
-                                liveRegion: true,
-                                child: Row(
-                                  children: [
-                                    if (_sourceRefresh ==
-                                        _DetailsRefresh.action) ...[
-                                      const CupertinoActivityIndicator(),
-                                      const SizedBox(width: 8),
-                                    ],
-                                    const Flexible(child: Text('正在刷新作品资料和章节')),
-                                  ],
-                                ),
-                              ),
-                            if (_sourceRefreshError case final error?)
-                              Semantics(
-                                liveRegion: true,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '未能刷新作品资料和章节。$error',
-                                      style: TextStyle(
-                                        color: AppColors.error.resolveFrom(
-                                          context,
-                                        ),
-                                      ),
-                                    ),
-                                    _sourceRefreshButton(retry: true),
-                                  ],
-                                ),
-                              ),
                             if (manga.genres.isNotEmpty) ...[
                               const SizedBox(height: 16),
                               Wrap(

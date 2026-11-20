@@ -13,6 +13,7 @@ import {
   type RuntimeSlot,
 } from '@karuyomi/protocol';
 
+import { detailsRefreshAcceptanceControl } from './acceptance-details-refresh.js';
 import { filterAcceptanceControl } from './acceptance-filters.js';
 import { migrationAcceptanceControl } from './acceptance-migration.js';
 import { preferenceGroupAcceptanceControl } from './acceptance-preference-groups.js';
@@ -38,6 +39,22 @@ if (profile === 'filters') {
   browser.karuyomiRuntime = {
     ...host,
     control: filterAcceptanceControl((input) => host.control(input), outcome),
+  };
+}
+
+if (profile === 'details-refresh') {
+  const stage = new URLSearchParams(location.search).get(
+    'details-refresh-stage',
+  );
+  if (stage !== 'details' && stage !== 'chapters') {
+    throw new Error('Details refresh acceptance requires details or chapters');
+  }
+  browser.karuyomiRuntime = {
+    ...host,
+    control: detailsRefreshAcceptanceControl(
+      (input) => host.control(input),
+      stage,
+    ),
   };
 }
 
