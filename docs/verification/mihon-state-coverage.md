@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-21，Karuyomi 正式 Web 补登记 16.K2 详情刷新等待和 16.K3 失败重试的两色主图。跨版本双主题主图为 172/173（99.4%），原生未连接 27.K1 待拍。Mihon 双主题主图为 168/170（98.8%），还缺未签名扩展提示和外层清理失败提示。[详情刷新故障](mihon-cupertino-fidelity.md#详情刷新故障的双主题正式-web) · [扩展材料读取失败](mihon-cupertino-fidelity.md#扩展材料读取失败的正式-web-复验)
+2026-11-21，Mihon 08.13 与 11.04 补齐原 APK 的受控故障实拍，双主题主图为 170/170（100%）。Karuyomi 跨版本双主题主图为 172/173（99.4%），原生未连接 27.K1 待拍。各状态的尺寸、变体和转换继续按下表验收。[签名数据缺失](mihon-cupertino-fidelity.md#mihon-插件签名数据缺失的双主题实拍) · [外层清理失败](mihon-cupertino-fidelity.md#mihon-外层清理失败与重试)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -259,8 +259,8 @@ stateDiagram-v2
     T3 --> T0: 反馈结束后可重试
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class E2,E12 partial
-    class S0,S1,S2,S3,S4,S5,E0,E1,E3,E5,E6,E7,E8,E9,E10,E11,E13,E14,D0,D1,D2,D3,R0,R1,R2,R3,R4,R5,R6,T0,T2 paired
+    class E2 partial
+    class S0,S1,S2,S3,S4,S5,E0,E1,E3,E5,E6,E7,E8,E9,E10,E11,E12,E13,E14,D0,D1,D2,D3,R0,R1,R2,R3,R4,R5,R6,T0,T2,T3 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                                | 浅色                                                                                                       | 深色                                                                                                    |
@@ -283,7 +283,7 @@ stateDiagram-v2
 | 08.10   | 请求失败后同一行显示重试，再次下载并取消                                             | `s0810-extension-download-retry-light`                                                                     | `s0810-extension-download-retry-dark`                                                                   |
 | 08.11   | 筛选和仓库入口                                                                       | `s0811-extension-menu-light`                                                                               | `s0811-extension-menu-dark`                                                                             |
 | 08.12   | 筛选页没有仓库语言目录时的独立空态、标题和返回                                       | `s0812-extension-filter-empty-light`                                                                       | `s0812-extension-filter-empty-dark`                                                                     |
-| 08.13   | Filtered / Unsigned / UnsupportedLibVersion / Malformed 的具体原因、关闭与卸载       | 待 Unsigned。已核对 `filtered-light`、`unsupported-light`、`malformed-light`                               | 待 Unsigned。已核对 `filtered-dark`、`unsupported-dark`、`malformed-dark`                               |
+| 08.13   | Filtered / Unsigned / UnsupportedLibVersion / Malformed 的具体原因、确定关闭与卸载   | `filtered-light`、`s0813-unsigned-light`、`unsupported-light`、`malformed-light`                           | `filtered-dark`、`s0813-unsigned-dark`、`unsupported-dark`、`malformed-dark`                            |
 | 08.14   | Failed 的具体错误、等宽诊断、复制完整堆栈、关闭及系统卸载落点                        | `failed-light`，复制、关闭及取消卸载已核对                                                                 | `failed-dark`，复制、关闭及卸载测试包已核对                                                             |
 | 08.15   | Android 安装权限缺失横幅及系统授权入口；本轮未改变安装权限                           | `s0803-extensions-untrusted-light`                                                                         | `s0803-extensions-untrusted-dark`                                                                       |
 | 09.01   | 图标、名称、包名、版本/语言/警告、卸载、来源启用/偏好；恢复后 Afrikaans 回首行       | `s0901-mangadex-details-light`、`s0901-mangadex-restored-light`                                            | `s0901-mangadex-details-dark`、`s0901-mangadex-restored-dark`                                           |
@@ -299,19 +299,19 @@ stateDiagram-v2
 | 10.07   | 同一仓库连接返回 502，表单保留地址和提交，原地址重试成功                             | `s1007-repository-request-error-light`                                                                     | `s1007-repository-request-error-dark`                                                                   |
 | 11.01   | 占用、存储范围及清理入口；两主题清理前均 165 kB，主图上下两段                        | `s1101-storage-top-light`、`s1101-storage-usage-light`                                                     | `s1101-storage-top-dark`、`s1101-storage-usage-dark`                                                    |
 | 11.03   | 清理后占用与实际反馈；两主题稳定状态均 1.37 kB；浅色删除3文件，深色再次清理删除0文件 | `s1103-storage-cleared-light`、`s1103-storage-clear-feedback-light`                                        | `s1103-storage-cleared-dark`、`s1103-storage-clear-feedback-dark`                                       |
-| 11.04   | 清理失败 toast 与保留占用，随后可再次点击清理；不能用成功反馈代替                    | 待                                                                                                         | 待                                                                                                      |
+| 11.04   | 外层枚举异常提示、保留占用及同一入口重试                                             | `s1104-storage-failed-light`、`s1104-storage-recovered-light`                                              | `s1104-storage-failed-dark`、`s1104-storage-recovered-dark`                                             |
 
 原 11.02“清理确认”是未经调用点核对的假设，现已移除。Mihon 的 `SettingsDataScreen.getDataGroup()` 直接调用 `chapterCache.clear()`，只在完成/失败时显示 toast，没有独立确认框或可见忙碌分支；Karuyomi 的 `ExtensionStoragePage` 同样直接调用 `controller.forget(sha256)`。Karuyomi 的取消 ACK、资源清理失败和身份约束仍须另验，不因此省略。
 
-11.04 的双主题复验均记录六次单文件删除失败，实际提示删除 0 个文件，占用保留。恢复权限后重试成功，外层异常提示待实拍。[缓存清理复验](mihon-cupertino-fidelity.md#本机存储的名称容量与清理反馈)
+11.04 两色单次目录枚举异常均显示「清除时发生错误」，六个文件及索引的摘要保持，撤去注入后同入口删除六个文件。先前单文件删除受阻时两色都提示删除 0 个文件。[外层失败与重试](mihon-cupertino-fidelity.md#mihon-外层清理失败与重试)
 
 07.03 两色均可由「插件」页签查看原有 MangaDex、xkcd，回到「图源」仍显示空态。对照副本只关闭在线语言时实际仍显示本地图源。[图源空态与扩展入口](mihon-cupertino-fidelity.md#图源空态与扩展入口)
 
-08.06 对应 `Reason.Untrusted` 的风险提示。08.13 的三种已采原因共用关闭与卸载结构。Android 安装器拒绝未签名包，私有扩展扫描也在 Android 解析归档时拒绝它。有签名的无代码归档出现在「未加载」，标为「未信任」。Mihon 的 `Unsigned` 面板仍待采。08.14 的等宽错误、复制完整堆栈与卸载落点均通过实测。08.15 继续记录 Android 安装权限横幅。[错误面板量测与复验步骤](mihon-cupertino-fidelity.md#mihon-插件无法加载的双主题复验)
+08.06 对应 `Reason.Untrusted` 的风险提示。08.13 的四种说明共用确定关闭和卸载动作。普通未签名归档在 Android 解析时被拒绝，`Unsigned` 的两色实拍来自原加载器收到缺少签名数据的受控输入。撤去注入后同一签名包回到已安装。08.14 的等宽错误和复制完整堆栈已实测，08.15 继续记录 Android 安装权限横幅。[签名数据缺失](mihon-cupertino-fidelity.md#mihon-插件签名数据缺失的双主题实拍)
 
 09.04 的开关关闭后，`ExtensionDetailsViewModel.subscribeToSources()` 按 `!enabled` 排序，将 Afrikaans 移到末尾；两主题都已拍到真正关闭的行，再重新启用回到首行。`s0901-mangadex-disabled-sorted-top-*` 只记录原位置移走，不作为关闭开关主图。09.03 的系统弹层两次均为 Android English 浅色，应用主题不控制其颜色；浅色从未信任列表发起，取消返回列表，深色从详情发起，取消返回详情，底层不同不计同状态像素叠图。`s0903-extension-uninstall-cancel-stale-dark` 的 XML 已返回详情，但 PNG 与确认图完全相同，已排除；另拍并实看稳定 `s0903-extension-uninstall-return-dark`。
 
-11.01 清理前两主题均为 165 kB；浅色清理删除 3 个文件，稳定占用为 1.37 kB，深色再次清理删除 0 个文件，占用保持 1.37 kB。上游明确保留 cache journal，非零值不表示清理失败。反馈图截到 toast 淡入，只用于确认内容，不能作稳定合成色/字形基准；失败反馈仍待。备份/导出等未实现功能只作为本页背景，不扩大本轮产品范围。
+11.01 清理前两主题均为 165 kB；浅色清理删除 3 个文件，稳定占用为 1.37 kB，深色再次清理删除 0 个文件，占用保持 1.37 kB。上游明确保留 cache journal，非零值不表示清理失败。早期 11.03 反馈图截到 toast 淡入。新版 11.04 使用完全显示的失败提示，并保留同入口重试的结果。备份/导出等未实现功能只作为本页背景，不扩大本轮产品范围。
 
 08.02 关闭查询后从真正空目录进入空插件商店，两主题都有落点。08.01 的冷加载帧来自关闭设备动画的独立实拍，下拉视频仍用于已打开空目录的刷新。08.07–08.10 用同一 Komga 1.6.76 样本，已核对排队、就地重试、下载取消、实际「安装中」短帧及返回前的 Android 系统提示。排队时第一次取消后曾重新显示「下载中」，见受控延迟复验。08.09 完成安装继续待验。10.07 两主题用同一地址触发连接错误，保留输入并直接重试成功。[首次加载量测](mihon-cupertino-fidelity.md#首次加载参考与-cupertino-页面转场) · [目录复验](mihon-cupertino-fidelity.md#mihon-扩展目录与仓库错误) · [扩展排队复验](mihon-cupertino-fidelity.md#扩展排队与短屏取消)
 

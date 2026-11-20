@@ -1674,6 +1674,12 @@ Karuyomi 旧布局的失败提示只显示原因，并会在长列表滚动区�
 
 `77ff240` 的分支和 PR 检查通过。[分支检查](https://github.com/Wybxc/karuyomi/actions/runs/44676528286) · [PR 检查](https://github.com/Wybxc/karuyomi/actions/runs/44676536593)
 
+### Mihon 插件签名数据缺失的双主题实拍
+
+2026-11-21，在 720×1600、320dpi 的只读 Android API 36 参考副本运行原版 Mihon 0.21.3（versionCode 39，源码 `feadad5e`）。已安装的 xkcd 1.6.2 在基线列于「已安装」。用 Frida 17.27.4 让 Mihon 的 `ExtensionLoader.getSignatures` 对这一个包返回缺少签名数据，其余包沿用原结果。基线样本有一个签名，原加载器记录该包 `isn't signed`，并将其移至「未加载」。这轮记录的是原 APK 在受控签名查询结果下的 08.13。普通未签名归档的 Android 安装和解析结果见前述复验。[加载器源码](../../vendor/mihon/app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionLoader.kt) · [原面板](../../vendor/mihon/app/src/main/java/eu/kanade/presentation/browse/ExtensionsScreen.kt) · [调试工具文档](https://frida.re/docs/android/)
+
+两色从同一行的信息图标打开「无法加载」，正文为「此插件未签名，因此没有签名可供检查。」。按 360×800 逻辑像素换算，两色标题均为 `[52,350.5,148,385.5)`，正文为 `[52,401.5,308,421.5)`。「卸载」与「确定」的边界分别为 `[198.5,459.5,227.5,479.5)`、`[264.5,459.5,293.5,479.5)`。两色点「确定」关闭并保留原行。移除注入并正常重开后，xkcd 回到「已安装」，与 MangaDex 同时可见。xkcd APK 前后 SHA-256 均为 `5e43a5b5dc0da6088365b8431c0788017007ff06e7af9eb6b64c58eb40095e8a`，Mihon 原 APK 也复核为发布摘要。[双主题覆盖](mihon-state-coverage.md)
+
 ## 首次加载参考与 Cupertino 页面转场
 
 2026-11-20，固定 Mihon 0.21.3（`feadad5e`，versionCode 39）在 Android API 36、软件渲染、720×1600 和 320dpi 的隔离参考副本中录屏。两种显式 DEFAULT 主题依次从冷启动的书架打开已有 xkcd，返回后首次进入「浏览 → 图源」，再切到「插件」及「迁移」。默认设备动画的两段录屏共解码 335 帧。能核对各内容页，未找到可归属的完整首次加载帧。
@@ -1711,6 +1717,12 @@ Mihon 的单文件删除函数记录异常并返回失败，清理入口按成�
 Karuyomi 从扩展菜单打开「本机存储」，360×800 和两倍字号下的两色组件回归均在旧版复现长名称截断和 256 字节显示为 `0.0 MiB`。Cupertino 列表行的标题随字号换行，总量、明细与诊断容量按实际大小选用单位。复验确认完整名称、`256 B`、可点击的清理按钮和浏览存储时的零账户写入。固定 Flutter 3.50.0 的 157 项定向回归、客户端严格 Dart 分析与本机 Web JavaScript／Wasm 编译通过。内置浏览器控制端仍无活动页面，最新正式 Web 的主图和转场待验。[存储界面](../../apps/reader/lib/features/extensions/extensions_page.dart) · [扩展回归](../../apps/reader/test/extensions/extensions_controller_test.dart)
 
 `a8ca2ba` 的分支、PR 与分支 Wasm 构建均通过。[分支检查](https://github.com/Wybxc/karuyomi/actions/runs/44694184573) · [PR 检查](https://github.com/Wybxc/karuyomi/actions/runs/44694192620)
+
+### Mihon 外层清理失败与重试
+
+2026-11-21，在 Android API 36、720×1600、320dpi 的只读参考副本使用固定 Mihon 0.21.3。安装的原 APK SHA-256 为 `0026bd25ce5b1c6bdc5bd2c9589a08a811ddc4fa7c994cf937729d5b7010619d`。浅深两次从同样的六个实际章节缓存文件及原索引开始，初始均显示 134 kB。页面加载后，只让 Mihon 进程对章节缓存目录的下一次 `File.listFiles()` 抛出 `SecurityException`。原应用日志同时给出 `ChapterCache.clear()` 与设置页清理调用，确定这次到达 11.04 的外层异常分支。[缓存源码](../../vendor/mihon/app/src/main/java/eu/kanade/tachiyomi/data/cache/ChapterCache.kt) · [设置入口](../../vendor/mihon/app/src/main/java/eu/kanade/presentation/more/settings/screen/SettingsDataScreen.kt) · [调试工具文档](https://frida.re/docs/android/)
+
+两色均实拍「清除时发生错误」。提示实色在 360×800 下约为 `[98,683,262,728)`，原操作和用量仍可见，六个文件及 `journal` 的 SHA-256 逐一相同。解除注入后在同一页重试，两色提示「已清除缓存，删除了 6 个文件」，实际仅剩 `journal`，占用降到 3.20 kB。两色的失败、重试画面、界面树、日志和缓存摘要均已核对。Mihon 用短时系统提示保留列表上下文，Karuyomi 在 Cupertino 分组中保留失败原因和精确重试入口。临时参考实例及专用调试连接已关闭。[Karuyomi 存储对照](#本机副本占用与恢复的双主题正式-web) · [逐状态清单](mihon-state-coverage.md)
 
 ### 本机副本占用与恢复的双主题正式 Web
 
