@@ -15,6 +15,7 @@ import 'package:karuyomi/features/extensions/extensions_controller.dart';
 import 'package:karuyomi/features/extensions/extensions_page.dart';
 import 'package:karuyomi/runtime/catalog_transport.dart';
 import 'package:karuyomi/theme/app_theme.dart';
+import 'package:karuyomi/widgets/edit_sheet.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -117,9 +118,10 @@ void main() {
   Future<void> showRepositoryPage(
     WidgetTester tester,
     Brightness appearance,
-    double textScale,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(360, 800));
+    double textScale, {
+    Size viewport = const Size(360, 800),
+  }) async {
+    await tester.binding.setSurfaceSize(viewport);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
       CupertinoApp(
@@ -136,6 +138,71 @@ void main() {
   }
 
   for (final appearance in Brightness.values) {
+    for (final (viewport, keyboardHeight) in [
+      (const Size(844, 390), 234.0),
+      (const Size(320, 560), 310.0),
+    ]) {
+      testWidgets(
+        'repository fields and preview stay reachable with the keyboard in $appearance at $viewport',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = viewport;
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetViewInsets);
+          await showRepositoryPage(tester, appearance, 2, viewport: viewport);
+          final add = find.byKey(const ValueKey('repositories-add'));
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+
+          final address = find.byKey(const ValueKey('repository-url'));
+          final name = find.byKey(const ValueKey('repository-name'));
+          final preview = find.byKey(
+            const ValueKey('repository-preview-submit'),
+          );
+          final cancel = find.text('取消');
+          await tester.ensureVisible(address);
+          await tester.pumpAndSettle();
+          await tester.enterText(address, 'https://community.example');
+          tester.view.viewInsets = FakeViewPadding(bottom: keyboardHeight);
+          await tester.pumpAndSettle();
+
+          void expectTopActions() {
+            for (final action in [cancel, preview]) {
+              expect(action.hitTestable(), findsOneWidget);
+              expect(
+                tester.getBottomLeft(action).dy,
+                lessThan(viewport.height - keyboardHeight),
+              );
+            }
+          }
+
+          expectTopActions();
+          expect(address.hitTestable(), findsOneWidget);
+          await tester.ensureVisible(name);
+          await tester.pumpAndSettle();
+          expect(name.hitTestable(), findsOneWidget);
+          await tester.enterText(name, '社区');
+          expectTopActions();
+
+          await tester.tap(preview);
+          tester.view.resetViewInsets();
+          await tester.pumpAndSettle();
+          expect(find.text('确认添加仓库'), findsOneWidget);
+          expect(find.textContaining('社区'), findsOneWidget);
+          expect(posts(), isEmpty);
+          expect(platform.preparations, isEmpty);
+          await tester.tap(cancel);
+          await tester.pumpAndSettle();
+          expect(find.byType(ExtensionRepositoriesPage), findsOneWidget);
+          expect(posts(), isEmpty);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
     testWidgets(
       'repository preview failure keeps its draft for retry in $appearance',
       (tester) async {
@@ -156,9 +223,9 @@ void main() {
         await tester.tap(submit);
         await tester.pumpAndSettle();
 
-        final dialog = find.byType(CupertinoAlertDialog);
+        final sheet = find.byType(EditSheet);
         expect(
-          find.descendant(of: dialog, matching: find.text(error)),
+          find.descendant(of: sheet, matching: find.text(error)),
           findsOneWidget,
         );
         expect(

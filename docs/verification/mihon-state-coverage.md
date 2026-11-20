@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-20，Mihon 已补齐图源空态 07.03 的浅深画面，双主题主图为 168/170（98.8%）。仍缺未签名扩展提示和外层清理失败提示。Karuyomi 跨版本双主题主图为 168/171（98.2%），准备失败、卸载确认和原生未连接仍缺双主题主图。[图源空态实拍](mihon-cupertino-fidelity.md#图源空态与扩展入口) · [扩展排队实拍](mihon-cupertino-fidelity.md#扩展排队与短屏取消)
+2026-11-21，Karuyomi 正式 Web 补齐卸载确认 09.K6，跨版本双主题主图为 169/171（98.8%）。准备失败 08.K9 已取得双主题画面，具体失败原因仍缺。原生未连接 27.K1 待拍。Mihon 双主题主图为 168/170（98.8%），还缺未签名扩展提示和外层清理失败提示。[扩展 Web 实拍](mihon-cupertino-fidelity.md#正式-web-的扩展准备失败与卸载确认) · [Mihon 图源空态](mihon-cupertino-fidelity.md#图源空态与扩展入口)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -1656,7 +1656,9 @@ stateDiagram-v2
     Saving --> Candidate: 从候选详情发起卸载并获确认
     Uninstalled --> Available: 返回列表
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class Available,Installed,EmptySearch,Language,Options,Preparing,Saving,Pending,Candidate,Enabled,Disabled,Diagnostics,Uninstalled paired
+    classDef partial fill:#ffedd5,stroke:#ea580c,color:#431407
+    class Available,Installed,EmptySearch,Language,Options,Preparing,Saving,Pending,Candidate,Enabled,Disabled,Diagnostics,Uninstalled,ConfirmUninstall paired
+    class PreparationFailed partial
 ```
 
 | 状态 ID | 最小必要信息                                                 | 浅色正式Web                                                                           | 深色正式Web                                                                       |
@@ -1669,15 +1671,15 @@ stateDiagram-v2
 | 08.K6   | 正在准备的状态、取消准备；不提前标记账户安装                 | `karuyomi-a8997fa-extension-flow-preparing-light`                                     | `karuyomi-a8997fa-extension-flow-preparing-dark`                                  |
 | 08.K7   | 等待账户确认、停用重复写入、保留原操作                       | `karuyomi-2512c51-extension-recovery-formal-extension-install-auto-waiting-light.jpg` | `karuyomi-2512c51-extension-recovery-formal-extension-install-waiting-dark.jpg`   |
 | 08.K8   | 未确认/冲突原因、原操作摘要、精确重试/重取                   | `karuyomi-2512c51-extension-recovery-formal-extension-uninstall-unknown-light.jpg`    | `karuyomi-2512c51-extension-recovery-formal-extension-uninstall-unknown-dark.jpg` |
-| 08.K9   | 扩展名、原构建版本、仓库和本机准备失败原因，原操作可重试     | 待                                                                                    | 待                                                                                |
+| 08.K9   | 扩展名、原构建版本、仓库和本机准备失败原因，原操作可重试     | `karuyomi-b189199-extension-preparation-failed-light.jpg`（原因仍为通用提示）         | `karuyomi-b189199-extension-preparation-failed-dark.jpg`（原因仍为通用提示）      |
 | 09.K1   | 候选版本/语言/状态、安装与源清单；未安装不打开源             | `karuyomi-9a09331-extension-candidate-enter-light.jpg`                                | `karuyomi-9a09331-extension-candidate-enter-system-dark.jpg`                      |
 | 09.K2   | 精确状态、已开启开关、维护/卸载影响、源清单与诊断入口        | `karuyomi-2df0551-extension-enabled-light.jpg`                                        | `karuyomi-2df0551-extension-enabled-dark.jpg`                                     |
 | 09.K3   | 已停用状态、关闭开关、可重新启用、源不可打开                 | `karuyomi-9a09331-extension-disabled-light.jpg`                                       | `karuyomi-9a09331-extension-disabled-system-dark.jpg`                             |
 | 09.K4   | 原仓库/包/构建身份、完整可选取正文、末端与收起               | `karuyomi-2df0551-extension-diagnostics-after-scroll-light.jpg`                       | `karuyomi-2df0551-extension-diagnostics-after-scroll-dark.jpg`                    |
 | 09.K5   | 已确认卸载、返回扩展列表；书架等业务数据保留                 | `karuyomi-2df0551-extension-uninstalled-light.jpg`                                    | `karuyomi-2512c51-extension-recovery-formal-extension-uninstalled-dark.jpg`       |
-| 09.K6   | 扩展名称、仓库和已知精确版本、账户卸载影响、取消和系统红确认 | 待                                                                                    | 待                                                                                |
+| 09.K6   | 扩展名称、仓库和已知精确版本、账户卸载影响、取消和系统红确认 | `karuyomi-b189199-extension-uninstall-confirm-light.jpg`                              | `karuyomi-b189199-extension-uninstall-confirm-dark.jpg`                           |
 
-08.K9 与 09.K6 已在浅深组件中核对常规视口与 360×480 两倍字号。准备失败原因和账户卸载影响在首屏可见，滚动后重试或取消仍可达。正式 Web 双主题主图待验。[失败重试与卸载确认的短屏复验](mihon-cupertino-fidelity.md#失败重试与卸载确认的短屏复验)
+`b189199` 正式 Web 的两色卸载确认和取消通过，均返回同一已安装详情。两色均触发清单 503，重试同一构建后实际安装，故障时的通用正文保留为 08.K9 部分证据。此前组件另核对 360×480 两倍字号时重试和取消可达。[正式 Web 检查](mihon-cupertino-fidelity.md#正式-web-的扩展准备失败与卸载确认) · [短屏组件复验](mihon-cupertino-fidelity.md#失败重试与卸载确认的短屏复验)
 
 这里只跟踪当前目标画面；主图、变体及每条转换分别验收。08.K8的冲突/拒绝/结果未知、资源清理失败、已移除仓库/已下架构建、长文本与减少动态效果仍须分项补充，不用正常启停主图代替。
 

@@ -1,5 +1,6 @@
 import '../../widgets/app_routes.dart';
 import '../../widgets/choice_field.dart';
+import '../../widgets/edit_sheet.dart';
 import '../../theme/app_theme.dart';
 
 import 'dart:async';
@@ -1302,38 +1303,38 @@ class const ExtensionRepositoriesPage({
     BuildContext context,
     ({String url, String name}) draft,
     String? failure,
-  ) => showAppDialog(
+  ) => showAppSheet<({String url, String name})>(
     context: context,
-    builder: (context) => HookBuilder(
+    enableDrag: false,
+    scrollableBuilder: (context, scrollController) => HookBuilder(
       builder: (context) {
         final address = useTextEditingController(text: draft.url);
         final name = useTextEditingController(text: draft.name);
-        return CupertinoAlertDialog(
+        return EditSheet(
           title: const Text('预览额外仓库'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('仓库必须公开提供 HTTPS 静态目录及 CORS，应用凭据不会发送给仓库。'),
-                CupertinoTextField(
-                  key: const ValueKey('repository-url'),
-                  controller: address,
-                  autofillHints: null,
-                  autocorrect: false,
-                  keyboardType: TextInputType.url,
-                  textInputAction: TextInputAction.next,
-                  placeholder: 'HTTPS 仓库地址',
-                ),
-                const SizedBox(height: 8),
-                CupertinoTextField(
-                  key: const ValueKey('repository-name'),
-                  controller: name,
-                  autofillHints: null,
-                  maxLength: 100,
-                  placeholder: '名称（可选）',
-                ),
-                if (failure != null)
-                  Semantics(
+          leading: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          trailing: CupertinoButton(
+            key: const ValueKey('repository-preview-submit'),
+            padding: EdgeInsets.zero,
+            onPressed: () =>
+                Navigator.pop(context, (url: address.text, name: name.text)),
+            child: const Text(
+              '只读预览',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          content: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            children: [
+              if (failure != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Semantics(
                     liveRegion: true,
                     child: Text(
                       failure,
@@ -1342,24 +1343,34 @@ class const ExtensionRepositoriesPage({
                       ),
                     ),
                   ),
-              ],
-            ),
-          ),
-          actions: [
-            CupertinoButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            CupertinoButton(
-              key: const ValueKey('repository-preview-submit'),
-              onPressed: () =>
-                  Navigator.pop(context, (url: address.text, name: name.text)),
-              child: const Text(
-                '只读预览',
-                style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              CupertinoFormSection.insetGrouped(
+                footer: const Text('仓库必须公开提供 HTTPS 静态目录及 CORS，应用凭据不会发送给仓库。'),
+                children: [
+                  CupertinoFormRow(
+                    child: CupertinoTextField(
+                      key: const ValueKey('repository-url'),
+                      controller: address,
+                      autofillHints: null,
+                      autocorrect: false,
+                      keyboardType: TextInputType.url,
+                      textInputAction: TextInputAction.next,
+                      placeholder: 'HTTPS 仓库地址',
+                    ),
+                  ),
+                  CupertinoFormRow(
+                    child: CupertinoTextField(
+                      key: const ValueKey('repository-name'),
+                      controller: name,
+                      autofillHints: null,
+                      maxLength: 100,
+                      placeholder: '名称（可选）',
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     ),
