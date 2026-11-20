@@ -583,29 +583,35 @@ void main() {
 
   for (final appearance in Brightness.values) {
     testWidgets(
-      'preparation failure identifies its build until an explicit retry in $appearance',
+      'preparation failure keeps its reason and exact-build retry reachable in $appearance',
       (tester) async {
+        final name = '${'跨端阅读测试扩展资料目录' * 6}末尾';
+        final index = wire.decodeProtoJson(
+          wire.ExtensionIndex(),
+          platform.inventory,
+        );
+        index.builds.single.sources.single.name = name;
+        platform.inventory = wire.encodeProtoJson(index);
+        await tester.runAsync(catalog.refreshCatalog);
         platform.preparationFailure = wire.RuntimeError(
           code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_UNSUPPORTED_CAPABILITY,
           message: 'Fixture rejected this build',
         );
-        tester.platformDispatcher.textScaleFactorTestValue = 2;
-        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-        await show(tester, appearance: appearance, size: const Size(360, 800));
+        await show(
+          tester,
+          appearance: appearance,
+          size: const Size(360, 480),
+          textScale: 2,
+        );
         final install = find.widgetWithText(CupertinoButton, '安装');
         final error = find.byKey(const ValueKey('extensions-error'));
+        final retry = find.byKey(const ValueKey('extensions-retry-prepare'));
         final candidate = catalog.builds.single;
         final repository = catalog.repositories.single;
         await tap(tester, install);
-        final message = tester.widget<Text>(error).data!;
-        expect(
-          message,
-          contains(
-            '${testCatalogSource.name} · ${candidate.version} · ${repository.name}',
-          ),
-        );
-        expect(message, contains('当前应用不支持此扩展材料'));
+        expect(tester.widget<Text>(error).data, contains('当前应用不支持此扩展材料'));
         expect(error.hitTestable(), findsOneWidget);
+        expect(retry.hitTestable(), findsOneWidget);
         expect(
           find.descendant(
             of: find.byKey(const PageStorageKey('extensions-scroll')),
@@ -639,8 +645,28 @@ void main() {
           isEmpty,
         );
 
+        final statusScroll = find.ancestor(
+          of: error,
+          matching: find.byType(Scrollable),
+        );
+        final fullName = find.descendant(
+          of: statusScroll,
+          matching: find.text(name),
+        );
+        expect(
+          tester.renderObject<RenderParagraph>(fullName).didExceedMaxLines,
+          isFalse,
+        );
+        final version = find.text('${candidate.version} · ${repository.name}');
+        final retryBounds = tester.getRect(retry);
+        await tester.ensureVisible(version);
+        await tester.pumpAndSettle();
+        expect(version.hitTestable(), findsOneWidget);
+        expect(tester.getRect(retry), retryBounds);
+
         platform.preparationFailure = null;
-        await tap(tester, install);
+        await tester.tap(retry.hitTestable());
+        await tester.pumpAndSettle();
         expect(error, findsNothing);
         expect(platform.preparations.map((request) => request.build.buildId), [
           candidate.id,
@@ -1703,6 +1729,118 @@ void main() {
   }
 
   testWidgets(
+    'retrying a failed local copy download preserves the account selection',
+    (tester) async {
+      await manager.install(catalog.builds.single);
+      final installed = catalog.installedExtensions.single;
+      final before = platform.businessServer.requests
+          .where((request) => request.method == 'POST')
+          .length;
+      platform.cachedArtifacts.clear();
+      platform.preparationFailure = wire.RuntimeError(
+        code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_STORAGE_BUSY,
+        message: 'Fixture rejected the local download',
+      );
+      await show(tester);
+      await tap(
+        tester,
+        find.byKey(ValueKey(('extension-installed', installed.packageName))),
+      );
+      await tap(
+        tester,
+        find.byKey(ValueKey(('extension-prepare', installed.packageName))),
+      );
+      expect(find.textContaining('扩展仍在使用'), findsOneWidget);
+      final retry = find.byKey(const ValueKey('extensions-retry-prepare'));
+      expect(retry.hitTestable(), findsOneWidget);
+      platform.preparationFailure = null;
+      await tap(tester, retry);
+      expect(find.text('本机产物已准备，账户选择未改变。'), findsOneWidget);
+      expect(catalog.installedExtensions.single, installed);
+      expect(platform.cachedArtifacts, contains(installed.bundleSha256));
+      expect(platform.preparations.map((request) => request.build.buildId), [
+        installed.buildId,
+        installed.buildId,
+        installed.buildId,
+      ]);
+      expect(
+        platform.businessServer.requests.where(
+          (request) => request.method == 'POST',
+        ),
+        hasLength(before),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'a long extension name keeps the uninstall effect and actions visible on a short screen',
+    (tester) async {
+      final name = '${'跨端阅读测试扩展资料目录' * 6}末尾';
+      final index = wire.decodeProtoJson(
+        wire.ExtensionIndex(),
+        platform.inventory,
+      );
+      index.builds.single.sources.single.name = name;
+      platform.inventory = wire.encodeProtoJson(index);
+      await tester.runAsync(() async {
+        await catalog.refreshCatalog();
+        await manager.install(catalog.builds.single);
+      });
+      final installed = catalog.installedExtensions.single;
+      await show(
+        tester,
+        appearance: Brightness.dark,
+        size: const Size(360, 480),
+        textScale: 2,
+      );
+      await tap(
+        tester,
+        find.byKey(ValueKey(('extension-installed', installed.packageName))),
+      );
+      final uninstall = find.byKey(
+        ValueKey(('extension-uninstall', installed.packageName)),
+      );
+      await tester.ensureVisible(uninstall);
+      await tester.pumpAndSettle();
+      await tester.tap(uninstall.hitTestable());
+      await tester.pumpAndSettle();
+
+      final dialog = find.byType(CupertinoAlertDialog);
+      final cancel = find.descendant(
+        of: dialog,
+        matching: find.widgetWithText(CupertinoButton, '取消'),
+      );
+      final confirm = find.byKey(const ValueKey('extension-uninstall-confirm'));
+      expect(find.text('此扩展将从账户移除。').hitTestable(), findsOneWidget);
+      expect(cancel.hitTestable(), findsOneWidget);
+      expect(confirm.hitTestable(), findsOneWidget);
+      final preserved = find.descendant(
+        of: dialog,
+        matching: find.text('书架、分类、阅读进度、收藏源及漫画源数据会保留。'),
+      );
+      await tester.ensureVisible(preserved);
+      await tester.pumpAndSettle();
+      expect(preserved.hitTestable(), findsOneWidget);
+      expect(cancel.hitTestable(), findsOneWidget);
+      expect(confirm.hitTestable(), findsOneWidget);
+
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(dialog, findsNothing);
+      expect(find.byType(ExtensionDetailsPage), findsOneWidget);
+      expect(catalog.installedExtensions.single, installed);
+      expect(
+        platform.businessServer.requests.where(
+          (request) => request.method == 'POST',
+        ),
+        hasLength(1),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'management page installs, shows confirmed disable and independently retries cleanup before uninstall',
     (tester) async {
       await show(
@@ -1787,7 +1925,15 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(dialog, findsOneWidget);
-      expect(find.text('卸载“${testCatalogSource.name}”？'), findsOneWidget);
+      expect(find.text('卸载扩展？'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: dialog,
+          matching: find.text(testCatalogSource.name),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('此扩展将从账户移除。').hitTestable(), findsOneWidget);
       expect(find.textContaining('书架、分类、阅读进度'), findsOneWidget);
       expect(
         tester.widget<CupertinoButton>(confirm).foregroundColor,

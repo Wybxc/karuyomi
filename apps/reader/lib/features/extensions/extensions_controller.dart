@@ -17,6 +17,11 @@ import 'extension_listing.dart';
 enum ExtensionActivity { reading, previewing, preparing, saving, cleaning }
 
 typedef ExtensionLocalCopy = ({String sha256, String name});
+typedef ExtensionPreparationFailure = ({
+  CatalogBuild build,
+  String reason,
+  wire.InstalledExtension? localCopyOf,
+});
 
 final class ExtensionsController extends ChangeNotifier {
   ExtensionsController({
@@ -46,12 +51,13 @@ final class ExtensionsController extends ChangeNotifier {
   SettingsController get _settingsCommands =>
       container.read(settingsControllerProvider(catalog, repository).notifier);
   wire.ExtensionCacheState? cache;
-  ({String message, bool duringPreparation})? _failure;
-  String? get error => _failure?.message;
+  ({String reason, CatalogBuild? build, wire.InstalledExtension? localCopyOf})?
+  _failure;
+  String? get error => _failure?.reason;
   set error(String? value) {
     _failure = value == null
         ? null
-        : (message: value, duringPreparation: false);
+        : (reason: value, build: null, localCopyOf: null);
   }
 
   String? message;
@@ -77,8 +83,12 @@ final class ExtensionsController extends ChangeNotifier {
   bool get canEdit => available && !busy && !catalog.busy && settings.canEdit;
   bool get preparing => available && _preparationId != null;
   CatalogBuild? get preparationBuild => available ? _preparationBuild : null;
-  bool get hasPreparationFailure =>
-      available && _failure?.duringPreparation == true;
+  ExtensionPreparationFailure? get preparationFailure => switch (_failure) {
+    (reason: final reason, build: final build?, localCopyOf: final localCopyOf)
+        when available =>
+      (build: build, reason: reason, localCopyOf: localCopyOf),
+    _ => null,
+  };
   ExtensionLocalCopy? get cleanupTarget => available ? _cleanupTarget : null;
   String? get cleanupError => available ? _cleanupError : null;
   List<wire.InstalledExtension> get installed =>
@@ -414,7 +424,9 @@ final class ExtensionsController extends ChangeNotifier {
   }
 
   Future<void> prepareInstalled(wire.InstalledExtension extension) async {
-    if (!available || busy || catalog.busy) return;
+    if (!available || busy || catalog.busy || !installed.contains(extension)) {
+      return;
+    }
     final build = catalog.builds
         .where(
           (build) =>
@@ -439,7 +451,7 @@ final class ExtensionsController extends ChangeNotifier {
       _changed();
       cache = await catalog.runtime.extensionCache();
       if (available) message = '本机产物已准备，账户选择未改变。';
-    });
+    }, localCopyOf: extension);
   }
 
   Future<wire.PreparedBuild?> _prepare(CatalogBuild build) async {
@@ -564,7 +576,10 @@ final class ExtensionsController extends ChangeNotifier {
     });
   }
 
-  Future<void> _run(Future<void> Function() operation) async {
+  Future<void> _run(
+    Future<void> Function() operation, {
+    wire.InstalledExtension? localCopyOf,
+  }) async {
     _busy = true;
     activity = ExtensionActivity.reading;
     repositoryTarget = null;
@@ -579,12 +594,7 @@ final class ExtensionsController extends ChangeNotifier {
         operationFailure = failure is RuntimeException ? failure.code : null;
         final reason = _operationError(failure);
         if (_preparationBuild case final build?) {
-          final item = ExtensionListing(catalog: catalog, candidate: build);
-          _failure = (
-            message:
-                '${item.name} · ${build.version} · ${item.repositoryName}\n$reason',
-            duringPreparation: true,
-          );
+          _failure = (reason: reason, build: build, localCopyOf: localCopyOf);
         } else {
           error = reason;
         }

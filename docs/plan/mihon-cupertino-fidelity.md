@@ -20,6 +20,8 @@
 
 ## 推进与待办
 
+- [x] 对照 Mihon 下载失败重试和卸载确认，在 Karuyomi 的浅深主题组件中将失败原因和账户卸载影响放到长名称之前。两倍字号下可核对原构建并直接重试，也可阅读数据保留范围后取消或确认卸载。两个状态的正式 Web 主图待验。[失败重试与卸载确认的短屏复验](../verification/mihon-cupertino-fidelity.md#失败重试与卸载确认的短屏复验)
+
 - [x] 固定 Mihon 补齐 07.03 图源空态的浅深原图。两色进入插件页签并返回空态。Karuyomi 空态居中，短屏两倍字号仍可点按「前往扩展」。正式 Web 待验。[图源空态与扩展入口](../verification/mihon-cupertino-fidelity.md#图源空态与扩展入口)
 
 - [x] 对照 Mihon 22.01、22.04 复拍 Karuyomi 单页等待、失败与原页重试。白画布调暗后，提示与动作采用可读的 Cupertino 色，分页、连续和放大的透明 PNG 通过像素采样。正式 Web 待验。[单页反馈与透明图片的调暗](../verification/mihon-cupertino-fidelity.md#单页反馈与透明图片的调暗)

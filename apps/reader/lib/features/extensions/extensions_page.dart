@@ -256,7 +256,7 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
       ),
       ('可安装', visible.where((item) => item.installed == null).toList()),
     ];
-    final preparationFailed = _controller.hasPreparationFailure;
+    final preparationFailure = _controller.preparationFailure;
     final list = CustomScrollView(
       key: const PageStorageKey('extensions-scroll'),
       slivers: [
@@ -351,12 +351,11 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
                       ),
                   ],
                 ),
-                if (!preparationFailed)
-                  ExtensionOperationStatus(
-                    controller: _controller,
-                    showPreparation: false,
-                    showProgress: !readingEmptyDirectory,
-                  ),
+                ExtensionOperationStatus(
+                  controller: _controller,
+                  showPreparation: false,
+                  showProgress: !readingEmptyDirectory,
+                ),
                 if (settings.snapshot == null &&
                     canCheck &&
                     settings.error == null)
@@ -418,13 +417,11 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
         controller: _controller,
         target: build,
       ),
-      null when preparationFailed => SingleChildScrollView(
-        primary: false,
-        child: ExtensionOperationStatus(
+      null when preparationFailure != null =>
+        _ExtensionPreparationFailureStatus(
           controller: _controller,
-          showPreparation: false,
+          failure: preparationFailure,
         ),
-      ),
       null => null,
     };
     final content = LayoutBuilder(
@@ -518,6 +515,8 @@ class const ExtensionOperationStatus({
     final failure = controller.settings.failure;
     final errorStyle = TextStyle(color: AppColors.error.resolveFrom(context));
     final preparation = controller.preparationBuild;
+    final preparationFailure = controller.preparationFailure;
+    final operationError = preparationFailure == null ? controller.error : null;
     final copy = controller.cleanupTarget;
     final cleaning =
         copy != null && controller.activity == ExtensionActivity.cleaning;
@@ -574,14 +573,20 @@ class const ExtensionOperationStatus({
             controller: controller,
             target: preparation,
           ),
+        if (showPreparation && preparationFailure != null)
+          _ExtensionPreparationFailureStatus(
+            controller: controller,
+            failure: preparationFailure,
+            showStorageAction: showStorageAction,
+          ),
         if (controller.message case final message?)
           Text(message, key: const ValueKey('extensions-message')),
-        if (controller.error case final error?)
+        if (operationError != null)
           Semantics(
             container: true,
             liveRegion: true,
             child: Text(
-              error,
+              operationError,
               key: const ValueKey('extensions-error'),
               style: errorStyle,
             ),
@@ -589,6 +594,7 @@ class const ExtensionOperationStatus({
         if (controller.settings.error case final error?)
           Text(error, style: errorStyle),
         if (showStorageAction &&
+            preparationFailure == null &&
             controller.operationFailure == RuntimeErrorCode.limitExceeded)
           CupertinoButton(
             onPressed: () => Navigator.of(context).push<void>(
@@ -688,7 +694,7 @@ class const ExtensionOperationStatus({
         if (pending != null ||
             failure != null ||
             controller.settings.snapshot == null ||
-            controller.error != null)
+            operationError != null)
           CupertinoButton(
             key: const ValueKey('extensions-refresh'),
             onPressed: !controller.available || controller.busy
@@ -750,6 +756,113 @@ class const _ExtensionPreparationStatus({
       ],
     ),
   );
+}
+
+class const _ExtensionPreparationFailureStatus({
+  required final ExtensionsController controller,
+  required final ExtensionPreparationFailure failure,
+  final bool showStorageAction = true,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final build = failure.build;
+    final item = ExtensionListing(
+      catalog: controller.catalog,
+      candidate: build,
+    );
+    final currentBuild = controller.catalog.builds
+        .where(
+          (candidate) =>
+              candidate.id == build.id &&
+              candidate.packageName == build.packageName &&
+              candidate.repoId == build.repoId &&
+              candidate.catalogUrl == build.catalogUrl,
+        )
+        .firstOrNull;
+    final localCopyOf = failure.localCopyOf;
+    VoidCallback? retry;
+    if (currentBuild != null &&
+        item.registered &&
+        !controller.busy &&
+        !controller.catalog.busy) {
+      if (localCopyOf == null && controller.canEdit) {
+        retry = () =>
+            unawaited(installExtension(context, controller, currentBuild));
+      } else if (localCopyOf != null &&
+          controller.installed.contains(localCopyOf)) {
+        retry = () => unawaited(controller.prepareInstalled(localCopyOf));
+      }
+    }
+    final storageFull =
+        controller.operationFailure == RuntimeErrorCode.limitExceeded;
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Flexible(
+          child: SingleChildScrollView(
+            primary: false,
+            child: CupertinoFormSection.insetGrouped(
+              margin: EdgeInsets.zero,
+              header: const Text('扩展准备失败'),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Semantics(
+                        container: true,
+                        liveRegion: true,
+                        child: Text(
+                          failure.reason,
+                          key: const ValueKey('extensions-error'),
+                          style: textStyle.copyWith(
+                            fontSize: 13,
+                            color: AppColors.error.resolveFrom(context),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(item.name),
+                      Text(
+                        '${build.version} · ${item.repositoryName}',
+                        style: textStyle.copyWith(
+                          fontSize: 13,
+                          color: AppColors.secondaryLabel.resolveFrom(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (storageFull && showStorageAction)
+          CupertinoButton(
+            alignment: AlignmentDirectional.centerStart,
+            onPressed: () => Navigator.of(context).push<void>(
+              AppPageRoute(
+                builder: (_) => ExtensionStoragePage(controller: controller),
+              ),
+            ),
+            child: const Text('管理本机存储'),
+          )
+        else if (!storageFull)
+          CupertinoButton(
+            key: const ValueKey('extensions-retry-prepare'),
+            alignment: AlignmentDirectional.centerStart,
+            onPressed: retry,
+            child: const Text('重试准备'),
+          ),
+      ],
+    );
+  }
 }
 
 class const _ExtensionCleanupStatus({
@@ -838,8 +951,18 @@ class const ExtensionDetailsPage({
     final accepted = await showAppDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        title: Text('卸载“$name”？'),
-        content: Text('$origin\n此扩展将从账户移除。书架、分类、阅读进度、收藏源及漫画源数据会保留。'),
+        title: const Text('卸载扩展？'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('此扩展将从账户移除。'),
+            const SizedBox(height: 8),
+            Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text(origin),
+            const SizedBox(height: 8),
+            const Text('书架、分类、阅读进度、收藏源及漫画源数据会保留。'),
+          ],
+        ),
         actions: [
           CupertinoButton(
             onPressed: () => Navigator.pop(context, false),
