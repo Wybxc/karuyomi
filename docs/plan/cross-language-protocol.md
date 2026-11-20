@@ -22,6 +22,7 @@
 - `pnpm protocol:setup` 准备独立锁定的 Dart generator；`pnpm generate:check` 在临时目录生成并比较完整文件集与字节，CI 同步检查。
 - TS/Dart 正反 golden、标准二进制与 ProtoJSON 对照、oneof/presence/非法字段、业务预算、签名 ID 和 generation/build 绑定回归。
 - 正式 Worker、Web 与 Native 小控制消息接入；Native 使用 JSON.stringify 文本再交官方 Dart codec，避免 WK NSNumber 的 double 表示改变整数输入。
+- 扩展静态材料读取失败有独立的生成错误类型。正式 Web 已验证清单 503 的 TS 宿主错误传到 Dart 界面，恢复后用原构建重试。[扩展材料读取失败](../verification/mihon-cupertino-fidelity.md#扩展材料读取失败的正式-web-复验)
 - index 删除分页字段；Source 输出使用具体四类 payload；图片/HTTP 大正文继续独立有界二进制传输。Java memo 对象与 64 KiB UTF-8 限额通过 JVM oracle。
 
 ## 待验收

@@ -1754,6 +1754,14 @@ Karuyomi 在 macOS Flutter 3.50.0 中从真实应用壳层点按书架、浏览�
 
 四张 JPEG 核对了真实显示与语义。完成审计记录三次显式主题保存和一次安装，卸载写入为零。浏览器视口已恢复，临时标签和本机验收端已关闭。Karuyomi 跨版本双主题合格主图为 **169/171（98.8%）**，剩余 08.K9 的具体原因和 27.K1 原生未连接。Mihon 参考仍有两组待采。[逐状态清单](mihon-state-coverage.md)
 
+## 扩展材料读取失败的正式 Web 复验
+
+2026-11-21，使用 `423639a` 的 Flutter 3.50.0 release Web、Vite 宿主和资产构建，由官方 Wrangler harness 服务本地独立 D1。实际通过 HTTP 交付的文件与构建逐字节一致。`main.dart.4cd446c4.js` 的 SHA-256 为 `4cd446c49b3d314ebe8617159166db53f62162fa74b9ad797b0baec23d77f1ec`，`runtime/host.js` 为 `e7f51512c3993844d655b6d7c58d05fdc4cb9c40109a23a97d810b8537be6c32`。内置浏览器视口为 360×800，测试账户保存显式浅色和深色。[验收入口](../../apps/api/test/README.md)
+
+对照 Mihon 下载失败后在原扩展上重试的流程。在 Karuyomi 两色分别点击安装 xkcd 1.6.1，受控故障让同一个构建清单两次返回 HTTP 503。画面都显示「无法从仓库读取扩展材料。」，并保留扩展、版本、默认仓库和「重试准备」。宿主用独立的 Protobuf 错误代码表示读取失败，并照常传递取消信号。[Mihon 失败重试](#失败重试与卸载确认的短屏复验) · [静态材料读取](../../packages/runtime-host/src/verified-loader.ts) · [扩展操作反馈](../../apps/reader/lib/features/extensions/extensions_controller.dart)
+
+两次 503 后独立读回账户设置，xkcd 仍未安装。恢复响应后点击原「重试准备」，同一清单返回 200，账户读回为同一构建已启用，界面显示本机产物已准备。审计为三次显式主题保存和一次安装写入。取得 08.K9 两张主图后，Karuyomi 跨版本双主题合格主图为 **170/171（99.4%）**，剩余原生未连接 27.K1。浏览器视口已恢复，临时标签和本机验收端已关闭。[逐状态清单](mihon-state-coverage.md)
+
 ## 仓库录入与短屏键盘
 
 2026-11-21，以 Mihon 10.02 的地址输入、取消和提交为对照，在 Flutter 3.50.0 的仓库管理组件里实际打开「添加仓库」。用两倍字号和模拟键盘占位核对浅深色。基线 `b2be740` 在 844×390 视口、底部占用 234 逻辑像素时，滚到「只读预览」仍无法点按。320×560 视口、底部占用 310 时，刚打开键盘便挤出预览动作，需另滚动动作区。[Mihon 与 Karuyomi 逐状态清单](mihon-state-coverage.md)
@@ -1765,7 +1773,9 @@ Karuyomi 在 macOS Flutter 3.50.0 中从真实应用壳层点按书架、浏览�
 | 844×390，156   | `[31.2,75.2)`                  |
 | 320×560，250   | `[44.8,88.8)`                  |
 
-983 项 Flutter 测试和严格 Dart 分析通过。新版 10.K2、10.K3 和 10.K5 的正式 Web 及实机键盘待验。[逐状态清单](mihon-state-coverage.md)
+983 项 Flutter 测试和严格 Dart 分析通过。[逐状态清单](mihon-state-coverage.md)
+
+同日用 `423639a` 的本地正式 Web 补验仓库录入与地址校验。360×800 浅深两色均从仓库管理打开同一编辑 Sheet，输入 `http://example.invalid/` 后按 Tab，把焦点移到名称并输入「复验仓库」。点「只读预览」后显示 HTTPS 和目录路径要求，两项草稿仍可编辑。取消返回仓库管理，目录仍显示最近的校验错误。两色审计均无仓库写入，浅色取消前后账户设置逐字节一致。两张稳定错误帧为 `karuyomi-423639a-repository-url-rejected-light.jpg` 和 `karuyomi-423639a-repository-url-rejected-dark.jpg`。实机软键盘以及新版 Web 的有效地址确认转换继续验收。[逐状态清单](mihon-state-coverage.md)
 
 ## 首次连接的短屏复验
 
