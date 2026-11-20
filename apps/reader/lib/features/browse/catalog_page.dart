@@ -1,4 +1,5 @@
 import '../../widgets/app_routes.dart';
+import '../../widgets/app_empty_state.dart';
 
 import 'dart:async';
 
@@ -149,52 +150,45 @@ class const CatalogPage({
         catalog?.settings != null &&
         {ServiceStatus.ready, ServiceStatus.failed}.contains(status);
     if (!ready) {
+      final connecting = catalog?.busy == true;
+      final needsLogin =
+          status == ServiceStatus.loginRequired ||
+          status == ServiceStatus.denied;
       return Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
           child: ListView(
             shrinkWrap: true,
-            padding: const EdgeInsets.all(24),
             children: [
-              const Icon(CupertinoIcons.globe, size: 56),
-              const SizedBox(height: 20),
-              Text(
-                switch (status) {
+              AppEmptyState(
+                leading: connecting
+                    ? const CupertinoActivityIndicator()
+                    : const Icon(CupertinoIcons.globe),
+                title: switch (status) {
                   ServiceStatus.loginRequired => '登录后继续浏览',
                   ServiceStatus.denied => '当前账号无法访问',
                   ServiceStatus.connecting => '正在连接服务',
                   ServiceStatus.failed => '服务连接未完成',
                   _ => '连接漫画服务',
                 },
-                style: CupertinoTheme.of(context)
-                    .textTheme
-                    .navLargeTitleTextStyle,
-                textAlign: TextAlign.center,
+                message:
+                    configurationError ??
+                    catalog?.error ??
+                    (catalog == null
+                        ? '填写 HTTPS 服务地址后即可浏览漫画源。'
+                        : '连接服务后，安装扩展并选择漫画源。'),
+                announce: true,
+                action: connecting
+                    ? null
+                    : (
+                        label: needsLogin
+                            ? '登录'
+                            : catalog == null
+                            ? '填写服务地址'
+                            : '连接服务',
+                        onPressed: needsLogin ? onAuthenticate : onConnect,
+                      ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                configurationError ?? catalog?.error ?? '连接服务后，安装扩展并选择漫画源。',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              if (catalog?.busy == true)
-                const CupertinoActivityIndicator()
-              else
-                Center(
-                  child: CupertinoButton.filled(
-                    onPressed:
-                        status == ServiceStatus.loginRequired ||
-                            status == ServiceStatus.denied
-                        ? onAuthenticate
-                        : onConnect,
-                    child: Text(
-                      status == ServiceStatus.loginRequired ||
-                              status == ServiceStatus.denied
-                          ? '登录'
-                          : '连接服务',
-                    ),
-                  ),
-                ),
             ],
           ),
         ),

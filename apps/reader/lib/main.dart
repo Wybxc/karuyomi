@@ -200,8 +200,11 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
-  void _configurationFailed(Object error) {
+  void _configurationFailed(Object error, {bool initializing = false}) {
     _configurationError = switch (error) {
+      ArgumentError() || FormatException()
+          when initializing && _originField.text.trim().isEmpty =>
+        null,
       ArgumentError() || FormatException() => '请先在设置中填写服务的 HTTPS 地址。',
       _ => '服务初始化未完成，请在设置中重新连接。',
     };
@@ -229,7 +232,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         unawaited(_connect(_pendingContinuation));
       });
     } catch (error) {
-      _configurationFailed(error);
+      _configurationFailed(error, initializing: true);
     }
   }
 
@@ -481,13 +484,24 @@ class _AppShellState extends ConsumerState<AppShell> {
       ),
       null => CupertinoPageScaffold(
         navigationBar: const CupertinoNavigationBar(middle: Text('服务连接')),
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text('连接并确认身份后可读取和保存同步设置。'),
-            const SizedBox(height: 16),
-            _connectionSettings(),
-          ],
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              children: [
+                _connectionSettings(),
+                const SizedBox(height: 8),
+                Text(
+                  '连接并确认身份后可读取和保存同步设置。',
+                  style: TextStyle(
+                    color: AppColors.secondaryLabel.resolveFrom(context),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     },
@@ -503,7 +517,9 @@ class _AppShellState extends ConsumerState<AppShell> {
         controller?.status == ServiceStatus.ready;
     final canConnect =
         controller?.busy != true && !_changingService && !_restoringOrigin;
-    final canAuthenticate = canConnect && _platform != null;
+    final hasService = _platform != null;
+    final gap = hasService ? 12.0 : 8.0;
+    final connect = canConnect ? _changeService : null;
     final status = _restoringOrigin
         ? '正在读取服务地址'
         : connecting
@@ -518,45 +534,60 @@ class _AppShellState extends ConsumerState<AppShell> {
     final form = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        CupertinoTextField(
-          key: const ValueKey('service-origin'),
-          controller: _originField,
-          readOnly: kIsWeb || _restoringOrigin || _changingService,
-          autofillHints: null,
-          keyboardType: TextInputType.url,
-          autocorrect: false,
-          placeholder: 'https://你的服务域名',
-          placeholderStyle: TextStyle(
-            color: AppColors.secondaryLabel.resolveFrom(context),
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.groupedSurface.resolveFrom(context),
-            border: Border.all(color: AppColors.separator.resolveFrom(context)),
-            borderRadius: BorderRadius.circular(6),
+        Semantics(
+          label: '服务地址',
+          child: CupertinoTextField(
+            key: const ValueKey('service-origin'),
+            controller: _originField,
+            readOnly: kIsWeb || _restoringOrigin || _changingService,
+            autofillHints: null,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            placeholder: 'https://你的服务域名',
+            placeholderStyle: TextStyle(
+              color: AppColors.secondaryLabel.resolveFrom(context),
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.groupedSurface.resolveFrom(context),
+              border: Border.all(
+                color: AppColors.separator.resolveFrom(context),
+              ),
+              borderRadius: BorderRadius.circular(6),
+            ),
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: gap),
         Wrap(
           spacing: 12,
           runSpacing: 8,
           children: [
             Semantics(
               enabled: canConnect,
-              child: CupertinoButton(
-                onPressed: canConnect ? _changeService : null,
-                child: const Text('连接服务'),
-              ),
+              child: hasService
+                  ? CupertinoButton(
+                      onPressed: connect,
+                      child: const Text('连接服务'),
+                    )
+                  : CupertinoButton.filled(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      onPressed: connect,
+                      child: const Text('连接服务'),
+                    ),
             ),
-            Semantics(
-              enabled: canAuthenticate,
-              child: CupertinoButton.filled(
-                foregroundColor: canAuthenticate
-                    ? null
-                    : CupertinoColors.tertiaryLabel.resolveFrom(context),
-                onPressed: canAuthenticate ? _authenticate : null,
-                child: const Text('登录'),
+            if (hasService)
+              Semantics(
+                enabled: canConnect,
+                child: CupertinoButton.filled(
+                  foregroundColor: canConnect
+                      ? null
+                      : CupertinoColors.tertiaryLabel.resolveFrom(context),
+                  onPressed: canConnect ? _authenticate : null,
+                  child: const Text('登录'),
+                ),
               ),
-            ),
           ],
         ),
       ],
@@ -598,12 +629,18 @@ class _AppShellState extends ConsumerState<AppShell> {
               ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: gap),
         form,
-        if (_configurationError != null)
-          Text(
-            _configurationError!,
-            style: TextStyle(color: AppColors.error.resolveFrom(context)),
+        if (_configurationError case final error?)
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              error,
+              style: TextStyle(
+                color: AppColors.error.resolveFrom(context),
+                fontSize: hasService ? null : 13,
+              ),
+            ),
           ),
         if (_originPersistenceError != null)
           Text(

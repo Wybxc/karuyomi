@@ -1,4 +1,5 @@
 import '../../widgets/app_routes.dart';
+import '../../widgets/app_empty_state.dart';
 import '../../widgets/choice_field.dart';
 
 import 'dart:async';
@@ -587,14 +588,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     }
     final view = snapshot.value;
     if (view == null) {
-      return SliverToBoxAdapter(
-        child: _repository == null && widget.controller != null
-            ? const Padding(
+      return _repository == null && widget.controller != null
+          ? const SliverToBoxAdapter(
+              child: Padding(
                 padding: EdgeInsets.all(32),
                 child: Text('连接并确认身份后显示服务端书架。'),
-              )
-            : _empty(),
-      );
+              ),
+            )
+          : _emptyLibrary();
     }
     return SliverMainAxisGroup(
       slivers: [
@@ -607,10 +608,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             ],
           ),
         ),
-        if (view.entries.isEmpty)
-          SliverToBoxAdapter(child: _empty())
-        else
-          _library(view),
+        if (view.entries.isEmpty) _emptyLibrary() else _library(view),
       ],
     );
   }
@@ -641,28 +639,18 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     );
   }
 
-  Widget _empty() => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 64),
-    child: Column(
-      children: [
-        Icon(
+  Widget _emptyLibrary() => SliverFillRemaining(
+    hasScrollBody: false,
+    child: Center(
+      child: AppEmptyState(
+        leading: Icon(
           CupertinoIcons.book,
-          size: 64,
           color: CupertinoTheme.of(context).primaryColor,
         ),
-        const SizedBox(height: 24),
-        Text(
-          '书架还是空的',
-          style: CupertinoTheme.of(context).textTheme.navLargeTitleTextStyle,
-        ),
-        const SizedBox(height: 12),
-        const Text('从浏览打开漫画详情，收藏喜欢的漫画。'),
-        const SizedBox(height: 24),
-        CupertinoButton.filled(
-          onPressed: widget.onBrowse,
-          child: const Text('去浏览'),
-        ),
-      ],
+        title: '书架还是空的',
+        message: '从浏览打开漫画详情，收藏喜欢的漫画。',
+        action: (label: '去浏览', onPressed: widget.onBrowse),
+      ),
     ),
   );
 

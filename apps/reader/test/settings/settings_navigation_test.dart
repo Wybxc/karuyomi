@@ -339,40 +339,87 @@ void main() {
     }
   }
 
-  testWidgets(
-    'unconfigured service exposes its status and a correctable address',
-    (tester) async {
-      await tester.pumpApp(
-        KaruyomiApp(
-          platformFactory: (_) => throw ArgumentError('Missing service'),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await _tap(tester, _navigation('设置'));
-      expect(find.text('尚未连接'), findsOneWidget);
-      expect(find.text('请先在设置中填写服务的 HTTPS 地址。'), findsOneWidget);
-      expect(find.text('账号'), findsNothing);
-      expect(
-        tester
-            .widget<CupertinoTextField>(
-              find.byKey(const ValueKey('service-origin')),
-            )
-            .readOnly,
-        false,
-      );
-      expect(
-        tester
-            .widget<CupertinoButton>(
-              find.widgetWithText(CupertinoButton, '连接服务'),
-            )
-            .onPressed,
-        isNotNull,
-      );
-      expect(tester.takeException(), isNull);
-      await tester.pumpApp(const SizedBox.shrink());
-      await tester.pumpAndSettle();
-    },
-  );
+  for (final brightness in Brightness.values) {
+    for (final size in [const Size(360, 480), const Size(800, 360)]) {
+      testWidgets('first connection is reachable at $size in $brightness', (
+        tester,
+      ) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 20);
+        tester.view.viewPadding = tester.view.padding;
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPadding);
+        addTearDown(tester.view.resetViewPadding);
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+        final platform = TestPlatform(seedDefaultInstallation: false);
+        await tester.pumpApp(
+          KaruyomiApp(
+            platformFactory: (origin) => origin == platform.origin
+                ? platform
+                : native.createPlatformRuntime(origin: origin),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        void expectVisible(Finder finder) {
+          final viewport = tester.getRect(
+            find.byKey(const ValueKey('app-content')),
+          );
+          expect(finder.hitTestable(), findsOneWidget);
+          expect(
+            tester.getRect(finder).bottom,
+            lessThanOrEqualTo(viewport.bottom),
+          );
+        }
+
+        final browse = find.widgetWithText(CupertinoButton, '去浏览');
+        expectVisible(browse);
+        await tester.tap(browse);
+        await tester.pumpAndSettle();
+        final configure = find.widgetWithText(CupertinoButton, '填写服务地址');
+        expectVisible(configure);
+        await tester.tap(configure);
+        await tester.pumpAndSettle();
+        final origin = find.byKey(const ValueKey('service-origin'));
+        final connect = find.widgetWithText(CupertinoButton, '连接服务');
+        expectVisible(find.text('尚未连接'));
+        expectVisible(origin);
+        expectVisible(connect);
+        expect(tester.widget<CupertinoTextField>(origin).readOnly, isFalse);
+        expect(find.widgetWithText(CupertinoButton, '登录'), findsNothing);
+        expect(find.text('账号'), findsNothing);
+        expect(find.textContaining('请先在设置中填写'), findsNothing);
+
+        await tester.enterText(origin, 'http://reader.example.com');
+        await _tap(tester, connect);
+        expect(find.textContaining('请先在设置中填写服务的 HTTPS 地址'), findsOneWidget);
+        expect(
+          tester.widget<CupertinoTextField>(origin).controller!.text,
+          'http://reader.example.com',
+        );
+        expect(platform.businessServer.requests, isEmpty);
+
+        await tester.enterText(origin, platform.origin.toString());
+        await _tap(tester, connect);
+        await _tap(
+          tester,
+          find.byKey(const ValueKey('settings-section-connection')),
+        );
+        expect(find.text('已连接，身份已确认'), findsOneWidget);
+        expect(find.text('owner@example.com'), findsOneWidget);
+        expect(platform.businessServer.appliedMutations, 0);
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      });
+    }
+  }
 
   testWidgets('returning to the foreground reads a confirmed remote theme', (
     tester,

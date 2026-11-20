@@ -20,6 +20,8 @@
 
 ## 推进与待办
 
+- [x] 对照 Mihon 空书架的居中布局和设置层级，收敛 Karuyomi 的书架空态、浏览连接入口和首次连接页。两倍字号下浅深横竖屏可依次点按三个入口，并可更正非法地址后确认测试身份。27.K1 原生主图待验。[首次连接的短屏复验](../verification/mihon-cupertino-fidelity.md#首次连接的短屏复验)
+
 - [x] 底栏浅深主题补齐键盘聚焦与激活。三处入口共用现有页面切换，大字号下的横竖屏和鼠标接续通过组件回归。扩展准备失败的官方 Web 夹具已经通过真实 HTTP 故障与恢复复验，内置浏览器预览排队，双主题主图待验。[底栏键盘复验](../verification/mihon-cupertino-fidelity.md#底栏键盘焦点与切换) · [清单 HTTP 复验](../verification/mihon-cupertino-fidelity.md#扩展准备失败的-http-复验)
 
 - [x] 对照 Mihon 浅深横竖屏底栏，在 Karuyomi 复现大字号挤压图标。Cupertino 底栏按标签实测行高增高，两倍、三倍字号下图标完整，三个入口均可点按。正式 Web 与真机待验。[底栏大字号复验](../verification/mihon-cupertino-fidelity.md#底栏大字号的横竖屏复验)
