@@ -30,6 +30,25 @@ class _AppPageRoute<T> extends AppPageRoute<T> {
 class AppPageRoute<T> extends CupertinoPageRoute<T> with _RouteMotion<T> {
   AppPageRoute({required super.builder, super.settings, super.title});
 
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    final page = super.buildPage(context, animation, secondaryAnimation);
+    // Heroes fly outside the page transition. Listen for motion changes in
+    // this wrapper so updating it keeps the route's existing page.
+    return Builder(
+      builder: (context) => HeroMode(
+        enabled:
+            !MediaQuery.disableAnimationsOf(context) &&
+            !MediaQuery.reduceMotionOf(context),
+        child: page,
+      ),
+    );
+  }
+
   static final _backdrop = _motionAwareBackdrop((
     context,
     _,

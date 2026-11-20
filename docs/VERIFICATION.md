@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，「图源 → 作品详情」的导航栏在减弱动态时随页面原位淡入淡出。按浅深两色比对进入和返回的组件画面，常规转场的八对采样 PNG 与基线逐字节相同。979 项 Flutter 测试和严格 Dart 分析通过，其中章节批量恢复核对了原请求重试。正式 Web 与原生现场转场待验。[作品详情导航栏的减弱动态](verification/mihon-cupertino-fidelity.md#作品详情导航栏的减弱动态)
+
 2026-11-20，Karuyomi 在浅深横竖屏组件中暂扣首次连接响应。连接等待、403 拒绝与重试确认均在原设置详情显示，测试观察到零次账户业务写入。977 项 Flutter 测试和严格 Dart 分析通过，正式 Web 与原生主图待验。[首次连接的等待和恢复](verification/mihon-cupertino-fidelity.md#首次连接的等待和恢复)
 
 2026-11-20，复看 Mihon 空书架与设置的浅深参考。Karuyomi 在两倍字号的浅深横竖屏从书架进入浏览并填写服务地址，三个入口均在首屏可点。非法地址保留草稿，修正后确认测试身份。977 项 Flutter 测试和严格 Dart 分析通过，原生双主题主图待验。[首次连接的短屏复验](verification/mihon-cupertino-fidelity.md#首次连接的短屏复验)

@@ -9,6 +9,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
+import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
@@ -102,6 +103,65 @@ void main() {
       await hide(tester);
     },
   );
+
+  for (final reduced in [false, true]) {
+    testWidgets('details navigation bar follows reduced motion: $reduced', (
+      tester,
+    ) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          FakeAccessibilityFeatures(reduceMotion: reduced);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      await show(tester);
+      final title = find.text(testManga.title);
+      final navigationBar = find.descendant(
+        of: find.byType(MangaDetailsPage),
+        matching: find.byType(CupertinoNavigationBar),
+      );
+      final navigationTitle = find.descendant(
+        of: navigationBar,
+        matching: title,
+      );
+      List<Rect> titleBoundsInHeader() {
+        final header = tester.getRect(navigationBar);
+        return title
+            .evaluate()
+            .map((element) {
+              return tester.getRect(
+                find.byElementPredicate((other) => identical(element, other)),
+              );
+            })
+            .where((bounds) {
+              return bounds.top >= header.top && bounds.bottom <= header.bottom;
+            })
+            .toList();
+      }
+
+      await tester.tap(title);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 180));
+      final entering = titleBoundsInHeader();
+      await tester.pumpAndSettle();
+      final settled = tester.getRect(navigationTitle);
+      expect(entering, reduced ? [settled] : hasLength(2));
+
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 180));
+      expect(titleBoundsInHeader(), reduced ? [settled] : hasLength(2));
+      await tester.pumpAndSettle();
+      expect(find.byType(MangaDetailsPage), findsNothing);
+      expect(find.byType(SourceBrowsePage), findsOneWidget);
+      expect(platform.businessServer.appliedMutations, 0);
+      expect(tester.takeException(), isNull);
+      await hide(tester);
+    });
+  }
 
   testWidgets(
     'an occupied Source has a separate retry action that activates with Enter',
