@@ -785,6 +785,38 @@ class const ExtensionDetailsPage({
   )?
   onOpenSource,
 }) extends HookWidget {
+  Future<void> _confirmUninstall(
+    BuildContext context,
+    ExtensionListing item,
+  ) async {
+    final installed = item.installed;
+    if (installed == null || !controller.canEdit) return;
+    final name = item.name;
+    final origin = [?item.exact?.version, item.repositoryName].join(' · ');
+    final accepted = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Text('卸载“$name”？'),
+        content: Text('$origin\n此扩展将从账户移除。书架、分类、阅读进度、收藏源及漫画源数据会保留。'),
+        actions: [
+          CupertinoButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          CupertinoButton(
+            key: const ValueKey('extension-uninstall-confirm'),
+            foregroundColor: AppColors.error.resolveFrom(context),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认卸载'),
+          ),
+        ],
+      ),
+    );
+    if (accepted == true && context.mounted) {
+      await controller.uninstall(installed);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     useListenable(controller);
@@ -919,7 +951,7 @@ class const ExtensionDetailsPage({
                     CupertinoButton(
                       key: ValueKey(('extension-uninstall', packageName)),
                       onPressed: controller.canEdit
-                          ? () => unawaited(controller.uninstall(installed))
+                          ? () => unawaited(_confirmUninstall(context, item))
                           : null,
                       child: Text(
                         '卸载扩展',

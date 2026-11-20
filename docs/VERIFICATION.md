@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-20，Mihon 核对六种确认面板的浅深原图，并实测从同一 MangaDex 详情取消卸载。Karuyomi 补齐 Cupertino 卸载确认，138 项定向 Flutter 回归通过。Mihon 双主题 161/170（94.7%），Karuyomi 新登记 09.K6 后为 168/170（98.8%），卸载确认正式 Web 尚待。[确认面板与扩展卸载](verification/mihon-cupertino-fidelity.md#mihon-确认面板与扩展卸载)
+
 2026-11-20，`2b3d4a5` 正式深色 Web 测到迁移候选封面为 162×243，Komiic 第二页精确重试及只读预览通过，七路权威读回一致。实拍发现分页失败把封面下推 184 逻辑像素。改为候选末尾反馈后，72 项定向 Flutter 回归通过，修正版正式 Web 两色待验。[正式深色网格与分页反馈](verification/mihon-cupertino-fidelity.md#正式深色网格与分页反馈)
 
 2026-11-20，`e7523ea` 正式 Web 实拍显式浅深色的同一宽封面，360×800 与 844×390 首屏均见四边。短横屏滚动后两项封面操作可达，两色都返回原作品。内置浏览器完成上述验收后恢复视口。[正式 Web 宽封面复验](verification/mihon-cupertino-fidelity.md#正式-web-宽封面双主题复验)

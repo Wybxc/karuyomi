@@ -92,6 +92,20 @@ void main() {
     expect(manager.cache!.artifacts, isEmpty);
   });
 
+  test('uninstall rejects a selection from a previous repository', () async {
+    await manager.install(catalog.builds.single);
+    final selected = manager.installed.single;
+    final stale = selected.deepCopy()..repoId = 'previous-repository';
+    final writes = platform.businessServer.appliedMutations;
+
+    await manager.uninstall(stale);
+
+    expect(manager.error, contains('扩展版本或仓库已改变'));
+    expect(manager.installed.single, selected);
+    expect(platform.businessServer.appliedMutations, writes);
+    expect(manager.cache!.artifacts.single.sha256, selected.bundleSha256);
+  });
+
   test('lost ACK is shared across pages and retries the exact original global request', () async {
     platform.businessServer.loseNextResponse = true;
     await manager.install(catalog.builds.single);
@@ -1463,7 +1477,11 @@ void main() {
   testWidgets(
     'management page installs, shows confirmed disable and independently retries cleanup before uninstall',
     (tester) async {
-      await show(tester);
+      await show(
+        tester,
+        appearance: Brightness.dark,
+        size: const Size(360, 800),
+      );
       expect(find.text('账户尚未安装扩展。'), findsOneWidget);
       await tap(
         tester,
@@ -1504,12 +1522,46 @@ void main() {
       await tap(tester, find.text('重试资源清理'));
       expect(catalog.session, isNull);
       expect(find.text('重试资源清理'), findsNothing);
-      await tap(
-        tester,
-        find.byKey(
-          const ValueKey(('extension-uninstall', 'eu.kanade.source.test')),
-        ),
+      final uninstall = find.byKey(
+        const ValueKey(('extension-uninstall', 'eu.kanade.source.test')),
       );
+      final dialog = find.byType(CupertinoAlertDialog);
+      final confirm = find.byKey(const ValueKey('extension-uninstall-confirm'));
+      int submissions() => platform.businessServer.requests
+          .where((request) => request.method == 'POST')
+          .length;
+      final before = submissions();
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+      await tap(tester, uninstall);
+      expect(dialog, findsOneWidget);
+      expect(find.text('卸载“${testCatalogSource.name}”？'), findsOneWidget);
+      expect(find.textContaining('书架、分类、阅读进度'), findsOneWidget);
+      expect(
+        tester.widget<CupertinoButton>(confirm).foregroundColor,
+        AppColors.error.resolveFrom(tester.element(confirm)),
+      );
+      expect(submissions(), before);
+      final cancel = find.descendant(
+        of: dialog,
+        matching: find.widgetWithText(CupertinoButton, '取消'),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(
+        FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<CupertinoButton>(),
+        tester.widget<CupertinoButton>(cancel),
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(dialog, findsNothing);
+      expect(catalog.installedExtensions.single.enabled, false);
+      expect(submissions(), before);
+      await tap(tester, uninstall);
+      await tap(tester, confirm);
+      expect(submissions(), before + 1);
       expect(find.text('账户已卸载此扩展，请返回扩展列表。'), findsOneWidget);
       await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();

@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-20，Karuyomi 跨版本双主题主图为 168/169（99.4%），未连接（27.K1）仍缺两侧。固定 Mihon 补齐源浏览追加与迁移空书架，双主题主图达到 160/170（94.1%）。最终像素、各触发变体与完整转场继续验收。[源浏览追加](mihon-cupertino-fidelity.md#mihon-源浏览追加) · [迁移空书架](mihon-cupertino-fidelity.md#mihon-迁移空书架) · [宽封面复验](mihon-cupertino-fidelity.md#正式-web-宽封面双主题复验)
+2026-11-20，Mihon 逐项复核六种确认弹层，补齐通用确认节点 30.04，双主题主图达到 161/170（94.7%）。Karuyomi 新增卸载确认（09.K6），该状态和原生未连接（27.K1）两侧待验。跨版本双主题主图为 168/170（98.8%）。最终像素、各触发变体与完整转场继续验收。[确认面板与扩展卸载](mihon-cupertino-fidelity.md#mihon-确认面板与扩展卸载)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -805,26 +805,28 @@ stateDiagram-v2
     U11 --> U0: 确认或取消
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
-    class U0,U1,U2,U3,U4,U5,U12,U13,U14,U15,U16 paired
+    class U0,U1,U2,U3,U4,U5,U11,U12,U13,U14,U15,U16 paired
 ```
 
-| 状态 ID | 最小必要信息/采集触发                                                             | 浅色                                                                    | 深色                                                                  |
-| ------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| 26.01   | 设置分类、标题/说明和返回；旧 `settings-main-default-dark` 实际为“更多”           | `s2601-settings-light`                                                  | `s2601-settings-dark`                                                 |
-| 26.02   | 当前浅深模式、DEFAULT 卡、主题选中、显示偏好                                      | `s2602-appearance-light`                                                | `s2602-appearance-dark`                                               |
-| 26.03   | 阅读显示/输入分组、当前值和说明；六段滚动主图，详见下文                           | `s2603-reader-preferences-*-light`                                      | `s2603-reader-preferences-*-dark`                                     |
-| 26.04   | 平板设置目录/当前分类与外观同屏、当前主题、分栏边界；768×1024dp                   | `nav-settings-tablet-light`                                             | `s2604-settings-tablet-dark`                                          |
-| 26.05   | 跟随系统选中、DEFAULT卡及实际应用表面；系统浅→深后仍停在原外观页                  | `s2605-appearance-system-light`                                         | `s2605-appearance-system-dark`                                        |
-| 26.06   | 显式浅/深选中、与系统相反时仍使用应用主题，系统变化后保持该选择                   | `s2606-appearance-explicit-light`、`s2606-explicit-system-change-light` | `s2606-appearance-explicit-dark`、`s2606-explicit-system-change-dark` |
-| 28.01   | 高级设置首屏、数据/网络、书架和阅读/扩展末段；中段有滚动偏差，未操作维护/网络选项 | `s2801-advanced-{top,network,library,extensions}-light`                 | `s2801-advanced-{top,network,library,extensions}-dark`                |
-| 28.02   | 调试信息的版本、构建、安装测试ID、编译状态、WebView与设备；上下两段               | `s2802-debug-info-top-light`、`s2802-debug-info-device-light`           | `s2802-debug-info-top-dark`、`s2802-debug-info-device-dark`           |
-| 28.03   | Worker info 的 Enqueued/Finished/Running、等宽正文、复制和返回；横向变体          | `s2803-worker-info-light`、`s2804-worker-horizontal-light`              | `s2803-worker-info-dark`、`s2804-worker-horizontal-dark`              |
-| 28.04   | 系统复制预览；只能确认已显示的内容，不能由点击推断完整剪贴板校验                  | `s2804-worker-copy-readable-light`                                      | `s2804-worker-copy-readable-dark`                                     |
-| 29.01   | 默认阅读模式标题、五个选项、当前右到左、取消；取消后原值不变                      | `s2901-reader-mode-choice-light`、`s2901-reader-mode-cancel-light`      | `s2901-reader-mode-choice-dark`、`s2901-reader-mode-cancel-dark`      |
-| 30.01   | 标题、必填/禁用提交、取消、键盘；关联05.03/10.02/14.04                            | `s0503-category-create-keyboard-light`（分类分项）                      | `s0503-category-create-empty-dark`（分类分项）                        |
-| 30.02   | 当前草稿、可用提交和取消；关联05.04/05.07/14.04                                   | `s0504-category-create-keyboard-light`（分类分项）                      | `s0504-category-create-keyboard-dark`（分类分项）                     |
-| 30.03   | 原输入、具体校验错误、修正/取消；关联05.05/10.03                                  | `s0505-category-create-duplicate-light`（分类分项）                     | `s0505-category-create-duplicate-dark`（分类分项）                    |
-| 30.04   | 对象、影响、确认/取消；逐操作关联04.02/05.08/09.03/10.06/21.01/25.02              | 待                                                                      | 待                                                                    |
+| 状态 ID | 最小必要信息/采集触发                                                                         | 浅色                                                                    | 深色                                                                  |
+| ------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 26.01   | 设置分类、标题/说明和返回；旧 `settings-main-default-dark` 实际为“更多”                       | `s2601-settings-light`                                                  | `s2601-settings-dark`                                                 |
+| 26.02   | 当前浅深模式、DEFAULT 卡、主题选中、显示偏好                                                  | `s2602-appearance-light`                                                | `s2602-appearance-dark`                                               |
+| 26.03   | 阅读显示/输入分组、当前值和说明；六段滚动主图，详见下文                                       | `s2603-reader-preferences-*-light`                                      | `s2603-reader-preferences-*-dark`                                     |
+| 26.04   | 平板设置目录/当前分类与外观同屏、当前主题、分栏边界；768×1024dp                               | `nav-settings-tablet-light`                                             | `s2604-settings-tablet-dark`                                          |
+| 26.05   | 跟随系统选中、DEFAULT卡及实际应用表面；系统浅→深后仍停在原外观页                              | `s2605-appearance-system-light`                                         | `s2605-appearance-system-dark`                                        |
+| 26.06   | 显式浅/深选中、与系统相反时仍使用应用主题，系统变化后保持该选择                               | `s2606-appearance-explicit-light`、`s2606-explicit-system-change-light` | `s2606-appearance-explicit-dark`、`s2606-explicit-system-change-dark` |
+| 28.01   | 高级设置首屏、数据/网络、书架和阅读/扩展末段；中段有滚动偏差，未操作维护/网络选项             | `s2801-advanced-{top,network,library,extensions}-light`                 | `s2801-advanced-{top,network,library,extensions}-dark`                |
+| 28.02   | 调试信息的版本、构建、安装测试ID、编译状态、WebView与设备；上下两段                           | `s2802-debug-info-top-light`、`s2802-debug-info-device-light`           | `s2802-debug-info-top-dark`、`s2802-debug-info-device-dark`           |
+| 28.03   | Worker info 的 Enqueued/Finished/Running、等宽正文、复制和返回；横向变体                      | `s2803-worker-info-light`、`s2804-worker-horizontal-light`              | `s2803-worker-info-dark`、`s2804-worker-horizontal-dark`              |
+| 28.04   | 系统复制预览；只能确认已显示的内容，不能由点击推断完整剪贴板校验                              | `s2804-worker-copy-readable-light`                                      | `s2804-worker-copy-readable-dark`                                     |
+| 29.01   | 默认阅读模式标题、五个选项、当前右到左、取消；取消后原值不变                                  | `s2901-reader-mode-choice-light`、`s2901-reader-mode-cancel-light`      | `s2901-reader-mode-choice-dark`、`s2901-reader-mode-cancel-dark`      |
+| 30.01   | 标题、必填/禁用提交、取消、键盘；关联05.03/10.02/14.04                                        | `s0503-category-create-keyboard-light`（分类分项）                      | `s0503-category-create-empty-dark`（分类分项）                        |
+| 30.02   | 当前草稿、可用提交和取消；关联05.04/05.07/14.04                                               | `s0504-category-create-keyboard-light`（分类分项）                      | `s0504-category-create-keyboard-dark`（分类分项）                     |
+| 30.03   | 原输入、具体校验错误、修正/取消；关联05.05/10.03                                              | `s0505-category-create-duplicate-light`（分类分项）                     | `s0505-category-create-duplicate-dark`（分类分项）                    |
+| 30.04   | 调用上下文、对象与影响、确认动作及取消方式。逐项复核 04.02、05.08、09.03、10.06、21.01、25.02 | 六种浅色主图已复核                                                      | 六种深色主图已复核                                                    |
+
+30.04 按表内六个调用点逐项核对。书架删除显示范围，迁移对象来自底层搜索结果，封面确认继承当前阅读页。迁移源码提供关闭回调，实际返回落点继续验证。两种应用主题的 Android 系统卸载框使用相同浅色表面。[归一化边界与卸载取消复验](mihon-cupertino-fidelity.md#mihon-确认面板与扩展卸载)
 
 2026-11-19，复核固定 Mihon 版本的六张分类原图和同名 XML，补登记 30.01–30.03 的空输入、可提交草稿和重名错误。两主题均实际显示键盘，应用输入框归一化边界均为 `[44,231,316,317]`，添加动作边界均为 `[258,341,316,389]`。XML 的可操作父节点分别报告禁用、启用、禁用。引用 05.03–05.05 的同一弹层原图，仓库、Source 输入及各确认动作继续分项复核。[分类参考基准](mihon-cupertino-fidelity.md#通用表单的分类参考复核)
 
@@ -1611,6 +1613,7 @@ stateDiagram-v2
     state "09.K3 已停用详情" as Disabled
     state "09.K4 展开诊断" as Diagnostics
     state "09.K5 已卸载详情" as Uninstalled
+    state "09.K6 卸载确认" as ConfirmUninstall
     Available --> Candidate: 点列表行
     Candidate --> Preparing: 安装
     Available --> Preparing: 尾部安装，不打开详情
@@ -1619,7 +1622,8 @@ stateDiagram-v2
     Saving --> Enabled: 从详情安装并获确认
     Saving --> Disabled: 更新后保留停用状态
     Saving --> Pending: 未收到确认
-    Pending --> Installed: 精确重试获确认
+    Pending --> Installed: 安装原请求获确认
+    Pending --> Uninstalled: 卸载原请求获确认
     Installed --> EmptySearch: 输入无匹配查询
     EmptySearch --> Installed: 清空
     Available --> Language: 语言
@@ -1636,29 +1640,34 @@ stateDiagram-v2
     Disabled --> Diagnostics: 展开
     Diagnostics --> Enabled: 收起且仍启用
     Diagnostics --> Disabled: 收起且仍停用
-    Enabled --> Uninstalled: 卸载并获确认
-    Disabled --> Uninstalled: 卸载并获确认
+    Enabled --> ConfirmUninstall: 点卸载扩展
+    Disabled --> ConfirmUninstall: 点卸载扩展
+    ConfirmUninstall --> Enabled: 取消并回到启用项
+    ConfirmUninstall --> Disabled: 取消并回到停用项
+    ConfirmUninstall --> Saving: 明确确认卸载
+    Saving --> Uninstalled: 从已安装详情发起卸载并获确认
+    Saving --> Candidate: 从候选详情发起卸载并获确认
     Uninstalled --> Available: 返回列表
-    Enabled --> Candidate: 从候选页安装后再卸载
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
     class Available,Installed,EmptySearch,Language,Options,Preparing,Saving,Pending,Candidate,Enabled,Disabled,Diagnostics,Uninstalled paired
 ```
 
-| 状态 ID | 最小必要信息                                          | 浅色正式Web                                                                           | 深色正式Web                                                                       |
-| ------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| 08.K1   | 分组、名称、当前候选版本/语言、状态、独立安装与行详情 | `karuyomi-9a09331-extensions-installed-light.jpg`                                     | `karuyomi-9a09331-extensions-available-system-dark.jpg`                           |
-| 08.K2   | 已确认安装、精确版本/语言、本机准备状态、管理入口     | `karuyomi-9a09331-extensions-installed-light.jpg`                                     | `karuyomi-9a09331-extensions-install-observed-system-dark.jpg`                    |
-| 08.K3   | 当前查询、无匹配原因、清空或清除筛选                  | `karuyomi-9a09331-extensions-empty-light.jpg`                                         | `karuyomi-9a09331-extensions-empty-system-dark.jpg`                               |
-| 08.K4   | 当前语言、可选语言、全部语言与取消                    | `karuyomi-9a09331-extensions-language-light.jpg`                                      | `karuyomi-9a09331-extensions-language-system-dark.jpg`                            |
-| 08.K5   | 仓库管理、本机存储和关闭                              | `karuyomi-9a09331-extensions-menu-light.jpg`                                          | `karuyomi-9a09331-extensions-menu-system-dark.jpg`                                |
-| 08.K6   | 正在准备的状态、取消准备；不提前标记账户安装          | `karuyomi-a8997fa-extension-flow-preparing-light`                                     | `karuyomi-a8997fa-extension-flow-preparing-dark`                                  |
-| 08.K7   | 等待账户确认、停用重复写入、保留原操作                | `karuyomi-2512c51-extension-recovery-formal-extension-install-auto-waiting-light.jpg` | `karuyomi-2512c51-extension-recovery-formal-extension-install-waiting-dark.jpg`   |
-| 08.K8   | 未确认/冲突原因、原操作摘要、精确重试/重取            | `karuyomi-2512c51-extension-recovery-formal-extension-uninstall-unknown-light.jpg`    | `karuyomi-2512c51-extension-recovery-formal-extension-uninstall-unknown-dark.jpg` |
-| 09.K1   | 候选版本/语言/状态、安装与源清单；未安装不打开源      | `karuyomi-9a09331-extension-candidate-enter-light.jpg`                                | `karuyomi-9a09331-extension-candidate-enter-system-dark.jpg`                      |
-| 09.K2   | 精确状态、已开启开关、维护/卸载影响、源清单与诊断入口 | `karuyomi-2df0551-extension-enabled-light.jpg`                                        | `karuyomi-2df0551-extension-enabled-dark.jpg`                                     |
-| 09.K3   | 已停用状态、关闭开关、可重新启用、源不可打开          | `karuyomi-9a09331-extension-disabled-light.jpg`                                       | `karuyomi-9a09331-extension-disabled-system-dark.jpg`                             |
-| 09.K4   | 原仓库/包/构建身份、完整可选取正文、末端与收起        | `karuyomi-2df0551-extension-diagnostics-after-scroll-light.jpg`                       | `karuyomi-2df0551-extension-diagnostics-after-scroll-dark.jpg`                    |
-| 09.K5   | 已确认卸载、返回扩展列表；书架等业务数据保留          | `karuyomi-2df0551-extension-uninstalled-light.jpg`                                    | `karuyomi-2512c51-extension-recovery-formal-extension-uninstalled-dark.jpg`       |
+| 状态 ID | 最小必要信息                                                 | 浅色正式Web                                                                           | 深色正式Web                                                                       |
+| ------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 08.K1   | 分组、名称、当前候选版本/语言、状态、独立安装与行详情        | `karuyomi-9a09331-extensions-installed-light.jpg`                                     | `karuyomi-9a09331-extensions-available-system-dark.jpg`                           |
+| 08.K2   | 已确认安装、精确版本/语言、本机准备状态、管理入口            | `karuyomi-9a09331-extensions-installed-light.jpg`                                     | `karuyomi-9a09331-extensions-install-observed-system-dark.jpg`                    |
+| 08.K3   | 当前查询、无匹配原因、清空或清除筛选                         | `karuyomi-9a09331-extensions-empty-light.jpg`                                         | `karuyomi-9a09331-extensions-empty-system-dark.jpg`                               |
+| 08.K4   | 当前语言、可选语言、全部语言与取消                           | `karuyomi-9a09331-extensions-language-light.jpg`                                      | `karuyomi-9a09331-extensions-language-system-dark.jpg`                            |
+| 08.K5   | 仓库管理、本机存储和关闭                                     | `karuyomi-9a09331-extensions-menu-light.jpg`                                          | `karuyomi-9a09331-extensions-menu-system-dark.jpg`                                |
+| 08.K6   | 正在准备的状态、取消准备；不提前标记账户安装                 | `karuyomi-a8997fa-extension-flow-preparing-light`                                     | `karuyomi-a8997fa-extension-flow-preparing-dark`                                  |
+| 08.K7   | 等待账户确认、停用重复写入、保留原操作                       | `karuyomi-2512c51-extension-recovery-formal-extension-install-auto-waiting-light.jpg` | `karuyomi-2512c51-extension-recovery-formal-extension-install-waiting-dark.jpg`   |
+| 08.K8   | 未确认/冲突原因、原操作摘要、精确重试/重取                   | `karuyomi-2512c51-extension-recovery-formal-extension-uninstall-unknown-light.jpg`    | `karuyomi-2512c51-extension-recovery-formal-extension-uninstall-unknown-dark.jpg` |
+| 09.K1   | 候选版本/语言/状态、安装与源清单；未安装不打开源             | `karuyomi-9a09331-extension-candidate-enter-light.jpg`                                | `karuyomi-9a09331-extension-candidate-enter-system-dark.jpg`                      |
+| 09.K2   | 精确状态、已开启开关、维护/卸载影响、源清单与诊断入口        | `karuyomi-2df0551-extension-enabled-light.jpg`                                        | `karuyomi-2df0551-extension-enabled-dark.jpg`                                     |
+| 09.K3   | 已停用状态、关闭开关、可重新启用、源不可打开                 | `karuyomi-9a09331-extension-disabled-light.jpg`                                       | `karuyomi-9a09331-extension-disabled-system-dark.jpg`                             |
+| 09.K4   | 原仓库/包/构建身份、完整可选取正文、末端与收起               | `karuyomi-2df0551-extension-diagnostics-after-scroll-light.jpg`                       | `karuyomi-2df0551-extension-diagnostics-after-scroll-dark.jpg`                    |
+| 09.K5   | 已确认卸载、返回扩展列表；书架等业务数据保留                 | `karuyomi-2df0551-extension-uninstalled-light.jpg`                                    | `karuyomi-2512c51-extension-recovery-formal-extension-uninstalled-dark.jpg`       |
+| 09.K6   | 扩展名称、仓库和已知精确版本、账户卸载影响、取消和系统红确认 | 待                                                                                    | 待                                                                                |
 
 这里只跟踪当前目标画面；主图、变体及每条转换分别验收。08.K8的冲突/拒绝/结果未知、资源清理失败、已移除仓库/已下架构建、长文本与减少动态效果仍须分项补充，不用正常启停主图代替。
 

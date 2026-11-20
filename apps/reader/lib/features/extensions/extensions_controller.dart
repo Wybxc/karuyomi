@@ -376,6 +376,14 @@ final class ExtensionsController extends ChangeNotifier {
         .where((value) => value.packageName == extension.packageName)
         .firstOrNull;
     if (removed == null) return;
+    if (removed.catalogUrl != extension.catalogUrl ||
+        removed.repoId != extension.repoId ||
+        removed.buildId != extension.buildId ||
+        removed.bundleSha256 != extension.bundleSha256) {
+      error = '扩展版本或仓库已改变，请核对后重新卸载。';
+      _changed();
+      return;
+    }
     final copy = (sha256: removed.bundleSha256, name: _installedName(removed));
     values.installedExtensions.removeWhere(
       (value) => value.packageName == extension.packageName,
