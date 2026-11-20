@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-20，Mihon 已补齐迁移源加载 20.01 的浅深画面，双主题主图为 166/170（97.6%）。Karuyomi 跨版本双主题主图为 168/171（98.2%），准备失败、卸载确认和原生未连接仍缺双主题主图。[迁移源加载实拍](mihon-cupertino-fidelity.md#mihon-迁移源加载的双主题实拍) · [图源、插件和作品详情加载](mihon-cupertino-fidelity.md#首次加载参考与-cupertino-页面转场)
+2026-11-20，Mihon 已补齐扩展排队 08.07 的浅深画面，双主题主图为 167/170（98.2%）。仍缺无可用图源、未签名扩展提示和外层清理失败提示。Karuyomi 跨版本双主题主图为 168/171（98.2%），准备失败、卸载确认和原生未连接仍缺双主题主图。[扩展排队实拍](mihon-cupertino-fidelity.md#扩展排队与短屏取消) · [迁移源加载实拍](mihon-cupertino-fidelity.md#mihon-迁移源加载的双主题实拍)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -260,7 +260,7 @@ stateDiagram-v2
     classDef partial fill:#fff0ce,color:#412e00,stroke:#b07a00
     classDef paired fill:#d9f4de,color:#14351d,stroke:#2b7a3d
     class E2,E12 partial
-    class S0,S1,S3,S4,S5,E0,E1,E3,E5,E7,E8,E9,E10,E11,E13,E14,D0,D1,D2,D3,R0,R1,R2,R3,R4,R5,R6,T0,T2 paired
+    class S0,S1,S3,S4,S5,E0,E1,E3,E5,E6,E7,E8,E9,E10,E11,E13,E14,D0,D1,D2,D3,R0,R1,R2,R3,R4,R5,R6,T0,T2 paired
 ```
 
 | 状态 ID | 最小必要信息/采集触发                                                                | 浅色                                                                                                       | 深色                                                                                                    |
@@ -277,7 +277,7 @@ stateDiagram-v2
 | 08.04   | 查询、无匹配说明、清空/返回；清空后恢复列表                                          | `s0804-extension-empty-light`；恢复 `s0804-extension-clear-light`                                          | `s0804-extension-empty-dark`；恢复 `s0804-extension-clear-dark`                                         |
 | 08.05   | 语言和内容筛选当前值                                                                 | `s0805-extension-filter-light`；启用语言与深色不同，待对齐重拍                                             | `s0805-extension-filter-dark`；待同条件重拍                                                             |
 | 08.06   | 未信任风险、信任/卸载与返回取消；取消仍未加载，浅色已确认恢复原信任，深色确认转换待  | `s0806-extension-trust-light`、`s0806-extension-trust-cancel-light`、`s0806-extension-trusted-light`       | `s0806-extension-trust-dark`、`s0806-extension-trust-cancel-dark`                                       |
-| 08.07   | 对象、等待标记、取消                                                                 | 待                                                                                                         | 待                                                                                                      |
+| 08.07   | Komga 1.6.76 同一行的等待标记、进度和取消                                            | `s0807-extension-waiting-light`                                                                            | `s0807-extension-waiting-dark`                                                                          |
 | 08.08   | Komga 1.6.76 同一行的下载标记、进度和取消                                            | `s0808-extension-downloading-light`                                                                        | `s0808-extension-downloading-dark`                                                                      |
 | 08.09   | Komga 「安装中」短帧与系统权限提示，取消后恢复原行，完成安装待验                     | `s0809-extension-install-permission-light`，安装中短帧见下文                                               | `s0809-extension-install-permission-dark`，安装中短帧见下文                                             |
 | 08.10   | 请求失败后同一行显示重试，再次下载并取消                                             | `s0810-extension-download-retry-light`                                                                     | `s0810-extension-download-retry-dark`                                                                   |
@@ -311,7 +311,7 @@ stateDiagram-v2
 
 11.01 清理前两主题均为 165 kB；浅色清理删除 3 个文件，稳定占用为 1.37 kB，深色再次清理删除 0 个文件，占用保持 1.37 kB。上游明确保留 cache journal，非零值不表示清理失败。反馈图截到 toast 淡入，只用于确认内容，不能作稳定合成色/字形基准；失败反馈仍待。备份/导出等未实现功能只作为本页背景，不扩大本轮产品范围。
 
-08.02 关闭查询后从真正空目录进入空插件商店，两主题都有落点。08.01 的冷加载帧来自关闭设备动画的独立实拍，下拉视频仍用于已打开空目录的刷新。08.08–08.10 用同一 Komga 1.6.76 样本，已核对就地重试、下载取消、实际「安装中」短帧及返回前的 Android 系统提示。08.07 排队和 08.09 完成安装继续待验。10.07 两主题用同一地址触发连接错误，保留输入并直接重试成功。[首次加载量测](mihon-cupertino-fidelity.md#首次加载参考与-cupertino-页面转场) · [目录复验](mihon-cupertino-fidelity.md#mihon-扩展目录与仓库错误)
+08.02 关闭查询后从真正空目录进入空插件商店，两主题都有落点。08.01 的冷加载帧来自关闭设备动画的独立实拍，下拉视频仍用于已打开空目录的刷新。08.07–08.10 用同一 Komga 1.6.76 样本，已核对排队、就地重试、下载取消、实际「安装中」短帧及返回前的 Android 系统提示。排队时第一次取消后曾重新显示「下载中」，见受控延迟复验。08.09 完成安装继续待验。10.07 两主题用同一地址触发连接错误，保留输入并直接重试成功。[首次加载量测](mihon-cupertino-fidelity.md#首次加载参考与-cupertino-页面转场) · [目录复验](mihon-cupertino-fidelity.md#mihon-扩展目录与仓库错误) · [扩展排队复验](mihon-cupertino-fidelity.md#扩展排队与短屏取消)
 
 ## 12–15：源内浏览、筛选、偏好与跨源搜索
 

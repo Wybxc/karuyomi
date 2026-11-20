@@ -659,8 +659,14 @@ void main() {
     testWidgets(
       'preparation names its build and remains visible until cancellation is acknowledged in $appearance',
       (tester) async {
-        await tester.binding.setSurfaceSize(const Size(360, 800));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final name = '${'跨端阅读测试扩展资料目录' * 6}末尾';
+        final index = wire.decodeProtoJson(
+          wire.ExtensionIndex(),
+          platform.inventory,
+        );
+        index.builds.single.sources.single.name = name;
+        platform.inventory = wire.encodeProtoJson(index);
+        await tester.runAsync(catalog.refreshCatalog);
         final releasePreparation = Completer<void>();
         final releaseCancellation = Completer<void>();
         String? cancelledId;
@@ -670,16 +676,12 @@ void main() {
           return releaseCancellation.future;
         };
         try {
-          await tester.pumpApp(
-            CupertinoApp(
-              theme: readerAppTheme(appearance),
-              home: ExtensionsPage(
-                catalog: catalog,
-                repository: manager.repository,
-              ),
-            ),
+          await show(
+            tester,
+            appearance: appearance,
+            size: const Size(360, 480),
+            textScale: 2,
           );
-          await tester.pumpAndSettle();
           final install = find.widgetWithText(CupertinoButton, '安装');
           await tester.ensureVisible(install);
           await tester.tap(install);
@@ -693,27 +695,34 @@ void main() {
             find.ancestor(of: preparation, matching: find.byType(Scrollable)),
             findsNothing,
           );
-          expect(
-            find.descendant(
-              of: preparation,
-              matching: find.text(testCatalogSource.name),
-            ),
-            findsOneWidget,
+          final label = find.descendant(
+            of: preparation,
+            matching: find.text(name),
           );
           expect(
-            find.descendant(of: preparation, matching: find.text('1.0')),
-            findsOneWidget,
+            tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+            isFalse,
+          );
+          final version = find.descendant(
+            of: preparation,
+            matching: find.text('1.0'),
           );
           final cancel = find.byKey(
             const ValueKey('extensions-cancel-prepare'),
           );
+          expect(cancel.hitTestable(), findsOneWidget);
+          await tester.ensureVisible(version);
+          await tester.pump();
+          expect(version.hitTestable(), findsOneWidget);
+          expect(cancel.hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
           await tester.tap(cancel);
           await tester.pump();
           releasePreparation.complete();
           await tester.pump();
 
           expect(cancelledId, platform.preparations.single.preparationId);
-          expect(find.text('正在取消准备'), findsOneWidget);
+          expect(find.text('正在取消准备').hitTestable(), findsOneWidget);
           expect(tester.widget<CupertinoButton>(install).enabled, isFalse);
           expect(manager.installed, isEmpty);
 

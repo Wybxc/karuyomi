@@ -1632,6 +1632,14 @@ Karuyomi 从扩展菜单打开「本机存储」，360×800 和两倍字号下�
 
 两张主图均显示迁移标签选中、右上帮助和中间加载环。像素由原录屏解码量测，环色取有色区域内出现频率最高的 RGB。随后两色均出现 MangaDex 与 xkcd 列表，xkcd 的计数均为 48,001。20.01 登记为浅深主图，Mihon 覆盖达到 **166/170（97.6%）**。Karuyomi 跨版本主图为 **168/171（98.2%）**。隔离副本和专用 ADB 已关闭。当前内置浏览器控制端仍无活动页面，正式 Web 待验。[逐状态清单](mihon-state-coverage.md) · [迁移状态](../../vendor/mihon/app/src/main/java/eu/kanade/tachiyomi/ui/browse/migration/sources/MigrateSourceViewModel.kt) · [源计数查询](../../vendor/mihon/data/src/main/sqldelight/tachiyomi/data/manga.sq)
 
+## 扩展排队与短屏取消
+
+2026-11-20，用固定 Mihon 0.21.3（`feadad5e`，versionCode 39）的原 APK 和隔离 Android API 36 模拟器复验。画面为 720×1600、320dpi，三项系统动画倍率均为 0。通过应用原有入口登记 Keiyoushi 后，搜索并选择同一条 Komga 1.6.76。目录就绪后关闭隔离设备的 Wi-Fi 和移动数据。原应用先发布 `Pending`，检查缓存目录后发布 `Downloading`。直接重试时，该目录的存在检查耗时 71 微秒。为采到实际排队画面，在每轮点击重试时只延长应用进程的下一次缓存目录检查，观测耗时为浅色 4.000913 秒、深色 4.001311 秒。[Keiyoushi 仓库入口](https://github.com/keiyoushi/extensions#usage) · [Mihon 安装状态](../../vendor/mihon/app/src/main/java/eu/kanade/tachiyomi/extension/util/ExtensionInstaller.kt)
+
+两张 08.07 主图及对应 UI 树均显示 Komga、Keiyoushi、1.6.76、图标上的旋转进度、「等待中」与「取消」。双主题的等待文字逻辑边界均为 `[126.5,322,161,338)`，取消节点为 `[308,300,332,324)`。两轮在检查完成前约 1.1 秒点第一次取消，同一行先恢复安装入口，检查返回后又显示「下载中」。第二次取消后，Komga 搜索行全部回到可安装，系统包列表无 Komga。该转换的证据来自受控延迟条件。隔离模拟器和专用 ADB 已关闭。Mihon 双主题主图为 **167/170（98.2%）**。[逐状态清单](mihon-state-coverage.md)
+
+Karuyomi 的扩展目录组件回归在浅深两色、360×480 和两倍字号下复现长扩展名称被截断。修正后名称自然换行，名称和版本可在反馈区内滚动，滚动前后均可点取消。发出取消时回到阶段标题，准确反馈「正在取消准备」，同一构建的安装入口等到取消确认才恢复。测试核对原准备 ID、迟到的准备响应和零账户提交。292 项相关 Flutter 回归通过，最终改动文件通过严格 Dart 分析。Karuyomi 跨版本双主题主图为 **168/171（98.2%）**，正式 Web 待验。[扩展目录界面](../../apps/reader/lib/features/extensions/extensions_page.dart) · [准备与取消回归](../../apps/reader/test/extensions/extensions_controller_test.dart)
+
 ## Mihon 源浏览追加
 
 2026-11-20，固定 Mihon 0.21.3 在 720×1600、320dpi 的只读参考模拟器中，两种显式主题均从相同 MangaDex 热门列表滑到第一页末尾。暂扣实际 MangaDex API 的下一页 CONNECT 时，「Bakebeta!」和「Kurenai-san wa Yoru wo Kurenai」等原封面留在列表内，旋转进度出现在最后一行下方。进度的双主题辅助边界均为 `[160,712,200,752)` 逻辑像素。放行后继续滚动，两色均出现新的「Seifuku Kanojo」与「Honey Creep」。原图/XML 成对登记在 12.08。[逐状态清单](mihon-state-coverage.md)

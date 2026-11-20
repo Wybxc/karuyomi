@@ -409,28 +409,30 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
           ),
       ],
     );
+    final preparationStatus = switch (_controller.preparationBuild) {
+      final build? => _ExtensionPreparationStatus(
+        controller: _controller,
+        target: build,
+      ),
+      null when preparationFailed => SingleChildScrollView(
+        primary: false,
+        child: ExtensionOperationStatus(
+          controller: _controller,
+          showPreparation: false,
+        ),
+      ),
+      null => null,
+    };
     final content = LayoutBuilder(
       builder: (context, constraints) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_controller.preparationBuild case final build?)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: _ExtensionPreparationStatus(
-                controller: _controller,
-                target: build,
-              ),
-            )
-          else if (preparationFailed)
+          if (preparationStatus != null)
             ConstrainedBox(
               constraints: BoxConstraints(maxHeight: constraints.maxHeight / 2),
-              child: SingleChildScrollView(
-                primary: false,
+              child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: ExtensionOperationStatus(
-                  controller: _controller,
-                  showPreparation: false,
-                ),
+                child: preparationStatus,
               ),
             ),
           Expanded(child: list),
@@ -704,20 +706,35 @@ class const _ExtensionPreparationStatus({
     key: const ValueKey('extension-preparation-status'),
     container: true,
     explicitChildNodes: true,
-    child: CupertinoFormSection.insetGrouped(
-      margin: EdgeInsets.zero,
-      header: Semantics(
-        liveRegion: true,
-        child: Text(controller.preparing ? '正在准备扩展' : '正在取消准备'),
-      ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        CupertinoListTile(
-          title: Text(
-            extensionName(target.packageName, target.sources),
-            maxLines: 2,
+        Flexible(
+          child: SingleChildScrollView(
+            // A new phase starts at the heading even after reading the details.
+            key: ValueKey(controller.preparing),
+            primary: false,
+            child: CupertinoFormSection.insetGrouped(
+              margin: EdgeInsets.zero,
+              header: Semantics(
+                liveRegion: true,
+                child: Text(controller.preparing ? '正在准备扩展' : '正在取消准备'),
+              ),
+              children: [
+                CupertinoListTile(
+                  title: DefaultTextStyle(
+                    style: CupertinoTheme.of(context).textTheme.textStyle,
+                    child: Text(
+                      extensionName(target.packageName, target.sources),
+                    ),
+                  ),
+                  subtitle: Text(target.version),
+                  trailing: const CupertinoActivityIndicator(),
+                ),
+              ],
+            ),
           ),
-          subtitle: Text(target.version),
-          trailing: const CupertinoActivityIndicator(),
         ),
         if (controller.preparing)
           CupertinoButton(
