@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，`1e6b1ba` 正式 Web 从真实英文 xkcd 分别复验资料和章节的刷新故障。两色等待、失败与恢复的章节标题像素位置一致，滚动后的底部重试仍可见。刷新前后七路账户响应逐字节一致，深色随后打开同一首章并显示真实图像。61 项定向 Flutter 回归与严格分析通过。16.K2/K3 已补登记，Karuyomi 跨版本主图为 172/173（99.4%）。[详情刷新故障](verification/mihon-cupertino-fidelity.md#详情刷新故障的双主题正式-web)
+
 2026-11-21，`07a2896` 正式 Web 在内置浏览器验证迁移热门第二页的双主题等待、失败和原页重试，末排保持原位，重试追加 30 项。`95bf156` 修复百项候选的预览落点，两色点选后直接呈现并聚焦标题，深色读回失败后也可在原目标重取。七路账户读回前后相同。35 项定向 Flutter 回归和改动文件严格 Dart 分析通过。[迁移网格与预览落点](verification/mihon-cupertino-fidelity.md#修正版迁移网格的双主题正式-web)
 
 2026-11-21，`b7c581f` 本地正式 Web 在内置浏览器补验设置、xkcd 作品详情、分类 Sheet 和卸载确认的两色常规转场。详情按钮和侧滑均实际回到原热门列表，取消卸载前后三路读回一致。图源空态 07.K2 更新两色主图并验证扩展往返。164 项定向 Flutter 回归通过。系统减弱动态的 Web 实拍和原生现场仍待验。[常规转场](verification/mihon-cupertino-fidelity.md#正式-web-的常规-cupertino-转场) · [图源空态](verification/mihon-cupertino-fidelity.md#图源空态与扩展入口)

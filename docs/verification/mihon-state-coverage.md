@@ -1,6 +1,6 @@
 # Mihon 参考截图状态机
 
-2026-11-21，Karuyomi 正式 Web 补齐扩展准备失败 08.K9 的两色原因和原构建重试。跨版本双主题主图为 170/171（99.4%），原生未连接 27.K1 待拍。Mihon 双主题主图为 168/170（98.8%），还缺未签名扩展提示和外层清理失败提示。[扩展材料读取失败](mihon-cupertino-fidelity.md#扩展材料读取失败的正式-web-复验) · [Mihon 图源空态](mihon-cupertino-fidelity.md#图源空态与扩展入口)
+2026-11-21，Karuyomi 正式 Web 补登记 16.K2 详情刷新等待和 16.K3 失败重试的两色主图。跨版本双主题主图为 172/173（99.4%），原生未连接 27.K1 待拍。Mihon 双主题主图为 168/170（98.8%），还缺未签名扩展提示和外层清理失败提示。[详情刷新故障](mihon-cupertino-fidelity.md#详情刷新故障的双主题正式-web) · [扩展材料读取失败](mihon-cupertino-fidelity.md#扩展材料读取失败的正式-web-复验)
 
 `b29c3bb` 正式 Web 复验跨源搜索空态禁用语义，以及分类、封面、迁移和漫画设置的系统深色失效行为。[历史复验](mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
 
@@ -1049,6 +1049,8 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> UncollectedDetails
     state "16.K1 未收藏作品详情" as UncollectedDetails
+    state "16.K2 已打开的详情正在刷新" as DetailsRefreshing
+    state "16.K3 详情刷新失败并保留内容" as DetailsRefreshFailed
     state "17.K1 章节搜索有结果" as ChapterMatch
     state "17.K2 章节搜索无匹配" as ChapterEmpty
     state "17.K3 章节选项展开" as ChapterOptions
@@ -1065,6 +1067,10 @@ stateDiagram-v2
     state "30.K6 章节部分提交" as ChapterPartial
     state "30.K7 章节身份或来源失效" as ChapterExpired
     state "重开原未确认清单" as ChapterReopened
+    UncollectedDetails --> DetailsRefreshing: 刷新作品资料和章节
+    DetailsRefreshing --> UncollectedDetails: 两阶段读回完成
+    DetailsRefreshing --> DetailsRefreshFailed: 任一读取失败
+    DetailsRefreshFailed --> DetailsRefreshing: 明确重试同一作品
     UncollectedDetails --> ChapterMatch: 输入长标题
     ChapterMatch --> ChapterEmpty: 改为无匹配查询
     ChapterEmpty --> UncollectedDetails: 清空
@@ -1093,20 +1099,24 @@ stateDiagram-v2
     ChapterExpired --> ChapterReopened: 关闭并重新连接后打开原作品
     ChapterReopened --> ChapterSending: 原样重试，再明确继续剩余章
     classDef paired fill:#dbeafe,stroke:#2563eb,color:#0f172a
-    class UncollectedDetails,ChapterMatch,ChapterEmpty,ChapterOptions,ChapterOrderMenu,NoChapterSelection,ChapterRange,ChapterReview,ChapterBookmarked,ChapterEndpoint,ChapterEndpointEmpty,ChapterSending,ChapterPartial,ChapterExpired,ChapterReopened paired
+    class UncollectedDetails,DetailsRefreshing,DetailsRefreshFailed,ChapterMatch,ChapterEmpty,ChapterOptions,ChapterOrderMenu,NoChapterSelection,ChapterRange,ChapterReview,ChapterBookmarked,ChapterEndpoint,ChapterEndpointEmpty,ChapterSending,ChapterPartial,ChapterExpired,ChapterReopened paired
 ```
 
-| 状态 ID | 最小必要信息                                                | 浅色正式Web                                       | 深色正式Web                                      |
-| ------- | ----------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------ |
-| 16.K1   | 名称、作者/源、简介、未收藏动作、章节数和返回；封面仍占位   | `karuyomi-b6bc240-details-uncollected-light.jpg`  | `karuyomi-b6bc240-details-uncollected-dark.jpg`  |
-| 17.K1   | 当前查询、1/3323数量、完整两行标题、次级章号/读态、独立书签 | `karuyomi-b6bc240-chapter-search-match-light.jpg` | `karuyomi-b6bc240-chapter-search-match-dark.jpg` |
-| 17.K2   | 查询、0/3323、无匹配说明及清空                              | `karuyomi-b6bc240-chapter-search-empty-light.jpg` | `karuyomi-b6bc240-chapter-search-empty-dark.jpg` |
-| 17.K3   | 展开状态、当前排序、仅书签及数量、读态筛选与刷新            | `karuyomi-0c4da11-range-options-light.jpg`        | `karuyomi-0c4da11-range-options-dark.jpg`        |
-| 17.K4   | 当前排序勾选、另一方向、官方菜单表面与可关闭                | `karuyomi-b6bc240-chapter-sort-light.jpg`         | `karuyomi-b6bc240-chapter-sort-dark.jpg`         |
-| 18.K1   | 已选0/隐藏0、退出/全选、清空禁用、范围起止未选              | `karuyomi-b6bc240-chapter-select-empty-light.jpg` | `karuyomi-b6bc240-chapter-select-empty-dark.jpg` |
-| 18.K2   | 六章/隐藏0、完整起止身份、包含两端说明和提交前预览          | `karuyomi-0c4da11-range-selected-light.jpg`       | `karuyomi-0c4da11-range-selected-dark.jpg`       |
-| 18.K3   | 六章完整名称/来源序号、逐章提交与失败暂停影响、取消/确认    | `karuyomi-0c4da11-range-preview-light.jpg`        | `karuyomi-0c4da11-range-preview-dark.jpg`        |
-| 18.K4   | 书签图标/移除名称、对应首章、未读保持；API核对仅此章        | `karuyomi-b6bc240-chapter-bookmarked-light.jpg`   | `karuyomi-b6bc240-chapter-bookmarked-dark.jpg`   |
+| 状态 ID | 最小必要信息                                                | 浅色正式Web                                           | 深色正式Web                                          |
+| ------- | ----------------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------- |
+| 16.K1   | 名称、作者/源、简介、未收藏动作、章节数和返回；封面仍占位   | `karuyomi-b6bc240-details-uncollected-light.jpg`      | `karuyomi-b6bc240-details-uncollected-dark.jpg`      |
+| 16.K2   | 原作者、简介、章节与刷新等待；继续滚动时反馈仍可见          | `karuyomi-1e6b1ba-details-chapters-waiting-light.jpg` | `karuyomi-1e6b1ba-details-chapters-waiting-dark.jpg` |
+| 16.K3   | 原资料与章节位置、具体读取失败、独立重试；资料和章节分别验  | `karuyomi-1e6b1ba-details-chapters-failed-light.jpg`  | `karuyomi-1e6b1ba-details-chapters-failed-dark.jpg`  |
+| 17.K1   | 当前查询、1/3323数量、完整两行标题、次级章号/读态、独立书签 | `karuyomi-b6bc240-chapter-search-match-light.jpg`     | `karuyomi-b6bc240-chapter-search-match-dark.jpg`     |
+| 17.K2   | 查询、0/3323、无匹配说明及清空                              | `karuyomi-b6bc240-chapter-search-empty-light.jpg`     | `karuyomi-b6bc240-chapter-search-empty-dark.jpg`     |
+| 17.K3   | 展开状态、当前排序、仅书签及数量、读态筛选与刷新            | `karuyomi-0c4da11-range-options-light.jpg`            | `karuyomi-0c4da11-range-options-dark.jpg`            |
+| 17.K4   | 当前排序勾选、另一方向、官方菜单表面与可关闭                | `karuyomi-b6bc240-chapter-sort-light.jpg`             | `karuyomi-b6bc240-chapter-sort-dark.jpg`             |
+| 18.K1   | 已选0/隐藏0、退出/全选、清空禁用、范围起止未选              | `karuyomi-b6bc240-chapter-select-empty-light.jpg`     | `karuyomi-b6bc240-chapter-select-empty-dark.jpg`     |
+| 18.K2   | 六章/隐藏0、完整起止身份、包含两端说明和提交前预览          | `karuyomi-0c4da11-range-selected-light.jpg`           | `karuyomi-0c4da11-range-selected-dark.jpg`           |
+| 18.K3   | 六章完整名称/来源序号、逐章提交与失败暂停影响、取消/确认    | `karuyomi-0c4da11-range-preview-light.jpg`            | `karuyomi-0c4da11-range-preview-dark.jpg`            |
+| 18.K4   | 书签图标/移除名称、对应首章、未读保持；API核对仅此章        | `karuyomi-b6bc240-chapter-bookmarked-light.jpg`       | `karuyomi-b6bc240-chapter-bookmarked-dark.jpg`       |
+
+`1e6b1ba` 的两色详情分别经过资料失败及章节失败。两种故障均保留原内容，滚动时可直接从底部重试，四轮原源和代次一致。已恢复的深色首章打开了真实图像。正式触控下拉及其它变体继续验收。[详情刷新故障](mihon-cupertino-fidelity.md#详情刷新故障的双主题正式-web)
 
 历史`b6bc240`两主题实际选择来源第1→2项、预览两章并用Enter取消，再明确退出；单章书签由Tab聚焦后Return标记，未进入阅读器，随后明确移除。该轮独立API最终accountRevision8，仅含三次主题、一次安装和四次书签增删；两主题预览取消零附写。搜索匹配、已选范围两图滚动锚点有差异，不计同位置像素对齐。
 
