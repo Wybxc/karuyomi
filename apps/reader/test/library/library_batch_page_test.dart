@@ -157,6 +157,62 @@ void main() {
   Finder category(String id) => find.byKey(ValueKey(('batch-category', id)));
 
   for (final brightness in Brightness.values) {
+    testWidgets(
+      'selection count and exit stay reachable in a scrolled short shelf in $brightness',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 480);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await favorite(tester, '隐藏作品');
+        for (var i = 0; i < 16; i++) {
+          await favorite(tester, '显示作品 $i');
+        }
+        await show(tester, brightness: brightness, textScale: 2);
+        server.requests.clear();
+        await selectAll(tester);
+        final scroll = find.byType(CustomScrollView);
+        final scrollable = find
+            .descendant(of: scroll, matching: find.byType(Scrollable))
+            .first;
+        final position = tester.state<ScrollableState>(scrollable).position;
+        position.jumpTo(0);
+        await tester.pumpAndSettle();
+        await search(tester, '显示作品');
+
+        final count = find.text('已选 17 部 · 当前隐藏 1 部');
+        final exit = find.byKey(const ValueKey('library-selection-toggle'));
+        final action = find.byKey(
+          const ValueKey('library-batch-remove-favorites'),
+        );
+        expect(count.hitTestable(), findsOneWidget);
+        await tester.drag(scroll, const Offset(0, -1050));
+        await tester.pumpAndSettle();
+        expect(position.pixels, greaterThan(400));
+        expect(count.hitTestable(), findsOneWidget);
+        expect(exit.hitTestable(), findsOneWidget);
+        expect(action.hitTestable(), findsOneWidget);
+        expect(
+          tester.getBottomLeft(count).dy,
+          lessThan(tester.getTopLeft(action).dy),
+        );
+
+        tester.view.physicalSize = const Size(844, 390);
+        await tester.pumpAndSettle();
+        expect(count.hitTestable(), findsOneWidget);
+        expect(exit.hitTestable(), findsOneWidget);
+        expect(action.hitTestable(), findsOneWidget);
+
+        await tester.tap(exit);
+        await tester.pumpAndSettle();
+        expect(count, findsNothing);
+        expect(action, findsNothing);
+        expect(mutations(), isEmpty);
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
+
     for (final textScale in [1.0, 2.0]) {
       testWidgets(
         'batch review preserves readable outcomes in $brightness at $textScale',

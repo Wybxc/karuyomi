@@ -507,11 +507,16 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     final AsyncValue<LibraryView?> snapshot = _repository == null
         ? const AsyncData(null)
         : ref.watch(libraryViewProvider(_repository!));
+    final view = snapshot.value;
+    final visible = view == null
+        ? const <LibraryEntry>[]
+        : _visibleEntries(view);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1100),
         child: Column(
           children: [
+            if (_selecting && view != null) _selectionBar(view, visible),
             Expanded(
               child: CustomScrollView(
                 slivers: [
@@ -552,19 +557,21 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       ],
                     ),
                   ),
-                  _libraryContents(snapshot),
+                  _libraryContents(snapshot, visible),
                 ],
               ),
             ),
-            if (snapshot.value case final view? when _selecting)
-              _batchActions(view),
+            if (_selecting && view != null) _batchActions(view),
           ],
         ),
       ),
     );
   }
 
-  Widget _libraryContents(AsyncValue<LibraryView?> snapshot) {
+  Widget _libraryContents(
+    AsyncValue<LibraryView?> snapshot,
+    List<LibraryEntry> visible,
+  ) {
     if (snapshot.hasError && !snapshot.hasValue) {
       return SliverToBoxAdapter(
         child: Column(
@@ -608,7 +615,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             ],
           ),
         ),
-        if (view.entries.isEmpty) _emptyLibrary() else _library(view),
+        if (view.entries.isEmpty) _emptyLibrary() else _library(view, visible),
       ],
     );
   }
@@ -758,14 +765,15 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     );
   }
 
+  bool get _canSelect =>
+      !_opening &&
+      !_editing &&
+      _retryingMetadata == null &&
+      widget.controller?.busy == false &&
+      widget.controller?.status == ServiceStatus.ready;
+
   Widget _batchActions(LibraryView view) {
     final repository = _repository;
-    final canSelect =
-        !_opening &&
-        !_editing &&
-        _retryingMetadata == null &&
-        widget.controller?.busy == false &&
-        widget.controller?.status == ServiceStatus.ready;
     final pending =
         repository != null &&
         (hasPendingLibraryCategoryEdit(repository) ||
@@ -800,7 +808,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 key: ValueKey('library-batch-$id'),
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                 onPressed:
-                    canSelect &&
+                    _canSelect &&
                         !pending &&
                         selected.isNotEmpty &&
                         (action == LibraryBatchAction.removeFavorites ||
@@ -822,11 +830,52 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     );
   }
 
-  Widget _library(LibraryView view) {
-    final entries = view.entries;
+  Widget _selectionToggle(bool enabled) => CupertinoButton(
+    key: const ValueKey('library-selection-toggle'),
+    padding: const EdgeInsets.all(8),
+    onPressed: enabled
+        ? () => setState(() {
+            _selecting = !_selecting;
+            if (!_selecting) _selection.clear();
+          })
+        : null,
+    child: Icon(
+      _selecting ? CupertinoIcons.xmark : CupertinoIcons.check_mark_circled,
+      semanticLabel: _selecting ? '退出选择' : '选择漫画',
+    ),
+  );
+
+  Widget _selectionBar(LibraryView view, List<LibraryEntry> visible) {
+    final selected = _selectedKeys(view);
+    final hiddenCount = selected
+        .difference(visible.map((entry) => entry.mangaKey).toSet())
+        .length;
+    return ColoredBox(
+      color: AppColors.toolbar.resolveFrom(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            _selectionToggle(_canSelect),
+            Expanded(
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  '已选 ${selected.length} 部 · 当前隐藏 $hiddenCount 部',
+                  style: CupertinoTheme.of(context).textTheme.textStyle,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<LibraryEntry> _visibleEntries(LibraryView view) {
     final query = _search.text.trim().toLowerCase();
     final filter = _filterFor(view);
-    final visible = entries.where((entry) {
+    final visible = view.entries.where((entry) {
       if (filter == '' && entry.categoryIds.isNotEmpty) return false;
       if (filter != null &&
           filter.isNotEmpty &&
@@ -849,6 +898,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       };
       return result == 0 ? a.mangaKey.compareTo(b.mangaKey) : result;
     });
+    return visible;
+  }
+
+  Widget _library(LibraryView view, List<LibraryEntry> visible) {
+    final entries = view.entries;
     final controller = widget.controller;
     final canOpen =
         !_selecting &&
@@ -863,12 +917,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         repository != null &&
         !hasPendingLibraryCategoryEdit(repository) &&
         pendingLibraryBatch(repository) == null;
-    final canSelect =
-        !_opening &&
-        !_editing &&
-        _retryingMetadata == null &&
-        controller?.busy == false &&
-        controller?.status == ServiceStatus.ready;
+    final canSelect = _canSelect;
     final hasPending =
         repository != null &&
         (hasPendingLibraryCategoryEdit(repository) ||
@@ -932,37 +981,21 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                       ),
                     ),
                   ),
-                  CupertinoButton(
-                    key: const ValueKey('library-selection-toggle'),
-                    padding: const EdgeInsets.all(8),
-                    onPressed: canSelect && (_selecting || !hasPending)
-                        ? () => setState(() {
-                            _selecting = !_selecting;
-                            if (!_selecting) _selection.clear();
-                          })
-                        : null,
-                    child: Icon(
-                      _selecting
-                          ? CupertinoIcons.xmark
-                          : CupertinoIcons.check_mark_circled,
-                      semanticLabel: _selecting ? '退出选择' : '选择漫画',
-                    ),
-                  ),
+                  if (!_selecting) _selectionToggle(canSelect && !hasPending),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  _selecting
-                      ? '已选 ${selected.length} 部 · 当前隐藏 $hiddenCount 部'
-                      : '收藏 ${entries.length} 部 · 当前显示 ${visible.length} 部',
-                  style: CupertinoTheme.of(context).textTheme.textStyle
-                      .copyWith(
-                        color: AppColors.secondaryLabel.resolveFrom(context),
-                        fontSize: 13,
-                      ),
+              if (!_selecting)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    '收藏 ${entries.length} 部 · 当前显示 ${visible.length} 部',
+                    style: CupertinoTheme.of(context).textTheme.textStyle
+                        .copyWith(
+                          color: AppColors.secondaryLabel.resolveFrom(context),
+                          fontSize: 13,
+                        ),
+                  ),
                 ),
-              ),
               if (_selecting) ...[
                 if (hiddenCount > 0) const Text('批量操作包含隐藏选中的漫画，请在确认清单中核对。'),
                 Wrap(
