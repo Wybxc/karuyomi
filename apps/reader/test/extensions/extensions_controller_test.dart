@@ -17,9 +17,11 @@ import 'package:karuyomi/data/progress_repository.dart';
 import 'package:karuyomi/features/reader/reading_progress_controller.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
+import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/extensions/extensions_controller.dart';
 import 'package:karuyomi/features/extensions/extensions_page.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
+import 'package:karuyomi/main.dart';
 import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -591,25 +593,50 @@ void main() {
           platform.inventory,
         );
         index.builds.single.sources.single.name = name;
-        platform.inventory = wire.encodeProtoJson(index);
-        await tester.runAsync(catalog.refreshCatalog);
-        platform.preparationFailure = wire.RuntimeError(
-          code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_UNSUPPORTED_CAPABILITY,
-          message: 'Fixture rejected this build',
-        );
-        await show(
-          tester,
-          appearance: appearance,
-          size: const Size(360, 480),
-          textScale: 2,
-        );
+        final appPlatform = TestPlatform(seedDefaultInstallation: false)
+          ..inventory = wire.encodeProtoJson(index)
+          ..preparationFailure = wire.RuntimeError(
+            code:
+                wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_UNSUPPORTED_CAPABILITY,
+            message: 'Fixture rejected this build',
+          );
+        await tester.binding.setSurfaceSize(const Size(360, 480));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 20);
+        tester.view.viewPadding = tester.view.padding;
+        addTearDown(tester.view.resetPadding);
+        addTearDown(tester.view.resetViewPadding);
+        tester.platformDispatcher.platformBrightnessTestValue = appearance;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await tester.pumpApp(KaruyomiApp(platform: appPlatform));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey(('app-destination', 1))));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('extensions-manage')));
+        await tester.pumpAndSettle();
+        final appCatalog = tester
+            .widget<CatalogPage>(find.byType(CatalogPage))
+            .controller!;
         final install = find.widgetWithText(CupertinoButton, '安装');
         final error = find.byKey(const ValueKey('extensions-error'));
         final retry = find.byKey(const ValueKey('extensions-retry-prepare'));
-        final candidate = catalog.builds.single;
-        final repository = catalog.repositories.single;
-        await tap(tester, install);
+        final candidate = appCatalog.builds.single;
+        final repository = appCatalog.repositories.single;
+        await tester.ensureVisible(install);
+        await tester.pumpAndSettle();
+        await tester.tap(install.hitTestable());
+        await tester.pumpAndSettle();
         expect(tester.widget<Text>(error).data, contains('当前应用不支持此扩展材料'));
+        final statusScroll = find.ancestor(
+          of: error,
+          matching: find.byType(Scrollable),
+        );
+        final viewport = tester.getRect(statusScroll);
+        final reasonBounds = tester.getRect(error);
+        expect(reasonBounds.top, greaterThanOrEqualTo(viewport.top));
+        expect(reasonBounds.bottom, lessThanOrEqualTo(viewport.bottom));
         expect(error.hitTestable(), findsOneWidget);
         expect(retry.hitTestable(), findsOneWidget);
         expect(
@@ -637,18 +664,14 @@ void main() {
           find.byKey(const ValueKey('extension-preparation-status')),
           findsNothing,
         );
-        expect(catalog.installedExtensions, isEmpty);
+        expect(appCatalog.installedExtensions, isEmpty);
         expect(
-          platform.businessServer.requests.where(
+          appPlatform.businessServer.requests.where(
             (request) => request.method == 'POST',
           ),
           isEmpty,
         );
 
-        final statusScroll = find.ancestor(
-          of: error,
-          matching: find.byType(Scrollable),
-        );
         final fullName = find.descendant(
           of: statusScroll,
           matching: find.text(name),
@@ -664,17 +687,21 @@ void main() {
         expect(version.hitTestable(), findsOneWidget);
         expect(tester.getRect(retry), retryBounds);
 
-        platform.preparationFailure = null;
+        appPlatform.preparationFailure = null;
         await tester.tap(retry.hitTestable());
         await tester.pumpAndSettle();
         expect(error, findsNothing);
-        expect(platform.preparations.map((request) => request.build.buildId), [
-          candidate.id,
-          candidate.id,
+        expect(appPlatform.preparations.map((request) => request.build), [
+          candidate.toProto(),
+          candidate.toProto(),
         ]);
-        expect(catalog.installedExtensions.single.buildId, candidate.id);
+        expect(appPlatform.preparations.map((request) => request.catalog), [
+          candidate.catalog,
+          candidate.catalog,
+        ]);
+        expect(appCatalog.installedExtensions.single.buildId, candidate.id);
         expect(
-          platform.businessServer.requests.where(
+          appPlatform.businessServer.requests.where(
             (request) => request.method == 'POST',
           ),
           hasLength(1),

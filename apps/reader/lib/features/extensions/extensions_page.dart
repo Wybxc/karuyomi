@@ -805,7 +805,6 @@ class const _ExtensionPreparationFailureStatus({
             primary: false,
             child: CupertinoFormSection.insetGrouped(
               margin: EdgeInsets.zero,
-              header: const Text('扩展准备失败'),
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -818,6 +817,7 @@ class const _ExtensionPreparationFailureStatus({
                       Semantics(
                         container: true,
                         liveRegion: true,
+                        label: '扩展准备失败',
                         child: Text(
                           failure.reason,
                           key: const ValueKey('extensions-error'),
@@ -843,22 +843,22 @@ class const _ExtensionPreparationFailureStatus({
             ),
           ),
         ),
-        if (storageFull && showStorageAction)
+        if (!storageFull || showStorageAction)
           CupertinoButton(
+            key: storageFull
+                ? null
+                : const ValueKey('extensions-retry-prepare'),
             alignment: AlignmentDirectional.centerStart,
-            onPressed: () => Navigator.of(context).push<void>(
-              AppPageRoute(
-                builder: (_) => ExtensionStoragePage(controller: controller),
-              ),
-            ),
-            child: const Text('管理本机存储'),
-          )
-        else if (!storageFull)
-          CupertinoButton(
-            key: const ValueKey('extensions-retry-prepare'),
-            alignment: AlignmentDirectional.centerStart,
-            onPressed: retry,
-            child: const Text('重试准备'),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            onPressed: storageFull
+                ? () => Navigator.of(context).push<void>(
+                    AppPageRoute(
+                      builder: (_) =>
+                          ExtensionStoragePage(controller: controller),
+                    ),
+                  )
+                : retry,
+            child: Text(storageFull ? '管理本机存储' : '重试准备'),
           ),
       ],
     );
