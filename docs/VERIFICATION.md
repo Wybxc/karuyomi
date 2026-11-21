@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，`6b424c5` 的阅读快捷设置在服务端回执前维持已确认的菜单值、翻页方向和画布。在 360×480、844×390 双倍字号中，两色均可看到等待并继续翻页。短屏丢回执后可直接重试，两色组件实测原样重试确认后第 2、3 页才并排。1006 项 Flutter 测试与 Web release 构建通过，正式 Web 与原生现场待验。[阅读快捷设置](verification/mihon-cupertino-fidelity.md#阅读快捷设置的确认布局与短屏反馈)
+
 2026-11-21，`6df9704` 对照 Mihon 18.01 将章节多选的上栏与标记动作固定在列表两端。两色组件的选中行覆盖 x=0–360，未读标题左缘为 x=30。360×480 两倍字号从末章直接打开确认，取消后保留选择和滚动位置，点按退出或系统返回均留在详情。1006 项 Flutter 测试与 Web release 构建通过，正式 Web 与原生实拍待验。[章节多选](verification/mihon-cupertino-fidelity.md#章节多选的固定操作栏)
 
 2026-11-21，`7e4fc47` 将 Source 日期放到章节次级资料首位。对照 17.01 的四个 xkcd 章节，两色 Flutter 组件的日期值和左缘与参考相符。回归覆盖本地日期边界、两倍字号、日期缺失及刷新失败后重试。1004 项 Flutter 测试与 Web release 构建通过。真实 Source 的新版正式 Web 待验。[章节日期](verification/mihon-cupertino-fidelity.md#章节发布日期和刷新回执)
