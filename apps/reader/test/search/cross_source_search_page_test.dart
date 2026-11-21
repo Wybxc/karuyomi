@@ -172,6 +172,88 @@ void main() {
       },
     );
 
+    testWidgets(
+      'search controls stay in reach while choosing from a long list in $brightness',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 480);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final service = FakeSourceSearch(
+          targets: [for (var i = 1; i <= 56; i++) searchTarget(i)],
+        );
+        await openPage(
+          tester,
+          service,
+          brightness: brightness,
+          textScaler: TextScaler.linear(2),
+        );
+        final query = find.byKey(const ValueKey('cross-search-query'));
+        final submit = find.byKey(const ValueKey('cross-search-submit'));
+        final refresh = find.byKey(const ValueKey('cross-search-refresh'));
+        final stop = find.byKey(const ValueKey('cross-search-stop'));
+        final scope = find.byKey(const ValueKey('cross-search-scope-toggle'));
+        final selected = service.targets[24];
+        final checkbox = find.byKey(
+          ValueKey(('cross-search-source', selected.key)),
+        );
+        expect(submit.hitTestable(), findsOneWidget);
+        expect(refresh.hitTestable(), findsOneWidget);
+        final initialQueryTop = tester.getTopLeft(query);
+        await tester.ensureVisible(checkbox);
+        await tester.pumpAndSettle();
+        expect(checkbox.hitTestable(), findsOneWidget);
+        await tester.tap(checkbox);
+        await tester.pumpAndSettle();
+        expect(scope.hitTestable(), findsNothing);
+        expect(tester.getTopLeft(query), initialQueryTop);
+        expect(submit.hitTestable(), findsOneWidget);
+        expect(service.tasks, isEmpty);
+
+        await tester.tap(submit);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('cross-search-error')).hitTestable(),
+          findsOneWidget,
+        );
+        expect(service.tasks, isEmpty);
+
+        await tester.enterText(query, '  远处的作品  ');
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pump(const Duration(milliseconds: 400));
+        final task = service.tasks.single;
+        expect(task.target.key, selected.key);
+        expect(task.query, '远处的作品');
+        expect(stop.hitTestable(), findsOneWidget);
+        expect(scope.hitTestable(), findsOneWidget);
+        expect(
+          tester
+              .getSemantics(scope)
+              .getSemanticsData()
+              .flagsCollection
+              .isExpanded,
+          Tristate.isFalse,
+        );
+
+        task.complete([]);
+        await tester.pumpAndSettle();
+        expect(
+          find
+              .byKey(const ValueKey('cross-search-results-heading'))
+              .hitTestable(),
+          findsOneWidget,
+        );
+        expect(find.text('此漫画源没有找到漫画。'), findsOneWidget);
+        await tester.tap(scope);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(checkbox);
+        await tester.pumpAndSettle();
+        expect(checkbox.hitTestable(), findsOneWidget);
+        expect(tester.widget<CupertinoCheckbox>(checkbox).value, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     for (final scale in [1.0, 2.0]) {
       testWidgets(
         'source scope uses native sections, complete names and whole-row selection in $brightness at $scale',
