@@ -297,8 +297,12 @@ void main() {
             );
           }
           for (final label in ['没有上一章', '没有下一章']) {
-            final button = find.widgetWithText(CupertinoButton, label);
+            final button = iconButton(label);
             expect(button, findsOneWidget);
+            expect(
+              tester.getSize(button).width,
+              kMinInteractiveDimensionCupertino,
+            );
             expect(
               tester
                   .getSemantics(button)
@@ -308,13 +312,19 @@ void main() {
               Tristate.isFalse,
             );
           }
-          final previous = tester.getCenter(find.text('没有上一章'));
-          final next = tester.getCenter(find.text('没有下一章'));
+          final previous = tester.getCenter(iconButton('没有上一章'));
+          final next = tester.getCenter(iconButton('没有下一章'));
           expect(previous.dy, next.dy);
           expect(rtl ? next.dx : previous.dx, lessThan(180));
           expect(rtl ? previous.dx : next.dx, greaterThan(180));
           expect(find.byType(CupertinoSlider), findsNothing);
           expect(find.text('1 / 1'), findsOneWidget);
+          await tester.longPress(iconButton('没有上一章'));
+          await tester.pump(const Duration(milliseconds: 200));
+          expect(find.text('没有上一章').hitTestable(), findsNothing);
+          expect(find.text('没有上一章'), findsOneWidget);
+          await tester.pump(const Duration(seconds: 2));
+          await tester.pumpAndSettle();
           expect(find.text('重新阅读本章'), findsNothing);
           expect(find.text('刷新书签'), findsNothing);
           final options = find.byKey(const ValueKey('reader-chapter-options'));
@@ -481,7 +491,7 @@ void main() {
         }
         final closeGate = Completer<void>();
         platform.closePageSessionHandler = (_) => closeGate.future;
-        await tester.tap(find.text('下一章'));
+        await tester.tap(iconButton('下一章'));
         await tester.pump();
         await tester.pump();
         expect(find.byType(ReaderScreen), findsNothing);
@@ -598,8 +608,8 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        final chapterLocation = tester.getCenter(find.text(direction));
-        await tester.tap(find.text(direction));
+        final chapterLocation = tester.getCenter(iconButton(direction));
+        await tester.tap(iconButton(direction));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
         final waiting = find.byType(CupertinoAlertDialog);
@@ -628,7 +638,7 @@ void main() {
           expect(waiting, findsNothing);
           final error = find.text('漫画源请求失败，请重试');
           expect(error, findsOneWidget);
-          expect(find.text(direction).hitTestable(), findsOneWidget);
+          expect(iconButton(direction).hitTestable(), findsOneWidget);
           final reader = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
           expect(reader.provider, same(opened.provider));
           expect(

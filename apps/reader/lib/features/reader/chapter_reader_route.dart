@@ -836,26 +836,59 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     final disabled =
         _busy || _accessPaused || _recovering || _refreshingProgress;
 
-    Widget button(ReaderChapterEdge edge, String label) {
+    Widget button(ReaderChapterEdge edge, String label, IconData icon) {
       final target = _adjacentChapter(edge);
       final enabled = !disabled && target != null;
-      return Semantics(
-        container: true,
-        enabled: enabled,
-        child: CupertinoButton(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          onPressed: enabled ? () => unawaited(_move(target)) : null,
-          child: Text(
-            target == null ? '没有$label' : label,
-            textAlign: TextAlign.center,
+      final description = target == null ? '没有$label' : label;
+      return RawTooltip(
+        semanticsTooltip: null,
+        ignorePointer: true,
+        tooltipBuilder: (context, animation) => FadeTransition(
+          opacity: animation,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.toolbar.resolveFrom(context),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.separator.resolveFrom(context),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                description,
+                style: TextStyle(color: AppColors.label.resolveFrom(context)),
+              ),
+            ),
+          ),
+        ),
+        child: Semantics(
+          container: true,
+          enabled: enabled,
+          child: CupertinoButton.tinted(
+            padding: EdgeInsets.zero,
+            borderRadius: BorderRadius.circular(
+              kMinInteractiveDimensionCupertino / 2,
+            ),
+            onPressed: enabled ? () => unawaited(_move(target)) : null,
+            child: Icon(icon, size: 20, semanticLabel: description),
           ),
         ),
       );
     }
 
+    final rtl = _mode == ReadingMode.rightToLeft;
     return (
-      previous: button(ReaderChapterEdge.previous, '上一章'),
-      next: button(ReaderChapterEdge.next, '下一章'),
+      previous: button(
+        ReaderChapterEdge.previous,
+        '上一章',
+        rtl ? CupertinoIcons.chevron_right_2 : CupertinoIcons.chevron_left_2,
+      ),
+      next: button(
+        ReaderChapterEdge.next,
+        '下一章',
+        rtl ? CupertinoIcons.chevron_left_2 : CupertinoIcons.chevron_right_2,
+      ),
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:karuyomi/widgets/choice_field.dart';
 
 import '../test_app.dart';
+import '../../test_support/cupertino.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -693,7 +694,7 @@ void main() {
       final oldKey = tester.widget<ReaderScreen>(find.byType(ReaderScreen)).key;
       final gate = Completer<void>();
       fixture.pagesGate = gate;
-      await tester.tap(find.text('下一章'));
+      await tester.tap(iconButton('下一章'));
       await tester.pump();
       fixture.expire = true;
       final session = fixture.catalog.session!;

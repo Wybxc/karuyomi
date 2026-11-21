@@ -1,4 +1,5 @@
 import '../test_app.dart';
+import '../../test_support/cupertino.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -417,7 +418,7 @@ void main() {
           windowReady: false,
         ),
       );
-      await tester.tap(find.text('下一章'));
+      await tester.tap(iconButton('下一章'));
       await tester.pumpAndSettle();
       expect(
         find.semantics.byLabel('真实源 DTO 测试 · 第二章').evaluate(),

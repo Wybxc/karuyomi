@@ -10,10 +10,12 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
-import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
+import 'package:flutter/rendering.dart'
+    show RenderParagraph, RenderRepaintBoundary;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:karuyomi/features/reader/reader_screen.dart';
+import 'package:karuyomi/features/reader/reader_page_navigation.dart';
 import 'package:karuyomi/features/reader/reader_preferences.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
 import 'package:karuyomi/features/reader/resource_image.dart';
@@ -1746,6 +1748,101 @@ void main() {
       expect(provider.acquired.skip(acquired.length).first.pageKey, 'page-19');
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'enlarged page numbers keep the slider position and focus across responsive layouts',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 480);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final selections = <int>[];
+      Widget rail(int index, int total) => CupertinoApp(
+        home: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: ReaderPageNavigation(
+              pageIndex: index,
+              pageCount: total,
+              direction: TextDirection.rtl,
+              onSelect: selections.add,
+              keyboardEnabled: true,
+              chapters: (
+                previous: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: null,
+                  child: const Icon(CupertinoIcons.chevron_right_2),
+                ),
+                next: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () {},
+                  child: const Icon(CupertinoIcons.chevron_left_2),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      void singleLine(String text) {
+        final paragraph = tester.renderObject<RenderParagraph>(find.text(text));
+        final lines = paragraph
+            .getBoxesForSelection(
+              TextSelection(baseOffset: 0, extentOffset: text.length),
+            )
+            .map((bounds) => bounds.top)
+            .toSet();
+        expect(lines, hasLength(1), reason: text);
+      }
+
+      final slider = find.byType(CupertinoSlider);
+      await tester.pumpWidget(rail(1, 3));
+      await tester.pumpAndSettle();
+      singleLine('2 / 3');
+      expect(
+        tester.getSize(slider).width,
+        greaterThanOrEqualTo(3 * kMinInteractiveDimensionCupertino),
+      );
+
+      await tester.pumpWidget(rail(8, 2048));
+      await tester.pumpAndSettle();
+      singleLine('9 / 2048');
+      expect(
+        tester.getBottomLeft(find.text('9 / 2048')).dy,
+        lessThanOrEqualTo(tester.getTopLeft(slider).dy),
+      );
+      final shortTrack = tester.getRect(slider);
+      await tester.pumpWidget(rail(1277, 2048));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .renderObject<RenderParagraph>(find.text('1278 / 2048'))
+            .didExceedMaxLines,
+        isFalse,
+      );
+      expect(tester.getRect(slider), shortTrack);
+      Focus.of(tester.element(slider)).requestFocus();
+      await tester.pumpAndSettle();
+      expect(Focus.of(tester.element(slider)).hasFocus, isTrue);
+
+      tester.view.physicalSize = const Size(720, 480);
+      await tester.pumpAndSettle();
+      expect(Focus.of(tester.element(slider)).hasFocus, isTrue);
+      expect(
+        tester.getCenter(find.text('1278 / 2048')).dy,
+        closeTo(tester.getCenter(slider).dy, .01),
+      );
+      final wideTrack = tester.getRect(slider);
+      await tester.pumpWidget(rail(2, 2048));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(slider), wideTrack);
+      await tester.sendKeyEvent(LogicalKeyboardKey.end);
+      await tester.pumpAndSettle();
+      expect(selections, [2047]);
+      expect(tester.takeException(), isNull);
     },
   );
 

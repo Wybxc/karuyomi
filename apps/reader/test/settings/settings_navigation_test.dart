@@ -1138,6 +1138,12 @@ void main() {
         await _tap(tester, find.text('第一章'));
         tester.view.physicalSize = const Size(360, 480);
         await tester.pumpAndSettle();
+        final slider = find.byType(CupertinoSlider);
+        expect(
+          tester.getSize(slider).width,
+          greaterThanOrEqualTo(3 * kMinInteractiveDimensionCupertino),
+          reason: 'the short reader still needs a usable drag and tap range',
+        );
         final mode = find.byType(ChoiceField<ReadingMode>);
         final layout = find.byKey(const ValueKey('reader-page-layout'));
         ReaderPageNavigation pager() => tester.widget<ReaderPageNavigation>(
@@ -1447,9 +1453,9 @@ void main() {
           .where((request) => request.uri.path == '/api/settings/mutations')
           .length;
       final firstLeaf = _reader(tester).key;
-      await tester.ensureVisible(find.text('下一章'));
+      await tester.ensureVisible(iconButton('下一章'));
       await tester.runAsync(() async {
-        await tester.tap(find.text('下一章'));
+        await tester.tap(iconButton('下一章'));
         await Future<void>.delayed(Duration.zero);
       });
       // Replacing the leaf first disposes its resources in a frame, then

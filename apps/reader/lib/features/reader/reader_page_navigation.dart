@@ -151,43 +151,98 @@ class _ReaderPageNavigationState extends State<ReaderPageNavigation> {
   @override
   Widget build(BuildContext context) {
     final index = _previewIndex ?? widget.pageIndex;
-    final count = Text(
-      '${widget.pageCount == 0 ? 0 : index + 1} / ${widget.pageCount}',
-      textAlign: TextAlign.center,
+    final textStyle = DefaultTextStyle.of(context).style;
+    final countStyle = textStyle.copyWith(
+      fontFeatures: [
+        ...?textStyle.fontFeatures,
+        const FontFeature.tabularFigures(),
+      ],
+      fontWeight: MediaQuery.boldTextOf(context) ? FontWeight.bold : null,
     );
     final chapters = widget.chapters;
-    final hasSlider = widget.pageCount > 1;
-    final rtl = widget.direction == TextDirection.rtl;
-    return Row(
+    const chapterGap = 4.0;
+    const countGap = 8.0;
+    const chapterWidth = kMinInteractiveDimensionCupertino;
+
+    Widget count({required bool wrap}) => Text(
+      '${widget.pageCount == 0 ? 0 : index + 1} / ${widget.pageCount}',
+      style: countStyle,
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+      softWrap: wrap,
+    );
+
+    Widget rail(List<Widget> center) => Row(
+      key: const ValueKey('page-navigation-row'),
       textDirection: widget.direction,
       children: [
-        if (chapters != null)
-          Expanded(
-            child: Align(
-              alignment: rtl ? Alignment.centerRight : Alignment.centerLeft,
-              child: chapters.previous,
-            ),
-          ),
-        Expanded(
-          flex: 2,
-          child: hasSlider
-              ? Row(
-                  textDirection: widget.direction,
-                  children: [
-                    Expanded(child: ExcludeSemantics(child: count)),
-                    Expanded(flex: 2, child: _slider(index)),
-                  ],
-                )
-              : count,
-        ),
-        if (chapters != null)
-          Expanded(
-            child: Align(
-              alignment: rtl ? Alignment.centerLeft : Alignment.centerRight,
-              child: chapters.next,
-            ),
-          ),
+        if (chapters != null) ...[
+          SizedBox(width: chapterWidth, child: chapters.previous),
+          const SizedBox(width: chapterGap),
+        ],
+        ...center,
+        if (chapters != null) ...[
+          const SizedBox(width: chapterGap),
+          SizedBox(width: chapterWidth, child: chapters.next),
+        ],
       ],
+    );
+    if (widget.pageCount <= 1) {
+      return rail([Expanded(child: count(wrap: true))]);
+    }
+
+    // Reserve the maximum digit count so moving or previewing a page keeps
+    // the track stationary, including when the current value gains a digit.
+    final longestCount = '${widget.pageCount} / ${widget.pageCount}';
+    Size measureCount(double width) {
+      final painter = TextPainter(
+        text: TextSpan(text: longestCount, style: countStyle),
+        textDirection: TextDirection.ltr,
+        textScaler: MediaQuery.textScalerOf(context),
+        locale: Localizations.maybeLocaleOf(context),
+      )..layout(maxWidth: width);
+      final size = painter.size;
+      painter.dispose();
+      return size;
+    }
+
+    final countWidth = measureCount(double.infinity).width.ceilToDouble();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final chapterSpace = chapters == null
+            ? 0
+            : (chapterWidth + chapterGap) * 2;
+        final availableTrack = constraints.maxWidth - chapterSpace;
+        final stacked =
+            availableTrack - countWidth - countGap <
+            3 * kMinInteractiveDimensionCupertino;
+        final wrap = countWidth > constraints.maxWidth;
+        final label = ExcludeSemantics(child: count(wrap: wrap));
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (stacked)
+              if (wrap)
+                SizedBox(
+                  height: measureCount(constraints.maxWidth).height,
+                  child: Center(child: label),
+                )
+              else
+                label,
+            rail([
+              if (!stacked) ...[
+                SizedBox(width: countWidth, child: label),
+                const SizedBox(width: countGap),
+              ],
+              Expanded(
+                key: const ValueKey('reader-page-slider'),
+                child: _slider(index),
+              ),
+            ]),
+          ],
+        );
+      },
     );
   }
 }

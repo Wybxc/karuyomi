@@ -176,12 +176,7 @@ void main() {
           _firstPages,
           completed: true,
         );
-        final next = find.ancestor(
-          of: find.text('下一章'),
-          matching: find.byWidgetPredicate(
-            (widget) => widget is CupertinoButton,
-          ),
-        );
+        final next = iconButton('下一章');
         await _wait(
           tester,
           '正式下一章入口可用',
