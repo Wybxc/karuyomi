@@ -12,6 +12,8 @@
 
 2026-11-22，原现网 191 个扩展的封面宿主升级已发布。Worker `68584fe5-3d3b-4425-8017-77ca374cc0c0` 承接 100% 流量。公开状态与索引逐字节匹配 revision `ef76d5d1952b4733a10704d8401748ad`，191 份清单、191 个安装包强 ETag、46 项 Web 静态资源及匿名 Access 302 均通过。已用正式 `commit-snapshot` 提交该检查点。完整目录仍有 1,257 个输入待计入已发布基线，`bootstrap.complete` 为 `false`。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
 
+2026-11-22，冻结批次的 MangaFire 缺少 TeaVM `Class.getResource`。宿主补充了打包资源的 URL 读取，JDK 与实际生成的 JavaScript 对照通过 8 项资源读取断言，原 80 项日期断言和 `pnpm teavm:check` 均通过。在 `macbook-pro-4` 固定 `b4cbede` 与同一上游提交补编 MangaFire 1.6.36，正式 Gradle、TeaVM 和产物完整性检查通过，打包有 7 个 Source 及 `hostAcquireCover`。共享运行材料清单与冻结批次逐字节一致，canonical SHA-256 为 `307cae848db6c5af71f33518daa46eee2c76d0e148f189b1cd6ebe2fb8573449`。结果为 `compiled_unverified`，等待完整候选合入及在线复验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
