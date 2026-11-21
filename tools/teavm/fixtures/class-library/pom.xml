@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion>
   <groupId>cc.wybxc.karuyomi</groupId>
-  <artifactId>date-format-contract</artifactId>
+  <artifactId>class-library-contract</artifactId>
   <version>1</version>
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
@@ -18,6 +18,11 @@
     <dependency>
       <groupId>org.teavm</groupId>
       <artifactId>teavm-classlib</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-extension-spi</artifactId>
       <version>${teavm.version}</version>
     </dependency>
   </dependencies>
@@ -39,10 +44,10 @@
             <configuration>
               <transformers><param
                 >prototype.TeaTransformer</param></transformers>
-              <mainClass>prototype.DateFormatScenarios</mainClass>
+              <mainClass>prototype.ClassLibraryScenarios</mainClass>
               <targetDirectory
               >${project.basedir}/target/javascript</targetDirectory>
-              <targetFileName>date-format.cjs</targetFileName>
+              <targetFileName>class-library.cjs</targetFileName>
               <optimizationLevel>ADVANCED</optimizationLevel>
               <minifying>true</minifying>
             </configuration>

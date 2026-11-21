@@ -1,5 +1,12 @@
-/** Execute one date contract on the JDK and on the actual product TeaVM transformer. */
-import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+/** Run the same class library contracts on the JDK and the product TeaVM transformer. */
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+} from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execa } from 'execa';
@@ -8,21 +15,22 @@ import { prepareSources } from './upstream-sources.ts';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-export interface DateFormatCheckOptions {
-  root?: string;
-  output?: string;
+export async function checkClassLibrary(root = ROOT): Promise<void> {
+  const output = mkdtempSync('/tmp/karuyomi.');
+  try {
+    await runContracts(root, output);
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
 }
 
-export async function checkDateFormat(
-  options: DateFormatCheckOptions = {},
-): Promise<void> {
-  const root = options.root ?? ROOT;
+async function runContracts(root: string, output: string): Promise<void> {
   const local = path.join(root, 'runtime/teavm/.local');
-  const output = options.output ?? path.join(local, 'date-format-test');
+  const fixtures = path.join(root, 'tools/teavm/fixtures/class-library');
   const platform = `${process.platform === 'darwin' ? 'macos' : process.platform}-${process.arch}`;
   const archive = LOCK.java.archives[platform];
   if (archive === undefined)
-    throw new Error('No locked JDK for the date-format check on ' + platform);
+    throw new Error('No locked JDK for the class library check on ' + platform);
   const javaHome = path.join(local, 'jdks', archive.home);
   const maven = path.join(
     local,
@@ -30,10 +38,8 @@ export async function checkDateFormat(
   );
   if (!existsSync(path.join(javaHome, 'bin/java')) || !existsSync(maven))
     throw new Error(
-      'Prepare the locked JDK and Maven before the date-format check',
+      'Prepare the locked JDK and Maven before the class library check',
     );
-  for (const name of ['src', 'target'])
-    rmSync(path.join(output, name), { recursive: true, force: true });
   const source = path.join(output, 'src/main/java');
   prepareSources(source, root);
   const owned = path.join(root, 'runtime/teavm/java/src/main/java');
@@ -42,6 +48,8 @@ export async function checkDateFormat(
     'prototype/PlatformSupport.java',
     'prototype/jcl/LocaleMethods.java',
     'prototype/jcl/LocaleState.java',
+    'prototype/jcl/PackagedResources.java',
+    'prototype/jcl/UrlMethods.java',
     'prototype/jcl/WaitListenerMethods.java',
     'org/teavm/classlib/java/lang/WaitObjectMethods.java',
     'org/teavm/classlib/java/lang/WaitInterruptSupport.java',
@@ -54,14 +62,26 @@ export async function checkDateFormat(
     mkdirSync(path.dirname(destination), { recursive: true });
     copyFileSync(path.join(owned, relative), destination);
   }
+  for (const name of [
+    'ClassLibraryScenarios.java',
+    'ClassLibraryResources.java',
+  ])
+    copyFileSync(
+      path.join(fixtures, name),
+      path.join(source, 'prototype', name),
+    );
   copyFileSync(
     path.join(root, 'tools/teavm/DateFormatScenarios.java'),
     path.join(source, 'prototype/DateFormatScenarios.java'),
   );
-  copyFileSync(
-    path.join(root, 'tools/teavm/fixtures/date-format/pom.xml'),
-    path.join(output, 'pom.xml'),
+  cpSync(
+    path.join(fixtures, 'resources'),
+    path.join(output, 'src/main/resources'),
+    {
+      recursive: true,
+    },
   );
+  copyFileSync(path.join(fixtures, 'pom.xml'), path.join(output, 'pom.xml'));
   const execute = execa({
     cwd: output,
     env: { JAVA_HOME: javaHome },
@@ -86,21 +106,22 @@ export async function checkDateFormat(
   const oracle = await execute(path.join(javaHome, 'bin/java'), [
     '-cp',
     path.join(output, 'target/classes'),
-    'prototype.DateFormatScenarios',
+    'prototype.ClassLibraryScenarios',
   ]);
   const generated = await execute(process.execPath, [
     '--input-type=commonjs',
     '--eval',
-    `require(${JSON.stringify(path.join(output, 'target/javascript/date-format.cjs'))}).main([]);`,
+    `require(${JSON.stringify(path.join(output, 'target/javascript/class-library.cjs'))}).main([]);`,
   ]);
   if (
-    !oracle.stdout.startsWith('DATE_FORMAT_SCENARIOS_PASS ') ||
+    !oracle.stdout.includes('DATE_FORMAT_SCENARIOS_PASS ') ||
+    !oracle.stdout.includes('PACKAGED_RESOURCE_SCENARIOS_PASS ') ||
     generated.stdout !== oracle.stdout
   )
     throw new Error(
-      'Generated TeaVM date contract differs from the JDK oracle',
+      'Generated TeaVM class library contract differs from the JDK oracle',
     );
   console.log('JDK and generated TeaVM JavaScript: ' + oracle.stdout.trim());
 }
 
-if (import.meta.main) await checkDateFormat();
+if (import.meta.main) await checkClassLibrary();

@@ -1,11 +1,31 @@
 package prototype;
 
+import java.net.URL;
 import org.teavm.model.*;
+import org.teavm.model.emit.ProgramEmitter;
 import org.teavm.model.instructions.*;
+import prototype.jcl.PackagedResources;
 
 /** Supply absent JCL entry points in TeaVM IR; never rewrites the extension input JAR. */
 public class TeaTransformer implements ClassHolderTransformer {
   public void transformClass(ClassHolder cls, ClassHolderTransformerContext context) {
+    if (cls.getName().equals("java.lang.Class")) {
+      MethodDescriptor descriptor = new MethodDescriptor("getResource", String.class, URL.class);
+      if (cls.getMethod(descriptor) == null) {
+        MethodHolder method = new MethodHolder(descriptor);
+        method.setLevel(AccessLevel.PUBLIC);
+        ProgramEmitter program = ProgramEmitter.create(method, context.getHierarchy());
+        program
+            .invoke(
+                PackagedResources.class,
+                "getResource",
+                URL.class,
+                program.var(0, Class.class),
+                program.var(1, String.class))
+            .returnValue();
+        cls.addMethod(method);
+      }
+    }
     if (cls.getName().equals("java.text.DateFormatElement$WeekdayText")) {
       replaceDateParse(
           cls,
