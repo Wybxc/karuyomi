@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:clock/clock.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/gestures.dart' show PointerScrollEvent;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -511,6 +512,58 @@ void main() {
       await _finish(tester, catalog);
     },
   );
+
+  testWidgets('scrolling chapters preserves the filter and ends editing', (
+    tester,
+  ) async {
+    final platform = _platform(
+      chapters: [
+        for (var index = 0; index < 34; index++)
+          wire.Chapter(url: '/chapter-$index', name: '待查章节 $index'),
+        wire.Chapter(url: '/excluded', name: '其他章节'),
+      ],
+    );
+    final catalog = await _details(
+      tester,
+      platform,
+      viewport: const Size(360, 480),
+      openOptions: false,
+    );
+    final field = find.byKey(const ValueKey('chapter-search'));
+    await tester.ensureVisible(field);
+    await tester.pumpAndSettle();
+    await _search(tester, '待查');
+    final editor = find.descendant(
+      of: field,
+      matching: find.byType(EditableText),
+    );
+    final focus = tester.widget<EditableText>(editor).focusNode;
+    final position = Scrollable.of(tester.element(field)).position;
+    final fieldOffset = position.pixels;
+    expect(focus.hasPrimaryFocus, isTrue);
+
+    position.jumpTo(fieldOffset - 8);
+    await tester.pumpAndSettle();
+    expect(focus.hasPrimaryFocus, isTrue);
+    final viewport = tester.getRect(
+      find.byKey(const ValueKey('details-scroll')),
+    );
+    tester.binding.handlePointerEvent(
+      PointerScrollEvent(
+        position: Offset(viewport.center.dx, viewport.bottom - 16),
+        scrollDelta: const Offset(0, 320),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(position.pixels, greaterThan(fieldOffset));
+    expect(focus.hasFocus, isFalse);
+
+    position.jumpTo(fieldOffset);
+    await tester.pumpAndSettle();
+    expect(tester.widget<EditableText>(editor).controller.text, '待查');
+    expect(find.text('显示 34 / 35 章'), findsOneWidget);
+    await _finish(tester, catalog);
+  });
 
   testWidgets(
     'reversed search and bookmarks open the exact duplicate Source occurrence',

@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:clock/clock.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter/scheduler.dart';
@@ -87,6 +88,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
   String? _rangeStart;
   String? _rangeEnd;
   late TextEditingController _chapterSearch;
+  late FocusNode _chapterSearchFocus;
   ChapterOrder _chapterOrder = ChapterOrder.source;
   bool _chapterOrderChosen = false;
   bool _chapterOptions = false;
@@ -1178,9 +1180,19 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
             selectionToolbar(_chapterSelectionBar(visibleKeys), top: true),
           Expanded(
             key: const ValueKey('details-scroll'),
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: slivers,
+            child: NotificationListener<UserScrollNotification>(
+              onNotification: (notification) {
+                // End editing when the user moves past the chapter search.
+                if (notification.depth == 0 &&
+                    notification.direction != ScrollDirection.idle) {
+                  _chapterSearchFocus.unfocus();
+                }
+                return false;
+              },
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: slivers,
+              ),
             ),
           ),
           if (_selectingChapters)
@@ -1365,6 +1377,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         autofillHints: null,
         key: const ValueKey('chapter-search'),
         controller: _chapterSearch,
+        focusNode: _chapterSearchFocus,
         enabled: !_opening,
         onChanged: (_) => setState(_resetRange),
         placeholder: '章节名、扫描组或章节号',
@@ -1496,6 +1509,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
   Widget build(BuildContext context) {
     _coverLifecycle = useValueNotifier(0);
     _chapterSearch = useTextEditingController();
+    _chapterSearchFocus = useFocusNode();
     useEffect(() {
       _initialize();
       return null;
