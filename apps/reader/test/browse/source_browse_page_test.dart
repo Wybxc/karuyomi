@@ -3,7 +3,7 @@ import 'package:karuyomi/widgets/app_routes.dart';
 import '../test_app.dart';
 
 import 'dart:async';
-import 'dart:ui' show SemanticsAction;
+import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
@@ -83,6 +83,145 @@ void main() {
   }
 
   for (final brightness in Brightness.values) {
+    testWidgets(
+      'latest shows centered progress until the listing resolves in $brightness',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(360, 480));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        platform.sourceInventory = [
+          wire.SourceInfo(
+            id: sourceId,
+            name: '测试漫画源',
+            lang: 'zh',
+            supportsLatest: true,
+          ),
+        ];
+        platform.invokeHandler = (_) async => page('原热门');
+        await show(tester, brightness: brightness);
+
+        final latest = find.text('最新');
+        final segments = find.byType(CupertinoSlidingSegmentedControl<String>);
+        final pending = Completer<wire.SourceResult>();
+        platform.invokeHandler = (call) {
+          expect(call.latest.page, 1);
+          return pending.future;
+        };
+        try {
+          await tester.tap(latest);
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(
+            tester
+                .widget<CupertinoSlidingSegmentedControl<String>>(segments)
+                .groupValue,
+            'latest',
+          );
+          expect(
+            tester
+                .getSemantics(latest)
+                .getSemanticsData()
+                .flagsCollection
+                .isEnabled,
+            Tristate.isFalse,
+          );
+          expect(
+            tester.widget<Text>(latest).style!.color,
+            AppColors.onSelection.resolveFrom(tester.element(latest)),
+          );
+          expect(catalog.listing, 'popular');
+          expect(find.text('原热门'), findsNothing);
+          expect(find.text('正在加载最新作品'), findsOneWidget);
+          final spinner = find.byType(CupertinoActivityIndicator);
+          expect(tester.getCenter(spinner).dy, inInclusiveRange(250, 310));
+        } finally {
+          pending.completeError(
+            const RuntimeException(RuntimeErrorCode.sourceError, 'failed'),
+          );
+          await tester.pumpAndSettle();
+        }
+        expect(catalog.listing, 'popular');
+        expect(find.text('原热门'), findsOneWidget);
+        platform.invokeHandler = (call) async {
+          expect(call.latest.page, 1);
+          return page('最新的作品');
+        };
+        await tester.tap(find.text('重试'));
+        await tester.pumpAndSettle();
+        expect(catalog.listing, 'latest');
+        expect(find.text('最新的作品'), findsOneWidget);
+        await hide(tester);
+      },
+    );
+
+    testWidgets(
+      'short source pagination keeps the bottom row and visible retry in $brightness',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 480);
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        platform.invokeHandler = (_) async => wire.SourceResult(
+          mangaPage: wire.MangaPage(
+            mangas: [
+              for (var index = 0; index < 12; index++)
+                wire.Manga(title: '作品$index', url: '/$index'),
+            ],
+            hasNextPage: true,
+          ),
+        );
+        await show(tester, brightness: brightness);
+        final scroll = tester
+            .widget<CustomScrollView>(
+              find.byKey(const PageStorageKey('source-manga-scroll')),
+            )
+            .controller!;
+        scroll.jumpTo(scroll.position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        final last = find.byKey(const ValueKey(('source-manga', '/11')));
+        final original = tester.getRect(last);
+        final pending = Completer<wire.SourceResult>();
+        platform.invokeHandler = (call) {
+          expect(call.popular.page, 2);
+          return pending.future;
+        };
+        try {
+          await tester.tap(find.byKey(const ValueKey('source-load-more')));
+          await tester.pump();
+          expect(tester.getRect(last), original);
+          expect(
+            tester
+                .getSemantics(last)
+                .getSemanticsData()
+                .flagsCollection
+                .isEnabled,
+            Tristate.isFalse,
+          );
+          expect(find.text('正在加载下一页'), findsOneWidget);
+        } finally {
+          pending.completeError(
+            const RuntimeException(RuntimeErrorCode.sourceError, 'failed'),
+          );
+          await tester.pumpAndSettle();
+        }
+        expect(tester.getRect(last), original);
+        expect(catalog.page, 1);
+        final retry = find.text('重试');
+        expect(retry.hitTestable(), findsOneWidget);
+        expect(tester.getRect(retry).bottom, lessThanOrEqualTo(480));
+        platform.invokeHandler = (call) async {
+          expect(call.popular.page, 2);
+          return page('第二页', more: false);
+        };
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(last), original);
+        expect(catalog.page, 2);
+        expect(catalog.mangas.last.title, '第二页');
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
+
     testWidgets(
       'single-mode source uses the selected label color in $brightness',
       (tester) async {

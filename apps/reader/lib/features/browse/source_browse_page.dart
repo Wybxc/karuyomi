@@ -37,6 +37,13 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
   static const _coverInset = 12.0;
   static const _coverSpacing = 12.0;
   static const _minimumCoverWidth = 120.0;
+  static const _pageFooterPadding = EdgeInsets.all(16);
+  static const _pageActionPadding = EdgeInsets.symmetric(
+    horizontal: 12,
+    vertical: 8,
+  );
+  static const _pageActionExtent = 44.0;
+  static const _pageActionSize = Size.square(_pageActionExtent);
 
   late TextEditingController _search;
   late ScrollController _scroll;
@@ -353,6 +360,106 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
       ],
     ),
   );
+
+  Widget _progress(String label) => Semantics(
+    liveRegion: true,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const CupertinoActivityIndicator(),
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: Text(label, textAlign: TextAlign.center),
+        ),
+      ],
+    ),
+  );
+
+  Widget _paginationFeedback({
+    required bool appending,
+    required bool canRetry,
+  }) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.toolbar.resolveFrom(context),
+        border: Border(
+          top: BorderSide(color: AppColors.separator.resolveFrom(context)),
+        ),
+      ),
+      child: Padding(
+        padding: _pageFooterPadding,
+        child: appending
+            ? Semantics(
+                liveRegion: true,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: _pageActionExtent,
+                  ),
+                  child: const Center(
+                    child: Padding(
+                      padding: _pageActionPadding,
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          CupertinoActivityIndicator(),
+                          Text('正在加载下一页', textAlign: TextAlign.center),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : Row(
+                children: [
+                  Expanded(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.sizeOf(context).height / 2,
+                      ),
+                      child: SingleChildScrollView(
+                        primary: false,
+                        padding: const EdgeInsetsDirectional.only(end: 8),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '下一页加载失败',
+                                style: CupertinoTheme.of(context)
+                                    .textTheme
+                                    .navTitleTextStyle,
+                              ),
+                              if (_error case final error?)
+                                Text(
+                                  error,
+                                  style: TextStyle(
+                                    color: AppColors.secondaryLabel.resolveFrom(
+                                      context,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  CupertinoButton(
+                    minimumSize: _pageActionSize,
+                    padding: _pageActionPadding,
+                    onPressed: canRetry ? _retry : null,
+                    child: const Text('重试'),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     _search = useTextEditingController();
@@ -377,24 +484,33 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
         catalog.busy || _loading != null || _leaving || _openingDetails;
     final showOld = _loading != _ListingWork.query;
     final appending = _loading == _ListingWork.more;
+    final listingProgress = switch (_loading) {
+      _ListingWork.initial => _preparation == null ? '正在打开漫画源' : '正在下载账户所选构建',
+      _ListingWork.query => switch (_requestedListing) {
+        'latest' => '正在加载最新作品',
+        'popular' => '正在加载热门作品',
+        _ => '正在加载新查询',
+      },
+      _ => null,
+    };
     final activity = _leaving
         ? '正在停止并收尾'
         : _openingDetails
         ? '正在打开作品详情'
-        : _preparation != null
-        ? '正在下载账户所选构建'
-        : switch (_loading) {
-            _ListingWork.initial => '正在打开漫画源',
-            _ListingWork.query => '正在加载新查询',
-            _ListingWork.refresh => '正在刷新，原作品仍可查看',
-            _ => null,
-          };
+        : _loading == _ListingWork.refresh
+        ? '正在刷新，原作品仍可查看'
+        : null;
     final canBrowse =
         _sourceCurrent &&
         catalog.extensionUnavailableReason == null &&
         !catalog.sourcePreferencesBlocked &&
         !catalog.accessPaused;
     final canInteract = !busy && canBrowse;
+    final showPaginationFeedback =
+        canBrowse &&
+        !_leaving &&
+        _results.isNotEmpty &&
+        (appending || _failed == _ListingWork.more);
     final keyboardOpen =
         _searchVisible &&
         searchFocus.hasFocus &&
@@ -405,7 +521,13 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
         canBrowse &&
         _results.isEmpty &&
         catalog.page > 0;
-    final popularSelected = _displayListing == 'popular';
+    final selectedMode = _loading == _ListingWork.query
+        ? _requestedListing
+        : _displayListing;
+    final popularSelected = selectedMode == 'popular';
+    final pendingModeColor = _loading == _ListingWork.query
+        ? AppColors.onSelection.resolveFrom(context)
+        : null;
     final mode = switch (_displayListing) {
       'search' => '搜索',
       'latest' => '最新',
@@ -570,12 +692,32 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                           children: [
                             if (catalog.activeSource?.supportsLatest == true)
                               CupertinoSlidingSegmentedControl<String>(
-                                groupValue: _displayListing == 'search'
+                                groupValue: selectedMode == 'search'
                                     ? null
-                                    : _displayListing,
-                                children: const {
-                                  'popular': Text('热门'),
-                                  'latest': Text('最新'),
+                                    : selectedMode,
+                                children: {
+                                  'popular': Semantics(
+                                    enabled: canInteract,
+                                    child: Text(
+                                      '热门',
+                                      style: TextStyle(
+                                        color: popularSelected
+                                            ? pendingModeColor
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                                  'latest': Semantics(
+                                    enabled: canInteract,
+                                    child: Text(
+                                      '最新',
+                                      style: TextStyle(
+                                        color: selectedMode == 'latest'
+                                            ? pendingModeColor
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
                                 },
                                 disabledChildren: !canInteract
                                     ? const {'popular', 'latest'}
@@ -591,6 +733,7 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                             else
                               Semantics(
                                 selected: popularSelected,
+                                enabled: canInteract,
                                 child: CupertinoButton(
                                   sizeStyle: CupertinoButtonSize.small,
                                   minimumSize: const Size(44, 44),
@@ -639,13 +782,7 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                         ),
                       ),
                     ),
-                  if (activity != null) ...[
-                    const CupertinoActivityIndicator(),
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(activity),
-                    ),
-                  ],
+                  if (activity != null) _progress(activity),
                   Expanded(
                     child: CustomScrollView(
                       key: const PageStorageKey('source-manga-scroll'),
@@ -660,6 +797,11 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                         ),
                         if (feedback.isNotEmpty)
                           SliverList.list(children: feedback),
+                        if (listingProgress != null && !_leaving)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Center(child: _progress(listingProgress)),
+                          ),
                         if (showOld && _results.isNotEmpty)
                           SliverPadding(
                             padding: const EdgeInsets.all(_coverInset),
@@ -682,26 +824,29 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                                     itemCount: _results.length,
                                     itemBuilder: (context, index) {
                                       final manga = _results[index];
-                                      return MangaCoverTile(
+                                      return Semantics(
                                         key: ValueKey((
                                           'source-manga',
                                           manga.url,
                                         )),
-                                        title: manga.title,
-                                        entry: saved[manga.url],
-                                        covers: _covers,
-                                        badge: saved[manga.url] == null
-                                            ? null
-                                            : Icon(
-                                                CupertinoIcons.book_fill,
-                                                color: CupertinoTheme.of(
-                                                  context,
-                                                ).primaryColor,
-                                                semanticLabel: '已在书架',
-                                              ),
-                                        onPressed: busy || !canBrowse
-                                            ? null
-                                            : () => unawaited(_details(manga)),
+                                        enabled: canInteract,
+                                        child: MangaCoverTile(
+                                          title: manga.title,
+                                          entry: saved[manga.url],
+                                          covers: _covers,
+                                          badge: saved[manga.url] == null
+                                              ? null
+                                              : Icon(
+                                                  CupertinoIcons.book_fill,
+                                                  color: CupertinoTheme.of(
+                                                    context,
+                                                  ).primaryColor,
+                                                  semanticLabel: '已在书架',
+                                                ),
+                                          onPressed: canInteract
+                                              ? () => unawaited(_details(manga))
+                                              : null,
+                                        ),
                                       );
                                     },
                                   ),
@@ -763,37 +908,19 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                               ),
                             ),
                           ),
-                        if (showOld && _results.isNotEmpty)
+                        if (showOld &&
+                            _results.isNotEmpty &&
+                            !showPaginationFeedback)
                           SliverPadding(
-                            padding: const EdgeInsets.all(16),
+                            padding: _pageFooterPadding,
                             sliver: SliverList.list(
                               children: [
-                                if (_failed == _ListingWork.more)
-                                  _failure('下一页加载失败')
-                                else if (appending && !_leaving && canBrowse)
-                                  Semantics(
-                                    liveRegion: true,
-                                    child: const Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 12,
-                                      ),
-                                      child: Wrap(
-                                        alignment: WrapAlignment.center,
-                                        crossAxisAlignment:
-                                            WrapCrossAlignment.center,
-                                        spacing: 8,
-                                        runSpacing: 4,
-                                        children: [
-                                          CupertinoActivityIndicator(),
-                                          Text('正在加载下一页'),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                else if (canBrowse && _hasNextPage)
+                                if (canBrowse && _hasNextPage)
                                   Center(
                                     child: CupertinoButton(
                                       key: const ValueKey('source-load-more'),
+                                      minimumSize: _pageActionSize,
+                                      padding: _pageActionPadding,
                                       onPressed: busy
                                           ? null
                                           : () => _start(_ListingWork.more),
@@ -816,6 +943,11 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                       ],
                     ),
                   ),
+                  if (showPaginationFeedback)
+                    _paginationFeedback(
+                      appending: appending,
+                      canRetry: canInteract,
+                    ),
                 ],
               ),
             ),
