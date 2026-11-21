@@ -240,8 +240,8 @@ class const ReaderScreen({
   final bool preserveInitialPlacement = false,
   final ReadingMode initialMode = ReadingMode.leftToRight,
 
-  /// Defaults to automatic width-based layout. An in-reader selection lasts for
-  /// this chapter unless this input changes; changing to null resumes automatic.
+  /// Defaults to automatic width-based layout. Without a request handler, a
+  /// selection lasts for this chapter. A null input resumes automatic layout.
   final bool? doublePage,
   final ReaderFit fit = ReaderFit.contain,
   final bool cropBorders = false,
@@ -252,9 +252,10 @@ class const ReaderScreen({
   final ReaderInputPreset tapZones = ReaderInputPreset.standard,
   final ReaderInputPreset keyboard = ReaderInputPreset.standard,
 
-  /// User selections only; applying parent settings and resizing do not save.
-  final ValueChanged<ReadingMode>? onModeChanged,
-  final ValueChanged<bool?>? onDoublePageChanged,
+  /// When provided, a handler receives the choice and the screen applies it
+  /// once it arrives as a parent setting. Otherwise choices apply locally.
+  final ValueChanged<ReadingMode>? onModeRequested,
+  final ValueChanged<bool?>? onDoublePageRequested,
 
   /// Only disables settings edits; chapter navigation and zoom remain usable.
   final bool layoutSettingsEnabled = true,
@@ -269,6 +270,7 @@ class const ReaderScreen({
   final ValueChanged<Future<void>>? onClosing,
   final ({Widget previous, Widget next})? chapterNavigation,
   final Widget? chapterControls,
+  final Widget? settingsStatus,
   final Widget? readingSettings,
   final VoidCallback? onAttached,
   final VoidCallback? onExit,
@@ -1097,10 +1099,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _selectMode(ReadingMode mode) {
     if (_reader.mode == mode) return;
-    _preferredPlacement = null;
     _navigation('layout', {'mode': mode.name});
+    if (widget.onModeRequested case final request?) {
+      request(mode);
+      return;
+    }
+    _preferredPlacement = null;
     _applyMode(mode);
-    widget.onModeChanged?.call(mode);
   }
 
   void _applyMode(ReadingMode mode) {
@@ -1113,14 +1118,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _selectDoublePage(bool? value) {
     if (_doublePagePreference == value) return;
-    _preferredPlacement = null;
     _navigation('layout', {'doublePage': value});
+    if (widget.onDoublePageRequested case final request?) {
+      request(value);
+      return;
+    }
+    _preferredPlacement = null;
     setState(() => _doublePagePreference = value);
     _restoring = true;
     _transform.value = Matrix4.identity();
     _applyDoublePagePreference();
     _scheduleRestore();
-    widget.onDoublePageChanged?.call(value);
   }
 
   void _applyDoublePagePreference() {
@@ -1969,13 +1977,44 @@ class _ReaderScreenState extends State<ReaderScreen> {
       3 * kMinInteractiveDimensionCupertino,
       available / 2,
     );
+    final controlsHeight = available - readingHeight;
     return ColoredBox(
       color: AppColors.toolbar.resolveFrom(context),
       child: SafeArea(
         top: false,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: available - readingHeight),
-          child: _scrollableControls(),
+          constraints: BoxConstraints(maxHeight: controlsHeight),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (widget.settingsStatus case final status?)
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: controlsHeight / 2),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: AppColors.separator.resolveFrom(context),
+                        ),
+                      ),
+                    ),
+                    child: SingleChildScrollView(
+                      primary: false,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      child: status,
+                    ),
+                  ),
+                ),
+              Flexible(
+                key: const ValueKey('reader-controls-content'),
+                child: _scrollableControls(),
+              ),
+            ],
+          ),
         ),
       ),
     );

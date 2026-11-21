@@ -142,8 +142,8 @@ Widget screen({
     onChapterEdge: onChapterEdge,
     onPositionChanged: onPosition,
     onViewportChanged: onViewport,
-    onModeChanged: onMode,
-    onDoublePageChanged: onDoublePage,
+    onModeRequested: onMode,
+    onDoublePageRequested: onDoublePage,
     imageBuilder: imageBuilder,
     imageEvictor: (_) async {},
   ),
@@ -2441,12 +2441,19 @@ void main() {
       final provider = FixturePageProvider();
       final manifest = fixtureChapter();
       final selections = <bool?>[];
+      bool? confirmedLayout;
       await tester.pumpWidget(
-        screen(
-          provider: provider,
-          manifest: manifest,
-          position: manifest.positionAt(1),
-          onDoublePage: selections.add,
+        StatefulBuilder(
+          builder: (context, confirm) => screen(
+            provider: provider,
+            manifest: manifest,
+            position: manifest.positionAt(1),
+            doublePage: confirmedLayout,
+            onDoublePage: (value) {
+              selections.add(value);
+              confirm(() => confirmedLayout = value);
+            },
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -2620,8 +2627,8 @@ void main() {
       expect(modes, [ReadingMode.rightToLeft]);
       expect(viewports.last.current.pageKey, 'page-5');
       expect(viewports.last.current.normalizedOffset, closeTo(.35, .001));
-      // A parent rebuild with its unchanged value cannot roll back a selection
-      // while the asynchronous settings acknowledgement is outstanding.
+      // The request leaves the confirmed layout in place while awaiting the
+      // parent, including across an unrelated parent rebuild.
       await tester.pumpWidget(configured(ReadingMode.webtoon, null));
       await tester.pumpAndSettle();
       expect(
@@ -2630,10 +2637,11 @@ void main() {
               find.byType(ChoiceField<ReadingMode>),
             )
             .value,
-        ReadingMode.rightToLeft,
+        ReadingMode.webtoon,
       );
       await tester.pumpWidget(configured(ReadingMode.rightToLeft, true));
       await tester.pumpAndSettle();
+      expect(viewports.last.mode, ReadingMode.rightToLeft);
       expect(pageLayoutPreference(tester), true);
       expect(modes, [ReadingMode.rightToLeft]);
       expect(pagePolicies, isEmpty);

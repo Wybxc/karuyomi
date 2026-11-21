@@ -143,9 +143,9 @@ void main() {
       // choices must survive a progress reopen independently of viewport data.
       tester
           .widget<ReaderScreen>(find.byType(ReaderScreen))
-          .onDoublePageChanged!(true);
+          .onDoublePageRequested!(true);
       await tester.pumpAndSettle();
-      tester.widget<ReaderScreen>(find.byType(ReaderScreen)).onModeChanged!(
+      tester.widget<ReaderScreen>(find.byType(ReaderScreen)).onModeRequested!(
         ReadingMode.webtoon,
       );
       await tester.pumpAndSettle();

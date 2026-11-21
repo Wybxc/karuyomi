@@ -163,22 +163,20 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       !_initializing &&
       _settingsState.canEdit;
 
-  void _changeMode(ReadingMode value) {
+  void _requestMode(ReadingMode value) {
     final controller = _settings;
     final snapshot = _settingsState.snapshot;
     if (!_canEditSettings || controller == null || snapshot == null) return;
-    setState(() => _mode = value);
     final draft = wire.ReaderSettingsOverride()
       ..mergeFromMessage(snapshot.overrides!)
       ..mode = settings_ui.wireReaderMode(value);
     unawaited(controller.saveOverrides(draft, snapshot.mangaRevision!));
   }
 
-  void _changePageLayout(bool? value) {
+  void _requestPageLayout(bool? value) {
     final controller = _settings;
     final snapshot = _settingsState.snapshot;
     if (!_canEditSettings || controller == null || snapshot == null) return;
-    setState(() => _doublePage = value);
     final draft = wire.ReaderSettingsOverride()
       ..mergeFromMessage(snapshot.overrides!)
       ..pageLayout = settings_ui.wirePageLayout(value);
@@ -879,14 +877,6 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
                 style: TextStyle(color: AppColors.error.resolveFrom(context)),
               ),
             ),
-        if (_settings case final settings?)
-          if (_settingsState.busy ||
-              _settingsState.error != null ||
-              _settingsState.pending != null)
-            settings_ui.SettingsStatus(
-              controller: settings,
-              state: _settingsState,
-            ),
         if (progress != null) _progressControls(progress),
         if (bookmarks != null &&
             (!bookmarks.loaded ||
@@ -900,6 +890,20 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget? _readerSettingsStatus() {
+    final settings = _settings;
+    final state = _settingsState;
+    if (settings == null ||
+        (!state.busy && state.error == null && state.pending == null)) {
+      return null;
+    }
+    return settings_ui.SettingsStatus(
+      controller: settings,
+      state: state,
+      compact: true,
     );
   }
 
@@ -1138,13 +1142,14 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       dimPercent: _dimPercent,
       tapZones: _tapZones,
       keyboard: _keyboard,
-      onModeChanged: _changeMode,
-      onDoublePageChanged: _changePageLayout,
+      onModeRequested: _requestMode,
+      onDoublePageRequested: _requestPageLayout,
       layoutSettingsEnabled: _canEditSettings,
       positionRequest: _positionRequest,
       paused: _accessPaused || _recovering,
       chapterNavigation: _chapterNavigation(),
       chapterControls: _chapterStatus(),
+      settingsStatus: _readerSettingsStatus(),
       readingSettings: _settings == null
           ? null
           : CupertinoButton(

@@ -102,88 +102,110 @@ class const SettingsStatus({
   required final SettingsController controller,
   required final SettingsState state,
   final VoidCallback? onReloaded,
+  final bool compact = false,
 }) extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      if (state.activity case final activity?)
-        Semantics(
-          container: true,
-          liveRegion: true,
-          child: Row(
-            children: [
-              const CupertinoActivityIndicator(),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  switch (activity) {
-                    SettingsActivity.reading =>
-                      state.pending?.acknowledged == true
-                          ? '原设置已确认，正在读取最新状态'
-                          : '正在读取服务端设置',
-                    SettingsActivity.saving => '正在等待服务端确认设置修改',
-                  },
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.secondaryLabel.resolveFrom(context),
+  Widget build(BuildContext context) {
+    final unknown =
+        state.failure == SettingsFailure.unknown &&
+        state.pending?.retryable == true;
+    final offersReload =
+        state.pending?.acknowledged != true || state.pending?.retryable != true;
+    final offersRetry =
+        state.activity != SettingsActivity.saving &&
+        state.pending?.retryable == true;
+    final reload = offersReload && (!compact || state.canRefresh)
+        ? Semantics(
+            enabled: state.canRefresh,
+            child: CupertinoButton(
+              onPressed: state.canRefresh
+                  ? () async {
+                      if (await controller.refresh()) onReloaded?.call();
+                    }
+                  : null,
+              child: const Text('重新读取设置'),
+            ),
+          )
+        : null;
+    final retry = offersRetry && (!compact || state.canRetry)
+        ? Semantics(
+            enabled: state.canRetry,
+            child: CupertinoButton(
+              onPressed: state.canRetry
+                  ? () async {
+                      if (await controller.retry()) onReloaded?.call();
+                    }
+                  : null,
+              child: Text(
+                state.pending?.acknowledged == true ? '重试读取最新设置' : '重试原设置操作',
+              ),
+            ),
+          )
+        : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (state.activity case final activity?)
+          Semantics(
+            container: true,
+            liveRegion: true,
+            child: Row(
+              children: [
+                const CupertinoActivityIndicator(),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    switch (activity) {
+                      SettingsActivity.reading =>
+                        state.pending?.acknowledged == true
+                            ? '原设置已确认，正在读取最新状态'
+                            : '正在读取服务端设置',
+                      SettingsActivity.saving => '正在等待服务端确认设置修改',
+                    },
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.secondaryLabel.resolveFrom(context),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      if (state.error case final error?)
-        Text(
-          error,
-          style: TextStyle(color: AppColors.error.resolveFrom(context)),
-        ),
-      if (state.activity != SettingsActivity.saving &&
-          state.pending?.retryable == true)
-        Text(
-          state.pending?.acknowledged == true
-              ? '原设置已确认，本会话保留原操作等待读取。'
-              : '设置尚未确认，本会话保留原操作。',
-          style: TextStyle(
-            fontSize: 13,
-            color: AppColors.secondaryLabel.resolveFrom(context),
-          ),
-        ),
-      Wrap(
-        children: [
-          if (state.pending?.acknowledged != true ||
-              state.pending?.retryable != true)
-            Semantics(
-              enabled: state.canRefresh,
-              child: CupertinoButton(
-                onPressed: state.canRefresh
-                    ? () async {
-                        if (await controller.refresh()) onReloaded?.call();
-                      }
-                    : null,
-                child: const Text('重新读取设置'),
+        if (state.error case final error? when !(compact && unknown))
+          Semantics(
+            liveRegion: compact,
+            child: Text(
+              error,
+              style: TextStyle(
+                fontSize: compact ? 13 : null,
+                color: AppColors.error.resolveFrom(context),
               ),
             ),
-          if (state.activity != SettingsActivity.saving &&
-              state.pending?.retryable == true)
-            Semantics(
-              enabled: state.canRetry,
-              child: CupertinoButton(
-                onPressed: state.canRetry
-                    ? () async {
-                        if (await controller.retry()) onReloaded?.call();
-                      }
-                    : null,
-                child: Text(
-                  state.pending?.acknowledged == true ? '重试读取最新设置' : '重试原设置操作',
-                ),
+          ),
+        if (state.activity != SettingsActivity.saving &&
+            (!compact || (!state.busy && (unknown || state.error == null))) &&
+            state.pending?.retryable == true)
+          Semantics(
+            liveRegion: compact && unknown,
+            child: Text(
+              state.pending?.acknowledged == true
+                  ? '原设置已确认，本会话保留原操作等待读取。'
+                  : '设置尚未确认，本会话保留原操作。',
+              style: TextStyle(
+                fontSize: 13,
+                color:
+                    (compact && unknown
+                            ? AppColors.error
+                            : AppColors.secondaryLabel)
+                        .resolveFrom(context),
               ),
             ),
-        ],
-      ),
-    ],
-  );
+          ),
+        Wrap(children: compact ? [?retry, ?reload] : [?reload, ?retry]),
+      ],
+    );
+  }
 }
 
 class const GlobalSettingsPanel({

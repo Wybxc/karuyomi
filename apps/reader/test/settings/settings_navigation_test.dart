@@ -17,6 +17,7 @@ import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
+import 'package:karuyomi/features/reader/reader_page_navigation.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/features/reader/reader_preferences.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
@@ -34,7 +35,7 @@ List<wire.Chapter> get _chapters => [
   wire.Chapter(url: '/two', name: '第二章'),
 ];
 
-TestPlatform _platform() =>
+TestPlatform _platform({bool twoPages = false}) =>
     TestPlatform()
       ..invokeHandler = (call) async => switch (call.whichRequest()) {
         wire.SourceCall_Request.details => wire.SourceResult(manga: testManga),
@@ -49,6 +50,13 @@ TestPlatform _platform() =>
                 pageKey: 'page-one',
                 url: '${call.pages.chapter.url}/page-one',
               ),
+              if (twoPages)
+                wire.Page(
+                  pageKey: 'page-two',
+                  index: 1,
+                  sourceIndex: 1,
+                  url: '${call.pages.chapter.url}/page-two',
+                ),
             ],
           ),
         ),
@@ -1118,14 +1126,28 @@ void main() {
 
   for (final appearance in Brightness.values) {
     testWidgets(
-      'reader quick settings show waiting until server confirmation in $appearance',
+      'short reader quick settings keep the confirmed layout while saving or retrying in $appearance',
       (tester) async {
         tester.platformDispatcher.platformBrightnessTestValue = appearance;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
         addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
-        final platform = _platform();
-        await _start(tester, platform, size: const Size(480, 800));
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final platform = _platform(twoPages: true);
+        await _start(tester, platform, size: const Size(480, 900));
         final catalog = await _details(tester);
         await _tap(tester, find.text('第一章'));
+        tester.view.physicalSize = const Size(360, 480);
+        await tester.pumpAndSettle();
+        final mode = find.byType(ChoiceField<ReadingMode>);
+        final layout = find.byKey(const ValueKey('reader-page-layout'));
+        ReaderPageNavigation pager() => tester.widget<ReaderPageNavigation>(
+          find.byType(ReaderPageNavigation),
+        );
+        final originalMode = tester
+            .widget<ChoiceField<ReadingMode>>(mode)
+            .value;
+        expect(originalMode, ReadingMode.leftToRight);
+        expect(tester.widget<ChoiceField<bool>>(layout).value, isNull);
         final container = ProviderScope.containerOf(
           tester.element(find.byType(ReaderScreen)),
           listen: false,
@@ -1152,7 +1174,7 @@ void main() {
           }
           return reply;
         };
-        await _tap(tester, find.byType(ChoiceField<ReadingMode>));
+        await _tap(tester, mode);
         await tester.runAsync(() async {
           await tester.tap(find.widgetWithText(CupertinoMenuItem, '从右到左'));
           await Future<void>.delayed(Duration.zero);
@@ -1161,7 +1183,13 @@ void main() {
         await tester.runAsync(
           () => entered.future.timeout(const Duration(seconds: 5)),
         );
-        expect(find.text('正在等待服务端确认设置修改'), findsOneWidget);
+        expect(find.text('正在等待服务端确认设置修改').hitTestable(), findsOneWidget);
+        expect(
+          tester.widget<ChoiceField<ReadingMode>>(mode).value,
+          originalMode,
+        );
+        expect(_reader(tester).initialMode, originalMode);
+        expect(pager().direction, TextDirection.ltr);
         expect(find.text('正在读取服务端设置'), findsNothing);
         expect(
           container.read(provider).snapshot!.mangaRevision,
@@ -1176,6 +1204,17 @@ void main() {
               .onChanged,
           isNull,
         );
+        tester.view.physicalSize = const Size(844, 390);
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(find.text('正在等待服务端确认设置修改').hitTestable(), findsOneWidget);
+        final nextPage = iconLabel('下一页');
+        expect(nextPage.hitTestable(), findsOneWidget);
+        await tester.tap(nextPage);
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(pager().pageIndex, 1);
+        expect(pager().direction, TextDirection.ltr);
+        tester.view.physicalSize = const Size(360, 480);
+        await tester.pump(const Duration(milliseconds: 250));
         await tester.runAsync(() async {
           release.complete();
           await Future<void>.delayed(Duration.zero);
@@ -1191,13 +1230,61 @@ void main() {
           wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
         );
         expect(
-          platform.businessServer.requests.where(
-            (request) =>
-                request.method == 'POST' &&
-                request.uri.path == '/api/settings/mutations',
-          ),
-          hasLength(1),
+          tester.widget<ChoiceField<ReadingMode>>(mode).value,
+          ReadingMode.rightToLeft,
         );
+        expect(pager().pageIndex, 1);
+        expect(pager().direction, TextDirection.rtl);
+        final writes = platform.businessServer.requests.where(
+          (request) =>
+              request.method == 'POST' &&
+              request.uri.path == '/api/settings/mutations',
+        );
+        expect(writes, hasLength(1));
+
+        var dropReply = true;
+        platform.afterBusinessReply = (request, reply) {
+          if (dropReply &&
+              request.method == 'POST' &&
+              request.uri.path == '/api/settings/mutations') {
+            dropReply = false;
+            return ApiReply(
+              status: reply.status,
+              headers: reply.headers,
+              body: '{',
+              redirected: reply.redirected,
+            );
+          }
+          return reply;
+        };
+        await _tap(tester, layout);
+        await _tap(tester, find.widgetWithText(CupertinoMenuItem, '双页'));
+        final unconfirmed = find.text('设置尚未确认，本会话保留原操作。');
+        expect(unconfirmed.hitTestable(), findsOneWidget);
+        expect(
+          tester.getTopLeft(unconfirmed).dy,
+          lessThan(tester.getTopLeft(find.byType(ReaderPageNavigation)).dy),
+        );
+        expect(tester.widget<ChoiceField<bool>>(layout).value, isNull);
+        expect(_reader(tester).doublePage, isNull);
+        expect(
+          container.read(provider).snapshot!.mangaRevision,
+          originalRevision + 1,
+        );
+        expect(writes, hasLength(2));
+        final originalWrite = writes.last.body;
+
+        final retry = find.widgetWithText(CupertinoButton, '重试原设置操作');
+        expect(retry.hitTestable(), findsOneWidget);
+        await _tap(tester, retry);
+        expect(writes, hasLength(3));
+        expect(writes.last.body, originalWrite);
+        expect(tester.widget<ChoiceField<bool>>(layout).value, true);
+        expect(
+          container.read(provider).snapshot!.mangaRevision,
+          originalRevision + 2,
+        );
+        expect(find.text('设置尚未确认，本会话保留原操作。'), findsNothing);
         await _leaveReader(tester, catalog);
         await _finish(tester, catalog);
       },
