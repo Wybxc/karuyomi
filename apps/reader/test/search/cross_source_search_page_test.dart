@@ -15,6 +15,7 @@ import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/extensions/extensions_page.dart';
 import 'package:karuyomi/features/search/cross_source_search_page.dart';
 import 'package:karuyomi/theme/app_theme.dart';
+import 'package:karuyomi/widgets/choice_field.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
 
@@ -250,6 +251,83 @@ void main() {
         await tester.pumpAndSettle();
         expect(checkbox.hitTestable(), findsOneWidget);
         expect(tester.widget<CupertinoCheckbox>(checkbox).value, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'search replies remain available after the language picker in $brightness',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        const languages = [
+          'en',
+          'zh',
+          'ja',
+          'ko',
+          'fr',
+          'de',
+          'es',
+          'pt',
+          'ru',
+        ];
+        final service = FakeSourceSearch(
+          targets: [
+            for (var i = 0; i < languages.length; i++)
+              searchTarget(i + 1, language: languages[i]),
+          ],
+        )..autoStart = false;
+        await openPage(tester, service, brightness: brightness);
+        final second = find.byKey(
+          ValueKey(('cross-search-source', service.targets[1].key)),
+        );
+        await tester.ensureVisible(second);
+        await tester.pumpAndSettle();
+        await tester.tap(second);
+        await tester.pump();
+        await chooseAndSearch(tester, service);
+        const transition = Duration(milliseconds: 600);
+        await tester.pump(transition);
+        expect(service.tasks, hasLength(2));
+        final scope = find.byKey(const ValueKey('cross-search-scope-toggle'));
+        final language = find.byKey(const ValueKey('cross-search-language'));
+        await tester.tap(scope);
+        await tester.pump();
+        await tester.pump(transition);
+        await tester.tap(language);
+        await tester.pump();
+        await tester.pump(transition);
+        expect(find.byType(ChoicePage<String>), findsOneWidget);
+
+        service.tasks.first.start();
+        service.tasks.first.complete([searchManga('仍属于原查询的作品')], more: true);
+        service.tasks.last.start();
+        service.tasks.last.fail('此源临时失败');
+        await tester.pump();
+        expect(find.byType(ChoicePage<String>), findsOneWidget);
+        await tester.tap(find.widgetWithText(CupertinoButton, 'zh'));
+        await tester.pump();
+        await tester.pump(transition);
+        expect(find.byType(ChoicePage<String>), findsNothing);
+        final languageButton = tester.widget<CupertinoButton>(
+          find.descendant(of: language, matching: find.byType(CupertinoButton)),
+        );
+        expect(languageButton.focusNode?.hasPrimaryFocus, isTrue);
+        expect(find.text('选择漫画源（已选 2 / 32）'), findsOneWidget);
+        await tester.tap(scope);
+        await tester.pump();
+        await tester.pump(transition);
+        final heading = tester.widget<Text>(
+          find.byKey(const ValueKey('cross-search-results-heading')),
+        );
+        expect(heading.data, '“测试作品” · 2 / 2 源完成 · 1 项');
+        expect(find.text('仍属于原查询的作品'), findsOneWidget);
+        expect(find.text('此源临时失败'), findsOneWidget);
+        expect(find.text('此源下一页'), findsOneWidget);
+        expect(find.text('重试此源'), findsOneWidget);
+        expect(service.tasks, hasLength(2));
         expect(tester.takeException(), isNull);
       },
     );

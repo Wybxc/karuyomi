@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
-SourceSearchTarget searchTarget(int index) {
+SourceSearchTarget searchTarget(int index, {String? language}) {
   final source = wire.CatalogSource(
     id: index.toString(),
     name: '漫画源 $index',
-    lang: index.isEven ? 'zh' : 'en',
+    lang: language ?? (index.isEven ? 'zh' : 'en'),
   );
   return SourceSearchTarget(
     build: CatalogBuild.fromProto(

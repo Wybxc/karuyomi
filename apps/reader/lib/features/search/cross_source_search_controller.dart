@@ -105,7 +105,9 @@ final class CrossSourceSearchController extends ChangeNotifier {
     ),
   );
 
-  bool _current(int epoch) => _ownsSearch && isCurrent() && epoch == _epoch;
+  // Accepted searches can finish while the language picker covers the page.
+  bool _ownsEpoch(int epoch) => _ownsSearch && epoch == _epoch;
+  bool _current(int epoch) => _ownsEpoch(epoch) && isCurrent();
 
   void _serviceChanged() {
     if (_disposed) return;
@@ -211,7 +213,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
         group.query,
         page: group.page + 1,
         onStarted: () {
-          if (!_current(epoch) || request != group._request) return;
+          if (!_ownsEpoch(epoch) || request != group._request) return;
           group.status = SourceSearchStatus.loading;
           notifyListeners();
         },
@@ -219,7 +221,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       group._task = task;
       unawaited(_receive(group, task, epoch, request));
     } catch (failure) {
-      if (!_current(epoch) || request != group._request) return;
+      if (!_ownsEpoch(epoch) || request != group._request) return;
       group.status = SourceSearchStatus.error;
       group.error = _message(failure);
       group.errorDetails = failure.toString();
@@ -234,7 +236,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
   ) async {
     try {
       final found = await task.result;
-      if (!_current(epoch) || request != group._request) return;
+      if (!_ownsEpoch(epoch) || request != group._request) return;
       group._task = null;
       if (group.mangas.length + found.mangas.length >
               crossSourcePerSourceLimit ||
@@ -254,7 +256,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
         group.limitReason = '已达每源200项或总计1000项的上限；请缩小范围后重新搜索以查看更多。';
       }
     } catch (failure) {
-      if (!_current(epoch) || request != group._request) return;
+      if (!_ownsEpoch(epoch) || request != group._request) return;
       group._task = null;
       group.status = SourceSearchStatus.error;
       group.error = _message(failure);
