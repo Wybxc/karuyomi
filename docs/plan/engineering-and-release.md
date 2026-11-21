@@ -56,7 +56,7 @@ Nexus Scanlation 使用 P‑256 密钥协商适配完成正式 AOT、完整性�
 
 Emaqi 通过 RSA-OAEP 适配恢复，Epsilon Scan 和 Soft Epsilon Scan 通过时区与打包资源读取适配恢复。Falco Scan（`tenkaiscan`）的仿射位图绘制和颜色矩阵通过 Android 原生参考与生成代码的分项检查，正式 AOT、完整性和封面入口检查也通过。六个补编批次共 35 个结果进入全量候选。[补编证据](../VERIFICATION.md)
 
-U-Next 与 OneReader 都已通过独立提前构建、完整性及封面入口检查，等待原冻结回执。MoeTruyen 的 Android 对话框和视图依赖仍需真实宿主能力。[补编证据](../VERIFICATION.md)
+U-Next 与 OneReader 都已通过独立提前构建、完整性及封面入口检查，等待原冻结回执。Softkomik 的标准 DNS 异常类型兼容已通过正式补编，成为第 36 个候选结果。MoeTruyen 的 Android 对话框和视图依赖仍需真实宿主能力。[补编证据](../VERIFICATION.md)
 
 Dragon Ball Multiverse 和 ManhuaRM 使用的 `StaticLayout.Builder` 需支持高质量、平衡断行及连字符。Android API 35 原生参考已为这些选项固定可区分的断行验收，后续实现需通过生成代码和真实扩展绘制复验。共享图形材料如有变化，按对应材料身份独立装配。[原生参考记录](../VERIFICATION.md)
 
