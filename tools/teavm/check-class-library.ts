@@ -57,6 +57,11 @@ async function runContracts(root: string, output: string): Promise<void> {
     'prototype/jcl/UrlMethods.java',
     'prototype/jcl/WaitListenerMethods.java',
     'com/google/gson/internal/Streams.java',
+    'android/graphics/Color.java',
+    'android/graphics/ColorFilter.java',
+    'android/graphics/ColorMatrix.java',
+    'android/graphics/ColorMatrixColorFilter.java',
+    'android/graphics/Matrix.java',
     'org/teavm/classlib/java/lang/WaitObjectMethods.java',
     'org/teavm/classlib/java/lang/WaitInterruptSupport.java',
     'org/teavm/classlib/java/util/regex/MatcherFindMethods.java',
@@ -83,6 +88,10 @@ async function runContracts(root: string, output: string): Promise<void> {
   copyFileSync(
     path.join(root, 'tools/teavm/DateFormatScenarios.java'),
     path.join(source, 'prototype/DateFormatScenarios.java'),
+  );
+  copyFileSync(
+    path.join(root, 'tools/teavm/GraphicsTransformTest.java'),
+    path.join(source, 'android/graphics/GraphicsTransformTest.java'),
   );
   const resources = path.join(output, 'src/main/resources');
   cpSync(path.join(fixtures, 'resources'), resources, { recursive: true });
@@ -194,6 +203,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     !oracle.stdout.includes('STRING_CONCAT_SCENARIO_PASS') ||
     !oracle.stdout.includes('EC_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('RSA_OAEP_SCENARIOS_PASS ') ||
+    !oracle.stdout.includes('Graphics transform oracle: ') ||
     generated.stdout !== oracle.stdout
   )
     throw new Error(

@@ -3,6 +3,9 @@ package prototype;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -113,6 +116,68 @@ public final class CanvasRotationScenarios {
       canvas.drawRect(3, 3, 7, 7, copied);
       pixel(output, 1, 1, Color.WHITE);
       pixel(output, 4, 2, Color.BLACK);
+    } finally {
+      output.recycle();
+      tile.recycle();
+    }
+  }
+
+  public static void runBitmapMatrixAndColorFilter() {
+    Bitmap tile = Bitmap.createBitmap(2, 1, Bitmap.Config.ARGB_8888);
+    Bitmap output = Bitmap.createBitmap(8, 4, Bitmap.Config.ARGB_8888);
+    try {
+      tile.setPixel(0, 0, Color.RED);
+      tile.setPixel(1, 0, Color.BLUE);
+      tile.setDensity(160);
+      output.setDensity(320);
+
+      Matrix transform = new Matrix();
+      transform.postScale(-1, 1, 1, .5f);
+      transform.postTranslate(1, 0);
+      ColorMatrix channels =
+          new ColorMatrix(
+              new float[] {0, 0, 1, 0, 0, 0, 1, 0, 0, 32, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0});
+      ColorMatrixColorFilter filter = new ColorMatrixColorFilter(channels);
+      channels.reset();
+      Paint paint = new Paint();
+      require(paint.setColorFilter(filter) == filter, "paint returns the supplied filter");
+      require(new Paint(paint).getColorFilter() == filter, "paint copy retains the filter");
+
+      Canvas canvas = new Canvas(output);
+      canvas.save();
+      require(canvas.clipRect(3, 1, 4, 2), "bitmap clip");
+      canvas.translate(2, 1);
+      canvas.drawBitmap(tile, transform, paint);
+      canvas.restore();
+      pixel(output, 3, 1, Color.rgb(255, 32, 0));
+      pixel(output, 4, 1, Color.TRANSPARENT);
+
+      canvas.drawBitmap(tile, new Matrix(), null);
+      pixel(output, 0, 0, Color.RED);
+      pixel(output, 1, 0, Color.BLUE);
+      pixel(output, 2, 0, Color.TRANSPARENT);
+
+      transform.setTranslate(3, 2);
+      canvas.drawBitmap(tile, transform, paint);
+      pixel(output, 3, 2, Color.rgb(0, 32, 255));
+      pixel(output, 4, 2, Color.rgb(255, 32, 0));
+      pixel(tile, 0, 0, Color.RED);
+      pixel(tile, 1, 0, Color.BLUE);
+
+      var forcedOpaque =
+          new ColorMatrixColorFilter(
+              new float[] {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 255});
+      paint.setColorFilter(forcedOpaque);
+      paint.setAlpha(128);
+      transform.setTranslate(5, 3);
+      canvas.drawBitmap(tile, transform, paint);
+      pixel(output, 5, 3, Color.RED);
+
+      paint.setColorFilter(filter);
+      transform.setTranslate(5, 0);
+      canvas.drawBitmap(tile, transform, paint);
+      pixel(output, 5, 0, Color.argb(128, 0, 32, 255));
+      require(paint.setColorFilter(null) == null, "clear paint filter");
     } finally {
       output.recycle();
       tile.recycle();

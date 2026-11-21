@@ -39,6 +39,11 @@ public final class AndroidTextTest {
   }
 
   @Test
+  public void nativeAndroidBitmapMatrixAndColorFilter() {
+    CanvasRotationScenarios.runBitmapMatrixAndColorFilter();
+  }
+
+  @Test
   public void nativeAndroidSharedScenarios() throws Exception {
     assertEquals(35, Build.VERSION.SDK_INT);
     Paint paint = new Paint();

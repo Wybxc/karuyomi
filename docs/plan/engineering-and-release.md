@@ -54,6 +54,8 @@ The Blank、TCB Scans、Webnex 已通过正式 AOT、产物完整性及封面入
 
 Nexus Scanlation 使用 P‑256 密钥协商适配完成正式 AOT、完整性及封面入口检查，第四个补编批次已通过装配预检。[补编证据](../VERIFICATION.md)
 
+Emaqi 通过 RSA-OAEP 适配恢复，Epsilon Scan 和 Soft Epsilon Scan 通过时区与打包资源读取适配恢复。第五个补编批次已通过装配预检。Tenkai Scan 所需的仿射位图绘制和颜色矩阵已通过 Android 原生参考与生成代码的分项检查，等待正式 AOT。[补编证据](../VERIFICATION.md)
+
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
 - [x] 先行发布原索引 191 个升级包，逐包读回生产资源并确认新的生产检查点。完整冻结队列继续构建后续目录。[生产证据](../VERIFICATION.md)

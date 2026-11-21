@@ -1,5 +1,6 @@
 package prototype;
 
+import android.graphics.GraphicsTransformTest;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -53,6 +54,7 @@ public final class ClassLibraryScenarios {
     System.out.println("STRING_CONCAT_SCENARIO_PASS");
     EcScenarios.run();
     RsaScenarios.run();
+    GraphicsTransformTest.main(args);
   }
 
   private static String concat(String title, int count, boolean enabled) {

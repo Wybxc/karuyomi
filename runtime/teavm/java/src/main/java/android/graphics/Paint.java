@@ -37,6 +37,7 @@ public class Paint {
   Cap cap = Cap.BUTT;
   Align align = Align.LEFT;
   Typeface typeface;
+  private ColorFilter colorFilter;
   private int layoutDirection;
 
   public Paint() {
@@ -63,6 +64,7 @@ public class Paint {
     cap = p.cap;
     align = p.align;
     typeface = p.typeface;
+    colorFilter = p.colorFilter;
     layoutDirection = p.layoutDirection;
   }
 
@@ -80,6 +82,15 @@ public class Paint {
 
   public int getAlpha() {
     return color >>> 24;
+  }
+
+  public ColorFilter setColorFilter(ColorFilter filter) {
+    colorFilter = filter;
+    return filter;
+  }
+
+  public ColorFilter getColorFilter() {
+    return colorFilter;
   }
 
   public void setTextSize(float v) {
@@ -249,7 +260,7 @@ public class Paint {
 
   JsonObject json() {
     JsonObject j = Graphics.args();
-    j.addProperty("color", color);
+    j.addProperty("color", colorFilter == null ? color : colorFilter.filterColor(color));
     j.addProperty(
         "direction", layoutDirection == 0 ? "auto" : layoutDirection == 1 ? "ltr" : "rtl");
     j.addProperty("flags", flags);
