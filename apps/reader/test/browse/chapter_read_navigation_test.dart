@@ -387,6 +387,21 @@ void main() {
         find.descendant(of: _row(0), matching: find.textContaining('已读')),
         findsOneWidget,
       );
+      expect(
+        tester
+            .getTopLeft(
+              find.descendant(of: _row(0), matching: find.text('同名章')),
+            )
+            .dx,
+        16,
+      );
+      expect(
+        find.descendant(
+          of: _row(0),
+          matching: find.byIcon(CupertinoIcons.circle_fill),
+        ),
+        findsNothing,
+      );
       await _reveal(tester, _row(1));
       expect(
         find.descendant(of: _row(1), matching: find.textContaining('未读')),

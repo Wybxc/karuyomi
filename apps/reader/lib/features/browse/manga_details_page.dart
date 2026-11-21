@@ -1077,6 +1077,87 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
     ),
   );
 
+  Widget _chapterRow(SequenceChapter chapter) {
+    final completed = _chapterRead?.completed(chapter.key);
+    final titleStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final name = Text(chapter.name);
+    final canOpen = !controller.busy && !_opening;
+    return Row(
+      key: ValueKey(('chapter-row', chapter.key)),
+      children: [
+        Expanded(
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: canOpen
+                ? (_selectingChapters
+                      ? _markingChapters
+                            ? null
+                            : () => _toggleChapter(chapter.key)
+                      : () => _openChapter(context, chapter.sourceIndex))
+                : null,
+            child: CupertinoListTile(
+              key: ValueKey(chapter.key),
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              leading: _selectingChapters
+                  ? CupertinoCheckbox(
+                      key: ValueKey(('chapter-select', chapter.key)),
+                      value: _chapterSelection.contains(chapter.key),
+                      onChanged: _markingChapters
+                          ? null
+                          : (_) => _toggleChapter(chapter.key),
+                    )
+                  : null,
+              title: DefaultTextStyle(
+                style: completed == true && !_selectingChapters
+                    ? titleStyle.copyWith(
+                        color: AppColors.secondaryLabel.resolveFrom(context),
+                      )
+                    : titleStyle,
+                child: !_selectingChapters && completed == false
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            CupertinoIcons.circle_fill,
+                            size: 8,
+                            color: AppColors.accent.resolveFrom(context),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(child: name),
+                        ],
+                      )
+                    : name,
+              ),
+              subtitle: DefaultTextStyle(
+                style: titleStyle.copyWith(
+                  fontSize: 12,
+                  color: AppColors.secondaryLabel.resolveFrom(context),
+                ),
+                child: Text(
+                  [
+                    ?_chapterSubtitle(chapter),
+                    switch (completed) {
+                      true => '已读',
+                      false => '未读',
+                      null => '状态未知',
+                    },
+                  ].join(' · '),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (_bookmarks case final bookmarks? when !_selectingChapters)
+          ChapterBookmarkButton(
+            controller: bookmarks,
+            chapterKey: chapter.key,
+            chapterName: chapter.name,
+            enabled: canOpen,
+          ),
+      ],
+    );
+  }
+
   List<Widget> _chapterList() {
     final sequence = _sequence;
     final query = _chapterSearch.text.trim().toLowerCase();
@@ -1250,57 +1331,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
             ],
           ),
         ),
-      for (final chapter in visible)
-        CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: !controller.busy && !_opening
-              ? (_selectingChapters
-                    ? _markingChapters
-                          ? null
-                          : () => _toggleChapter(chapter.key)
-                    : () => _openChapter(context, chapter.sourceIndex))
-              : null,
-          child: CupertinoListTile(
-            key: ValueKey(chapter.key),
-            leading: _selectingChapters
-                ? CupertinoCheckbox(
-                    key: ValueKey(('chapter-select', chapter.key)),
-                    value: _chapterSelection.contains(chapter.key),
-                    onChanged: _markingChapters
-                        ? null
-                        : (_) => _toggleChapter(chapter.key),
-                  )
-                : const Icon(CupertinoIcons.doc_text),
-            title: DefaultTextStyle(
-              style: CupertinoTheme.of(context).textTheme.textStyle,
-              child: Text(chapter.name),
-            ),
-            subtitle: DefaultTextStyle(
-              style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                fontSize: 12,
-                color: AppColors.secondaryLabel.resolveFrom(context),
-              ),
-              child: Text(
-                [
-                  ?_chapterSubtitle(chapter),
-                  switch (_chapterRead?.completed(chapter.key)) {
-                    true => '已读',
-                    false => '未读',
-                    null => '状态未知',
-                  },
-                ].join(' · '),
-              ),
-            ),
-            trailing: _selectingChapters || _bookmarks == null
-                ? null
-                : ChapterBookmarkButton(
-                    controller: _bookmarks!,
-                    chapterKey: chapter.key,
-                    chapterName: chapter.name,
-                    enabled: !controller.busy && !_opening,
-                  ),
-          ),
-        ),
+      for (final chapter in visible) _chapterRow(chapter),
     ];
   }
 

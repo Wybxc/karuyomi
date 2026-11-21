@@ -242,6 +242,19 @@ void main() {
               reason: 'duplicate occurrence identity and read status must remain visible',
             );
             final name = find.descendant(of: row, matching: find.text('同名章'));
+            expect(tester.getTopLeft(name).dx, 30);
+            expect(tester.getTopLeft(subtitle).dx, 16);
+            expect(
+              find.descendant(
+                of: row,
+                matching: find.byIcon(CupertinoIcons.circle_fill),
+              ),
+              findsOneWidget,
+            );
+            final bookmark = find.byKey(
+              ValueKey('chapter-bookmark-${chapter.key}'),
+            );
+            expect(find.ancestor(of: bookmark, matching: button), findsNothing);
             Focus.of(tester.element(name)).requestFocus();
             await tester.pumpAndSettle();
             await tester.sendKeyEvent(LogicalKeyboardKey.tab);
@@ -334,6 +347,77 @@ void main() {
     },
   );
 
+  testWidgets('tapping a disabled chapter bookmark never opens the chapter', (
+    tester,
+  ) async {
+    final platform = _platform();
+    final readStarted = Completer<void>();
+    final releaseRead = Completer<void>();
+    addTearDown(() {
+      if (!releaseRead.isCompleted) releaseRead.complete();
+    });
+    platform.businessServer.beforeRequest = (request) async {
+      if (request.method == 'GET' &&
+          request.uri.path ==
+              '/api/state/manga/${_sequence.mangaKey}/bookmarks' &&
+          !readStarted.isCompleted) {
+        readStarted.complete();
+        await releaseRead.future;
+      }
+      return null;
+    };
+    final catalog = await _details(
+      tester,
+      platform,
+      settleDetails: false,
+      viewport: const Size(360, 800),
+      openOptions: false,
+    );
+    await tester.runAsync(
+      () => readStarted.future.timeout(const Duration(seconds: 2)),
+    );
+    final chapter = _sequence.entries[2];
+    final bookmark = find.byKey(ValueKey('chapter-bookmark-${chapter.key}'));
+    await tester.scrollUntilVisible(
+      bookmark,
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(MangaDetailsPage),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pump();
+    expect(tester.widget<CupertinoButton>(bookmark).enabled, isFalse);
+    await tester.runAsync(() async {
+      await tester.tap(bookmark);
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(
+      platform.invocations.where(
+        (call) => call.whichRequest() == wire.SourceCall_Request.pages,
+      ),
+      isEmpty,
+    );
+    expect(find.byType(MangaDetailsPage), findsOneWidget);
+    expect(find.byType(ChapterReaderRoute), findsNothing);
+    await tester.runAsync(() async {
+      releaseRead.complete();
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pumpAndSettle();
+    expect(tester.widget<CupertinoButton>(bookmark).enabled, isTrue);
+    await _tap(tester, bookmark);
+    expect(
+      platform.businessServer.bookmarked(_sequence.mangaKey, chapter.key),
+      isTrue,
+    );
+    expect(find.byType(MangaDetailsPage), findsOneWidget);
+    await _finish(tester, catalog);
+  });
+
   testWidgets(
     'chapter search matches name scanlator and displayed number locally and can clear an empty result',
     (tester) async {
@@ -377,7 +461,10 @@ void main() {
       final calls = platform.invocations.length;
       await _tap(
         tester,
-        find.descendant(of: _row(2), matching: iconLabel('标记章节书签 同名章')),
+        find.descendant(
+          of: find.byKey(ValueKey(('chapter-row', _sequence.entries[2].key))),
+          matching: iconLabel('标记章节书签 同名章'),
+        ),
       );
       expect(
         platform.businessServer.bookmarked(
