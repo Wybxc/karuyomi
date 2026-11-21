@@ -16,10 +16,11 @@ import org.teavm.jso.typedarrays.ArrayBuffer;
 import org.teavm.jso.typedarrays.Uint8Array;
 
 /** P-256 operations are performed by the Worker's WebCrypto provider. */
-final class EcCrypto {
+public final class EcCrypto {
   static final int COORDINATE_BYTES = 32;
   private static final int MAX_ENCODED_KEY_BYTES = 1024;
-  private static final String WEB_ALGORITHM = "ECDSA";
+  private static final String SIGNATURE_ALGORITHM = "ECDSA";
+  private static final String AGREEMENT_ALGORITHM = "ECDH";
   private static final BigInteger PRIME =
       integer("FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF");
 
@@ -58,7 +59,9 @@ final class EcCrypto {
   static KeyPair generateKeyPair() {
     SubtleCrypto subtle = crypto().getSubtle();
     CryptoKeyPair pair =
-        subtle.generateKey(keyParameters(), true, usages("sign", "verify")).await();
+        subtle
+            .generateKey(keyParameters(SIGNATURE_ALGORITHM), true, usages("sign", "verify"))
+            .await();
     byte[] encoded = exportKey(subtle, "pkcs8", pair.getPrivateKey());
     return new KeyPair(
         publicKey(subtle, pair.getPublicKey()), new P256PrivateKey(pair.getPrivateKey(), encoded));
@@ -83,7 +86,10 @@ final class EcCrypto {
     try {
       SubtleCrypto subtle = crypto().getSubtle();
       CryptoKey key =
-          subtle.importKey(format, toJs(encoded), keyParameters(), true, usages("verify")).await();
+          subtle
+              .importKey(
+                  format, toJs(encoded), keyParameters(SIGNATURE_ALGORITHM), true, usages("verify"))
+              .await();
       return publicKey(subtle, key);
     } catch (RuntimeException error) {
       throw new InvalidKeySpecException("WebCrypto rejected the P-256 public key", error);
@@ -100,7 +106,8 @@ final class EcCrypto {
       CryptoKey key =
           crypto()
               .getSubtle()
-              .importKey("pkcs8", keyData, keyParameters(), false, usages("sign"))
+              .importKey(
+                  "pkcs8", keyData, keyParameters(SIGNATURE_ALGORITHM), false, usages("sign"))
               .await();
       return new P256PrivateKey(key, encoded.clone());
     } catch (RuntimeException error) {
@@ -131,6 +138,42 @@ final class EcCrypto {
         .verify(signatureParameters(), key, toJs(rawSignature), toJs(message))
         .await()
         .booleanValue();
+  }
+
+  public static CryptoKey agreementPrivateKey(Key key) throws InvalidKeyException {
+    if (!(key instanceof P256PrivateKey ec))
+      throw new InvalidKeyException("Expected a P-256 private key");
+    return importAgreementKey("pkcs8", ec.encoded, usages("deriveBits"));
+  }
+
+  public static CryptoKey agreementPublicKey(Key key) throws InvalidKeyException {
+    if (!(key instanceof P256PublicKey ec))
+      throw new InvalidKeyException("Expected a P-256 public key");
+    return importAgreementKey("spki", ec.encoded, usages());
+  }
+
+  private static CryptoKey importAgreementKey(
+      String format, byte[] encoded, JSArray<JSString> usages) throws InvalidKeyException {
+    // WebCrypto binds each handle to its algorithm, even for the same P-256 key.
+    Uint8Array keyData = toJs(encoded);
+    try {
+      return crypto()
+          .getSubtle()
+          .importKey(format, keyData, keyParameters(AGREEMENT_ALGORITHM), false, usages)
+          .await();
+    } catch (RuntimeException error) {
+      throw new InvalidKeyException("WebCrypto rejected the P-256 agreement key", error);
+    } finally {
+      for (int i = 0; i < keyData.getByteLength(); i++) keyData.set(i, (short) 0);
+    }
+  }
+
+  public static byte[] deriveSecret(CryptoKey local, CryptoKey peer) {
+    EcAgreementParameters parameters = JSObjects.create();
+    parameters.setName(AGREEMENT_ALGORITHM);
+    parameters.setPublicKey(peer);
+    return toJava(
+        crypto().getSubtle().deriveBits(parameters, local, COORDINATE_BYTES * Byte.SIZE).await());
   }
 
   private static void checkEncodedLength(byte[] bytes) throws InvalidKeySpecException {
@@ -181,16 +224,16 @@ final class EcCrypto {
     return usages;
   }
 
-  private static EcKeyParameters keyParameters() {
+  private static EcKeyParameters keyParameters(String algorithm) {
     EcKeyParameters parameters = JSObjects.create();
-    parameters.setName(WEB_ALGORITHM);
+    parameters.setName(algorithm);
     parameters.setNamedCurve("P-256");
     return parameters;
   }
 
   private static EcSignatureParameters signatureParameters() {
     EcSignatureParameters parameters = JSObjects.create();
-    parameters.setName(WEB_ALGORITHM);
+    parameters.setName(SIGNATURE_ALGORITHM);
     parameters.setHash("SHA-256");
     return parameters;
   }
@@ -198,7 +241,7 @@ final class EcCrypto {
   @JSBody(script = "return globalThis.crypto;")
   private static native CryptoProvider crypto();
 
-  interface CryptoKey extends JSObject {}
+  public interface CryptoKey extends JSObject {}
 
   private interface CryptoProvider extends JSObject {
     @JSProperty
@@ -231,6 +274,8 @@ final class EcCrypto {
 
     JSPromise<JSBoolean> verify(
         EcSignatureParameters parameters, CryptoKey key, Uint8Array signature, Uint8Array message);
+
+    JSPromise<ArrayBuffer> deriveBits(EcAgreementParameters parameters, CryptoKey key, int length);
   }
 
   private interface EcKeyParameters extends JSObject {
@@ -247,6 +292,14 @@ final class EcCrypto {
 
     @JSProperty
     void setHash(String hash);
+  }
+
+  private interface EcAgreementParameters extends JSObject {
+    @JSProperty
+    void setName(String name);
+
+    @JSProperty("public")
+    void setPublicKey(CryptoKey key);
   }
 
   private static final class P256PublicKey implements ECPublicKey {

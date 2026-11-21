@@ -131,6 +131,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     classes,
     ...securitySources,
     ...[
+      'javax/crypto/KeyAgreement.java',
       'javax/crypto/SecretKeyFactory.java',
       'javax/crypto/spec/PBEKeySpec.java',
       'javax/crypto/spec/SecretKeySpec.java',

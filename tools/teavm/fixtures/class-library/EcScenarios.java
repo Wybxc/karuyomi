@@ -4,6 +4,7 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.AlgorithmParameters;
 import java.security.GeneralSecurityException;
+import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -18,6 +19,8 @@ import java.security.spec.ECPublicKeySpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
+import javax.crypto.KeyAgreement;
 
 final class EcScenarios {
   private static final String EC = "EC";
@@ -83,7 +86,52 @@ final class EcScenarios {
     } catch (InvalidKeySpecException expected) {
       checks++;
     }
+    agreement(keys, spec);
     System.out.println("EC_SCENARIOS_PASS " + checks);
+  }
+
+  private static void agreement(KeyFactory keys, ECParameterSpec spec)
+      throws GeneralSecurityException {
+    // RFC 5903 Section 8.1 publishes both test keys and the expected shared secret.
+    var localKey =
+        keys.generatePrivate(
+            new PKCS8EncodedKeySpec(
+                decode(
+                    "3041020100301306072A8648CE3D020106082A8648CE3D030107042730250201010420"
+                        + "C88F01F510D9AC3F70A292DAA2316DE544E9AAB8AFE84049C62A9C57862D1433")));
+    var peerPoint =
+        new ECPoint(
+            new BigInteger("D12DFB5289C8D4F81208B70270398C342296970A0BCCB74C736FC7554494BF63", 16),
+            new BigInteger("56FBF3CA366CC23E8157854C13C58D6AAC23F046ADA30F8353E74F33039872AB", 16));
+    var peerKey = keys.generatePublic(new ECPublicKeySpec(peerPoint, spec));
+    byte[] expected = decode("D6840F6B42F6EDAFD13116E0E12565202FEF8E9ECE7DCE03812464D04B9442DE");
+
+    var agreement = KeyAgreement.getInstance("ECDH");
+    agreement.init(localKey);
+    try {
+      agreement.doPhase(localKey, true);
+      throw new AssertionError("An ECDH peer private key was accepted");
+    } catch (InvalidKeyException rejected) {
+      checks++;
+    }
+    try {
+      agreement.doPhase(peerKey, false);
+      throw new AssertionError("An intermediate ECDH phase was accepted");
+    } catch (IllegalStateException rejected) {
+      checks++;
+    }
+    require(agreement.doPhase(peerKey, true) == null, "the final phase emits no key");
+    require(Arrays.equals(agreement.generateSecret(), expected), "published ECDH vector");
+    try {
+      agreement.generateSecret();
+      throw new AssertionError("ECDH peer phase was reused");
+    } catch (IllegalStateException reset) {
+      checks++;
+    }
+    agreement.doPhase(peerKey, true);
+    require(
+        Arrays.equals(agreement.generateSecret(), expected),
+        "an initialized ECDH key can be reused");
   }
 
   static void interop(String[] args) throws GeneralSecurityException {
