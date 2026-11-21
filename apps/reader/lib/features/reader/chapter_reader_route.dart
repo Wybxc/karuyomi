@@ -15,6 +15,7 @@ import '../../widgets/edit_sheet.dart';
 import '../browse/catalog_controller.dart';
 import '../bookmarks/chapter_bookmarks_controller.dart';
 import '../bookmarks/bookmark_status.dart';
+import '../settings/reader_device_settings.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_widgets.dart' as settings_ui;
 import 'chapter_sequence.dart';
@@ -58,10 +59,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
   late bool? _doublePage = widget.initialDoublePage;
   ReaderFit _fit = ReaderFit.contain;
   bool _cropBorders = false;
-  ReaderBackground _background = ReaderBackground.black;
-  int _dimPercent = 0;
-  ReaderInputPreset _tapZones = ReaderInputPreset.standard;
-  ReaderInputPreset _keyboard = ReaderInputPreset.standard;
+  EffectiveReaderDevicePreferences _device = defaultReaderDevicePreferences;
   Completer<void> _viewClosed = Completer<void>();
   bool _visible = true;
   bool _busy = false;
@@ -145,14 +143,8 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       _appliedSettings = value;
       _mode = settings_ui.readerMode(value.effectiveReader.mode);
       _doublePage = settings_ui.doublePage(value.effectiveReader.pageLayout);
-      _background = settings_ui.readerBackground(
-        value.effectiveReader.background,
-      );
       _fit = settings_ui.readerFit(value.effectiveReader.fit);
       _cropBorders = value.effectiveReader.cropBorders;
-      _dimPercent = value.effectiveReader.dimPercent;
-      _tapZones = settings_ui.readerInputPreset(value.effectiveReader.tapZones);
-      _keyboard = settings_ui.readerInputPreset(value.effectiveReader.keyboard);
     }
   }
 
@@ -810,8 +802,8 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       targetChapter: target == null
           ? null
           : (name: target.name, scanlator: target.snapshot.scanlator),
-      background: _background,
-      dimPercent: _dimPercent,
+      background: _device.background,
+      dimPercent: _device.dimPercent,
       loading: target != null && error == null && (_busy || pageCount == null),
       error: error,
       onContinue:
@@ -1113,6 +1105,11 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     useOnListenableChange(_bookmarks, _progressChanged);
     useOnAppLifecycleStateChange((_, state) => _lifecycleChanged(state));
     if (_settingsCurrent) _applySettings(ref.watch(_settingsProvider));
+    _device = ref.watch(
+      effectiveReaderDevicePreferencesProvider(
+        scope: (origin: _origin ?? '', mangaKey: _sequence.mangaKey),
+      ),
+    );
     return PopScope<void>(
       canPop: _chapterEdge == null && (_progress == null || _allowPop),
       onPopInvokedWithResult: (didPop, _) {
@@ -1171,10 +1168,10 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       doublePage: _doublePage,
       fit: _fit,
       cropBorders: _cropBorders,
-      background: _background,
-      dimPercent: _dimPercent,
-      tapZones: _tapZones,
-      keyboard: _keyboard,
+      background: _device.background,
+      dimPercent: _device.dimPercent,
+      tapZones: _device.tapZones,
+      keyboard: _device.keyboard,
       onModeRequested: _requestMode,
       onDoublePageRequested: _requestPageLayout,
       layoutSettingsEnabled: _canEditSettings,

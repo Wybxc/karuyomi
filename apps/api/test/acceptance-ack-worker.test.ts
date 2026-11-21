@@ -10,9 +10,7 @@ import {
 } from '@karuyomi/contracts';
 import {
   BusinessStateErrorCode as ErrorCode,
-  ReaderBackground,
   ReaderFit,
-  ReaderInputPreset,
   ReaderMode,
   ReaderPageLayout,
   SettingsMutationSchema,
@@ -318,10 +316,7 @@ test('default acceptance does not intercept and the existing settings fixture pr
           reader: {
             mode: ReaderMode.LEFT_TO_RIGHT,
             pageLayout: ReaderPageLayout.AUTO,
-            background: ReaderBackground.BLACK,
             fit: ReaderFit.CONTAIN,
-            tapZones: ReaderInputPreset.STANDARD,
-            keyboard: ReaderInputPreset.STANDARD,
           },
         },
       },

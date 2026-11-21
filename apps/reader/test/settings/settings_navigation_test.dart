@@ -3,6 +3,7 @@ import 'package:karuyomi/widgets/choice_field.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
 
+import 'settings_fixture.dart';
 import 'settings_probe.dart';
 import '../test_app.dart';
 import '../../test_support/cupertino.dart';
@@ -21,6 +22,7 @@ import 'package:karuyomi/features/reader/reader_page_navigation.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/features/reader/reader_preferences.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
+import 'package:karuyomi/features/settings/reader_device_settings.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/theme/app_theme.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
@@ -104,7 +106,11 @@ Future<void> _chooseField<T>(
 ) async {
   await openSettingsSection(
     tester,
-    T == wire.ReaderInputPreset ? 'input' : 'reading',
+    T == ReaderInputPreset
+        ? 'input'
+        : T == ReaderBackground
+        ? 'appearance'
+        : 'reading',
   );
   await _tap(tester, _field<T>(field));
   await _tap(tester, find.widgetWithText(CupertinoMenuItem, value));
@@ -124,7 +130,7 @@ Future<void> _dim(
   String scope, {
   required bool zero,
 }) async {
-  if (scope == 'global') await openSettingsSection(tester, 'reading');
+  if (scope == 'global') await openSettingsSection(tester, 'appearance');
   final slider = find.byKey(ValueKey('$scope-dim'));
   await tester.ensureVisible(slider);
   await tester.pumpAndSettle();
@@ -160,8 +166,14 @@ Future<void> _start(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.pumpApp(
-    KaruyomiApp(platform: platform, platformFactory: factory),
+  await tester.pumpWidget(
+    ProviderScope(
+      key: const ValueKey('reader-device-settings-tests'),
+      overrides: [
+        readerDeviceStorageProvider.overrideWithValue(TestDevicePreferences()),
+      ],
+      child: KaruyomiApp(platform: platform, platformFactory: factory),
+    ),
   );
   await tester.pumpAndSettle();
 }
@@ -173,15 +185,15 @@ Future<void> _globalDefaults(
 }) async {
   await _openSettings(tester);
   if (dark) await _choose<AppAppearance>(tester, '深色');
+  await _chooseField<ReaderBackground>(tester, '阅读背景', '白色');
+  await _dim(tester, 'global', zero: false);
+  await _chooseField<ReaderInputPreset>(tester, '分页点击区', '反向');
+  await _chooseField<ReaderInputPreset>(tester, '阅读快捷键', '关闭');
   await _choose<wire.ReaderMode>(tester, '从右到左');
   await _choose<wire.ReaderPageLayout>(tester, '双页');
   await _chooseField<wire.ReaderFit>(tester, '图像适配', '适宽');
-  await _chooseField<bool>(tester, '裁白', '开启');
-  await _chooseField<wire.ReaderBackground>(tester, '阅读背景', '白色');
-  await _dim(tester, 'global', zero: false);
-  await _chooseField<wire.ReaderInputPreset>(tester, '分页点击区', '反向');
   beforeLastChoice?.call();
-  await _chooseField<wire.ReaderInputPreset>(tester, '阅读快捷键', '关闭');
+  await _chooseField<bool>(tester, '裁白', '开启');
 }
 
 Future<CatalogController> _details(WidgetTester tester) async {
@@ -1064,7 +1076,7 @@ void main() {
         platform.businessServer.requests.where(
           (request) => request.uri.path == '/api/settings/mutations',
         ),
-        hasLength(8),
+        hasLength(4),
       );
       final catalog = await _details(tester);
       final inherited = await tester.runAsync(
@@ -1076,23 +1088,6 @@ void main() {
       expect(inherited.overrides!.hasCropBorders(), false);
       expect(inherited.effectiveReader.cropBorders, true);
       expect(inherited.effectiveReader.fit, wire.ReaderFit.READER_FIT_WIDTH);
-      expect(inherited.overrides!.hasBackground(), false);
-      expect(inherited.overrides!.hasDimPercent(), false);
-      expect(inherited.overrides!.hasTapZones(), false);
-      expect(inherited.overrides!.hasKeyboard(), false);
-      expect(
-        inherited.effectiveReader.background,
-        wire.ReaderBackground.READER_BACKGROUND_WHITE,
-      );
-      expect(inherited.effectiveReader.dimPercent, 40);
-      expect(
-        inherited.effectiveReader.tapZones,
-        wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
-      );
-      expect(
-        inherited.effectiveReader.keyboard,
-        wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
-      );
       expect(
         inherited.effectiveReader.mode,
         wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
@@ -1370,11 +1365,20 @@ void main() {
       expect(find.byType(MangaSettingsEditor), findsOneWidget);
       final leafBeforeAppearance = _reader(tester).key;
       await _chooseField<wire.ReaderFit>(tester, '图像适配', '完整显示');
-      await _chooseField<wire.ReaderBackground>(tester, '阅读背景', '黑色');
+      final beforeDeviceEdit = platform.businessServer.requests
+          .where((request) => request.uri.path == '/api/settings/mutations')
+          .length;
+      await _chooseField<ReaderBackground>(tester, '阅读背景', '黑色');
       await _tap(tester, find.byKey(const ValueKey('manga-dim-inherit')));
       await _dim(tester, 'manga', zero: true);
-      await _chooseField<wire.ReaderInputPreset>(tester, '分页点击区', '标准');
-      await _chooseField<wire.ReaderInputPreset>(tester, '阅读快捷键', '反向');
+      await _chooseField<ReaderInputPreset>(tester, '分页点击区', '标准');
+      await _chooseField<ReaderInputPreset>(tester, '阅读快捷键', '反向');
+      expect(
+        platform.businessServer.requests.where(
+          (request) => request.uri.path == '/api/settings/mutations',
+        ),
+        hasLength(beforeDeviceEdit),
+      );
       expect(_reader(tester).key, leafBeforeAppearance);
       expect(_reader(tester).fit, ReaderFit.contain);
       expect(_reader(tester).cropBorders, false);
@@ -1389,8 +1393,6 @@ void main() {
       expect(snapshot.overrides!.fit, wire.ReaderFit.READER_FIT_CONTAIN);
       expect(snapshot.overrides!.hasCropBorders(), true);
       expect(snapshot.overrides!.cropBorders, false);
-      expect(snapshot.overrides!.hasDimPercent(), true);
-      expect(snapshot.overrides!.dimPercent, 0);
       await _choose<wire.ReaderMode>(tester, '跟随全局');
       snapshot = await tester.runAsync(
         () => catalog.settings!.loadManga(_mangaKey),
@@ -1422,20 +1424,6 @@ void main() {
       expect(snapshot.overrides!.fit, wire.ReaderFit.READER_FIT_CONTAIN);
       expect(snapshot.overrides!.hasCropBorders(), true);
       expect(snapshot.overrides!.cropBorders, false);
-      expect(snapshot.overrides!.hasDimPercent(), true);
-      expect(snapshot.overrides!.dimPercent, 0);
-      expect(
-        snapshot.overrides!.background,
-        wire.ReaderBackground.READER_BACKGROUND_BLACK,
-      );
-      expect(
-        snapshot.overrides!.tapZones,
-        wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
-      );
-      expect(
-        snapshot.overrides!.keyboard,
-        wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
-      );
       expect(
         snapshot.overrides!.pageLayout,
         wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
@@ -1491,20 +1479,16 @@ void main() {
       final leafBeforeInheritance = _reader(tester).key;
       await _chooseField<wire.ReaderFit>(tester, '图像适配', '跟随全局');
       await _chooseField<bool>(tester, '裁白', '跟随全局');
-      await _chooseField<wire.ReaderBackground>(tester, '阅读背景', '跟随全局');
+      await _chooseField<ReaderBackground>(tester, '阅读背景', '跟随本机默认');
       await _tap(tester, find.byKey(const ValueKey('manga-dim-inherit')));
-      await _chooseField<wire.ReaderInputPreset>(tester, '分页点击区', '跟随全局');
-      await _chooseField<wire.ReaderInputPreset>(tester, '阅读快捷键', '跟随全局');
+      await _chooseField<ReaderInputPreset>(tester, '分页点击区', '跟随本机默认');
+      await _chooseField<ReaderInputPreset>(tester, '阅读快捷键', '跟随本机默认');
       snapshot = await tester.runAsync(
         () => catalog.settings!.loadManga(_mangaKey),
       );
       expect(snapshot!.overrides!.hasFit(), false);
       expect(snapshot.overrides!.hasCropBorders(), false);
       expect(snapshot.effectiveReader.cropBorders, true);
-      expect(snapshot.overrides!.hasBackground(), false);
-      expect(snapshot.overrides!.hasDimPercent(), false);
-      expect(snapshot.overrides!.hasTapZones(), false);
-      expect(snapshot.overrides!.hasKeyboard(), false);
       await _closeModal(tester);
       expect(_reader(tester).key, leafBeforeInheritance);
       expect(_reader(tester).fit, ReaderFit.width);
@@ -1570,13 +1554,14 @@ void main() {
             .value,
         wire.ReaderFit.READER_FIT_WIDTH,
       );
+      await openSettingsSection(tester, 'appearance');
       expect(
         tester
-            .widget<ChoiceField<wire.ReaderBackground>>(
-              _field<wire.ReaderBackground>('阅读背景'),
+            .widget<ChoiceField<ReaderBackground>>(
+              _field<ReaderBackground>('阅读背景'),
             )
             .value,
-        wire.ReaderBackground.READER_BACKGROUND_WHITE,
+        ReaderBackground.white,
       );
       expect(
         tester
@@ -1588,25 +1573,26 @@ void main() {
         tester
             .widget<CupertinoSlider>(find.byKey(const ValueKey('global-dim')))
             .onChanged,
-        isNull,
+        isNotNull,
       );
       await openSettingsSection(tester, 'input');
       expect(
         tester
-            .widget<ChoiceField<wire.ReaderInputPreset>>(
-              _field<wire.ReaderInputPreset>('分页点击区'),
+            .widget<ChoiceField<ReaderInputPreset>>(
+              _field<ReaderInputPreset>('分页点击区'),
             )
             .value,
-        wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
+        ReaderInputPreset.reversed,
       );
       expect(
         tester
-            .widget<ChoiceField<wire.ReaderInputPreset>>(
-              _field<wire.ReaderInputPreset>('阅读快捷键'),
+            .widget<ChoiceField<ReaderInputPreset>>(
+              _field<ReaderInputPreset>('阅读快捷键'),
             )
             .value,
-        wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
+        ReaderInputPreset.disabled,
       );
+      await openSettingsSection(tester, 'reading');
       await _tap(tester, find.text('重新读取设置'));
       expect(writes(), hasLength(priorWrites! + 1));
       await _tap(tester, find.text('重试原设置操作'));

@@ -222,12 +222,8 @@ const globalSettingsValues = {
   reader: {
     mode: 'READER_MODE_LEFT_TO_RIGHT',
     pageLayout: 'READER_PAGE_LAYOUT_AUTO',
-    background: 'READER_BACKGROUND_BLACK',
     fit: 'READER_FIT_CONTAIN',
     cropBorders: false,
-    dimPercent: 0,
-    tapZones: 'READER_INPUT_PRESET_STANDARD',
-    keyboard: 'READER_INPUT_PRESET_STANDARD',
   },
 };
 
@@ -245,7 +241,6 @@ test('settings mutations require typed complete defaults and preserve per-field 
       ...manga.setManga,
       overrides: {
         pageLayout: 'READER_PAGE_LAYOUT_AUTO',
-        dimPercent: 0,
         fit: 'READER_FIT_CONTAIN',
         cropBorders: false,
       },
@@ -255,13 +250,13 @@ test('settings mutations require typed complete defaults and preserve per-field 
     throw new Error('Missing manga settings');
   expect(explicit.operation.value.overrides?.mode).toBeUndefined();
   expect(explicit.operation.value.overrides?.pageLayout).toBe(1);
-  expect(explicit.operation.value.overrides?.dimPercent).toBe(0);
+
   expect(explicit.operation.value.overrides?.fit).toBe(1);
   expect(explicit.operation.value.overrides?.cropBorders).toBe(false);
   const inherited = settingsMutationSchema.parse(manga);
   if (inherited.operation.case !== 'setManga')
     throw new Error('Missing manga settings');
-  expect(inherited.operation.value.overrides?.dimPercent).toBeUndefined();
+
   expect(inherited.operation.value.overrides?.fit).toBeUndefined();
   expect(inherited.operation.value.overrides?.cropBorders).toBeUndefined();
   for (const value of [
@@ -291,13 +286,10 @@ test('settings mutations require typed complete defaults and preserve per-field 
       { fit: 0 },
       { fit: 4 },
       { fit: 1.5 },
-      { background: 0 },
-      { background: 4 },
-      { tapZones: 0 },
-      { keyboard: 4 },
-      { dimPercent: -1 },
-      { dimPercent: 81 },
-      { dimPercent: 0.5 },
+      { background: 'READER_BACKGROUND_WHITE' },
+      { dimPercent: 0 },
+      { tapZones: 'READER_INPUT_PRESET_STANDARD' },
+      { keyboard: 'READER_INPUT_PRESET_DISABLED' },
     ].flatMap((fields) => [
       { ...manga, setManga: { ...manga.setManga, overrides: fields } },
       {
@@ -361,14 +353,7 @@ test('settings replies verify the complete snapshot and effective defaults/overr
     { ...manga, manga: { ...manga.manga, revision: 4 } },
     { ...manga, manga: { ...manga.manga, overrides: undefined } },
     { ...manga, effectiveReader: globalSettingsValues.reader },
-    ...[
-      { cropBorders: true },
-      { fit: 'READER_FIT_WIDTH' },
-      { background: 'READER_BACKGROUND_WHITE' },
-      { dimPercent: 1 },
-      { tapZones: 'READER_INPUT_PRESET_DISABLED' },
-      { keyboard: 'READER_INPUT_PRESET_REVERSED' },
-    ].map((fields) => ({
+    ...[{ cropBorders: true }, { fit: 'READER_FIT_WIDTH' }].map((fields) => ({
       ...manga,
       effectiveReader: { ...manga.effectiveReader, ...fields },
     })),

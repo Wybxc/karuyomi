@@ -497,20 +497,12 @@ void _expectGlobal(
 ({
   wire.ReaderMode mode,
   wire.ReaderPageLayout pageLayout,
-  wire.ReaderBackground background,
-  int dimPercent,
-  wire.ReaderInputPreset tapZones,
-  wire.ReaderInputPreset keyboard,
   wire.ReaderFit fit,
   bool cropBorders,
 })
 _readerValues(wire.ReaderSettings value) => (
   mode: value.mode,
   pageLayout: value.pageLayout,
-  background: value.background,
-  dimPercent: value.dimPercent,
-  tapZones: value.tapZones,
-  keyboard: value.keyboard,
   fit: value.fit,
   cropBorders: value.cropBorders,
 );

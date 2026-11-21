@@ -2051,16 +2051,8 @@ bool _settingsMatch(
 // Dart stores an explicitly assigned default. Compare their generated getters;
 // manga overrides keep protobuf equality because their optional presence matters.
 final _readerSettingsEquality = EqualityBy(
-  (wire.ReaderSettings value) => (
-    value.mode,
-    value.pageLayout,
-    value.background,
-    value.dimPercent,
-    value.tapZones,
-    value.keyboard,
-    value.fit,
-    value.cropBorders,
-  ),
+  (wire.ReaderSettings value) =>
+      (value.mode, value.pageLayout, value.fit, value.cropBorders),
 );
 final _favoriteSourcesEquality = ListEquality(
   EqualityBy(

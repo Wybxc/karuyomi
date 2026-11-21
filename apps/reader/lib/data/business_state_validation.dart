@@ -398,20 +398,6 @@ void validateBusinessReaderSettings(wire.ReaderSettings value) {
     'Invalid reader page layout',
   );
   _require(value.fit.value >= 1 && value.fit.value <= 3, 'Invalid reader fit');
-  _require(
-    value.background.value >= 1 && value.background.value <= 3,
-    'Invalid reader background',
-  );
-  _require(
-    value.dimPercent >= 0 && value.dimPercent <= 80,
-    'Invalid reader dimming',
-  );
-  for (final preset in [value.tapZones, value.keyboard]) {
-    _require(
-      preset.value >= 1 && preset.value <= 3,
-      'Invalid reader input preset',
-    );
-  }
 }
 
 void validateBusinessReaderOverrides(wire.ReaderSettingsOverride value) {
@@ -431,30 +417,6 @@ void validateBusinessReaderOverrides(wire.ReaderSettingsOverride value) {
     _require(
       value.fit.value >= 1 && value.fit.value <= 3,
       'Invalid reader fit override',
-    );
-  }
-  if (value.hasBackground()) {
-    _require(
-      value.background.value >= 1 && value.background.value <= 3,
-      'Invalid reader background override',
-    );
-  }
-  if (value.hasDimPercent()) {
-    _require(
-      value.dimPercent >= 0 && value.dimPercent <= 80,
-      'Invalid reader dimming override',
-    );
-  }
-  if (value.hasTapZones()) {
-    _require(
-      value.tapZones.value >= 1 && value.tapZones.value <= 3,
-      'Invalid reader tap preset override',
-    );
-  }
-  if (value.hasKeyboard()) {
-    _require(
-      value.keyboard.value >= 1 && value.keyboard.value <= 3,
-      'Invalid reader keyboard preset override',
     );
   }
 }
@@ -658,22 +620,6 @@ void validateBusinessSettingsResponse(
             (overrides?.hasPageLayout() == true
                 ? overrides!.pageLayout
                 : global.values.reader.pageLayout) &&
-        value.effectiveReader.background ==
-            (overrides?.hasBackground() == true
-                ? overrides!.background
-                : global.values.reader.background) &&
-        value.effectiveReader.dimPercent ==
-            (overrides?.hasDimPercent() == true
-                ? overrides!.dimPercent
-                : global.values.reader.dimPercent) &&
-        value.effectiveReader.tapZones ==
-            (overrides?.hasTapZones() == true
-                ? overrides!.tapZones
-                : global.values.reader.tapZones) &&
-        value.effectiveReader.keyboard ==
-            (overrides?.hasKeyboard() == true
-                ? overrides!.keyboard
-                : global.values.reader.keyboard) &&
         value.effectiveReader.fit ==
             (overrides?.hasFit() == true
                 ? overrides!.fit

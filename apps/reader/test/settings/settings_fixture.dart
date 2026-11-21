@@ -1,9 +1,34 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../browse/fakes.dart';
 import '../data/business_state_server.dart';
+
+final class TestDevicePreferences extends Fake
+    implements SharedPreferencesAsync {
+  TestDevicePreferences({this.beforeWrite});
+
+  final values = <String, String>{};
+  final void Function()? beforeWrite;
+
+  @override
+  Future<String?> getString(String key) async => values[key];
+
+  @override
+  Future<void> setString(String key, String value) async {
+    beforeWrite?.call();
+    values[key] = value;
+  }
+
+  @override
+  Future<void> remove(String key) async {
+    beforeWrite?.call();
+    values.remove(key);
+  }
+}
 
 final class SettingsFixture {
   SettingsFixture({TestBusinessServer? server})

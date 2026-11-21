@@ -40,12 +40,6 @@ class const PendingGlobalSettings({
                 wire.ReaderFit.READER_FIT_HEIGHT => '适高',
                 _ => '完整显示',
               }}；裁白：${reader.cropBorders ? '开启' : '关闭'}',
-              '阅读背景：${switch (reader.background) {
-                wire.ReaderBackground.READER_BACKGROUND_WHITE => '白色',
-                wire.ReaderBackground.READER_BACKGROUND_THEME => '跟随应用主题',
-                _ => '黑色',
-              }}；应用内调暗：${reader.dimPercent}%',
-              '分页点击区：${_input(reader.tapZones)}；阅读快捷键：${_input(reader.keyboard)}',
               if (values.favoriteSources.isEmpty) '收藏源：空列表',
               for (final source in values.favoriteSources)
                 '收藏源：${source.sourceName} · ${source.sourceLang} · ${source.packageName} · ${source.sourceId}',
@@ -61,10 +55,4 @@ class const PendingGlobalSettings({
       ],
     );
   }
-
-  String _input(wire.ReaderInputPreset value) => switch (value) {
-    wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED => '反向',
-    wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED => '关闭',
-    _ => '标准',
-  };
 }

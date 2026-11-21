@@ -4,7 +4,7 @@
 
 **首要设计目标是多端同步。** [P2](p2-sync.md) 提升为当前主线，与 [P1](p1-library-and-progress.md) 的数据模型、API 和客户端读写一起推进；阶段编号保留，不代表同步必须等完整本地书架之后才开始。Worker API + D1 为唯一业务权威，先打通同身份跨 Web/iOS/Android 的在线保存与恢复，再扩展外围功能。
 
-2026-11-21，[本机设置、自动保存、自适应布局与漫画封面](device-settings-adaptive-covers.md)进入实施。外观和设备偏好本机保存，账户偏好继续由服务端确认。先处理设置，再接入宽窄导航和真实 Source 封面。
+2026-11-21，[本机设置、自动保存、自适应布局与漫画封面](device-settings-adaptive-covers.md)已完成设备设置与账户协议拆分，并接入自动保存。宽窄导航和真实 Source 封面继续实施，正式平台设置复验待完成。
 
 2026-11-10：[Web 0.1.0、API 和首份六材料扩展基线已上线](../verification/first-web-release.md)。生产 Web 的 Access、收藏、xkcd 阅读和续读已通过；11 日又通过 [Arknights Comics 与 CuuTruyen 的生产整章、跨章与续读](../verification/first-web-release.md#生产代表源整章与续读)。正式签名、真机和同账号三端读写继续按 [P0](p0-runtime-and-reading.md) 与 [P2](p2-sync.md)验收。
 

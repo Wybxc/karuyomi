@@ -2,36 +2,88 @@ import '../test_app.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:karuyomi/features/reader/reader_preferences.dart';
+import 'package:karuyomi/features/settings/reader_device_settings.dart';
 import 'package:karuyomi/theme/app_theme.dart';
 import 'package:karuyomi/widgets/choice_field.dart';
 import 'package:karuyomi/main.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../browse/fakes.dart';
+import 'settings_fixture.dart';
 import 'settings_probe.dart';
 
-final class _Preferences extends Fake implements SharedPreferencesAsync {
-  _Preferences({this.beforeWrite});
-
-  final values = <String, String>{};
-  final void Function()? beforeWrite;
-
-  @override
-  Future<String?> getString(String key) async => values[key];
-
-  @override
-  Future<void> setString(String key, String value) async {
-    beforeWrite?.call();
-    values[key] = value;
-  }
-}
-
 void main() {
+  test('reader device overrides survive restart and inherit by deployment and manga', () async {
+    final storage = TestDevicePreferences();
+    ProviderContainer open() => ProviderContainer(
+      overrides: [readerDeviceStorageProvider.overrideWithValue(storage)],
+    );
+    const scope = (origin: 'https://first.example', mangaKey: 'book');
+    const anotherDeployment = (
+      origin: 'https://second.example',
+      mangaKey: 'book',
+    );
+    const anotherManga = (origin: 'https://first.example', mangaKey: 'other');
+    const defaults = (
+      background: ReaderBackground.white,
+      dimPercent: 40,
+      tapZones: ReaderInputPreset.reversed,
+      keyboard: ReaderInputPreset.disabled,
+    );
+    const ReaderDevicePreferences overrides = (
+      background: null,
+      dimPercent: 0,
+      tapZones: null,
+      keyboard: ReaderInputPreset.standard,
+    );
+    final base = readerDeviceSettingsProvider();
+    final manga = readerDeviceSettingsProvider(scope: scope);
+    final first = open();
+    first.listen(base, (_, _) {});
+    first.listen(manga, (_, _) {});
+    await first.read(base.future);
+    await first.read(manga.future);
+    await first.read(base.notifier).save(defaults);
+    await first.read(manga.notifier).save(overrides);
+    first.dispose();
+
+    final reopened = open();
+    addTearDown(reopened.dispose);
+    EffectiveReaderDevicePreferences effective(ReaderDeviceScope scope) =>
+        reopened.read(effectiveReaderDevicePreferencesProvider(scope: scope));
+    for (final provider in [
+      base,
+      manga,
+      readerDeviceSettingsProvider(scope: anotherDeployment),
+      readerDeviceSettingsProvider(scope: anotherManga),
+    ]) {
+      reopened.listen(provider, (_, _) {});
+      await reopened.read(provider.future);
+    }
+    expect(effective(scope), (
+      background: ReaderBackground.white,
+      dimPercent: 0,
+      tapZones: ReaderInputPreset.reversed,
+      keyboard: ReaderInputPreset.standard,
+    ));
+    expect(effective(anotherDeployment), defaults);
+    expect(effective(anotherManga), defaults);
+    await reopened.read(manga.notifier).save((
+      background: null,
+      dimPercent: null,
+      tapZones: null,
+      keyboard: null,
+    ));
+    expect(effective(scope), defaults);
+    expect(storage.values, hasLength(1));
+  });
+
   testWidgets(
     'device appearance autosaves offline, retries and restores in a fresh app',
     (tester) async {
       var failWrites = true;
-      final preferences = _Preferences(
+      final preferences = TestDevicePreferences(
         beforeWrite: () {
           if (failWrites) {
             throw StateError('Simulated preferences write failure');
@@ -90,7 +142,7 @@ void main() {
   testWidgets('Native restores the selected HTTPS service in a fresh app', (
     tester,
   ) async {
-    final preferences = _Preferences();
+    final preferences = TestDevicePreferences();
     final connected = <TestPlatform>[];
     KaruyomiApp app() => KaruyomiApp(
       connectionPreferences: preferences,

@@ -51,10 +51,7 @@ wire.SettingsMutation favoriteSourceSettings(
     reader: wire.ReaderSettings(
       mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
       pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
-      background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
       fit: wire.ReaderFit.READER_FIT_CONTAIN,
-      tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
-      keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
     ),
     favoriteSources: sources,
   ),

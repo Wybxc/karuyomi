@@ -290,20 +290,6 @@ enum ReaderPageLayout {
   READER_PAGE_LAYOUT_DOUBLE = 3;
 }
 
-enum ReaderBackground {
-  READER_BACKGROUND_UNSPECIFIED = 0;
-  READER_BACKGROUND_BLACK = 1;
-  READER_BACKGROUND_WHITE = 2;
-  READER_BACKGROUND_THEME = 3;
-}
-
-enum ReaderInputPreset {
-  READER_INPUT_PRESET_UNSPECIFIED = 0;
-  READER_INPUT_PRESET_STANDARD = 1;
-  READER_INPUT_PRESET_REVERSED = 2;
-  READER_INPUT_PRESET_DISABLED = 3;
-}
-
 enum ReaderFit {
   READER_FIT_UNSPECIFIED = 0;
   READER_FIT_CONTAIN = 1;
@@ -312,13 +298,11 @@ enum ReaderFit {
 }
 
 message ReaderSettings {
+  reserved 3, 4, 5, 6;
+  reserved "background", "dim_percent", "tap_zones", "keyboard";
+
   ReaderMode mode = 1;
   ReaderPageLayout page_layout = 2;
-  ReaderBackground background = 3;
-  // Reading-content dimming only; never changes platform display brightness.
-  uint32 dim_percent = 4;
-  ReaderInputPreset tap_zones = 5;
-  ReaderInputPreset keyboard = 6;
   ReaderFit fit = 7;
   bool crop_borders = 8;
 }
@@ -326,12 +310,11 @@ message ReaderSettings {
 // Missing fields inherit the global reader preference. AUTO is an explicit
 // value, distinct from inheritance. An empty message clears all overrides.
 message ReaderSettingsOverride {
+  reserved 3, 4, 5, 6;
+  reserved "background", "dim_percent", "tap_zones", "keyboard";
+
   optional ReaderMode mode = 1;
   optional ReaderPageLayout page_layout = 2;
-  optional ReaderBackground background = 3;
-  optional uint32 dim_percent = 4;
-  optional ReaderInputPreset tap_zones = 5;
-  optional ReaderInputPreset keyboard = 6;
   optional ReaderFit fit = 7;
   optional bool crop_borders = 8;
 }

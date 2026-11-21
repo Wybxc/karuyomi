@@ -12,6 +12,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 import '../../state/account_providers.dart';
 import '../browse/catalog_controller.dart';
 import '../reader/reader_preferences.dart';
+import 'reader_device_controls.dart';
 import 'settings_controller.dart';
 
 ReadingMode readerMode(wire.ReaderMode mode) => switch (mode) {
@@ -44,23 +45,6 @@ ReaderFit readerFit(wire.ReaderFit value) => switch (value) {
   wire.ReaderFit.READER_FIT_HEIGHT => ReaderFit.height,
   _ => throw const FormatException('Unsupported reader fit'),
 };
-ReaderBackground readerBackground(wire.ReaderBackground value) =>
-    switch (value) {
-      wire.ReaderBackground.READER_BACKGROUND_BLACK => ReaderBackground.black,
-      wire.ReaderBackground.READER_BACKGROUND_WHITE => ReaderBackground.white,
-      wire.ReaderBackground.READER_BACKGROUND_THEME => ReaderBackground.theme,
-      _ => throw const FormatException('Unsupported reader background'),
-    };
-ReaderInputPreset readerInputPreset(wire.ReaderInputPreset value) =>
-    switch (value) {
-      wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD =>
-        ReaderInputPreset.standard,
-      wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED =>
-        ReaderInputPreset.reversed,
-      wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED =>
-        ReaderInputPreset.disabled,
-      _ => throw const FormatException('Unsupported reader input preset'),
-    };
 const _modes = <wire.ReaderMode, String>{
   wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT: '从左到右',
   wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT: '从右到左',
@@ -77,17 +61,6 @@ const _fits = <wire.ReaderFit, String>{
   wire.ReaderFit.READER_FIT_CONTAIN: '完整显示',
   wire.ReaderFit.READER_FIT_WIDTH: '适宽',
   wire.ReaderFit.READER_FIT_HEIGHT: '适高',
-};
-
-const _backgrounds = <wire.ReaderBackground, String>{
-  wire.ReaderBackground.READER_BACKGROUND_BLACK: '黑色',
-  wire.ReaderBackground.READER_BACKGROUND_WHITE: '白色',
-  wire.ReaderBackground.READER_BACKGROUND_THEME: '跟随应用主题',
-};
-const _inputPresets = <wire.ReaderInputPreset, String>{
-  wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD: '标准',
-  wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED: '反向',
-  wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED: '关闭',
 };
 
 class const SettingsStatus({
@@ -253,7 +226,7 @@ class const DeviceAppearanceSettings({
 
 enum _SettingsSection {
   appearance('appearance', '外观与主题', '跟随系统、浅色与深色', CupertinoIcons.paintbrush),
-  reading('reading', '阅读显示', '阅读模式、图像与背景', CupertinoIcons.book),
+  reading('reading', '账户阅读偏好', '阅读模式、页组、图像适配和裁白', CupertinoIcons.book),
   input('input', '翻页与快捷键', '点击区与键盘操作', CupertinoIcons.keyboard),
   connection('connection', '服务连接', '服务地址与登录', CupertinoIcons.cloud),
   about('about', '关于', 'Karuyomi', CupertinoIcons.info);
@@ -263,6 +236,7 @@ enum _SettingsSection {
   final String title;
   final String subtitle;
   final IconData icon;
+  bool get isLocal => this == appearance || this == input;
 }
 
 class MangaSettingsEditor extends _SettingsEditor {
@@ -301,11 +275,7 @@ final class _FormDraft {
         ..mode = r.mode
         ..pageLayout = r.pageLayout
         ..fit = r.fit
-        ..cropBorders = r.cropBorders
-        ..background = r.background
-        ..dimPercent = r.dimPercent
-        ..tapZones = r.tapZones
-        ..keyboard = r.keyboard;
+        ..cropBorders = r.cropBorders;
     }
   }
   final wire.GlobalSettingsValues? global;
@@ -318,10 +288,6 @@ final class _FormDraft {
           pageLayout: reader.pageLayout,
           fit: reader.fit,
           cropBorders: reader.cropBorders,
-          background: reader.background,
-          dimPercent: reader.dimPercent,
-          tapZones: reader.tapZones,
-          keyboard: reader.keyboard,
         );
 }
 
@@ -361,8 +327,6 @@ class const _SettingsEditor({
     final wasWide = useRef<bool?>(null);
     final directoryFocus = useFocusScopeNode();
     final detailFocus = useFocusScopeNode();
-    final dimDragOwner = useRef<Object?>(null);
-    final dimPreview = useState<int?>(null);
     final manga = mangaKey != null;
     final scope = manga ? 'manga' : 'global';
 
@@ -413,11 +377,6 @@ class const _SettingsEditor({
     final r = draft?.reader;
     final canClose =
         state.activity != SettingsActivity.saving || state.submitting != null;
-    final dim = r?.hasDimPercent() == true ? r!.dimPercent : null;
-    final visibleDim = dimDragOwner.value == owner
-        ? dimPreview.value ?? dim
-        : dim;
-    final inheritedDim = state.snapshot?.global.reader.dimPercent ?? 0;
     Widget group(String title, List<Widget> fields, {String? footer}) =>
         CupertinoFormSection.insetGrouped(
           margin: const EdgeInsets.symmetric(vertical: 8),
@@ -448,7 +407,7 @@ class const _SettingsEditor({
       children: [
         if (owner != null) ?mangaContext,
         if (connection != null &&
-            section != _SettingsSection.appearance &&
+            section?.isLocal != true &&
             section != _SettingsSection.connection &&
             service?.status != ServiceStatus.ready) ...[
           if (service?.error case final error?)
@@ -465,7 +424,12 @@ class const _SettingsEditor({
           ?connection,
           if (service == null) const Text('连接并确认身份后可读取和保存同步设置。'),
         ],
-        if (section == _SettingsSection.appearance) ?appearance,
+        if (section == _SettingsSection.appearance) ...[
+          ?appearance,
+          const ReaderDeviceControls(display: true, input: false),
+        ],
+        if (section == _SettingsSection.input)
+          const ReaderDeviceControls(display: false, input: true),
         if (section == _SettingsSection.about)
           const CupertinoListTile(
             title: Text('Karuyomi'),
@@ -474,13 +438,13 @@ class const _SettingsEditor({
           ),
         if (draft == null &&
             !state.available &&
-            section != _SettingsSection.appearance &&
+            section?.isLocal != true &&
             section != _SettingsSection.about &&
             section != _SettingsSection.connection)
           const Text('连接并确认身份后可读取和保存同步设置。'),
         if (r != null) ...[
           if (manga || section == _SettingsSection.reading) ...[
-            group('阅读显示', [
+            group('账户阅读偏好', [
               choice(
                 'mode',
                 '阅读模式',
@@ -513,109 +477,21 @@ class const _SettingsEditor({
                 (reader, value) => reader.cropBorders = value,
                 (reader) => reader.clearCropBorders(),
               ),
-              choice(
-                'background',
-                '阅读背景',
-                r.hasBackground() ? r.background : null,
-                _backgrounds,
-                (reader, value) => reader.background = value,
-                (reader) => reader.clearBackground(),
-              ),
-            ], footer: manga ? '选择“跟随全局”时，之后的全局修改会应用到此漫画。' : null),
-            group('应用内调暗', [
-              if (manga)
-                MergeSemantics(
-                  child: CupertinoFormRow(
-                    prefix: Expanded(flex: 3, child: const Text('调暗跟随全局')),
-                    child: CupertinoSwitch(
-                      key: ValueKey('$scope-dim-inherit'),
-                      value: dim == null,
-                      onChanged: state.canChange
-                          ? (inherit) => change((reader) {
-                              if (inherit) {
-                                reader.clearDimPercent();
-                              } else {
-                                reader.dimPercent = inheritedDim;
-                              }
-                            })
-                          : null,
-                    ),
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      visibleDim == null
-                          ? '应用内调暗：跟随全局（$inheritedDim%）'
-                          : '应用内调暗：$visibleDim%',
-                    ),
-                    CupertinoSlider(
-                      key: ValueKey('$scope-dim'),
-                      value: (visibleDim ?? inheritedDim).toDouble(),
-                      min: 0,
-                      max: 80,
-                      divisions: 80,
-                      onChanged: state.canChange && dim != null
-                          ? (value) {
-                              if (dimDragOwner.value == null) {
-                                change(
-                                  (reader) => reader.dimPercent = value.round(),
-                                );
-                              } else if (identical(dimDragOwner.value, owner)) {
-                                dimPreview.value = value.round();
-                              }
-                            }
-                          : null,
-                      onChangeStart: (_) => dimDragOwner.value = owner,
-                      onChangeEnd: (value) {
-                        final dragOwner = dimDragOwner.value;
-                        dimDragOwner.value = null;
-                        dimPreview.value = null;
-                        if (dragOwner != null && identical(dragOwner, owner)) {
-                          change((reader) => reader.dimPercent = value.round());
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ], footer: '仅调暗阅读内容，不改变系统亮度。'),
-          ],
-          if (manga || section == _SettingsSection.input) ...[
-            group('分页点击区', [
-              choice(
-                'tap-zones',
-                '分页点击区',
-                r.hasTapZones() ? r.tapZones : null,
-                _inputPresets,
-                (reader, value) => reader.tapZones = value,
-                (reader) => reader.clearTapZones(),
-              ),
-            ], footer: '反向会交换左右翻页；关闭后仍可从中央显示工具栏，滑动翻页不变。'),
-            group('阅读快捷键', [
-              choice(
-                'keyboard',
-                '阅读快捷键',
-                r.hasKeyboard() ? r.keyboard : null,
-                _inputPresets,
-                (reader, value) => reader.keyboard = value,
-                (reader) => reader.clearKeyboard(),
-              ),
-            ], footer: '反向会交换方向键、上下翻页键和空格的翻页方向。Home/End 到首末页，T 显示或隐藏工具栏。'),
+            ], footer: manga ? '选择“跟随全局”时，之后的账户默认值会应用到此漫画。' : null),
           ],
         ],
+        if (manga)
+          ReaderDeviceControls(
+            scope: (
+              origin: service?.deploymentOrigin?.origin ?? '',
+              mangaKey: mangaKey!,
+            ),
+            display: true,
+            input: true,
+          ),
         if (!manga &&
-            section != _SettingsSection.appearance &&
-            ({
-                  _SettingsSection.reading,
-                  _SettingsSection.input,
-                }.contains(section) ||
+            section?.isLocal != true &&
+            (section == _SettingsSection.reading ||
                 state.unsent != null ||
                 state.activity == SettingsActivity.saving ||
                 state.pending != null ||

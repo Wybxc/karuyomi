@@ -36,9 +36,6 @@ wire.GlobalSettingsValues _global({
     mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
     pageLayout: layout,
     fit: fit,
-    background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
-    tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
-    keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
   ),
 );
 
@@ -296,7 +293,7 @@ void main() {
           expect(find.text('当前设置已获服务端确认。').hitTestable(), findsOneWidget);
           expect(find.text(_target.title).hitTestable(), findsOneWidget);
           expect(find.text('zh · 测试漫画源').hitTestable(), findsOneWidget);
-          final inheritance = find.text('选择“跟随全局”时，之后的全局修改会应用到此漫画。');
+          final inheritance = find.text('选择“跟随全局”时，之后的账户默认值会应用到此漫画。');
           expect(
             find.ancestor(
               of: inheritance,

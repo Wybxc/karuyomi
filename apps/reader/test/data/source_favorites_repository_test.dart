@@ -30,12 +30,8 @@ wire.GlobalSettingsValues _values({
   reader: wire.ReaderSettings(
     mode: wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
     pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
-    background: wire.ReaderBackground.READER_BACKGROUND_THEME,
-    dimPercent: 30,
     fit: wire.ReaderFit.READER_FIT_WIDTH,
     cropBorders: true,
-    tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
-    keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
   ),
   favoriteSources: favorites,
 );

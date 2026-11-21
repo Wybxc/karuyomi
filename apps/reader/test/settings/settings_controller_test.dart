@@ -13,14 +13,7 @@ wire.GlobalSettingsValues _global({
   wire.ReaderMode mode = wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
   wire.ReaderPageLayout layout = wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
 }) => wire.GlobalSettingsValues(
-  reader: wire.ReaderSettings(
-    mode: mode,
-    pageLayout: layout,
-    fit: fit,
-    background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
-    tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
-    keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
-  ),
+  reader: wire.ReaderSettings(mode: mode, pageLayout: layout, fit: fit),
 );
 
 void main() {

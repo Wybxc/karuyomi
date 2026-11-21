@@ -32,11 +32,8 @@ final class _Account {
       reader: wire.ReaderSettings(
         mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
         pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
-        background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
         fit: wire.ReaderFit.READER_FIT_CONTAIN,
         cropBorders: false,
-        tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
-        keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
       ),
     ),
   );
@@ -462,18 +459,6 @@ final class TestBusinessServer implements ApiFetch {
         cropBorders: overrides?.hasCropBorders() == true
             ? overrides!.cropBorders
             : defaults.cropBorders,
-        background: overrides?.hasBackground() == true
-            ? overrides!.background
-            : defaults.background,
-        dimPercent: overrides?.hasDimPercent() == true
-            ? overrides!.dimPercent
-            : defaults.dimPercent,
-        tapZones: overrides?.hasTapZones() == true
-            ? overrides!.tapZones
-            : defaults.tapZones,
-        keyboard: overrides?.hasKeyboard() == true
-            ? overrides!.keyboard
-            : defaults.keyboard,
       ),
     );
   }

@@ -550,7 +550,7 @@ void main() {
           await tester.pumpAndSettle();
 
           void expectDirectory() {
-            for (final label in ['外观与主题', '阅读显示', '翻页与快捷键', '服务连接', '关于']) {
+            for (final label in ['外观与主题', '账户阅读偏好', '翻页与快捷键', '服务连接', '关于']) {
               expect(
                 find.semantics.byPredicate(
                   (node) =>

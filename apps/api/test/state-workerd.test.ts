@@ -6,9 +6,7 @@ import {
 } from '@bufbuild/protobuf';
 import {
   BusinessStateErrorCode as ErrorCode,
-  ReaderBackground,
   ReaderFit,
-  ReaderInputPreset,
   ReaderMode,
   ReaderPageLayout,
   SettingsMutationSchema,
@@ -1070,11 +1068,7 @@ function globalSettings(
         reader: {
           mode,
           pageLayout,
-          background: ReaderBackground.BLACK,
           fit,
-          dimPercent: 0,
-          tapZones: ReaderInputPreset.STANDARD,
-          keyboard: ReaderInputPreset.STANDARD,
         },
       },
     },
@@ -1086,12 +1080,8 @@ function mangaSettings(
   overrides: {
     mode?: ReaderMode;
     pageLayout?: ReaderPageLayout;
-    background?: ReaderBackground;
     fit?: ReaderFit;
     cropBorders?: boolean;
-    dimPercent?: number;
-    tapZones?: ReaderInputPreset;
-    keyboard?: ReaderInputPreset;
   } = {},
 ) {
   return create(SettingsMutationSchema, {
@@ -1191,7 +1181,7 @@ test('settings reads do not write, defaults inherit per field, and clearing over
   ).toBe(3);
 });
 
-test('device appearance migration removes the old account theme and preserves manga settings replay', async () => {
+test('device preference migrations preserve account settings and exact manga replay', async () => {
   const owner = await client();
   const key = favorite().mangaKey;
   expect((await owner.mutateSettings(globalSettings())).status).toBe(200);
@@ -1201,18 +1191,28 @@ test('device appearance migration removes the old account theme and preserves ma
   const before = await owner.settings(key);
   await env.DB.batch([
     env.DB.prepare(
-      "UPDATE reader_settings SET values_json = json_set(values_json, '$.theme', 'APP_THEME_DARK') WHERE subject = ? AND scope_key = ''",
+      "UPDATE reader_settings SET values_json = json_set(values_json, '$.theme', 'APP_THEME_DARK', '$.reader.background', 'READER_BACKGROUND_WHITE', '$.reader.dimPercent', 60, '$.reader.tapZones', 'READER_INPUT_PRESET_STANDARD') WHERE subject = ? AND scope_key = ''",
     ).bind(owner.subject),
     env.DB.prepare(
-      "UPDATE state_mutations SET response_json = json_set(response_json, '$.global.values.theme', 'APP_THEME_DARK') WHERE subject = ? AND mutation_id = ?",
+      "UPDATE reader_settings SET values_json = json_set(values_json, '$.dimPercent', 0, '$.keyboard', 'READER_INPUT_PRESET_DISABLED') WHERE subject = ? AND scope_key = ?",
+    ).bind(owner.subject, key),
+    env.DB.prepare(
+      "UPDATE state_mutations SET response_json = json_set(response_json, '$.global.values.theme', 'APP_THEME_DARK', '$.global.values.reader.dimPercent', 60, '$.manga.overrides.dimPercent', 0, '$.effectiveReader.dimPercent', 0) WHERE subject = ? AND mutation_id = ?",
     ).bind(owner.subject, command.mutationId),
   ]);
 
-  const migration = env.TEST_MIGRATIONS.find(
-    ({ name }) => name === '0011_local-device-appearance.sql',
+  const migrations = env.TEST_MIGRATIONS.filter(({ name }) =>
+    [
+      '0011_local-device-appearance.sql',
+      '0012_local-reader-device-preferences.sql',
+    ].includes(name),
   );
-  if (!migration) throw new Error('Device appearance migration is missing');
-  await env.DB.batch(migration.queries.map((query) => env.DB.prepare(query)));
+  expect(migrations).toHaveLength(2);
+  await env.DB.batch(
+    migrations.flatMap(({ queries }) =>
+      queries.map((query) => env.DB.prepare(query)),
+    ),
+  );
 
   expect(await owner.settings(key)).toEqual(before);
   const replayed = await owner.mutateSettings(command);
@@ -1221,7 +1221,7 @@ test('device appearance migration removes the old account theme and preserves ma
   expect((await owner.settings(key)).accountRevision).toBe(2);
 });
 
-test('reader preferences preserve explicit zero and false, inherit all fields and reject invalid writes without touching reading state', async () => {
+test('reader preferences preserve explicit false, inherit all fields and reject invalid writes without touching reading state', async () => {
   const reader = await client();
   const command = favorite();
   const key = command.mangaKey;
@@ -1230,44 +1230,28 @@ test('reader preferences preserve explicit zero and false, inherit all fields an
   const before = await reader.state(key, 'chapter-1');
   const defaults = await reader.settings(key);
   expect(defaults.effectiveReader).toMatchObject({
-    background: ReaderBackground.BLACK,
     fit: ReaderFit.CONTAIN,
     cropBorders: false,
-    dimPercent: 0,
-    tapZones: ReaderInputPreset.STANDARD,
-    keyboard: ReaderInputPreset.STANDARD,
   });
   const global = globalSettings();
   if (global.operation.case !== 'setGlobal' || !global.operation.value.reader)
     throw new Error('Missing reader defaults');
   Object.assign(global.operation.value.reader, {
-    background: ReaderBackground.THEME,
     fit: ReaderFit.WIDTH,
     cropBorders: true,
-    dimPercent: 80,
-    tapZones: ReaderInputPreset.REVERSED,
-    keyboard: ReaderInputPreset.DISABLED,
   });
   expect((await reader.mutateSettings(global)).status).toBe(200);
   const overrides = mangaSettings(key, 0, {
-    background: ReaderBackground.WHITE,
     fit: ReaderFit.CONTAIN,
     cropBorders: false,
-    dimPercent: 0,
-    tapZones: ReaderInputPreset.DISABLED,
-    keyboard: ReaderInputPreset.REVERSED,
   });
   const saved = await reader.mutateSettings(overrides);
   expect(saved.status).toBe(200);
   expect(saved.body.effectiveReader).toMatchObject({
-    background: ReaderBackground.WHITE,
     fit: ReaderFit.CONTAIN,
     cropBorders: false,
-    dimPercent: 0,
-    tapZones: ReaderInputPreset.DISABLED,
-    keyboard: ReaderInputPreset.REVERSED,
   });
-  expect(saved.body.manga?.overrides?.dimPercent).toBe(0);
+
   expect(saved.body.manga?.overrides?.fit).toBe(ReaderFit.CONTAIN);
   expect(saved.body.manga?.overrides?.cropBorders).toBe(false);
   expect((await reader.mutateSettings(overrides)).body).toEqual(saved.body);
@@ -1275,7 +1259,7 @@ test('reader preferences preserve explicit zero and false, inherit all fields an
   expect(preserved.manga).toEqual(before.manga);
   expect(preserved.progress).toEqual(before.progress);
   const cleared = await reader.mutateSettings(mangaSettings(key, 1));
-  expect(cleared.body.manga?.overrides?.dimPercent).toBeUndefined();
+
   expect(cleared.body.manga?.overrides?.fit).toBeUndefined();
   expect(cleared.body.manga?.overrides?.cropBorders).toBeUndefined();
   expect(cleared.body.effectiveReader).toEqual(global.operation.value.reader);
@@ -1289,13 +1273,6 @@ test('reader preferences preserve explicit zero and false, inherit all fields an
     { fit: 0 },
     { fit: 4 },
     { fit: 1.5 },
-    { background: 0 },
-    { background: 4 },
-    { tapZones: 0 },
-    { keyboard: 4 },
-    { dimPercent: -1 },
-    { dimPercent: 81 },
-    { dimPercent: 0.5 },
   ]) {
     const response = await reader.request('/api/settings/mutations', {
       method: 'POST',
@@ -2069,7 +2046,6 @@ test('installed extensions preserve confirmed settings through cross-client repl
         reader: {
           ...values.reader,
           fit: ReaderFit.WIDTH,
-          dimPercent: 60,
           cropBorders: true,
         },
       },

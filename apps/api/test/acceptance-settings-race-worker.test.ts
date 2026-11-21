@@ -6,9 +6,7 @@ import {
 } from '@karuyomi/contracts';
 import {
   BusinessStateErrorCode,
-  ReaderBackground,
   ReaderFit,
-  ReaderInputPreset,
   ReaderMode,
   ReaderPageLayout,
   SettingsMutationSchema,
@@ -59,10 +57,7 @@ function command(fit: ReaderFit, expectedRevision = 0) {
         reader: {
           mode: ReaderMode.LEFT_TO_RIGHT,
           pageLayout: ReaderPageLayout.AUTO,
-          background: ReaderBackground.BLACK,
           fit,
-          tapZones: ReaderInputPreset.STANDARD,
-          keyboard: ReaderInputPreset.STANDARD,
         },
       },
     },

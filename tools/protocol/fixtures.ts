@@ -316,10 +316,6 @@ const businessMutation: JsonObject = {
 const globalReader: JsonObject = {
   mode: 'READER_MODE_RIGHT_TO_LEFT',
   pageLayout: 'READER_PAGE_LAYOUT_AUTO',
-  background: 'READER_BACKGROUND_WHITE',
-  dimPercent: 60,
-  tapZones: 'READER_INPUT_PRESET_REVERSED',
-  keyboard: 'READER_INPUT_PRESET_STANDARD',
   fit: 'READER_FIT_WIDTH',
   cropBorders: true,
 };
@@ -361,9 +357,6 @@ const globalSettingsValues: JsonObject = {
   ],
 };
 const readerOverrides: JsonObject = {
-  background: 'READER_BACKGROUND_THEME',
-  dimPercent: 0,
-  keyboard: 'READER_INPUT_PRESET_DISABLED',
   fit: 'READER_FIT_CONTAIN',
   cropBorders: false,
 };
@@ -663,10 +656,6 @@ export const goldenFixtures: GoldenFixture[] = [
           reader: {
             mode: 'READER_MODE_LEFT_TO_RIGHT',
             pageLayout: 'READER_PAGE_LAYOUT_AUTO',
-            background: 'READER_BACKGROUND_BLACK',
-            dimPercent: 0,
-            tapZones: 'READER_INPUT_PRESET_STANDARD',
-            keyboard: 'READER_INPUT_PRESET_STANDARD',
             fit: 'READER_FIT_CONTAIN',
           },
         },
@@ -674,10 +663,6 @@ export const goldenFixtures: GoldenFixture[] = [
       effectiveReader: {
         mode: 'READER_MODE_LEFT_TO_RIGHT',
         pageLayout: 'READER_PAGE_LAYOUT_AUTO',
-        background: 'READER_BACKGROUND_BLACK',
-        dimPercent: 0,
-        tapZones: 'READER_INPUT_PRESET_STANDARD',
-        keyboard: 'READER_INPUT_PRESET_STANDARD',
         fit: 'READER_FIT_CONTAIN',
       },
     },

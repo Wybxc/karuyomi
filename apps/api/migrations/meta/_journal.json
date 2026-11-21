@@ -85,6 +85,13 @@
       "when": 1795255871342,
       "tag": "0011_local-device-appearance",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1795257674695,
+      "tag": "0012_local-reader-device-preferences",
+      "breakpoints": true
     }
   ]
 }

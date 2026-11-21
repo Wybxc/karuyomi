@@ -74,40 +74,6 @@ final $typed_data.Uint8List readerPageLayoutDescriptor = $convert.base64Decode(
     'sKF1JFQURFUl9QQUdFX0xBWU9VVF9BVVRPEAESHQoZUkVBREVSX1BBR0VfTEFZT1VUX1NJTkdM'
     'RRACEh0KGVJFQURFUl9QQUdFX0xBWU9VVF9ET1VCTEUQAw==');
 
-@$core.Deprecated('Use readerBackgroundDescriptor instead')
-const ReaderBackground$json = {
-  '1': 'ReaderBackground',
-  '2': [
-    {'1': 'READER_BACKGROUND_UNSPECIFIED', '2': 0},
-    {'1': 'READER_BACKGROUND_BLACK', '2': 1},
-    {'1': 'READER_BACKGROUND_WHITE', '2': 2},
-    {'1': 'READER_BACKGROUND_THEME', '2': 3},
-  ],
-};
-
-/// Descriptor for `ReaderBackground`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List readerBackgroundDescriptor = $convert.base64Decode(
-    'ChBSZWFkZXJCYWNrZ3JvdW5kEiEKHVJFQURFUl9CQUNLR1JPVU5EX1VOU1BFQ0lGSUVEEAASGw'
-    'oXUkVBREVSX0JBQ0tHUk9VTkRfQkxBQ0sQARIbChdSRUFERVJfQkFDS0dST1VORF9XSElURRAC'
-    'EhsKF1JFQURFUl9CQUNLR1JPVU5EX1RIRU1FEAM=');
-
-@$core.Deprecated('Use readerInputPresetDescriptor instead')
-const ReaderInputPreset$json = {
-  '1': 'ReaderInputPreset',
-  '2': [
-    {'1': 'READER_INPUT_PRESET_UNSPECIFIED', '2': 0},
-    {'1': 'READER_INPUT_PRESET_STANDARD', '2': 1},
-    {'1': 'READER_INPUT_PRESET_REVERSED', '2': 2},
-    {'1': 'READER_INPUT_PRESET_DISABLED', '2': 3},
-  ],
-};
-
-/// Descriptor for `ReaderInputPreset`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List readerInputPresetDescriptor = $convert.base64Decode(
-    'ChFSZWFkZXJJbnB1dFByZXNldBIjCh9SRUFERVJfSU5QVVRfUFJFU0VUX1VOU1BFQ0lGSUVEEA'
-    'ASIAocUkVBREVSX0lOUFVUX1BSRVNFVF9TVEFOREFSRBABEiAKHFJFQURFUl9JTlBVVF9QUkVT'
-    'RVRfUkVWRVJTRUQQAhIgChxSRUFERVJfSU5QVVRfUFJFU0VUX0RJU0FCTEVEEAM=');
-
 @$core.Deprecated('Use readerFitDescriptor instead')
 const ReaderFit$json = {
   '1': 'ReaderFit',
@@ -1194,31 +1160,6 @@ const ReaderSettings$json = {
       '10': 'pageLayout'
     },
     {
-      '1': 'background',
-      '3': 3,
-      '4': 1,
-      '5': 14,
-      '6': '.karuyomi.v1.ReaderBackground',
-      '10': 'background'
-    },
-    {'1': 'dim_percent', '3': 4, '4': 1, '5': 13, '10': 'dimPercent'},
-    {
-      '1': 'tap_zones',
-      '3': 5,
-      '4': 1,
-      '5': 14,
-      '6': '.karuyomi.v1.ReaderInputPreset',
-      '10': 'tapZones'
-    },
-    {
-      '1': 'keyboard',
-      '3': 6,
-      '4': 1,
-      '5': 14,
-      '6': '.karuyomi.v1.ReaderInputPreset',
-      '10': 'keyboard'
-    },
-    {
       '1': 'fit',
       '3': 7,
       '4': 1,
@@ -1228,18 +1169,22 @@ const ReaderSettings$json = {
     },
     {'1': 'crop_borders', '3': 8, '4': 1, '5': 8, '10': 'cropBorders'},
   ],
+  '9': [
+    {'1': 3, '2': 4},
+    {'1': 4, '2': 5},
+    {'1': 5, '2': 6},
+    {'1': 6, '2': 7},
+  ],
+  '10': ['background', 'dim_percent', 'tap_zones', 'keyboard'],
 };
 
 /// Descriptor for `ReaderSettings`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List readerSettingsDescriptor = $convert.base64Decode(
     'Cg5SZWFkZXJTZXR0aW5ncxIrCgRtb2RlGAEgASgOMhcua2FydXlvbWkudjEuUmVhZGVyTW9kZV'
     'IEbW9kZRI+CgtwYWdlX2xheW91dBgCIAEoDjIdLmthcnV5b21pLnYxLlJlYWRlclBhZ2VMYXlv'
-    'dXRSCnBhZ2VMYXlvdXQSPQoKYmFja2dyb3VuZBgDIAEoDjIdLmthcnV5b21pLnYxLlJlYWRlck'
-    'JhY2tncm91bmRSCmJhY2tncm91bmQSHwoLZGltX3BlcmNlbnQYBCABKA1SCmRpbVBlcmNlbnQS'
-    'OwoJdGFwX3pvbmVzGAUgASgOMh4ua2FydXlvbWkudjEuUmVhZGVySW5wdXRQcmVzZXRSCHRhcF'
-    'pvbmVzEjoKCGtleWJvYXJkGAYgASgOMh4ua2FydXlvbWkudjEuUmVhZGVySW5wdXRQcmVzZXRS'
-    'CGtleWJvYXJkEigKA2ZpdBgHIAEoDjIWLmthcnV5b21pLnYxLlJlYWRlckZpdFIDZml0EiEKDG'
-    'Nyb3BfYm9yZGVycxgIIAEoCFILY3JvcEJvcmRlcnM=');
+    'dXRSCnBhZ2VMYXlvdXQSKAoDZml0GAcgASgOMhYua2FydXlvbWkudjEuUmVhZGVyRml0UgNmaX'
+    'QSIQoMY3JvcF9ib3JkZXJzGAggASgIUgtjcm9wQm9yZGVyc0oECAMQBEoECAQQBUoECAUQBkoE'
+    'CAYQB1IKYmFja2dyb3VuZFILZGltX3BlcmNlbnRSCXRhcF96b25lc1IIa2V5Ym9hcmQ=');
 
 @$core.Deprecated('Use readerSettingsOverrideDescriptor instead')
 const ReaderSettingsOverride$json = {
@@ -1266,51 +1211,12 @@ const ReaderSettingsOverride$json = {
       '17': true
     },
     {
-      '1': 'background',
-      '3': 3,
-      '4': 1,
-      '5': 14,
-      '6': '.karuyomi.v1.ReaderBackground',
-      '9': 2,
-      '10': 'background',
-      '17': true
-    },
-    {
-      '1': 'dim_percent',
-      '3': 4,
-      '4': 1,
-      '5': 13,
-      '9': 3,
-      '10': 'dimPercent',
-      '17': true
-    },
-    {
-      '1': 'tap_zones',
-      '3': 5,
-      '4': 1,
-      '5': 14,
-      '6': '.karuyomi.v1.ReaderInputPreset',
-      '9': 4,
-      '10': 'tapZones',
-      '17': true
-    },
-    {
-      '1': 'keyboard',
-      '3': 6,
-      '4': 1,
-      '5': 14,
-      '6': '.karuyomi.v1.ReaderInputPreset',
-      '9': 5,
-      '10': 'keyboard',
-      '17': true
-    },
-    {
       '1': 'fit',
       '3': 7,
       '4': 1,
       '5': 14,
       '6': '.karuyomi.v1.ReaderFit',
-      '9': 6,
+      '9': 2,
       '10': 'fit',
       '17': true
     },
@@ -1319,7 +1225,7 @@ const ReaderSettingsOverride$json = {
       '3': 8,
       '4': 1,
       '5': 8,
-      '9': 7,
+      '9': 3,
       '10': 'cropBorders',
       '17': true
     },
@@ -1327,28 +1233,27 @@ const ReaderSettingsOverride$json = {
   '8': [
     {'1': '_mode'},
     {'1': '_page_layout'},
-    {'1': '_background'},
-    {'1': '_dim_percent'},
-    {'1': '_tap_zones'},
-    {'1': '_keyboard'},
     {'1': '_fit'},
     {'1': '_crop_borders'},
   ],
+  '9': [
+    {'1': 3, '2': 4},
+    {'1': 4, '2': 5},
+    {'1': 5, '2': 6},
+    {'1': 6, '2': 7},
+  ],
+  '10': ['background', 'dim_percent', 'tap_zones', 'keyboard'],
 };
 
 /// Descriptor for `ReaderSettingsOverride`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List readerSettingsOverrideDescriptor = $convert.base64Decode(
     'ChZSZWFkZXJTZXR0aW5nc092ZXJyaWRlEjAKBG1vZGUYASABKA4yFy5rYXJ1eW9taS52MS5SZW'
     'FkZXJNb2RlSABSBG1vZGWIAQESQwoLcGFnZV9sYXlvdXQYAiABKA4yHS5rYXJ1eW9taS52MS5S'
-    'ZWFkZXJQYWdlTGF5b3V0SAFSCnBhZ2VMYXlvdXSIAQESQgoKYmFja2dyb3VuZBgDIAEoDjIdLm'
-    'thcnV5b21pLnYxLlJlYWRlckJhY2tncm91bmRIAlIKYmFja2dyb3VuZIgBARIkCgtkaW1fcGVy'
-    'Y2VudBgEIAEoDUgDUgpkaW1QZXJjZW50iAEBEkAKCXRhcF96b25lcxgFIAEoDjIeLmthcnV5b2'
-    '1pLnYxLlJlYWRlcklucHV0UHJlc2V0SARSCHRhcFpvbmVziAEBEj8KCGtleWJvYXJkGAYgASgO'
-    'Mh4ua2FydXlvbWkudjEuUmVhZGVySW5wdXRQcmVzZXRIBVIIa2V5Ym9hcmSIAQESLQoDZml0GA'
-    'cgASgOMhYua2FydXlvbWkudjEuUmVhZGVyRml0SAZSA2ZpdIgBARImCgxjcm9wX2JvcmRlcnMY'
-    'CCABKAhIB1ILY3JvcEJvcmRlcnOIAQFCBwoFX21vZGVCDgoMX3BhZ2VfbGF5b3V0Qg0KC19iYW'
-    'NrZ3JvdW5kQg4KDF9kaW1fcGVyY2VudEIMCgpfdGFwX3pvbmVzQgsKCV9rZXlib2FyZEIGCgRf'
-    'Zml0Qg8KDV9jcm9wX2JvcmRlcnM=');
+    'ZWFkZXJQYWdlTGF5b3V0SAFSCnBhZ2VMYXlvdXSIAQESLQoDZml0GAcgASgOMhYua2FydXlvbW'
+    'kudjEuUmVhZGVyRml0SAJSA2ZpdIgBARImCgxjcm9wX2JvcmRlcnMYCCABKAhIA1ILY3JvcEJv'
+    'cmRlcnOIAQFCBwoFX21vZGVCDgoMX3BhZ2VfbGF5b3V0QgYKBF9maXRCDwoNX2Nyb3BfYm9yZG'
+    'Vyc0oECAMQBEoECAQQBUoECAUQBkoECAYQB1IKYmFja2dyb3VuZFILZGltX3BlcmNlbnRSCXRh'
+    'cF96b25lc1IIa2V5Ym9hcmQ=');
 
 @$core.Deprecated('Use favoriteSourceDescriptor instead')
 const FavoriteSource$json = {

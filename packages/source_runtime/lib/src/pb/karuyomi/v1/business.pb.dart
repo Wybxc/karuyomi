@@ -3434,20 +3434,12 @@ class ReaderSettings extends $pb.GeneratedMessage {
   factory ReaderSettings({
     ReaderMode? mode,
     ReaderPageLayout? pageLayout,
-    ReaderBackground? background,
-    $core.int? dimPercent,
-    ReaderInputPreset? tapZones,
-    ReaderInputPreset? keyboard,
     ReaderFit? fit,
     $core.bool? cropBorders,
   }) {
     final result = ReaderSettings._();
     if (mode != null) result.mode = mode;
     if (pageLayout != null) result.pageLayout = pageLayout;
-    if (background != null) result.background = background;
-    if (dimPercent != null) result.dimPercent = dimPercent;
-    if (tapZones != null) result.tapZones = tapZones;
-    if (keyboard != null) result.keyboard = keyboard;
     if (fit != null) result.fit = fit;
     if (cropBorders != null) result.cropBorders = cropBorders;
     return result;
@@ -3470,13 +3462,6 @@ class ReaderSettings extends $pb.GeneratedMessage {
         enumValues: ReaderMode.values)
     ..aE<ReaderPageLayout>(2, _omitFieldNames ? '' : 'pageLayout',
         enumValues: ReaderPageLayout.values)
-    ..aE<ReaderBackground>(3, _omitFieldNames ? '' : 'background',
-        enumValues: ReaderBackground.values)
-    ..aI(4, _omitFieldNames ? '' : 'dimPercent', fieldType: $pb.PbFieldType.OU3)
-    ..aE<ReaderInputPreset>(5, _omitFieldNames ? '' : 'tapZones',
-        enumValues: ReaderInputPreset.values)
-    ..aE<ReaderInputPreset>(6, _omitFieldNames ? '' : 'keyboard',
-        enumValues: ReaderInputPreset.values)
     ..aE<ReaderFit>(7, _omitFieldNames ? '' : 'fit',
         enumValues: ReaderFit.values)
     ..aOB(8, _omitFieldNames ? '' : 'cropBorders')
@@ -3522,58 +3507,21 @@ class ReaderSettings extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearPageLayout() => $_clearField(2);
 
-  @$pb.TagNumber(3)
-  ReaderBackground get background => $_getN(2);
-  @$pb.TagNumber(3)
-  set background(ReaderBackground value) => $_setField(3, value);
-  @$pb.TagNumber(3)
-  $core.bool hasBackground() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearBackground() => $_clearField(3);
-
-  /// Reading-content dimming only; never changes platform display brightness.
-  @$pb.TagNumber(4)
-  $core.int get dimPercent => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set dimPercent($core.int value) => $_setUnsignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasDimPercent() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearDimPercent() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  ReaderInputPreset get tapZones => $_getN(4);
-  @$pb.TagNumber(5)
-  set tapZones(ReaderInputPreset value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasTapZones() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearTapZones() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  ReaderInputPreset get keyboard => $_getN(5);
-  @$pb.TagNumber(6)
-  set keyboard(ReaderInputPreset value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasKeyboard() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearKeyboard() => $_clearField(6);
-
   @$pb.TagNumber(7)
-  ReaderFit get fit => $_getN(6);
+  ReaderFit get fit => $_getN(2);
   @$pb.TagNumber(7)
   set fit(ReaderFit value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasFit() => $_has(6);
+  $core.bool hasFit() => $_has(2);
   @$pb.TagNumber(7)
   void clearFit() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.bool get cropBorders => $_getBF(7);
+  $core.bool get cropBorders => $_getBF(3);
   @$pb.TagNumber(8)
-  set cropBorders($core.bool value) => $_setBool(7, value);
+  set cropBorders($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(8)
-  $core.bool hasCropBorders() => $_has(7);
+  $core.bool hasCropBorders() => $_has(3);
   @$pb.TagNumber(8)
   void clearCropBorders() => $_clearField(8);
 }
@@ -3584,20 +3532,12 @@ class ReaderSettingsOverride extends $pb.GeneratedMessage {
   factory ReaderSettingsOverride({
     ReaderMode? mode,
     ReaderPageLayout? pageLayout,
-    ReaderBackground? background,
-    $core.int? dimPercent,
-    ReaderInputPreset? tapZones,
-    ReaderInputPreset? keyboard,
     ReaderFit? fit,
     $core.bool? cropBorders,
   }) {
     final result = ReaderSettingsOverride._();
     if (mode != null) result.mode = mode;
     if (pageLayout != null) result.pageLayout = pageLayout;
-    if (background != null) result.background = background;
-    if (dimPercent != null) result.dimPercent = dimPercent;
-    if (tapZones != null) result.tapZones = tapZones;
-    if (keyboard != null) result.keyboard = keyboard;
     if (fit != null) result.fit = fit;
     if (cropBorders != null) result.cropBorders = cropBorders;
     return result;
@@ -3620,13 +3560,6 @@ class ReaderSettingsOverride extends $pb.GeneratedMessage {
         enumValues: ReaderMode.values)
     ..aE<ReaderPageLayout>(2, _omitFieldNames ? '' : 'pageLayout',
         enumValues: ReaderPageLayout.values)
-    ..aE<ReaderBackground>(3, _omitFieldNames ? '' : 'background',
-        enumValues: ReaderBackground.values)
-    ..aI(4, _omitFieldNames ? '' : 'dimPercent', fieldType: $pb.PbFieldType.OU3)
-    ..aE<ReaderInputPreset>(5, _omitFieldNames ? '' : 'tapZones',
-        enumValues: ReaderInputPreset.values)
-    ..aE<ReaderInputPreset>(6, _omitFieldNames ? '' : 'keyboard',
-        enumValues: ReaderInputPreset.values)
     ..aE<ReaderFit>(7, _omitFieldNames ? '' : 'fit',
         enumValues: ReaderFit.values)
     ..aOB(8, _omitFieldNames ? '' : 'cropBorders')
@@ -3674,57 +3607,21 @@ class ReaderSettingsOverride extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearPageLayout() => $_clearField(2);
 
-  @$pb.TagNumber(3)
-  ReaderBackground get background => $_getN(2);
-  @$pb.TagNumber(3)
-  set background(ReaderBackground value) => $_setField(3, value);
-  @$pb.TagNumber(3)
-  $core.bool hasBackground() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearBackground() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get dimPercent => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set dimPercent($core.int value) => $_setUnsignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasDimPercent() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearDimPercent() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  ReaderInputPreset get tapZones => $_getN(4);
-  @$pb.TagNumber(5)
-  set tapZones(ReaderInputPreset value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasTapZones() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearTapZones() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  ReaderInputPreset get keyboard => $_getN(5);
-  @$pb.TagNumber(6)
-  set keyboard(ReaderInputPreset value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasKeyboard() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearKeyboard() => $_clearField(6);
-
   @$pb.TagNumber(7)
-  ReaderFit get fit => $_getN(6);
+  ReaderFit get fit => $_getN(2);
   @$pb.TagNumber(7)
   set fit(ReaderFit value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasFit() => $_has(6);
+  $core.bool hasFit() => $_has(2);
   @$pb.TagNumber(7)
   void clearFit() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.bool get cropBorders => $_getBF(7);
+  $core.bool get cropBorders => $_getBF(3);
   @$pb.TagNumber(8)
-  set cropBorders($core.bool value) => $_setBool(7, value);
+  set cropBorders($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(8)
-  $core.bool hasCropBorders() => $_has(7);
+  $core.bool hasCropBorders() => $_has(3);
   @$pb.TagNumber(8)
   void clearCropBorders() => $_clearField(8);
 }

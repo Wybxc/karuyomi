@@ -20,6 +20,7 @@ import 'features/reader/chapter_reader_route.dart';
 import 'features/browse/catalog_controller.dart';
 import 'features/browse/catalog_page.dart';
 import 'features/library/library_page.dart';
+import 'features/settings/reader_device_settings.dart';
 import 'features/settings/settings_controller.dart';
 import 'features/settings/settings_widgets.dart';
 import 'runtime/platform_runtime.dart';
@@ -30,6 +31,7 @@ void main() {
   final preferences = SharedPreferencesAsync();
   runApp(
     ProviderScope(
+      overrides: [readerDeviceStorageProvider.overrideWithValue(preferences)],
       child: KaruyomiApp(
         connectionPreferences: kIsWeb ? null : preferences,
         appearancePreferences: preferences,

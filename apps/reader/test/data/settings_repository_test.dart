@@ -30,14 +30,7 @@ wire.GlobalSettingsValues _global({
   wire.ReaderMode mode = wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
   wire.ReaderPageLayout layout = wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
 }) => wire.GlobalSettingsValues(
-  reader: wire.ReaderSettings(
-    mode: mode,
-    pageLayout: layout,
-    background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
-    fit: fit,
-    tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
-    keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
-  ),
+  reader: wire.ReaderSettings(mode: mode, pageLayout: layout, fit: fit),
 );
 
 ApiReply _reply(GeneratedMessage value) => ApiReply(
@@ -59,10 +52,7 @@ wire.SettingsResponse _snapshot() => wire.SettingsResponse(
   effectiveReader: wire.ReaderSettings(
     mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
     pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
-    background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
     fit: wire.ReaderFit.READER_FIT_CONTAIN,
-    tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
-    keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
   ),
 );
 
@@ -119,7 +109,6 @@ final class _OmittedSettingsDefaults implements ApiFetch {
 
   void _omitDefaults(Object? value) {
     if (!omitDefaults || value is! Map<String, Object?>) return;
-    if (value['dimPercent'] == 0) value.remove('dimPercent');
     if (value['cropBorders'] == false) value.remove('cropBorders');
   }
 }
@@ -353,49 +342,43 @@ void main() {
     },
   );
 
-  test('TypeScript ProtoJSON omitted implicit false and zero confirms global settings', () async {
-    final api = _OmittedSettingsDefaults(server);
-    client.rebindApi(api, verifiedIdentity: client.identity);
-    final enabled = _global();
-    enabled.reader
-      ..cropBorders = true
-      ..dimPercent = 35;
-    await repository.setGlobal(values: enabled, basedOnRevision: 0);
-    final disabled = enabled.deepCopy();
-    disabled.reader
-      ..cropBorders = false
-      ..dimPercent = 0;
+  test(
+    'TypeScript ProtoJSON omitted implicit false confirms global settings',
+    () async {
+      final api = _OmittedSettingsDefaults(server);
+      client.rebindApi(api, verifiedIdentity: client.identity);
+      final enabled = _global();
+      enabled.reader.cropBorders = true;
+      await repository.setGlobal(values: enabled, basedOnRevision: 0);
+      final disabled = enabled.deepCopy();
+      disabled.reader.cropBorders = false;
 
-    final saved = await repository.setGlobal(
-      values: disabled,
-      basedOnRevision: 1,
-    );
-    expect(saved.globalRevision, 2);
-    expect(saved.accountRevision, 2);
-    expect(saved.global.reader.cropBorders, false);
-    expect(saved.global.reader.dimPercent, 0);
-    expect(saved.effectiveReader.cropBorders, false);
-    expect(saved.effectiveReader.dimPercent, 0);
-    expect(repository.pendingGlobal(), isNull);
-    expect(server.appliedMutations, 2);
-    expect(writes(), hasLength(2));
-    final confirmed = await repository.loadGlobal();
-    expect(confirmed.globalRevision, 2);
-    expect(confirmed.global.reader.cropBorders, false);
-    expect(confirmed.global.reader.dimPercent, 0);
-    for (final reply in api.replies.where(
-      (value) => value['accountRevision'] == 2,
-    )) {
-      final global = reply['global']! as Map<String, Object?>;
-      final values = global['values']! as Map<String, Object?>;
-      final reader = values['reader']! as Map<String, Object?>;
-      expect(reader.containsKey('cropBorders'), false);
-      expect(reader.containsKey('dimPercent'), false);
-      final effective = reply['effectiveReader']! as Map<String, Object?>;
-      expect(effective.containsKey('cropBorders'), false);
-      expect(effective.containsKey('dimPercent'), false);
-    }
-  });
+      final saved = await repository.setGlobal(
+        values: disabled,
+        basedOnRevision: 1,
+      );
+      expect(saved.globalRevision, 2);
+      expect(saved.accountRevision, 2);
+      expect(saved.global.reader.cropBorders, false);
+      expect(saved.effectiveReader.cropBorders, false);
+      expect(repository.pendingGlobal(), isNull);
+      expect(server.appliedMutations, 2);
+      expect(writes(), hasLength(2));
+      final confirmed = await repository.loadGlobal();
+      expect(confirmed.globalRevision, 2);
+      expect(confirmed.global.reader.cropBorders, false);
+      for (final reply in api.replies.where(
+        (value) => value['accountRevision'] == 2,
+      )) {
+        final global = reply['global']! as Map<String, Object?>;
+        final values = global['values']! as Map<String, Object?>;
+        final reader = values['reader']! as Map<String, Object?>;
+        expect(reader.containsKey('cropBorders'), false);
+        final effective = reply['effectiveReader']! as Map<String, Object?>;
+        expect(effective.containsKey('cropBorders'), false);
+      }
+    },
+  );
 
   test('TypeScript ProtoJSON omitted disabled extension confirms its exact account selection', () async {
     final api = _OmittedSettingsDefaults(server);
@@ -452,70 +435,59 @@ void main() {
     final api = _OmittedSettingsDefaults(server)..omitDefaults = false;
     client.rebindApi(api, verifiedIdentity: client.identity);
     final defaults = _global();
-    defaults.reader
-      ..cropBorders = false
-      ..dimPercent = 0;
+    defaults.reader.cropBorders = false;
     await repository.setGlobal(values: defaults, basedOnRevision: 0);
     final explicit = await repository.loadGlobal();
     expect(explicit.global.reader.hasCropBorders(), true);
-    expect(explicit.global.reader.hasDimPercent(), true);
     api.omitDefaults = true;
     final omitted = await repository.loadGlobal();
     expect(omitted.globalRevision, explicit.globalRevision);
     expect(omitted.accountRevision, explicit.accountRevision);
     expect(omitted.global.reader.hasCropBorders(), false);
-    expect(omitted.global.reader.hasDimPercent(), false);
     expect(
       omitted.global.reader.cropBorders,
       explicit.global.reader.cropBorders,
     );
-    expect(omitted.global.reader.dimPercent, explicit.global.reader.dimPercent);
     expect(writes(), hasLength(1));
     expect(server.appliedMutations, 1);
   });
 
-  test('TypeScript ProtoJSON keeps optional false and zero distinct from inheritance', () async {
-    final api = _OmittedSettingsDefaults(server);
-    client.rebindApi(api, verifiedIdentity: client.identity);
-    final global = _global();
-    global.reader
-      ..cropBorders = true
-      ..dimPercent = 35;
-    await repository.setGlobal(values: global, basedOnRevision: 0);
-    final explicit = await repository.setManga(
-      mangaKey: _key,
-      basedOnRevision: 0,
-      overrides: wire.ReaderSettingsOverride(cropBorders: false, dimPercent: 0),
-    );
-    expect(explicit.overrides!.hasCropBorders(), true);
-    expect(explicit.overrides!.cropBorders, false);
-    expect(explicit.overrides!.hasDimPercent(), true);
-    expect(explicit.overrides!.dimPercent, 0);
-    expect(explicit.effectiveReader.cropBorders, false);
-    expect(explicit.effectiveReader.dimPercent, 0);
-    expect(repository.pendingManga(_key), isNull);
-    final reply = api.replies.last;
-    final manga = reply['manga']! as Map<String, Object?>;
-    final overrides = manga['overrides']! as Map<String, Object?>;
-    expect(overrides['cropBorders'], false);
-    expect(overrides['dimPercent'], 0);
-    final effective = reply['effectiveReader']! as Map<String, Object?>;
-    expect(effective.containsKey('cropBorders'), false);
-    expect(effective.containsKey('dimPercent'), false);
+  test(
+    'TypeScript ProtoJSON keeps optional false distinct from inheritance',
+    () async {
+      final api = _OmittedSettingsDefaults(server);
+      client.rebindApi(api, verifiedIdentity: client.identity);
+      final global = _global();
+      global.reader.cropBorders = true;
+      await repository.setGlobal(values: global, basedOnRevision: 0);
+      final explicit = await repository.setManga(
+        mangaKey: _key,
+        basedOnRevision: 0,
+        overrides: wire.ReaderSettingsOverride(cropBorders: false),
+      );
+      expect(explicit.overrides!.hasCropBorders(), true);
+      expect(explicit.overrides!.cropBorders, false);
+      expect(explicit.effectiveReader.cropBorders, false);
+      expect(repository.pendingManga(_key), isNull);
+      final reply = api.replies.last;
+      final manga = reply['manga']! as Map<String, Object?>;
+      final overrides = manga['overrides']! as Map<String, Object?>;
+      expect(overrides['cropBorders'], false);
+      final effective = reply['effectiveReader']! as Map<String, Object?>;
+      expect(effective.containsKey('cropBorders'), false);
 
-    final inherited = await repository.setManga(
-      mangaKey: _key,
-      basedOnRevision: 1,
-      overrides: wire.ReaderSettingsOverride(),
-    );
-    expect(inherited.overrides!.hasCropBorders(), false);
-    expect(inherited.overrides!.hasDimPercent(), false);
-    expect(inherited.effectiveReader.cropBorders, true);
-    expect(inherited.effectiveReader.dimPercent, 35);
-    expect(inherited.mangaRevision, 2);
-    expect(inherited.globalRevision, 1);
-    expect(server.appliedMutations, 3);
-  });
+      final inherited = await repository.setManga(
+        mangaKey: _key,
+        basedOnRevision: 1,
+        overrides: wire.ReaderSettingsOverride(),
+      );
+      expect(inherited.overrides!.hasCropBorders(), false);
+      expect(inherited.effectiveReader.cropBorders, true);
+      expect(inherited.mangaRevision, 2);
+      expect(inherited.globalRevision, 1);
+      expect(server.appliedMutations, 3);
+    },
+  );
 
   test('adding a mutation UUID rejects an oversized final body without sending or retaining a draft', () async {
     final values = _global()
@@ -644,33 +616,22 @@ void main() {
     expect(server.bookmarked(_key, 'chapter'), true);
   });
 
-  test('reader overrides distinguish explicit zero and false from inheritance and preserve unrelated defaults', () async {
+  test('reader overrides distinguish explicit false from inheritance and preserve unrelated defaults', () async {
     final global = _global();
-    global.reader
-      ..cropBorders = true
-      ..background = wire.ReaderBackground.READER_BACKGROUND_THEME
-      ..dimPercent = 80
-      ..tapZones = wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED
-      ..keyboard = wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED;
+    global.reader.cropBorders = true;
     await repository.setGlobal(values: global, basedOnRevision: 0);
     final explicit = await repository.setManga(
       mangaKey: _key,
       basedOnRevision: 0,
-      overrides: wire.ReaderSettingsOverride(dimPercent: 0, cropBorders: false),
+      overrides: wire.ReaderSettingsOverride(cropBorders: false),
     );
-    expect(explicit.overrides!.hasDimPercent(), true);
     expect(explicit.overrides!.hasCropBorders(), true);
     expect(explicit.effectiveReader.cropBorders, false);
-    expect(explicit.effectiveReader.dimPercent, 0);
-    expect(explicit.effectiveReader.background, global.reader.background);
-    expect(explicit.effectiveReader.tapZones, global.reader.tapZones);
-    expect(explicit.effectiveReader.keyboard, global.reader.keyboard);
     final cleared = await repository.setManga(
       mangaKey: _key,
       basedOnRevision: 1,
       overrides: wire.ReaderSettingsOverride(),
     );
-    expect(cleared.overrides!.hasDimPercent(), false);
     expect(cleared.overrides!.hasCropBorders(), false);
     expect(cleared.effectiveReader.cropBorders, true);
     expect(cleared.effectiveReader, global.reader);
@@ -740,10 +701,6 @@ void main() {
                 mangaKey: _key,
                 overrides: wire.ReaderSettingsOverride(
                   pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
-                  background: wire.ReaderBackground.READER_BACKGROUND_WHITE,
-                  dimPercent: 0,
-                  tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
-                  keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
                   fit: wire.ReaderFit.READER_FIT_HEIGHT,
                   cropBorders: false,
                 ),
@@ -777,24 +734,10 @@ void main() {
         expect(sent.mutationId, isNotEmpty);
         expect(sent.expectedRevision, 0);
         if (mangaScope) {
-          expect(sent.setManga.overrides.hasDimPercent(), true);
           expect(sent.setManga.overrides.hasFit(), true);
           expect(sent.setManga.overrides.hasCropBorders(), true);
           expect(result.effectiveReader.cropBorders, false);
           expect(result.effectiveReader.fit, wire.ReaderFit.READER_FIT_HEIGHT);
-          expect(
-            result.effectiveReader.background,
-            wire.ReaderBackground.READER_BACKGROUND_WHITE,
-          );
-          expect(result.effectiveReader.dimPercent, 0);
-          expect(
-            result.effectiveReader.tapZones,
-            wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
-          );
-          expect(
-            result.effectiveReader.keyboard,
-            wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
-          );
         }
         expect(server.appliedMutations, 1);
         expect(mangaScope ? result.mangaRevision : result.globalRevision, 1);
@@ -902,29 +845,6 @@ void main() {
       _snapshot()
         ..effectiveReader.mode = wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
       _snapshot()..manga.clearOverrides(),
-      _snapshot()
-        ..global.values.reader.background =
-            wire.ReaderBackground.READER_BACKGROUND_UNSPECIFIED,
-      _snapshot()
-        ..manga.overrides.background =
-            wire.ReaderBackground.READER_BACKGROUND_UNSPECIFIED,
-      _snapshot()..manga.overrides.dimPercent = 81,
-      _snapshot()
-        ..manga.overrides.tapZones =
-            wire.ReaderInputPreset.READER_INPUT_PRESET_UNSPECIFIED,
-      _snapshot()
-        ..manga.overrides.keyboard =
-            wire.ReaderInputPreset.READER_INPUT_PRESET_UNSPECIFIED,
-      _snapshot()
-        ..effectiveReader.background =
-            wire.ReaderBackground.READER_BACKGROUND_THEME,
-      _snapshot()..effectiveReader.dimPercent = 1,
-      _snapshot()
-        ..effectiveReader.tapZones =
-            wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
-      _snapshot()
-        ..effectiveReader.keyboard =
-            wire.ReaderInputPreset.READER_INPUT_PRESET_REVERSED,
     ];
     for (final value in invalid) {
       server.beforeRequest = (_) => _reply(value);
