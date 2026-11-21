@@ -466,6 +466,45 @@ void main() {
 
   for (final appearance in Brightness.values) {
     testWidgets(
+      'settings preserve navigation focus at both layout changes in $appearance',
+      (tester) async {
+        final controller = editor();
+        await tester.runAsync(controller.refresh);
+        await show(
+          tester,
+          controller,
+          appearance: appearance,
+          openAppearance: false,
+          size: const Size(360, 800),
+        );
+        await openSettingsSection(tester, 'about');
+        Widget? focusedBack() => FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<CupertinoNavigationBarBackButton>();
+        for (var i = 0; i < 10 && focusedBack() == null; i++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+        }
+        expect(focusedBack(), isA<CupertinoNavigationBarBackButton>());
+
+        tester.view.physicalSize = const Size(768, 1024);
+        await tester.pumpAndSettle();
+        final focusedRow = FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<CupertinoButton>();
+        expect(
+          focusedRow?.key,
+          const ValueKey(('settings-navigation', 'about')),
+        );
+        tester.view.physicalSize = const Size(844, 390);
+        await tester.pumpAndSettle();
+        expect(focusedBack(), isA<CupertinoNavigationBarBackButton>());
+        expect(find.text('轻松翻开下一页'), findsOneWidget);
+        expect(writes(), isEmpty);
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
+
+    testWidgets(
       'settings directory opens a detail by keyboard in $appearance',
       (tester) async {
         final controller = editor();

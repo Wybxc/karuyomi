@@ -290,6 +290,9 @@ class const _SettingsEditor({
     );
     final detailScroll = useScrollController();
     final navigator = useMemoized(GlobalKey<NavigatorState>.new);
+    final wasWide = useRef<bool?>(null);
+    final directoryFocus = useFocusScopeNode();
+    final detailFocus = useFocusScopeNode();
     final manga = mangaKey != null;
     final scope = manga ? 'manga' : 'global';
     final confirmedRevision = manga
@@ -622,6 +625,37 @@ class const _SettingsEditor({
                   MediaQuery.sizeOf(context).shortestSide >= 600;
               final section = selected.value ?? _SettingsSection.appearance;
               final showDetail = wide || selected.value != null;
+              bool isBackControl(FocusNode node) =>
+                  node.context
+                      ?.findAncestorWidgetOfExactType<
+                        CupertinoNavigationBarBackButton
+                      >() !=
+                  null;
+
+              final focus = FocusManager.instance.primaryFocus;
+              final moveBackFocus =
+                  wide &&
+                  wasWide.value == false &&
+                  focus != null &&
+                  focus.context?.findAncestorStateOfType<NavigatorState>() ==
+                      navigator.currentState &&
+                  isBackControl(focus);
+              if (!wide &&
+                  wasWide.value == true &&
+                  showDetail &&
+                  directoryFocus.hasFocus) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (context.mounted &&
+                      wasWide.value == false &&
+                      selected.value == section) {
+                    detailFocus.traversalDescendants
+                        .where(isBackControl)
+                        .firstOrNull
+                        ?.requestFocus();
+                  }
+                });
+              }
+              wasWide.value = wide;
               void select(_SettingsSection value) {
                 FocusScope.of(context).unfocus();
                 selected.value = value;
@@ -652,6 +686,7 @@ class const _SettingsEditor({
                                     'settings-navigation',
                                     item.id,
                                   )),
+                                  autofocus: moveBackFocus && section == item,
                                   padding: EdgeInsets.zero,
                                   onPressed: () => select(item),
                                   child: CupertinoListTile(
@@ -732,7 +767,7 @@ class const _SettingsEditor({
                     SizedBox(
                       key: const ValueKey('settings-directory'),
                       width: (constraints.maxWidth / 2).clamp(240, 384),
-                      child: directory,
+                      child: FocusScope(node: directoryFocus, child: directory),
                     ),
                   Expanded(
                     key: const ValueKey('settings-detail'),
@@ -754,7 +789,10 @@ class const _SettingsEditor({
                               AppPage<void>(
                                 key: const ValueKey('settings-detail-page'),
                                 title: section.title,
-                                child: detail,
+                                child: FocusScope(
+                                  node: detailFocus,
+                                  child: detail,
+                                ),
                               ),
                           ],
                           onDidRemovePage: (page) {
