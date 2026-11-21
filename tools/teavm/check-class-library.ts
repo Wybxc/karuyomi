@@ -153,6 +153,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     !oracle.stdout.includes('PACKAGED_RESOURCE_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('DIGEST_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('PBKDF2_SCENARIOS_PASS ') ||
+    !oracle.stdout.includes('TIME_ZONE_SCENARIOS_PASS ') ||
     generated.stdout !== oracle.stdout
   )
     throw new Error(

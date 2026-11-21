@@ -7,6 +7,8 @@
 - `Class.getResource` 通过 TeaVM 已打包的资源表返回可读取的 URL。`pnpm teavm:check` 对照 JDK 与实际生成的 JavaScript，验证严格 HTTP 日期解析和打包资源读取。[JDK 资源读取合同](<https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Class.html#getResource(java.lang.String)>)
 - `MessageDigest` 通过标准的构造器和引擎方法调用扩展自带的摘要实现。现有内置 MD5 和 SHA-256 继续用于 Source 身份及摘要计算。子类分派、重置和内置向量由 `pnpm teavm:check` 与 JDK 对照验证。[JDK 摘要接口](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/security/MessageDigest.html)
 - `PBEKeySpec` 与 `SecretKeyFactory` 在 AOT 中通过 Worker 的 WebCrypto 实现有界的 PBKDF2-HMAC-SHA-256 和 SHA-512。合成输入的 UTF-8 编码、密钥字节及参数语义由 `pnpm teavm:check` 与 JDK 对照验证。[WebCrypto PBKDF2](https://www.w3.org/TR/webcrypto/#pbkdf2)
+- `TimeZone.toZoneId` 复用 TeaVM 的时区规则和别名表，UTC 格式化、地区夏令时和显式偏移由 `pnpm teavm:check` 与 JDK 对照验证。[JDK 时区接口](<https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/TimeZone.html#toZoneId()>)
+- Android `ApplicationInfo.dataDir` 由当前 Context 的虚拟文件目录派生，访问范围由扩展的文件命名空间决定。[Android 应用信息](https://developer.android.com/reference/android/content/pm/ApplicationInfo#dataDir)
 - `bridge/`：严格 TypeScript 产品浏览器桥。Zstd 只读取已校验的共享材料映射，Web 使用静态字节，Native 使用应用内字节。
 - `toolchain-lock.json`、`toolchain/`：工具版本、下载摘要、runtime seed 材料与 Android SDK 元数据。`toolchain/android-sdk-license` 是复制到 SDK `licenses/` 的协议接受摘要记录；协议正文在相邻 XML 元数据中。
 - [来源与许可](NOTICE.md)、`licenses/`：ABI 适配、上游来源与必须保留的许可说明。

@@ -155,6 +155,21 @@ public final class NetworkHelperTest {
               .getCanonicalFile()
               .equals(new File(java.net.URI.create(args[1])).getCanonicalFile()),
           "owned Cache CodeSource");
+      var app = new Application();
+      var accessor = Application.class.getMethod("getApplicationInfo");
+      Object applicationInfo = accessor.invoke(app);
+      Field dataDir = applicationInfo.getClass().getField("dataDir");
+      check("/files".equals(dataDir.get(applicationInfo)), "virtual application data directory");
+      var customApp =
+          new Application() {
+            @Override
+            public File getFilesDir() {
+              return new File("/private/source/files");
+            }
+          };
+      check(
+          "/private/source".equals(dataDir.get(accessor.invoke(customApp))),
+          "application data directory follows the context files directory");
       NetworkHelper network = new NetworkHelper(new Application());
       OkHttpClient client = network.getClient();
       Request request =

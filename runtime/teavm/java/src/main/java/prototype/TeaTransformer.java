@@ -1,6 +1,9 @@
 package prototype;
 
 import java.net.URL;
+import java.time.ZoneId;
+import java.util.Map;
+import java.util.TimeZone;
 import org.teavm.model.*;
 import org.teavm.model.emit.ProgramEmitter;
 import org.teavm.model.instructions.*;
@@ -22,6 +25,23 @@ public class TeaTransformer implements ClassHolderTransformer {
                 URL.class,
                 program.var(0, Class.class),
                 program.var(1, String.class))
+            .returnValue();
+        cls.addMethod(method);
+      }
+    }
+    if (cls.getName().equals("java.util.TimeZone")) {
+      MethodDescriptor descriptor = new MethodDescriptor("toZoneId", ZoneId.class);
+      if (cls.getMethod(descriptor) == null) {
+        MethodHolder method = new MethodHolder(descriptor);
+        method.setLevel(AccessLevel.PUBLIC);
+        ProgramEmitter program = ProgramEmitter.create(method, context.getHierarchy());
+        program
+            .invoke(
+                ZoneId.class,
+                "of",
+                ZoneId.class,
+                program.var(0, TimeZone.class).invokeVirtual("getID", String.class),
+                program.getField(ZoneId.class, "SHORT_IDS", Map.class))
             .returnValue();
         cls.addMethod(method);
       }
