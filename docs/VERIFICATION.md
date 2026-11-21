@@ -56,6 +56,8 @@
 
 2026-11-22，Dragon Ball Multiverse 和 ManhuaRM 的冻结构建均缺少 `StaticLayout.Builder`。Android API 35 原生图形参考以合成段落复现三组不同断行结果。80 px 下，简单与高质量断行的第 5 行分别止于 UTF‑16 偏移 40 和 39，关闭与开启完整连字符的第 2 行分别止于 12 和 14。85 px 下，高质量与平衡断行的第 9 行分别止于 69 和 71。扩展所需的断行与连字符仍待宿主实现。[Android 参考测试](../tools/teavm/fixtures/text-layout/AndroidTextTest.java) · [Android Builder](https://developer.android.com/reference/android/text/StaticLayout.Builder)
 
+2026-11-22，宿主接入 `StaticLayout.Builder`、段落断行和按语言选用的连字符词表。布局与图形桥的 28 项定向测试通过，覆盖三种策略、硬换行、字素边界，以及补画连字符后的行宽和原始 UTF‑16 偏移。`pnpm teavm:check`、严格类型检查和正式 Web/Native 运行时构建通过。新图形材料 SHA‑256 为 `3df7d350c88ee9ed495d17df976534d1fdc00c51ed0ce5432bf34d2f263504f0`，须使用匹配的扩展构建。两个扩展的正式补编、实际绘制和生产发布待验。[文字布局计划](plan/text-layout.md)
+
 2026-11-22，SoftKomik 冻结构建缺少 Java `UnknownHostException`。JDK 与生成的 TeaVM JavaScript 对照通过该异常的继承、捕获和消息保留，完整 `pnpm teavm:check` 通过。当前 HTTP 中继以通用网络错误表示请求失败，扩展在线遇到 DNS 错误时的分支仍待验证。[HTTP 传输边界](HTTP-BRIDGE.md)
 
 2026-11-22，在 `macbook-pro-4` 固定 `eac70b4` 补编 Softkomik 1.6.4，正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `f0606f04683feb3e0d4cf56c5a21ad39eac08f3b4838259c54f1396806a16809`，共享材料逐字节一致，候选预检纳入第 36 个补编结果。生产仍为 revision `ef76d5d1952b4733a10704d8401748ad`，已读回的公开索引含 191 个扩展。在线出图与 DNS 错误情况待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)

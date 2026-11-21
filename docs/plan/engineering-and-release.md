@@ -58,7 +58,7 @@ Emaqi 通过 RSA-OAEP 适配恢复，Epsilon Scan 和 Soft Epsilon Scan 通过�
 
 U-Next 与 OneReader 都已通过独立提前构建、完整性及封面入口检查，等待原冻结回执。Softkomik 的标准 DNS 异常类型兼容已通过正式补编。ebookjapan 补齐 `Rect` 精确中心接口后通过正式 AOT、产物完整性及封面入口检查，装配预检累计纳入 37 个补编结果。MoeTruyen 的 Android 对话框和视图依赖仍需真实宿主能力。[补编证据](../VERIFICATION.md)
 
-Dragon Ball Multiverse 和 ManhuaRM 使用的 `StaticLayout.Builder` 需支持高质量、平衡断行及连字符。Android API 35 原生参考已为这些选项固定可区分的断行验收，后续实现需通过生成代码和真实扩展绘制复验。共享图形材料如有变化，按对应材料身份独立装配。[原生参考记录](../VERIFICATION.md)
+Dragon Ball Multiverse 和 ManhuaRM 使用的 `StaticLayout.Builder` 已接入简单、高质量和平衡断行及连字符。Android API 35 原生参考与宿主定向测试均覆盖策略之间的差异，正式补编与真实扩展绘制待验。本次有新的共享图形材料，按其材料身份独立装配候选。[验收记录](../VERIFICATION.md)
 
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。

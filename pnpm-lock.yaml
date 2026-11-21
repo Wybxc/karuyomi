@@ -238,6 +238,9 @@ importers:
       get-stream:
         specifier: 9.0.1
         version: 9.0.1
+      hyphen:
+        specifier: 1.14.1
+        version: 1.14.1
       idb:
         specifier: 8.0.4
         version: 8.0.4
@@ -2026,6 +2029,9 @@ packages:
   human-signals@8.0.1:
     resolution: {integrity: sha512-eKCa6bwnJhvxj14kZk5NCPc6Hb6BdsU9DZcOnmQKSnO1VKrfV0zCvtttPZUsBvjmNDn8rpcJfpwSYnHBjc95MQ==}
     engines: {node: '>=18.18.0'}
+
+  hyphen@1.14.1:
+    resolution: {integrity: sha512-kvL8xYl5QMTh+LwohVN72ciOxC0OEV79IPdJSTwEXok9y9QHebXGdFgrED4sWfiax/ODx++CAMk3hMy4XPJPOw==}
 
   idb@8.0.4:
     resolution: {integrity: sha512-jd0ITCrN+Zah4J7R/Z2jnR3W7A4BXDAjmo62MwWuSjxCiueUAf7X5rbodEdidWzeknwXHmLpdZkoiiCppNi30Q==}
@@ -4131,6 +4137,8 @@ snapshots:
   hono@4.13.16: {}
 
   human-signals@8.0.1: {}
+
+  hyphen@1.14.1: {}
 
   idb@8.0.4: {}
 

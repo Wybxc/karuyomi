@@ -47,13 +47,60 @@ describe('bounded plain text layout with real Unicode rule libraries', () => {
   });
   it('never splits emoji ZWJ or combining graphemes when forcing a long word', () => {
     for (const text of ['👩‍👩‍👧‍👦👨‍👩‍👦', 'e\u0301e\u0301', '🇨🇳🇯🇵']) {
-      const result = layout(text, { width: 0 });
       const expected = [
         ...new Intl.Segmenter('und', { granularity: 'grapheme' }).segment(text),
       ].map((item) => item.segment);
-      expect(result.lines.map((row) => text.slice(row[0], row[1]))).toEqual(
-        expected,
-      );
+      for (const breakStrategy of [0, 1, 2]) {
+        const result = layout(text, { width: 0, breakStrategy });
+        expect(result.lines.map((row) => text.slice(row[0], row[1]))).toEqual(
+          expected,
+        );
+      }
+    }
+  });
+
+  it('optimizes multiple lines and includes the final line in balanced scoring', () => {
+    const ends = (text: string, breakStrategy: number) =>
+      layout(text, { breakStrategy, fontSize: 10 }).lines.map((row) => row[1]);
+
+    expect(ends('aa bbb c dddddd', 0)).toEqual([7, 9, 15]);
+    expect(ends('aa bbb c dddddd', 1)).toEqual([3, 9, 15]);
+    expect(ends('aa a aa aaa', 1)).toEqual([8, 11]);
+    expect(ends('aa a aa aaa', 2)).toEqual([5, 11]);
+    expect(ends('aa a aa aaa\nnew line', 2)).toEqual([5, 12, 16, 20]);
+  });
+
+  it('measures the added hyphen while retaining original UTF-16 positions', () => {
+    const text = 'internationalization';
+    const options = {
+      breakStrategy: 1,
+      fontSize: 10,
+      alignment: 'ALIGN_CENTER',
+    } as const;
+    const none = layout(text, options);
+    const full = layout(text, {
+      ...options,
+      hyphenationFrequency: 2,
+      locale: 'en-US',
+    });
+    const unsupported = layout(text, {
+      ...options,
+      hyphenationFrequency: 2,
+      locale: 'ja',
+    });
+    expect(unsupported.lines).toEqual(none.lines);
+    expect(full.lines.map((row) => row[1])).not.toEqual(
+      none.lines.map((row) => row[1]),
+    );
+    expect(full.lines.map((row) => text.slice(row[0], row[1])).join('')).toBe(
+      text,
+    );
+    const hyphenated = full.lines.filter((row) => row[10]);
+    expect(hyphenated.length).toBeGreaterThan(0);
+    for (const row of hyphenated) {
+      expect(row[7]).toBe(measure(`${text.slice(row[0], row[2])}\u2010`).width);
+      expect(row[6]).toBe((70 - row[7]) / 2);
+      expect(row[7]).toBeLessThanOrEqual(70);
     }
   });
   it('uses paragraph bidi level for normal/opposite alignment, not a script heuristic', () => {

@@ -13,3 +13,21 @@ declare module 'bidi-js' {
     };
   };
 }
+declare module 'hyphen' {
+  interface PatternTrie {
+    readonly [character: string]:
+      number | PatternTrie | readonly [PatternTrie, number];
+  }
+  export type HyphenationPatterns = readonly [
+    readonly (readonly number[])[],
+    PatternTrie,
+    Readonly<Record<string, readonly number[]>>?,
+  ];
+  export default function createHyphenator(
+    patterns: HyphenationPatterns,
+  ): (text: string) => string;
+}
+declare module 'hyphen/patterns/*.js' {
+  const patterns: import('hyphen').HyphenationPatterns;
+  export default patterns;
+}

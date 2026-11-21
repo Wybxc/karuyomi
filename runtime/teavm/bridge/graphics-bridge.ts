@@ -93,6 +93,9 @@ interface GraphicsRequest {
   spacingMult: number;
   spacingAdd: number;
   includePad: boolean;
+  breakStrategy: number;
+  hyphenationFrequency: number;
+  locale: string;
 }
 function rect(value: unknown): Rect {
   if (!Array.isArray(value) || value.length !== 4)
@@ -293,6 +296,13 @@ export function parseGraphicsRequest(value: unknown): GraphicsRequest {
     spacingMult: numeric('spacingMult', 1),
     spacingAdd: numeric('spacingAdd'),
     includePad: data.includePad === undefined ? true : bool(data.includePad),
+    breakStrategy:
+      data.breakStrategy === undefined ? 0 : integer(data.breakStrategy, 0, 2),
+    hyphenationFrequency:
+      data.hyphenationFrequency === undefined
+        ? 0
+        : integer(data.hyphenationFrequency, 0, 2),
+    locale: optionalText(data.locale) ?? 'und',
   };
 }
 interface BitmapLease {
@@ -915,6 +925,10 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
             spacingMult: a.spacingMult,
             spacingAdd: a.spacingAdd,
             includePad: a.includePad,
+            breakStrategy: a.breakStrategy,
+            hyphenationFrequency: a.hyphenationFrequency,
+            locale: a.locale,
+            fontSize: a.paint.size * a.paint.scaleX,
           },
           measure,
         );

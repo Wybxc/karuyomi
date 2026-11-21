@@ -72,6 +72,7 @@
     "fake-indexeddb": "6.2.7",
     "fflate": "0.8.3",
     "get-stream": "9.0.1",
+    "hyphen": "1.14.1",
     "idb": "8.0.4",
     "image-dimensions": "2.6.0",
     "is-plain-obj": "4.1.0",
