@@ -4,6 +4,7 @@ import '../test_app.dart';
 
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/rendering.dart';
@@ -42,6 +43,7 @@ List<wire.Chapter> get _chapters => [
     name: '同名章',
     chapterNumber: 7.25,
     scanlator: '乙组',
+    dateUpload: DateTime(2020, 3, 7, 12).millisecondsSinceEpoch.toString(),
     sourceOrder: 8,
     memoJson: '{"edition":"b"}',
   ),
@@ -55,12 +57,12 @@ ChapterSequence get _sequence => ChapterSequence(
   chapters: _chapters,
 );
 
-TestPlatform _platform() =>
+TestPlatform _platform({List<wire.Chapter>? chapters}) =>
     TestPlatform()
       ..invokeHandler = (call) async => switch (call.whichRequest()) {
         wire.SourceCall_Request.details => wire.SourceResult(manga: testManga),
         wire.SourceCall_Request.chapters => wire.SourceResult(
-          chapters: wire.ChapterList(chapters: _chapters),
+          chapters: wire.ChapterList(chapters: chapters ?? _chapters),
         ),
         wire.SourceCall_Request.pages => wire.SourceResult(
           pageList: wire.PageList(
@@ -237,6 +239,10 @@ void main() {
               matching: find.textContaining('来源第 3 项'),
             );
             expect(
+              tester.widget<Text>(subtitle).data,
+              startsWith('2020/3/7 ·'),
+            );
+            expect(
               tester.renderObject<RenderParagraph>(subtitle).didExceedMaxLines,
               false,
               reason: 'duplicate occurrence identity and read status must remain visible',
@@ -302,6 +308,59 @@ void main() {
       );
     }
   }
+
+  testWidgets(
+    'chapter rows render actual upload dates using local calendar days',
+    (tester) async {
+      final now = DateTime(2026, 11, 17, 0, 15);
+      String timestamp(DateTime date) => date.millisecondsSinceEpoch.toString();
+      final dates = [
+        (timestamp(DateTime(2026, 11, 17, 19)), '今天'),
+        (timestamp(DateTime(2026, 11, 16, 23, 45)), '1 天前'),
+        (timestamp(DateTime(2026, 11, 11, 19)), '6 天前'),
+        (timestamp(DateTime(2026, 11, 10, 19)), '2026/11/10'),
+        (timestamp(DateTime(2026, 11, 24, 19)), '7 天后'),
+        (timestamp(DateTime(2026, 11, 25, 19)), '2026/11/25'),
+        (timestamp(DateTime(1969, 11, 20, 12)), '1969/11/20'),
+        ('', null),
+        ('0', null),
+        ('9223372036854775807', null),
+        ('-9223372036854775808', null),
+      ];
+      final chapters = [
+        for (final (index, date) in dates.indexed)
+          wire.Chapter(
+            url: '/dated/$index',
+            name: '日期测试 ${index + 1}',
+            dateUpload: date.$1,
+          ),
+      ];
+      final sequence = ChapterSequence(
+        packageName: 'eu.kanade.source.test',
+        sourceId: sourceId,
+        mangaUrl: testManga.url,
+        chapters: chapters,
+      );
+      final platform = _platform(chapters: chapters);
+
+      await withClock(Clock.fixed(now), () async {
+        final catalog = await _details(tester, platform, openOptions: false);
+        for (final (index, date) in dates.indexed) {
+          final subtitle = find.descendant(
+            of: find.byKey(ValueKey(sequence.entries[index].key)),
+            matching: find.textContaining('未读'),
+          );
+          expect(subtitle, findsOneWidget);
+          expect(
+            tester.widget<Text>(subtitle).data,
+            [?date.$2, '未读'].join(' · '),
+            reason: 'dateUpload ${date.$1}',
+          );
+        }
+        await _finish(tester, catalog);
+      });
+    },
+  );
 
   testWidgets(
     'chapter list preserves duplicate occurrences and Source order with absent and fractional numbers',

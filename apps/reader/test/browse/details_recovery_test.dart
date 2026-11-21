@@ -185,7 +185,16 @@ void main() {
               chapters: wire.ChapterList(
                 chapters: [
                   ..._chapters,
-                  wire.Chapter(url: '/new', name: '新章节'),
+                  wire.Chapter(
+                    url: '/new',
+                    name: '新章节',
+                    dateUpload: DateTime(
+                      2012,
+                      11,
+                      2,
+                      12,
+                    ).millisecondsSinceEpoch.toString(),
+                  ),
                 ],
               ),
             );
@@ -231,6 +240,7 @@ void main() {
       expect(find.textContaining('未能刷新作品资料和章节'), findsNothing);
       await _reveal(tester, find.text('新章节'));
       expect(find.text('新章节'), findsOneWidget);
+      expect(find.text('2012/11/2 · 未读'), findsOneWidget);
       expect(platform.businessServer.appliedMutations, before);
       await _finish(tester, catalog);
     },

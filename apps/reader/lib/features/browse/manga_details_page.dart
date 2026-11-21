@@ -5,10 +5,12 @@ import '../../theme/app_theme.dart';
 
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:intl/intl.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/reading_progress.dart';
@@ -771,6 +773,31 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         : number.toString();
   }
 
+  String? _chapterDate(
+    String dateUpload,
+    DateTime today,
+    DateFormat dateFormat,
+  ) {
+    final milliseconds = int.tryParse(dateUpload, radix: 10);
+    // Leave room for the local calendar day at the limits of DateTime.
+    const maxEpoch = 8640000000000000 - Duration.millisecondsPerDay;
+    if (milliseconds == null ||
+        milliseconds == 0 ||
+        milliseconds < -maxEpoch ||
+        milliseconds > maxEpoch) {
+      return null;
+    }
+    final local = DateTime.fromMillisecondsSinceEpoch(milliseconds);
+    final day = DateTime.utc(local.year, local.month, local.day);
+    final daysAgo = today.difference(day).inDays;
+    return switch (daysAgo) {
+      0 => '今天',
+      > 0 && < 7 => '$daysAgo 天前',
+      >= -7 && < 0 => '${-daysAgo} 天后',
+      _ => dateFormat.format(local),
+    };
+  }
+
   String? _chapterSubtitle(SequenceChapter chapter) {
     final number = _chapterNumber(chapter);
     final scanlator = chapter.snapshot.scanlator.trim();
@@ -1077,7 +1104,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
     ),
   );
 
-  Widget _chapterRow(SequenceChapter chapter) {
+  Widget _chapterRow(SequenceChapter chapter, String? date) {
     final completed = _chapterRead?.completed(chapter.key);
     final titleStyle = CupertinoTheme.of(context).textTheme.textStyle;
     final name = Text(chapter.name);
@@ -1135,6 +1162,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
                 ),
                 child: Text(
                   [
+                    ?date,
                     ?_chapterSubtitle(chapter),
                     switch (completed) {
                       true => '已读',
@@ -1181,6 +1209,11 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
           return text.contains(query);
         })
         .toList();
+    final now = clock.now().toLocal();
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final dateFormat = DateFormat.yMd(
+      Localizations.localeOf(context).toString(),
+    );
     return [
       Row(
         children: [
@@ -1331,7 +1364,11 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
             ],
           ),
         ),
-      for (final chapter in visible) _chapterRow(chapter),
+      for (final chapter in visible)
+        _chapterRow(
+          chapter,
+          _chapterDate(chapter.snapshot.dateUpload, today, dateFormat),
+        ),
     ];
   }
 
