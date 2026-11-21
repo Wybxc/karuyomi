@@ -520,7 +520,8 @@ void main() {
       chapters: [
         for (var index = 0; index < 34; index++)
           wire.Chapter(url: '/chapter-$index', name: '待查章节 $index'),
-        wire.Chapter(url: '/excluded', name: '其他章节'),
+        for (var index = 0; index < 16; index++)
+          wire.Chapter(url: '/excluded-$index', name: '其他章节 $index'),
       ],
     );
     final catalog = await _details(
@@ -530,15 +531,35 @@ void main() {
       openOptions: false,
     );
     final field = find.byKey(const ValueKey('chapter-search'));
+    final scrollView = find.descendant(
+      of: find.byKey(const ValueKey('details-scroll')),
+      matching: find.byType(CustomScrollView),
+    );
+    SemanticsData chapterListSemantics() {
+      final root = tester.getSemantics(scrollView);
+      final scrollNodes = [if (root.scrollExtentMax != null) root];
+      root.visitChildren((node) {
+        if (node.scrollExtentMax != null) scrollNodes.add(node);
+        return true;
+      });
+      return scrollNodes.single.getSemanticsData();
+    }
+
     await tester.ensureVisible(field);
     await tester.pumpAndSettle();
+    final position = Scrollable.of(tester.element(field)).position;
+    final originalExtent = position.maxScrollExtent;
+    expect(chapterListSemantics().scrollChildCount, 50);
     await _search(tester, '待查');
+    final filteredSemantics = chapterListSemantics();
+    expect(filteredSemantics.scrollChildCount, 34);
+    expect(filteredSemantics.scrollExtentMax, position.maxScrollExtent);
+    expect(filteredSemantics.scrollExtentMax, lessThan(originalExtent));
     final editor = find.descendant(
       of: field,
       matching: find.byType(EditableText),
     );
     final focus = tester.widget<EditableText>(editor).focusNode;
-    final position = Scrollable.of(tester.element(field)).position;
     final fieldOffset = position.pixels;
     expect(focus.hasPrimaryFocus, isTrue);
 
@@ -561,7 +582,10 @@ void main() {
     position.jumpTo(fieldOffset);
     await tester.pumpAndSettle();
     expect(tester.widget<EditableText>(editor).controller.text, '待查');
-    expect(find.text('显示 34 / 35 章'), findsOneWidget);
+    final searchSemantics = tester.getSemantics(editor).getSemanticsData();
+    expect(searchSemantics.label, '筛选章节');
+    expect(searchSemantics.value, '待查');
+    expect(find.text('显示 34 / 50 章'), findsOneWidget);
     await _finish(tester, catalog);
   });
 

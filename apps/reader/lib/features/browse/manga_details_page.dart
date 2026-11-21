@@ -1191,6 +1191,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
               },
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
+                semanticChildCount: visibleKeys.length,
                 slivers: slivers,
               ),
             ),
@@ -1373,31 +1374,34 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
         ],
       ),
       const SizedBox(height: 12),
-      CupertinoTextField(
-        autofillHints: null,
-        key: const ValueKey('chapter-search'),
-        controller: _chapterSearch,
-        focusNode: _chapterSearchFocus,
-        enabled: !_opening,
-        onChanged: (_) => setState(_resetRange),
-        placeholder: '章节名、扫描组或章节号',
-        placeholderStyle: TextStyle(
-          color: AppColors.secondaryLabel.resolveFrom(context),
-        ),
-        prefix: Padding(
-          padding: const EdgeInsets.only(left: 8),
-          child: Icon(
-            CupertinoIcons.search,
-            size: 20,
+      Semantics(
+        label: '筛选章节',
+        child: CupertinoTextField(
+          autofillHints: null,
+          key: const ValueKey('chapter-search'),
+          controller: _chapterSearch,
+          focusNode: _chapterSearchFocus,
+          enabled: !_opening,
+          onChanged: (_) => setState(_resetRange),
+          placeholder: '章节名、扫描组或章节号',
+          placeholderStyle: TextStyle(
             color: AppColors.secondaryLabel.resolveFrom(context),
           ),
+          prefix: Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Icon(
+              CupertinoIcons.search,
+              size: 20,
+              color: AppColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.groupedSurface.resolveFrom(context),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          clearButtonMode: OverlayVisibilityMode.editing,
+          clearButtonSemanticLabel: '清空章节搜索',
         ),
-        decoration: BoxDecoration(
-          color: AppColors.groupedSurface.resolveFrom(context),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        clearButtonMode: OverlayVisibilityMode.editing,
-        clearButtonSemanticLabel: '清空章节搜索',
       ),
       const SizedBox(height: 12),
       if (_chapterOptions ||
@@ -1593,6 +1597,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                         sliver: SliverList.list(
+                          addSemanticIndexes: false,
                           children: [
                             if (widget.notice case final notice?) Text(notice),
                             if (_library != null) ...[
