@@ -21,7 +21,7 @@
 | 书架与浏览         | `features/library/`、`browse/`、`sources/`、`extensions/`、`search/`、`migration/`               | 统一导航与操作层；内容清晰，保留既有状态、范围和恢复入口                             |
 | 阅读               | `features/reader/reader_screen.dart`、`chapter_reader_route.dart`、必要的设置布局                | 精简主工具条、展开章节/次要设置；画布视口、保存和关闭流程正确                        |
 | 编辑与设置         | `widgets/choice_field.dart`、`edit_sheet.dart`、`features/settings/`、分类/书签/封面等编辑调用点 | 直接复用官方或已选库组件，删去重复布局，草稿与保存仍由业务持有                       |
-| 路由、诊断、Access | `widgets/app_page_route.dart`、诊断入口、`platform_runtime_native.dart`                          | 统一视觉、明确返回、正确 PlatformView 路径；不接管业务导航                           |
+| 路由、诊断、Access | `widgets/app_routes.dart`、诊断入口、`platform_runtime_native.dart`                              | 统一视觉、明确返回、正确 PlatformView 路径；不接管业务导航                           |
 
 以上路径均相对 `apps/reader/`。不扩张为 Worker/D1、Source 宿主、图片处理或 AOT 重构；UI 改动复用现有 runtime 与扩展快照。若增加“减少透明度/实色外观”用户选择，按既有非敏感设置的 Worker API + D1 权威路径同步，直接维护当前协议及生成模型，不引入本地独立偏好数据库或旧版兼容分支。
 

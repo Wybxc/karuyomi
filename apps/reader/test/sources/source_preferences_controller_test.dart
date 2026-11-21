@@ -239,7 +239,15 @@ void main() {
       editor.snapshot!.nodes[4].group.nodes[1].text.value,
       'https://example.com',
     );
-    expect(editor.message, '漫画源未接受输入；设置未更改。');
+    expect(editor.error, '漫画源未接受输入；设置未更改。');
+    expect(editor.message, isNull);
+    expect(await editor.load(), true);
+    expect(editor.error, isNull);
+    expect(editor.message, isNull);
+    expect(
+      editor.snapshot!.nodes[4].group.nodes[1].text.value,
+      'https://example.com',
+    );
   });
 
   test('unknown runtime result never replays its callback; explicit read and reconstruction restore confirmed state', () async {

@@ -12,7 +12,7 @@
 node tools/teavm/check-text-layout.ts
 ```
 
-默认复用 `runtime/teavm/toolchain-lock.json` 固定的 JDK/Maven 路径，依赖与生成工程在忽略的 `runtime/teavm/.local/`。无需 seed 或项目 owned Android 类。可用 `--maven PATH --java-home PATH --repository PATH` 指定已准备工具与 Maven 缓存；官方测试依赖初次下载体积较大，不接入日常 CI。
+JDK 和 Maven 版本由 `runtime/teavm/toolchain-lock.json` 固定。无需 seed 或项目 owned Android 类。可用 `--maven PATH --java-home PATH --repository PATH` 指定已准备工具与 Maven 缓存；官方测试依赖初次下载体积较大，不接入日常 CI。
 
 ```sh
 pnpm typecheck:tools

@@ -369,6 +369,7 @@ Future<Map<String, Object?>> _prepare(
   expect(catalog.session!.buildId, installed.buildId);
   expect(catalog.activeSource!.lang, _prepareSourceLanguage);
   if (_prepareSearch.isNotEmpty) {
+    await _tap(tester, find.byKey(const ValueKey('source-search-toggle')));
     final search = find.descendant(
       of: sourcePage,
       matching: find.byWidgetPredicate(

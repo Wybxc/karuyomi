@@ -1,3 +1,5 @@
+import '../../theme/app_theme.dart';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -10,8 +12,13 @@ class const PendingGlobalSettings({
   Widget build(BuildContext context) {
     final reader = values.reader;
     return CupertinoListSection(
+      backgroundColor: AppColors.background.resolveFrom(context),
+      separatorColor: AppColors.separator.resolveFrom(context),
+      decoration: BoxDecoration(
+        color: AppColors.groupedSurface.resolveFrom(context),
+      ),
       key: const ValueKey('favorite-source-pending-global'),
-      header: const Text('未确认的原全局设置内容'),
+      header: const Text('原全局设置内容'),
       footer: Text('原操作基于版本 $revision；重试会保留全部原内容。'),
       children: [
         Align(
@@ -47,6 +54,12 @@ class const PendingGlobalSettings({
               if (values.favoriteSources.isEmpty) '收藏源：空列表',
               for (final source in values.favoriteSources)
                 '收藏源：${source.sourceName} · ${source.sourceLang} · ${source.packageName} · ${source.sourceId}',
+              if (values.installedExtensions.isEmpty) '扩展安装选择：空列表',
+              for (final extension in values.installedExtensions)
+                '扩展安装选择：${extension.packageName}（${extension.enabled ? '启用' : '停用'}）\n仓库：${extension.repoId} · ${extension.catalogUrl}\n构建：${extension.buildId}\n产物标识：${extension.bundleSha256}',
+              if (values.repositories.isEmpty) '额外仓库：空列表',
+              for (final repository in values.repositories)
+                '额外仓库：${repository.name}\n${repository.repoId} · ${repository.catalogUrl}',
             ].join('\n'),
           ),
         ),

@@ -38,13 +38,13 @@ flutter test test/covers/ test/runtime/cover_transport_test.dart
 
 提交 `cc59335` 的[项目 CI](https://github.com/Wybxc/karuyomi/actions/runs/42116194785) 全部通过，包含 `pnpm check`、`pnpm flutter:check`、`pnpm build` 与本地 D1 migration。
 
-临时日志保留在忽略的 `.local/cover-*.log`。全库可复验入口为 `pnpm format`、`pnpm format:check`、`pnpm check`、`pnpm flutter:check` 和 `pnpm build`。官方生成的 Worker runtime 类型保持生成器输出，其余自有文件补丁检查通过。
+全库可复验入口为 `pnpm format`、`pnpm format:check`、`pnpm check`、`pnpm flutter:check` 和 `pnpm build`。官方生成的 Worker runtime 类型保持生成器输出，其余自有文件补丁检查通过。
 
 ## 原生构建
 
 正式 `lib/main.dart` 的 iOS simulator debug 与 Android ARM64 debug 均 exit 0。iOS 使用 Xcode 27.2 / Simulator SDK 27.2，产物为 arm64+x86_64 universal `Runner.app`；Android 使用已有 SDK/NDK 与固定 JDK/Gradle，APK 为 93,144,545 字节。两端生成的插件注册均包含 file_selector，未修改正式产品源码、Podfile.lock 或 TLS 策略。
 
-iOS Xcode 构建 26.7 秒。Android 首轮 Maven Central 的 Kotlin 2.1.20 TLS 握手中断，保留该失败后由同一 Flutter 官方进程自动重试成功，没有另开竞争构建或跳过证书校验。日志位于 `.local/cover-native/ios-build.log` 与 `.local/cover-native/android-build.log`；构建后无本轮 Flutter、Xcode、Gradle 或 Kotlin daemon 遗留。
+iOS Xcode 构建 26.7 秒。Android 首轮 Maven Central 的 Kotlin 2.1.20 TLS 握手中断，保留该失败后由同一 Flutter 官方进程自动重试成功，没有另开竞争构建或跳过证书校验。构建后无本轮 Flutter、Xcode、Gradle 或 Kotlin daemon 遗留。
 
 本轮没有启动 Native App 或模拟器，构建通过不表示真实选择器、Cookie、Access 或 Native UI 已验收。
 
@@ -67,7 +67,7 @@ iOS Xcode 构建 26.7 秒。Android 首轮 Maven Central 的 Kotlin 2.1.20 TLS �
 
 四个独立 Flutter 进程均 1/1 通过。第一次上传橙色 PNG，第二次新进程读回橙图并替换为青色 PNG；两次均从 Android 系统 DocumentsUI 的 `ACTION_OPEN_DOCUMENT` 列表实际选择文件。正式预览、确认后封面、详情和书架解码为预期颜色。第三次新进程读回青图并清除，第四次启动仍无封面引用，显示原占位，未附带写入。
 
-独立 HTTPS 与只读 D1/R2 审计核对：账户／作品 revision `3/1 → 4/2 → 5/3 → 6/4 → 6/4`，三个写阶段各有一条唯一回执。两份实际返回的 JPEG 均为 192 × 256，正文大小和 SHA-256 与当前 D1 引用及 R2 内容一致。替换后橙图路径 404，清除后两份旧路径均 404；旧对象仍按宽限期留在 R2。对照收藏、作品资料、设置、书签和阅读进度保持不变。复验步骤、系统选择器证据及独立摘要位于本机忽略目录 `.local/native-android-cover-426536d/` 的 `REPRODUCE.md` 和 `evidence/verified.json`。
+独立 HTTPS 与只读 D1/R2 审计核对：账户／作品 revision `3/1 → 4/2 → 5/3 → 6/4 → 6/4`，三个写阶段各有一条唯一回执。两份实际返回的 JPEG 均为 192 × 256，正文大小和 SHA-256 与当前 D1 引用及 R2 内容一致。替换后橙图路径 404，清除后两份旧路径均 404；旧对象仍按宽限期留在 R2。对照收藏、作品资料、设置、书签和阅读进度保持不变。
 
 ## iOS 模拟器系统选择器与新进程读回
 
@@ -75,7 +75,7 @@ iOS Xcode 构建 26.7 秒。Android 首轮 Maven Central 的 Kotlin 2.1.20 TLS �
 
 上传、替换、清除和重启读回四个 Flutter 进程各 1/1。正式详情预览、确认后的封面与书架显示预期颜色；替换与清除分别从新进程读到上一份已确认封面。第四次启动仍保留同一收藏，恢复原占位。独立 D1/R2 核对三条新成功回执，账户／作品 revision 为 `3/1 → 4/2 → 5/3 → 6/4 → 6/4`；两份 192 × 256 JPEG 的 HTTP 大小与摘要均匹配当时的 D1 引用和 R2 对象。替换后旧橙图路径 404，清除后两份旧路径均 404，两个对象仍在宽限期。对照收藏、设置、进度和书签不变。
 
-首轮选择器定位及 Flutter 等待超时保留；测试驱动改为预编译后及时启动并点实际文件单元格的缩略图，正式产品未改。原始 Flutter 日志、XCUITest 结果与各阶段快照保存在本机忽略目录 `.local/native-ios-cover-426536d/`。
+首轮选择器定位及 Flutter 等待超时保留；测试驱动改为预编译后及时启动并点实际文件单元格的缩略图，正式产品未改。
 
 ## iOS 与 Android 模拟器同库封面交接
 
@@ -85,12 +85,12 @@ iOS Xcode 构建 26.7 秒。Android 首轮 Maven Central 的 Kotlin 2.1.20 TLS �
 2. 全新 Android 进程读取同一作品的相同封面 ID，书架解码像素与 iOS 一致；进入正式编辑器清除并等待确认。
 3. 保留原安装数据的 iOS 新进程读回同一收藏，显示默认占位；没有再次写入。
 
-独立 HTTPS 与 D1/R2 核对账户／作品 revision `3/1 → 4/2 → 5/3 → 5/3`；两次确认恰好各留一条新回执，重启读回无变更。清除后当前引用为空、旧路径 404，原 R2 对象仍保留至宽限期。对照收藏、设置、进度及书签不变。原始日志与 `verified.json` 在本机忽略目录 `.local/native-mixed-cover-426536d/evidence/`。Web↔Native 同库、故障、生产和真机另验。
+独立 HTTPS 与 D1/R2 核对账户／作品 revision `3/1 → 4/2 → 5/3 → 5/3`；两次确认恰好各留一条新回执，重启读回无变更。清除后当前引用为空、旧路径 404，原 R2 对象仍保留至宽限期。对照收藏、设置、进度及书签不变。Web↔Native 同库、故障、生产和真机另验。
 
 ## 剩余平台、故障与生产门
 
 Web 与 iOS、Android 模拟器分别通过独立文档／进程的顺序保存和读回，iOS→Android→iOS 同库上传、清除和读回已过。Web↔Native 同库、并发旧 CAS、响应丢失后原请求恢复、服务端重启、生产 Cookie／Access 与真机仍须验收。
 
-已通过当前账户的 Wrangler 创建配置匹配的 `karuyomi-covers` bucket，`wrangler r2 bucket dev-url get karuyomi-covers` 确认公开 r2.dev 访问关闭；创建记录在忽略的 `.local/cover-bucket-create.log`，隐私检查在 `.local/cover-bucket-privacy.log`。这只证明资源已准备，尚未部署新 Worker 绑定或应用生产 D1 schema。部署后仍需分别记录已登录上传/读取、匿名拒绝、不同 subject 隔离、旧 asset 撤销和宽限期后显式清理。远端对象不即时删除是当前设计，不能将暂存旧对象误记为当前 API 可公开读取。
+已通过当前账户的 Wrangler 创建配置匹配的 `karuyomi-covers` bucket，`wrangler r2 bucket dev-url get karuyomi-covers` 确认公开 r2.dev 访问关闭；这只证明资源已准备，尚未部署新 Worker 绑定或应用生产 D1 schema。部署后仍需分别记录已登录上传/读取、匿名拒绝、不同 subject 隔离、旧 asset 撤销和宽限期后显式清理。远端对象不即时删除是当前设计，不能将暂存旧对象误记为当前 API 可公开读取。
 
 完整 P1/P2、生产 Access 和真机门仍未通过；下一步按 [P1](../plan/p1-library-and-progress.md) 与 [P2](../plan/p2-sync.md) 的剩余日用流程、错误恢复及实际跨端缺口推进。

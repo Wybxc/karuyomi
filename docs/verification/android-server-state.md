@@ -62,6 +62,6 @@ flutter test integration_test/server_sync_test.dart --no-pub \
   --reporter expanded
 ```
 
-运行前先以正常 Web/另一 Native UI 保存非默认第 2 页，并独立读回确认；构建环境不得携带 GitHub 或 Cloudflare 发布 token。保留首次失败和随后成功的不同日志，不覆盖原始失败。临时工程、SQLite 备份/导出、JSON、APK、证书与私钥均留在忽略的 `.local/android-server-sync/`，不提交。
+运行前先以正常 Web/另一 Native UI 保存非默认第 2 页，并独立读回确认；构建环境不得携带 GitHub 或 Cloudflare 发布 token。保留首次失败和随后成功的不同日志，不覆盖原始失败。
 
 实际并发/前台重取、生产 Access、物理设备、分类、书签和同步设置仍按[P2](../plan/p2-sync.md)继续验收；少量 xkcd 分项不提升其它扩展的 `compiled_unverified` / `runtimeReady=false` 状态。

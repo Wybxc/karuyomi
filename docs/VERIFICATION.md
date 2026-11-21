@@ -1,5 +1,271 @@
 # 实施验证记录
 
+记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
+
+2026-11-21，正式 Web 双主题验证章节筛选框失焦后有独立的无障碍名称，组件验证章节计数随筛选更新。真实 xkcd 筛选后首次快速到底并回顶，两色仍有 489 逻辑像素的 DOM 坐标偏移，重建的文本输入丢失 DOM 值。浅色按角色定位点击失败，按画面位置可操作。Web JS/Wasm 构建通过。[章节筛选语义实测](verification/mihon-cupertino-fidelity.md#作品详情的章节筛选语义与滚动偏移)
+
+2026-11-21，`e013fb2` 的双主题正式 Web 核对真实 xkcd 章节日期、滚动后的 11 项筛选及短屏六章确认。取消后保留原末行，七路权威读回与基线一致。深色暂扣首项回执时界面显示 0/6，D1 已提交 3325。放行后两色各完成 3325–3320 六章，浅色新文档读回同一组。1019 项 Flutter 测试、改动文件严格 Dart 分析及 Web JS/Wasm 构建通过。浏览器回顶后部分 DOM 语义坐标偏移仍待查证。[短屏六章实测](verification/mihon-cupertino-fidelity.md#作品详情的章节筛选与短屏六章确认)
+
+2026-11-21，`b3b2db7` 的双主题正式 Web 复验跨源搜索。两色打开语言页期间收到真实 MangaDex 的 20 项和一次受控 xkcd 失败，返回后可用 Enter 重开语言页。长名单连续两次到底回顶后保留名称筛选和原勾选。两色真实分页到 34 项，随后 xkcd 独立重试返回空结果。每轮五路权威读回一致。1018 项 Flutter 测试、严格分析、依赖规则与 Web JS/Wasm 构建通过。[跨源搜索实测](verification/mihon-cupertino-fidelity.md#跨源搜索的语言返回与筛选保留)
+
+2026-11-21，`efd402a` 的正式 Web 双主题复验英文 MangaDex。切到「最新」后，所请求的分段可读，进度在内容区中央，随后两色取得真实作品。360×480 追加失败后可直接重试，前后原末排均在 y=149，新取得 20 项。两色各自七路权威响应逐字节相等。1017 项 Flutter 测试复跑通过，严格 Dart 分析及 Web JS/Wasm 构建通过。正式浏览器使用 JS 产物与默认字号。[源内浏览分页实测](verification/mihon-cupertino-fidelity.md#源内浏览的最新等待与分页重试)
+
+2026-11-21，`e95e712` 正式 Web 在 Codex 内置浏览器复验英文 xkcd 3324 的两色阅读滑杆。指针留在原轨道时从 360×480 缩至 844×390，滑杆短暂禁用，再自行恢复原焦点及蓝色焦点环。Home 与 End 可直接跳页，主动按 Tab 或打开阅读菜单后焦点留在新控件。两色各确认九次阅读进度，独立 D1 读回当前第 1 页。1013 项 Flutter 测试、严格 Dart 分析及 Web JS/Wasm 构建通过，浏览器实测使用 JS 构建。系统双倍字号与原生待验。[滑杆焦点实测](verification/mihon-cupertino-fidelity.md#缩高时页码滑杆的键盘焦点)
+
+2026-11-21，`62646c7` 的正式 Web 双主题复验真实 xkcd 3324 的章间按钮、方向回执，以及 3322 的拖动或点按跳页、键盘恢复及新文档续读。两色新文档均恢复第 2 页，各有六路前后读回一致。深色 3324 缩短视口高度时原滑杆失焦，重新 Tab 后 Home/End 正常。首轮标准 HTML 和 Cupertino 滑杆对照均保留焦点，随后在原指针位置重现并修复。[阅读器现场复验](verification/mihon-cupertino-fidelity.md#正式-web-的页码滑杆与章间按钮复验)
+
+2026-11-21，`f30a345` 的正式 Web 在恢复控制的 Codex 内置浏览器中复验英文 xkcd 热门与短屏搜索。首封面的左缘及尺寸与 Mihon 相同，以导航标题中心为原点时上缘只差 1 逻辑像素。两色提交、收起与清除均通过，深色修正后的热门选中字清晰。四路账户读取前后相同，仅会话有效期按签发时刻变化。1013 项 Flutter 测试、严格 Dart 分析与 Web release 构建通过。最新和追加的正式 Web、系统软键盘及原生待验。[源内浏览与短屏搜索](verification/mihon-cupertino-fidelity.md#源内浏览紧凑网格与短屏搜索)
+
+2026-11-21，`12eeb56` 对照 22.03 将章间动作改为两端的 Cupertino 圆形按钮。浅深组件在 360×480 双倍字号的滑杆宽度由 114.7 增至 175，页码恢复单行。长页码另起一行时保留轨道位置与键盘焦点，缺少相邻章仍提供禁用语义和长按说明。1007 项 Flutter 测试与 Web release 构建通过，正式 Web 和原生现场待验。[大字号页码工具区](verification/mihon-cupertino-fidelity.md#阅读页码工具区在大字号下的布局)
+
+2026-11-21，`6b424c5` 的阅读快捷设置在服务端回执前维持已确认的菜单值、翻页方向和画布。在 360×480、844×390 双倍字号中，两色均可看到等待并继续翻页。短屏丢回执后可直接重试，两色组件实测原样重试确认后第 2、3 页才并排。1006 项 Flutter 测试与 Web release 构建通过，正式 Web 与原生现场待验。[阅读快捷设置](verification/mihon-cupertino-fidelity.md#阅读快捷设置的确认布局与短屏反馈)
+
+2026-11-21，`6df9704` 对照 Mihon 18.01 将章节多选的上栏与标记动作固定在列表两端。两色组件的选中行覆盖 x=0–360，未读标题左缘为 x=30。360×480 两倍字号从末章直接打开确认，取消后保留选择和滚动位置，点按退出或系统返回均留在详情。1006 项 Flutter 测试与 Web release 构建通过，正式 Web 与原生实拍待验。[章节多选](verification/mihon-cupertino-fidelity.md#章节多选的固定操作栏)
+
+2026-11-21，`7e4fc47` 将 Source 日期放到章节次级资料首位。对照 17.01 的四个 xkcd 章节，两色 Flutter 组件的日期值和左缘与参考相符。回归覆盖本地日期边界、两倍字号、日期缺失及刷新失败后重试。1004 项 Flutter 测试与 Web release 构建通过。真实 Source 的新版正式 Web 待验。[章节日期](verification/mihon-cupertino-fidelity.md#章节发布日期和刷新回执)
+
+2026-11-21，`11c1ed1` 的双主题章节组件将未读标题左缘从 x=80 移到 x=30，已读标题和次级资料移到 x=16，相邻标题间距从 48 增至 68 逻辑像素，与 Mihon 17.01 的对应边界一致。点按禁用书签不再打开章节，恢复后仅写入点按的重复条目。1003 项 Flutter 测试及 Web release 构建通过。正式 Web 同版渲染待验。[章节布局与独立书签](verification/mihon-cupertino-fidelity.md#章节列表的对齐与独立书签)
+
+2026-11-21，`0d7b34d` 将跨源分页移动到源标题旁，浅深组件中第二组标题上缘由 y=511 移至 y=439，Mihon 参考为 y=433。360×480 两倍字号复验等待、失败与重试，操作和首排位置保持。1002 项 Flutter 测试及 Web release 构建通过。内置浏览器连接超时，正式 Web 分页待验。[源间距与分页](verification/mihon-cupertino-fidelity.md#跨源搜索源间距与分页回执)
+
+2026-11-21，`da3ca05` 的两色 Flutter 组件复验将跨源搜索首个封面上移 113 逻辑像素至 y=242，Mihon 参考为 y=241，标题左缘同为 x=16。两倍字号下提交与查询仍同排，等待和返回的源标题位置一致。998 项 Flutter 测试和 Web release 构建通过。第二组及真实 Web 继续验收。[首排作品量测](verification/mihon-cupertino-fidelity.md#跨源搜索首排作品量测)
+
+2026-11-21，`e39b5ef` 修复跨源搜索打开语言选择页期间的回执丢失。两色组件从原页返回后都保留原选源，焦点回到语言行，正常显示一项结果及另一个源的失败。998 项 Flutter 测试、严格分析和 Web release 构建通过。重复滚动在组件环境的视觉与语义边界相等，内置浏览器连接超时，正式 Web 复验待验。[语言选择页返回](verification/mihon-cupertino-fidelity.md#语言选择页返回时的跨源搜索回执)
+
+2026-11-21，`872a121` 的正式 Web 两色从短屏长选源名单末端通过空词校验及真实 xkcd 搜索。结果回顶后可重新展开范围并读回原勾选。深色 844×390 可用 Enter 提交，两色三路权威状态逐字节相等。996 项 Flutter 测试及严格分析通过。MangaDex 超时，重开范围后的重复滚动另有语义偏移待验。[跨源搜索短屏](verification/mihon-cupertino-fidelity.md#跨源搜索短屏与重新选源)
+
+2026-11-21，`3e25459` 正式 Web 复验两色五个设置栏目。切为双栏时焦点从即将消失的返回交给当前栏目，缩成短横屏时交回详情返回。草稿在换栏与返回后重进仍保留，导航快照逐字节相同，明确保存后各写入一次且新文档读回。994 项 Flutter 回归、严格分析及正常 Web 构建通过。[设置分栏焦点](verification/mihon-cupertino-fidelity.md#设置分栏切换与键盘焦点)
+
+2026-11-21，`a899954` 的书架浅深两色在 360×480 滚到末端仍显示已选、隐藏数量和退出，深色旋转到 844×390 后以 Enter 退出。两色从末端打开移出清单，取消前后账户与完整分页相同；随后各确认两项分类写入，新文档读回。992 项 Flutter 回归、严格分析及正常 Web release 构建通过。[书架选择栏短屏](verification/mihon-cupertino-fidelity.md#书架选择栏与批量预览的短屏复验)
+
+2026-11-21，`71bc54e` 的正式 Web 浅深两色在白画布调暗 80% 时实测 xkcd 3321 同页等待、受控失败、短屏重试及新文档续读。失败文字采样对比约 12.63∶1，等待与失败的七路读回完全相同。两色连续阅读的图片查看器通过放大、复位和短横屏同页关闭。73 项 Flutter 定向回归通过。[单页与图片查看证据](verification/mihon-cupertino-fidelity.md#双主题正式-web-的单页失败与图片查看)
+
+2026-11-21，`7925a84` 的正式 Web 浅深两色在 844×390 下从 MangaDex 详情的源列表末端完成取消准备、清单 503 后原构建重试和安装。独立 D1 核对取消及失败期间账户零提交，重试成功后各确认一次，新文档可读回。990 项 Flutter 测试、改动文件严格 Dart 分析和正常 Web release 构建通过。[扩展详情短屏](verification/mihon-cupertino-fidelity.md#扩展详情短屏的准备取消与重试)
+
+2026-11-21，固定 Mihon 原 APK 补齐受控签名数据缺失的拒绝加载面板和外层清理异常，两色实拍后均复核恢复。已安装 xkcd 的 APK 摘要相同，清理失败保留原六个文件，撤去故障后重试删除六个。Mihon 状态表主图达到 170/170（100%）。[签名数据缺失](verification/mihon-cupertino-fidelity.md#mihon-插件签名数据缺失的双主题实拍) · [清理异常](verification/mihon-cupertino-fidelity.md#mihon-外层清理失败与重试)
+
+2026-11-21，`539ec0c` 的双主题正式 Web 通过可控的浏览器媒体查询复验设置、真实 xkcd 详情、分类 Sheet 和卸载确认。切换减弱动态后四类标记首个采样均在最终位置，详情仍可左缘返回，已打开的弹层按新偏好关闭。七路账户读回一致，211 项定向 Flutter 测试通过。实际系统偏好和原生现场待验。[减弱动态媒体查询](verification/mihon-cupertino-fidelity.md#正式-web-的减弱动态媒体查询复验)
+
+2026-11-21，本机存储在 360×480 两倍字号下可从已滚动列表定位到清理反馈，原因和重试先于完整副本名称与摘要。两色正式 Web 验证真实标签占用、按同一摘要恢复、清空和重新下载，七路账户状态一致。988 项 Flutter 测试、改动文件严格分析和 Web release 构建通过。[本机副本占用与恢复](verification/mihon-cupertino-fidelity.md#本机副本占用与恢复的双主题正式-web)
+
+2026-11-21，详情下拉补上章节区刷新按钮的禁用语义。隔离 Web 用鼠标拖动复验两色，短拖不读取，长拖发起真实 xkcd 刷新，章节失败后独立重试恢复。深色中段同一行坐标保持，七路账户读回一致。988 项 Flutter 测试、改动文件严格分析和正常 Web release 构建通过。触控由组件测试模拟，真机触屏待验。[下拉手势对照](verification/mihon-cupertino-fidelity.md#下拉刷新的双主题手势对照)
+
+2026-11-21，迁移搜索在正式 Web 两色均复验动漫屋第 2 页。等待时旧候选报告禁用，失败和精确重试均保持末排位置，重试实际追加 21 项。八路账户读回一致，44 项定向测试通过。MangaDex 的第 1 页在线中断另记。[搜索分页与禁用语义](verification/mihon-cupertino-fidelity.md#搜索第二页的双主题恢复与禁用语义)
+
+2026-11-21，修复宽封面草稿在短横屏不可见。受控本地 Web 实拍两色选图及取消后均回到同一完整预览，关闭后七路账户和原图读回一致。两色清除各应用一次，新文档读回。31 项定向测试、严格分析和正常 Web release 构建通过。[封面草稿与确认](verification/mihon-cupertino-fidelity.md#替换封面后自动显示草稿)
+
+2026-11-21，`a9a21aa` 正式 Web 补齐浅深稳定章间等待。白画布调暗 80% 后，加载说明和返回仍可见。真实页列表交付前可退回 3320 第 1 页，七路账户读回相等，明确进入 3319 后可在新文档续读。63 项定向 Flutter 回归通过。[双主题稳定章间等待](verification/mihon-cupertino-fidelity.md#双主题正式-web-的稳定章间等待)
+
+2026-11-21，`1e6b1ba` 正式 Web 从真实英文 xkcd 分别复验资料和章节的刷新故障。两色等待、失败与恢复的章节标题像素位置一致，滚动后的底部重试仍可见。刷新前后七路账户响应逐字节一致，深色随后打开同一首章并显示真实图像。61 项定向 Flutter 回归与严格分析通过。16.K2/K3 已补登记，Karuyomi 跨版本主图为 172/173（99.4%）。[详情刷新故障](verification/mihon-cupertino-fidelity.md#详情刷新故障的双主题正式-web)
+
+2026-11-21，`07a2896` 正式 Web 在内置浏览器验证迁移热门第二页的双主题等待、失败和原页重试，末排保持原位，重试追加 30 项。`95bf156` 修复百项候选的预览落点，两色点选后直接呈现并聚焦标题，深色读回失败后也可在原目标重取。七路账户读回前后相同。35 项定向 Flutter 回归和改动文件严格 Dart 分析通过。[迁移网格与预览落点](verification/mihon-cupertino-fidelity.md#修正版迁移网格的双主题正式-web)
+
+2026-11-21，`b7c581f` 本地正式 Web 在内置浏览器补验设置、xkcd 作品详情、分类 Sheet 和卸载确认的两色常规转场。详情按钮和侧滑均实际回到原热门列表，取消卸载前后三路读回一致。图源空态 07.K2 更新两色主图并验证扩展往返。164 项定向 Flutter 回归通过。系统减弱动态的 Web 实拍和原生现场仍待验。[常规转场](verification/mihon-cupertino-fidelity.md#正式-web-的常规-cupertino-转场) · [图源空态](verification/mihon-cupertino-fidelity.md#图源空态与扩展入口)
+
+2026-11-21，`423639a` 的本地正式 Web 在内置浏览器取得扩展准备失败的浅深主图。两次 xkcd 清单 503 均显示读取扩展材料失败，账户仍未安装。恢复 200 后点原重试，确认同一构建只安装一次。Karuyomi 跨版本主图为 170/171（99.4%）。协议生成校验、10 项协议测试、237 项宿主测试、87 项 Dart Source runtime 测试、984 项 Flutter 测试和严格 Dart 分析通过。[扩展材料读取失败](verification/mihon-cupertino-fidelity.md#扩展材料读取失败的正式-web-复验)
+
+同版正式 Web 补验浅深两色仓库表单。Tab 可从地址移到名称，非法地址保留两项输入，取消无仓库写入。实机软键盘与新版有效地址确认转换待验。[仓库录入与短屏键盘](verification/mihon-cupertino-fidelity.md#仓库录入与短屏键盘)
+
+2026-11-21，`b189199` 正式 Web 在内置浏览器取得卸载确认的双主题主图，取消后原扩展、书架和分类的独立读回一致，Karuyomi 跨版本主图达到 169/171（98.8%）。两色同一清单均实测 503，原构建重试成功，故障原因仍只有通用提示。[正式 Web 的扩展准备失败与卸载确认](verification/mihon-cupertino-fidelity.md#正式-web-的扩展准备失败与卸载确认)
+
+2026-11-21，仓库录入在浅深横竖屏两倍字号的键盘组件复验通过，顶部取消和只读预览可点按，地址和名称可滚动编辑。983 项 Flutter 测试与严格 Dart 分析通过，新版正式 Web 和实机键盘待验。[仓库录入与短屏键盘](verification/mihon-cupertino-fidelity.md#仓库录入与短屏键盘)
+
+2026-11-21，「图源 → 作品详情」的导航栏在减弱动态时随页面原位淡入淡出。按浅深两色比对进入和返回的组件画面，常规转场的八对采样 PNG 与基线逐字节相同。979 项 Flutter 测试和严格 Dart 分析通过，其中章节批量恢复核对了原请求重试。正式 Web 与原生现场转场待验。[作品详情导航栏的减弱动态](verification/mihon-cupertino-fidelity.md#作品详情导航栏的减弱动态)
+
+2026-11-20，Karuyomi 在浅深横竖屏组件中暂扣首次连接响应。连接等待、403 拒绝与重试确认均在原设置详情显示，测试观察到零次账户业务写入。977 项 Flutter 测试和严格 Dart 分析通过，正式 Web 与原生主图待验。[首次连接的等待和恢复](verification/mihon-cupertino-fidelity.md#首次连接的等待和恢复)
+
+2026-11-20，复看 Mihon 空书架与设置的浅深参考。Karuyomi 在两倍字号的浅深横竖屏从书架进入浏览并填写服务地址，三个入口均在首屏可点。非法地址保留草稿，修正后确认测试身份。977 项 Flutter 测试和严格 Dart 分析通过，原生双主题主图待验。[首次连接的短屏复验](verification/mihon-cupertino-fidelity.md#首次连接的短屏复验)
+
+2026-11-20，Karuyomi 底栏通过浅深主题的 Tab 焦点、键盘激活及鼠标和触屏接续复验。974 项 Flutter 测试和严格 Dart 分析通过。`ba3b31f` 的正式 Web 归档在隔离 Worker 中交付原始客户端字节，xkcd 清单实测 200 → 503 → 200。预览面板排队，正式 Web 主图待验。[底栏键盘复验](verification/mihon-cupertino-fidelity.md#底栏键盘焦点与切换) · [清单 HTTP 复验](verification/mihon-cupertino-fidelity.md#扩展准备失败的-http-复验)
+
+2026-11-20，复看 Mihon 浅深横竖屏底栏参考。Karuyomi 底栏按标签行高增高，两倍和三倍字号恢复完整图标并可点按三个入口。四组常规字号的前后组件 PNG 相同。972 项 Flutter 测试通过，正式 Web 和真机继续待验。[底栏大字号复验](verification/mihon-cupertino-fidelity.md#底栏大字号的横竖屏复验)
+
+2026-11-20，Mihon 下载失败与卸载参考逐图复看。Karuyomi 在浅深主题、360×480 两倍字号下，从「浏览 → 扩展」复验准备失败和卸载确认。安装重试核对同一构建与一次账户提交，本机副本重试和取消卸载均无新增提交。970 项 Flutter 测试通过，正式 Web 主图待验。[失败重试与卸载确认的短屏复验](verification/mihon-cupertino-fidelity.md#失败重试与卸载确认的短屏复验)
+
+2026-11-20，固定 Mihon 在隔离参考副本补齐图源空态 07.03 的浅深实拍，双主题主图达 168/170（98.8%），并实际进入插件目录后返回空态。Karuyomi 在剩余内容区居中显示确认的空态，短屏与两倍字号均可进入扩展。968 项 Flutter 测试通过，正式 Web 待验。[图源空态与扩展入口](verification/mihon-cupertino-fidelity.md#图源空态与扩展入口)
+
+2026-11-20，对照 Mihon 单页等待和失败的浅深参考，复拍 Karuyomi 页等待、失败和同页重试。白画布调暗 80% 的失败文字实测从 1.66∶1 提高到 12.63∶1。分页、连续及放大核对三种透明度的 PNG，967 项 Flutter 测试通过，正式 Web 待验。[单页反馈与透明图片的调暗](verification/mihon-cupertino-fidelity.md#单页反馈与透明图片的调暗)
+
+2026-11-20，Karuyomi 章间等待的浅深组件实拍补齐稳定帧，章节标签间距 103，Mihon 参考为 104。80% 调暗的白画布保留原底色，标题实测对比度从 1.66∶1 提高到 12.63∶1，返回保持原页。966 项 Flutter 测试与严格 Dart 分析通过，深色稳定等待的正式 Web 待验。[章间稳定等待与调暗](verification/mihon-cupertino-fidelity.md#章间稳定等待与调暗)
+
+2026-11-20，对照 Mihon 扩展详情的双主题原图，把 Karuyomi 的名称、包名、精确版本和仓库放入可滚动的 Cupertino 分组。360×480 与两倍字号的双主题组件复验确认长名称和源名称完整可读。首次自动检查成功后直接展示列表，手动检查保留完成反馈。965 项 Flutter 测试和严格 Dart 分析通过，正式 Web 待验。[扩展详情的身份与字号](verification/mihon-cupertino-fidelity.md#扩展详情的身份与字号)
+
+2026-11-20，固定 Mihon 在隔离设备上取得 Komga 1.6.76 排队态的浅深两色实拍，参考主图达到 167/170（98.2%）。Karuyomi 修正短屏大字号下准备状态的名称截断，取消可见并等待原操作的确认。292 项相关 Flutter 回归与严格 Dart 分析通过，正式 Web 待验。[扩展排队与短屏取消](verification/mihon-cupertino-fidelity.md#扩展排队与短屏取消)
+
+2026-11-20，固定 Mihon 在同一隔离测试书架取得迁移源加载的浅深两色实拍，参考主图达到 166/170（97.6%）。Karuyomi 修正减弱动态下的底页位移和已打开 Sheet 的偏好切换。963 项 Flutter 回归与严格 Dart 分析通过，正式 Web 和原生现场转场待验。[迁移源加载](verification/mihon-cupertino-fidelity.md#mihon-迁移源加载的双主题实拍) · [底页转场](verification/mihon-cupertino-fidelity.md#cupertino-转场的底页位置)
+
+2026-11-20，固定 Mihon 浅深色实测六个缓存文件无法删除时仍显示删除 0 个，占用 134 kB。恢复权限后从同一入口删除六个文件，占用降至 3.20 kB。Karuyomi 本机存储支持长名称换行，容量按实际大小选用单位。Mihon 11.04 外层提示与 Karuyomi 正式 Web 待验。[本机存储的名称容量与清理反馈](verification/mihon-cupertino-fidelity.md#本机存储的名称容量与清理反馈)
+
+2026-11-20，Karuyomi 确认框与编辑 Sheet 共用 Cupertino 路由的动画设置。实际卸载和分类入口的组件回归核对原位淡入、关闭动画后首帧移除与取消零写入，Flutter 全套 957 项回归通过。固定 Mihon 直接进入迁移标签仍未拍到独立加载帧。正式 Web 转场待验。[Cupertino 确认框与编辑 Sheet 转场](verification/mihon-cupertino-fidelity.md#cupertino-确认框与编辑-sheet-转场)
+
+2026-11-20，Mihon 在关闭设备动画的隔离参考副本取得图源、插件和作品详情首次加载的浅深实拍，主图达到 165/170（97.1%）。Karuyomi 共享页面路由的减弱动态保留侧滑淡出，关闭动画时首帧完成入栈和退出。279 项 Flutter 回归通过，正式转场实拍待验。[首次加载参考与 Cupertino 页面转场](verification/mihon-cupertino-fidelity.md#首次加载参考与-cupertino-页面转场)
+
+2026-11-20，固定 Mihon 完成 08.14 双主题类加载错误、堆栈复制与卸载落点复验，主图达到 162/170（95.3%）。08.13 的三种原因已拍，未签名仍待。Karuyomi 准备失败提示保留扩展、版本、仓库及原因，140 项定向回归通过。新增 08.K9 后跨版本主图为 168/171（98.2%），该状态正式 Web 待验。[插件无法加载的双主题复验](verification/mihon-cupertino-fidelity.md#mihon-插件无法加载的双主题复验)
+
+2026-11-20，Mihon 核对六种确认面板的浅深原图，并实测从同一 MangaDex 详情取消卸载。Karuyomi 补齐 Cupertino 卸载确认，138 项定向 Flutter 回归通过。Mihon 双主题 161/170（94.7%），Karuyomi 新登记 09.K6 后为 168/170（98.8%），卸载确认正式 Web 尚待。[确认面板与扩展卸载](verification/mihon-cupertino-fidelity.md#mihon-确认面板与扩展卸载)
+
+2026-11-20，`2b3d4a5` 正式深色 Web 测到迁移候选封面为 162×243，Komiic 第二页精确重试及只读预览通过，七路权威读回一致。实拍发现分页失败把封面下推 184 逻辑像素。改为候选末尾反馈后，72 项定向 Flutter 回归通过，修正版正式 Web 两色待验。[正式深色网格与分页反馈](verification/mihon-cupertino-fidelity.md#正式深色网格与分页反馈)
+
+2026-11-20，`e7523ea` 正式 Web 实拍显式浅深色的同一宽封面，360×800 与 844×390 首屏均见四边。短横屏滚动后两项封面操作可达，两色都返回原作品。内置浏览器完成上述验收后恢复视口。[正式 Web 宽封面复验](verification/mihon-cupertino-fidelity.md#正式-web-宽封面双主题复验)
+
+2026-11-20，Mihon 补齐源浏览追加与迁移空书架，双主题主图达到 160/170（94.1%）。Karuyomi 将追加指示移到封面列表末尾，50 项定向 Flutter 回归通过。[源浏览追加](verification/mihon-cupertino-fidelity.md#mihon-源浏览追加) · [迁移空书架](verification/mihon-cupertino-fidelity.md#mihon-迁移空书架)
+
+2026-11-20，`fd8bc04` 的分支检查在下载 Java 格式化器时收到 Maven Central HTTP 404。下载器增加同版本的 Google GitHub 发布地址。模拟空缓存和 404 后成功读取官方文件，3,781,805 字节的 SHA-256 与原锁定值相等。[分支检查](https://github.com/Wybxc/karuyomi/actions/runs/44631624888) · [Google 官方发布](https://github.com/google/google-java-format/releases/tag/v2.0.0)
+
+2026-11-20，Mihon 新增扩展空目录、下载中、安装阶段、失败重试和仓库连接错误五组双主题实拍，累计 158/170（92.9%）。Karuyomi 调整目录等待、空态和失败反馈，仓库只读预览失败后保留地址与名称。121 项 Flutter 定向回归通过，正式 Web 双主题继续验收。[扩展目录与仓库错误](verification/mihon-cupertino-fidelity.md#mihon-扩展目录与仓库错误)
+
+2026-11-20，Mihon 新增迁移搜索等待、失败、单源网格、共存等待与完成五组双主题实拍，累计 153/170（90.0%）。Karuyomi 迁移候选采用 Cupertino 封面网格，115 项 Flutter 定向回归通过，正式 Web 待验。[迁移搜索与共存](verification/mihon-cupertino-fidelity.md#mihon-迁移搜索与共存)
+
+2026-11-20，`8dd507a` 正式深色 Web 复验竖屏章间缺页与就绪、短横屏重试和第 3319 章第 1 页的新文档续读，进入前六路读回完全一致。`4332503` 的正式深色 Web 复现了宽封面固定占高、横屏裁掉下沿。修正后 138 项 Flutter 定向回归通过，最新版正式 Web 继续待验。[章间量测](verification/mihon-cupertino-fidelity.md#画布内等待的信息间距与按钮) · [封面预览](verification/mihon-cupertino-fidelity.md#karuyomi-封面预览)
+
+2026-11-20，固定 Mihon 0.21.3 的刷新等待、章节失败、源空清单和筛选无匹配新增四组双主题实拍，累计 148/170（87.1%）。Karuyomi 详情的 Cupertino 下拉刷新保留原资料直到两段读取成功，增加失败重试和筛选清除。最新版的正式 Web 双主题继续待验。[详情刷新与章节空态](verification/mihon-cupertino-fidelity.md#mihon-详情刷新与章节空态)
+
+2026-11-20，`66be7cd` 正式 Web 双主题通过分页、连续和条漫的工具显隐、隐藏页码与恢复入口。三种模式均保留当前页位，连续的最远页随新露出的实际图片推进。153 项回归覆盖转场、快速切换和系统减弱动态，分支、PR CI 和 Wasm 通过。[阅读器显隐与页码](verification/mihon-cupertino-fidelity.md#阅读器显隐与页码)
+
+2026-11-19，`313bbc9` 的正式 Web 双主题同页图片上缘从 47 px 移到 128 px，参考 Mihon 为 132–133 px。工具显隐、菜单焦点、书签和新标签续读通过，122 项定向回归、分支与 PR CI 和 Wasm 通过。[阅读器工具区与画布](verification/mihon-cupertino-fidelity.md#阅读器工具区与画布)
+
+2026-11-19，`7db8551` 的正式 Web 双主题通过阅读器页码滑杆、从右到左方向、键盘操作和新标签续读。三个跳转动作各提交一次进度。100 项定向回归、分支与 PR CI 通过；同页画布纵向位置和工具区仍需对齐。[阅读页码与方向](verification/mihon-cupertino-fidelity.md#阅读页码滑杆与方向排列)
+
+2026-11-19，`4026db3` 的第 3324 章第一页完成与 Mihon 的同页量测。`21f23d6` 正式 Web 深浅色核对暂停确认后的独立结束节点、首次回车、页章边界禁用与 D1 续读位置第 2 页。两轮各只有一次章节标记，106 项 Flutter 回归通过。[键盘焦点](verification/mihon-cupertino-fidelity.md#章节批量动作名称与焦点范围) · [同页对照](verification/mihon-cupertino-fidelity.md#阅读器同页与边界的正式-web-双主题对照)
+
+2026-11-19，固定 Mihon 0.21.3 补齐空章反馈、相邻章过渡与失败、首章与末章边界五项双主题参考，累计 137/170（80.6%）。浅色缺页过渡通过原重试恢复并进入实际下一章。`b5998b0` 正式 Web 深色复现章节批量结束键盘失效，`4026db3` 调整辅助动作范围，59 项定向回归通过，正式 Web 复验待完成。[阅读参考及量测](verification/mihon-cupertino-fidelity.md#mihon-章节过渡与空页的双主题参考) · [章节焦点](verification/mihon-cupertino-fidelity.md#章节批量动作名称与焦点范围)
+
+2026-11-19，`f084467` 正式 Web 补齐 30.K6/K7。两种主题均实测逐章部分提交、丢回执后的原文重试、受控 401 后关闭旧窗口及同一身份恢复。16 组六路权威读回确认已生效的命令没有重复写入，第三章只在明确继续后提交。双主题主图累计 168/169（99.4%）。[章节批量与恢复](verification/mihon-cupertino-fidelity.md#章节部分提交与编辑失效的正式-web-双主题验收)
+
+2026-11-19，`d0d963c` 正式 Web 补齐 30.K1–K5。封面和阅读设置显示当前作品与来源，确认等待中的保存和关闭报告禁用。双主题核对取消零写入、丢确认后的原文重试及真实 409 冲突后的只读恢复。双主题主图累计 166/169（98.2%）。[共享编辑](verification/mihon-cupertino-fidelity.md#共享编辑对象与保存阶段的正式-web-双主题验收)
+
+2026-11-19，`704d148` 正式 Web 补齐 28.K1/K2。显式深浅色均通过跨源搜索失效后的释放等待、失败、同槽重试与返回。重新连接后手动查询从新代次取得真实结果，两组四路权威读回一致。双主题主图累计 161/169（95.3%）。[释放与恢复](verification/mihon-cupertino-fidelity.md#失效后释放搜索资源的正式-web-双主题验收)
+
+2026-11-19，`0e432ce` 正式 Web 显式浅深色通过设置分组、继承禁用和原监听路径。两组四路读回各确认一次实际章节设置，主图累计 159/169（94.1%）。[设置分组](verification/mihon-cupertino-fidelity.md#漫画源设置分组与禁用色的正式-web-双主题验收)
+
+2026-11-19，`517a73e` 正式 Web 双主题通过打开迁移目标及追加失败，原候选保留，原页重试成功，五路权威读回相等。主图累计 158/169（93.5%）。[迁移恢复](verification/mihon-cupertino-fidelity.md#迁移目标与分页失败的正式-web-双主题验收)
+
+2026-11-19，`7461850` 正式 Web 双主题通过真实 Komiic 的读取、重置、应用、描述失败和会话失效复验。两组四路权威读回一致，主图累计 157/169（92.9%）。[筛选实拍与运行时验证](verification/mihon-cupertino-fidelity.md#漫画源筛选过程与恢复的正式-web-双主题验收)
+
+2026-11-19，`a251191` 正式 Web 双主题核对退出等待、失败提示、精确重试与返回，两组前后权威读回一致。15.K13 补齐，跨版本主图累计 152/169（89.9%）。[整页退出实拍](verification/mihon-cupertino-fidelity.md#跨源退出清理的正式-web-双主题验收)
+
+2026-11-19，`ad41606` 正式 Web 双主题确认清理和重读在等待中实际禁用，清理后零副本且账户安装一致。11.K3 补齐，主图累计 151/169（89.3%）。[清理实拍与读回](verification/mihon-cupertino-fidelity.md#本机副本清理的正式-web-双主题验收)
+
+2026-11-19，`392273b` 正式 Web 双主题补齐 15.K10 和 15.K12，跨版本主图累计 150/169（88.8%）。同一停止显式重试成功，迟到的真实结果未公开显示。整页退出清理提示另修，正式画面仍待。[实拍与读回](verification/mihon-cupertino-fidelity.md#跨源单源停止的正式-web-双主题验收)
+
+2026-11-19，`78f4c4b` 正式 Web 用隔离运行时回执夹具复现跨源停止停滞，以及存储清理时两项按钮仍报告可用。随后修正清理和重读的禁用语义，修复后正式双主题继续验收。[停止实拍与存储修正](verification/mihon-cupertino-fidelity.md#停止与本机清理的正式-web-基线)
+
+2026-11-19，跨源搜索控制器和执行槽回归复现丢失停止确认时的不可恢复等待。修正后只重试原资源释放，保持旧查询，拦截迟到结果。正式 Web 双主题待验。[复现与修正](verification/mihon-cupertino-fidelity.md#跨源停止确认丢失的复现与修正)
+
+2026-11-19，`78f4c4b` 正式 Web 双主题确认 257／256 条映射时禁用，减去一条后能进入二次确认，退出后权威状态一致。20.K18 补齐，主图累计 148/169（87.6%）。[实拍与读回](verification/mihon-cupertino-fidelity.md#章节映射超限的正式-web-双主题验收)
+
+2026-11-19，`5f5d287` 正式 Web 通过真实英语 Commit Strip 的设置空态双主题，重读及关闭无额外写入，主图累计 147/169（87.0%）。[实拍与读回](verification/mihon-cupertino-fidelity.md#漫画源设置空态的正式-web-双主题验收)
+
+2026-11-19，`5f5d287` 正式 Web 补齐批量分类身份失效双主题，达到 146/169（86.4%）。三轮均只有首部写入，次部收到 401，末部未发送。迁移超限用隔离上游夹具复现并修正确认按钮语义，正式双主题仍待。[批量实拍](verification/mihon-cupertino-fidelity.md#批量分类失效的正式-web-双主题验收) · [迁移复现](verification/mihon-cupertino-fidelity.md#章节映射超限的复现)
+
+2026-11-19，`1ef627b` 正式 Web 验证封面等待的三个禁用语义及失效迁移首个观测帧。三作品批量实测首项确认、次项 401、末项未发送，随后修正旧窗口的重试入口和文案，72 项书架相关回归通过。04.K8 修复后双主题仍待。[实拍与修正](verification/mihon-cupertino-fidelity.md#编辑复验与批量窗口失效)
+
+2026-11-19，`138ccbd` 正式 Web 在系统深色下保留已确认的浅色，补齐分类、封面、迁移和漫画设置四个失效主图及分类与设置禁用语义。101 条审计有终态，两组前后七路读回一致。覆盖达到 145/169（85.8%），迁移首帧调整仍待正式 Web 复验。[实拍与读回](verification/mihon-cupertino-fidelity.md#身份失效的正式-web-浅色复验)
+
+2026-11-19，`1d29865` 的正式 Web 核对服务连接禁用语义和恢复，并补齐 19.K5 的同一封面选图等待双主题。覆盖 141/169（83.4%）。68 条审计均有客户端终态，读回原封面及字节一致。失效由夹具触发，手动系统取消仍待。[实拍与读回](verification/mihon-cupertino-fidelity.md#选图等待的正式-web-双主题验收)
+
+2026-11-19，Access 暂停时的主题突变已复现并修复。两种对向系统主题、账号更替、读取拒绝及重新连接经 167 项定向回归和两文件分析核对，正式 Web 实拍待验。[主题延续](verification/mihon-cupertino-fidelity.md#access-暂停时延续已确认主题)
+
+2026-11-19，`b29c3bb` 正式 Web 确认跨源搜索空态的提交禁用语义，并核对四个编辑身份失效流程。87 条审计均有客户端终态。照片实际为系统深色，双主题主图覆盖保持 140/169（82.8%）。连接、设置重读和分类按钮的禁用语义修正通过 131 项定向回归及六文件分析，正式 Web 复验继续待办。[实拍和修正](verification/mihon-cupertino-fidelity.md#禁用语义与编辑身份失效的正式-web-复验)
+
+2026-11-19，`0a28f6a` 正式 Web 补齐 27.K2–K4 浅色和 15.K14 双主题，覆盖为 140/169（82.8%）。两主题新文档均核对《ONE PIECE航海王》详情、返回原三项结果和同副本清理。133 条审计均有客户端终态。跨源禁用语义与具体失败原因通过 162 项定向回归和四文件分析，最新 Web 无障碍仍待复验。[正式复验与边界](verification/mihon-cupertino-fidelity.md#连接状态与跨源详情的正式-web-复验)
+
+2026-11-18，内置浏览器恢复后使用 `a8997fa` 正式 CI Web，补齐扩展准备、存储检查、两标签真实占用清理和选源空态的四对主图，达到 136/169（80.5%）。70 条审计有 69 条终态，五组账户读取相同。跨源停止、退出、打开反馈与实拍发现的存储及空态修正通过 160 项定向回归和六文件分析，最新正式 Web 待验。[双主题验收](verification/mihon-cupertino-fidelity.md#扩展与选源的正式-web-双主题验收)
+
+2026-11-18，扩展准备显示目标与版本，独立核对了准备结果先到时仍等待取消确认，以及本机副本清理在重新读取后按原 SHA-256 重试。155 项定向回归和四文件分析通过。内置浏览器控制超时，正式双主题覆盖为 132/169（78.1%）。[准备与清理记录](verification/mihon-cupertino-fidelity.md#扩展准备与本机副本清理)
+
+2026-11-18，跨源搜索无可选源可进入扩展管理。360×800 浅深组件验证搜索关闭后导航、零账户写入及零 Source 打开，相关 110 项回归和三文件分析通过，15.K2 正式画面继续待验。[状态记录](verification/mihon-cupertino-fidelity.md#跨源搜索空态直达扩展管理)
+
+2026-11-18，`fcf3632` 的分支和 PR CI 通过。真实 HTTP 核对扩展构建清单延迟约五秒，索引及有查询清单照常交付。本机存储初次读取去除重复进度，未读状态和重读按钮禁用色通过浅深组件测试。三文件 99 项定向回归及两文件分析通过。内置浏览器现场尚缺深色与审计，覆盖仍为 132/169（78.1%）。[验收细节](verification/mihon-cupertino-fidelity.md#扩展准备的正式验收入口)
+
+2026-11-18，`dc6e3c9` 分支 CI、Web、Wasm 和 PR 检查通过。正式 Web 两主题核对 Komiic 单选去重与同步说明，深色实际两标签用 Tab、Enter 恢复热门，再读回设置。四组七路快照及 43 条终态审计确认重试和读回零额外写入。焦点轮廓局部裁切待修。[正式复验](verification/mihon-cupertino-fidelity.md#source-单选值与运行槽重试)
+
+2026-11-18，`92d4f93` 的迁移向导双主题实测打开目标 Source 的等待、读取失败与成功落点。四组六路快照、32 条终态审计确认迁移零业务写入。20.K8 新增一对主图，达到 132/169（78.1%）。[正式验收](verification/mihon-cupertino-fidelity.md#迁移打开目标源的正式-web-双主题验收)
+
+2026-11-18，`92d4f93` 的分支及 PR CI 通过。正式 Web 双主题核对 Komiic 设置读取、关闭重开恢复、两次精确重试零重复和已确认后的只读恢复。17 组七路快照及 137 条终态审计通过，独立 Web 文档读回两项设置。新增 14.K1/K5，主图达到 131/169（77.5%）。[验收与遗留问题](verification/mihon-cupertino-fidelity.md#source-偏好读取与恢复的正式-web-双主题验收)
+
+2026-11-18，`270db05`完整push/PR CI、Web与push Wasm通过，[仓库预览与操作恢复正式双主题](verification/mihon-cupertino-fidelity.md#仓库预览与操作恢复的正式-web-双主题验收)补齐10.K4/K7/K9，126→129/169（76.3%）。40张JPEG/DOM、两份完整ARIA、23组六路快照与13个相等区间核对原对象、确认后读取和中性原值标题；114条审计全部终态，13条POST为两次准备、九次UI原操作和两次零重复重试，已确认读取恢复零额外POST。五次读取503含一次失败快照探测，转场/错过时刻/输入校验失败单列排除。剩余40个主状态及全部变体/最终产物，无Source运行、Native或生产增量，PR仍草稿未部署。
+
+2026-11-18，[仓库预览目标与保存阶段](verification/mihon-cupertino-fidelity.md#仓库预览目标与保存后的读取阶段)的十四项流程先复现后通过，预览与提交期间保留完整名称/地址，有效确认后的目录刷新显示读取，重试等待不再提前显示未知指引。五文件136项相关回归、四文件严格分析通过；内置浏览器空白标签控制实际恢复，新完整CI及正式Web双主题仍待，主图仍126/169（74.6%），没有Source运行、原生或生产增量。
+
+2026-11-18，[已确认原值标题残留](verification/mihon-cupertino-fidelity.md#已确认原值标题的残留修正)在两项既有双主题流程先复现，现改为中性标题，外层确认阶段和原请求不变。五文件134项相关UI回归、两文件严格分析及官方生成一致性通过；新完整CI见PR #8检查，新正式标题复验仍待，主图保持126/169（74.6%）。
+
+2026-11-18，`2512c51`完整push/PR CI、Web及push Wasm通过，[扩展与共享设置正式双主题](verification/mihon-cupertino-fidelity.md#扩展与共享设置恢复的正式-web-双主题验收)以41张DOM实拍、两份ARIA、22组六路快照与14个相等区间核对原对象跨页保留及已确认读取恢复。113条审计中112条终态、首个人工挂起14单列；13条POST为两次准备、八次UI原操作和三次零重复重试，读取恢复零额外POST。补齐07.K8、08.K7/K8及09.K5深色，122→126/169（74.6%），剩余43个主状态及全部变体/最终产物；准备未截到、禁用辅助语义仍待，没有Source运行、Native或生产增量，PR仍草稿未部署。
+
+2026-11-18，[扩展原操作与设置读取恢复](verification/mihon-cupertino-fidelity.md#扩展原操作与设置确认后的读取恢复)补齐冻结的扩展/仓库原对象及完整提交值，并区分未知写入与有效ACK后的补读失败；后者重试零额外POST。相关缺口先复现后修复，十文件189项组件/数据回归通过，无效ACK与已知拒绝重建继续约束。新提交完整CI和正式Web双主题仍待，主图仍122/169（72.2%），没有Source运行、原生或生产增量。
+
+2026-11-18，`1bc3c70`完整push/PR CI、Web及push Wasm通过，[源收藏与存储隔离正式双主题](verification/mihon-cupertino-fidelity.md#源收藏与存储隔离的正式-web-双主题验收)完成。18张JPEG/DOM、16组六路完整快照、十个相等区间和73条终态审计核对两次准备、五次UI原操作（含一次主题保存）与两次相同UUID/CAS/正文重试零重复；其它业务保持。此前失败的深色重开及确认清除后再次重开正常，控制台无错误/警告。新增07.K1/K5/K9三对，119→122/169（72.2%），剩余47个主状态及全部变体/最终产物；没有新增Source运行、Native或生产证据，PR仍草稿未部署。
+
+2026-11-18，`fe57f2c`完整push/PR CI、Web及push Wasm通过，[正式源目录复验](verification/mihon-cupertino-fidelity.md#展开状态与滚动位置的存储隔离)在浅色完成读取/等待/未知恢复与原对象保留，深色重开实际渲染失败。十组六路完整快照、六个相等区间和49条终态审计确认两次准备、两次源原操作、一次主题保存及一次零重复重试，其它业务保持；11张JPEG/DOM及控制台异常保留，没有新主图。定位为Expansible布尔值与滚动数值共用PageStorage，现为六处折叠提供独立键。源/扩展八项共享bucket回归先复现后通过，四文件100项相关回归、五文件严格分析、完整格式/校验、证据工具类型与依赖检查通过；新提交完整CI和新正式Web待验，仍119/169（70.4%），没有Source运行、原生或生产增量。
+
+2026-11-18，正式CI客户端`9a1c03c`在内置浏览器完成[源收藏浅色缺陷复现](verification/mihon-cupertino-fidelity.md#源收藏恢复布局的浅色复现与修复)：状态贴边、全局值挤占内容、取消收藏缺少原对象摘要。七张JPEG/DOM、五组六路快照与26条终态审计核对两次UI原操作及一次零重复原文重试，未执行Source。现改为内缩状态、冻结原对象摘要和可展开完整值；四项主题/字号回归先失败后通过，八文件124项相关回归、五文件严格分析、完整格式/校验、证据工具严格类型和依赖检查通过。新提交完整CI与正式双主题待验，仍119/169（70.4%），没有新增主图或生产证据。
+
+2026-11-18，`9a1c03c`完整push/PR CI及Web/Wasm通过，内置浏览器本轮实际恢复控制。[分类与部分批量双主题验收](verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-双主题验收)以28组十二路完整快照、16个相等区间和224条终态审计核对六次准备、17次UI原操作、四次零重复重试、确认读取零额外POST及四次受控400零应用。34张DOM实拍补齐04.K4/K6、05.K10三对，116→119/169（70.4%）；剩余50个主状态及全部变体/最终产物。旧归属失败保留，恢复原因未知；临时标签、视口及harness已正常清理，没有新增真实CAS、身份失效、Source、原生或生产证据。
+
+2026-11-18，[单作品与批量读取恢复](verification/mihon-cupertino-fidelity.md#单作品与批量确认后的读取恢复)先复现有效ACK后补读失败仍重复POST及误报未确认，再改为保留已校验确认、仅重读。批量读取未完成不自动发送后续项；相关十三文件159项组件/仓库回归通过，无效ACK与较新远端修改继续拦截。新提交完整CI见[PR #8检查](https://github.com/Wybxc/karuyomi/pull/8/checks)，正式Web待验，没有新主图，仍116/169（68.6%）。
+
+2026-11-18，用户确认当前聊天浏览器面板已打开后，显式iab选择和完整库存两次调用仍超时，累计六次。最新[归属记录](verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-准备受阻)确认桌面`ownerRoutePath`已指向本聊天，但浏览器`conversationId`仍是`client-new-thread`临时身份，控制请求继续因“属于另一个任务”被拒绝；普通打开面板未恢复绑定，官方打开入口仍queued。更深桌面状态原因尚未确定，待重建桌面连接后再验证；没有新产品画面，仍116/169（68.6%）。
+
+2026-11-18，同轮[浏览器归属诊断](verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-准备受阻)在ChatGPT 26.1111.21308的本地日志定位到当前聊天/当前turn的直接拒绝：`IAB browser belongs to another task.`，发生于IAB `getInfo / prepareSessionRoute`。在本聊天打开内置浏览器面板的官方入口返回queued，尚不能算控制恢复；已请求用户显示本聊天的浏览器后继续。为什么桌面归属不一致仍未确定，不能把同时出现的其它WebSocket警告当作因果证据。CI与API准备证据保持，主图仍116/169；没有绕过归属检查或改用其它浏览器。
+
+2026-11-18，`c6f1ce6`完整push/PR CI、Web及push Wasm通过，deploy跳过。[正式Web准备受阻记录](verification/mihon-cupertino-fidelity.md#分类与部分批量的正式-web-准备受阻)核对CI客户端`d09212b`与独立夹具，实际HTTP的35条资源与CI相等。临时D1六次准备、三部收藏的十二路ProtoJSON基线及18条完成审计已核对，全部POST均为独立准备，UI业务写入为0。内置浏览器组合调用、库存、指定URL定位与显式iab选择均约30秒超时并重置，未取得可核验画面；首个调用的具体失败步骤和视口是否改变/恢复均未确认，根因未定。未改用其它浏览器，验收服务正常退出0。没有新主图，仍116/169（68.6%）；拒绝修复、部分批量和其余正式UI/生产门继续待验。
+
+2026-11-18，`d09212b`完整push/PR CI、Web及push Wasm通过，deploy跳过；正式Web归档与39条资源校验并装配，拒绝提示的新正式双主题尚待。为取得已确认/未确认/未开始并存的实际批量主图，[官方故障入口](verification/mihon-cupertino-fidelity.md#批量部分提交的确定性故障入口)新增首项确认后丢后项确认模式，62项真实Workers/D1/R2回归通过，精确重试零重复、取消和显式模式覆盖保持。首轮第二作品未收藏的测试准备导致真实400，已补齐收藏后重跑；未放宽分类API。新夹具完整CI、正式UI与剩余门待验，不增加116/169（68.6%）主图计数。
+
+2026-11-17，夹具`5979361`完整push/PR CI、Web及push Wasm通过。复用`49f3482`正式CI客户端完成[分类保存与恢复的双主题复验](verification/mihon-cupertino-fidelity.md#分类保存与恢复的正式-web-双主题复验)，28组九路快照、九个完全相等区间与247条完成审计确认16次UI分类原操作、两次零重复重试、两次已确认读取重试零额外POST；五次准备、四次独立远端写入与一次明确UI主题保存分开核对。新增05.K8/K9两对主图，114→116/169（68.6%），05.K11只补深色；剩余53个主状态（仅单侧9、双侧均缺44）及全部变体/最终产物。双主题明确拒绝及真实409的辅助说明仍沿用未知指引，保留失败后修复；四项主题/字号流程先复现，相关69项分类/书架/批量回归通过。新提示完整CI及正式Web、其它状态与生产仍待，PR草稿未部署。
+
+2026-11-17，`49f3482`完整push/PR CI、Web及push Wasm通过，deploy跳过。[内置浏览器恢复后的分类浅色复验](verification/mihon-cupertino-fidelity.md#内置浏览器恢复后的分类浅色复验)先核对正式CI与实际HTTP的35条Web资源，再验证保存阶段及未知结果下原UUID/CAS/正文重试。四组九路快照、两个相等区间与36条审计核对一次UI原操作、一次零重复重试及五次独立准备；首次确认交付sequence17没有终态，明确单列，不能计正常释放。四张DOM实拍和一张辅助AX图不增加成对主图，仍114/169（67.5%）。现有官方夹具新增短自动确认/读取及确认后读取失败，57项Workers/D1/R2回归和严格类型通过；新夹具完整CI、正式双主题及其余门待验，PR草稿未部署。
+
+2026-11-17，`500b5a3`完整push/PR CI、Web和Wasm通过，deploy跳过。[分类读取与关闭](verification/mihon-cupertino-fidelity.md#分类确认后读取阶段的即时反馈)的四项主题/字号流程先复现确认后仍显示保存及只读关闭禁用，再验证即时读取反馈、关闭/书架重开复用原读取，迟到结果不关闭新窗口。真实CAS重读另复现新窗口保留旧分类，修复后交接新快照并恢复编辑；仓库用例复现其它漫画通知提前放行首次书架读取，现等待自身权威刷新。相关154项数据、书架/续读、批量及迁移回归通过，原UUID/CAS/正文及只读重试规则保持。内置浏览器四次控制调用均超时，根因未确认；未进入产品页面、启动验收服务或取得新截图，仍114/169（67.5%）。新完整CI、正式Web双主题及其余门待验，PR草稿未部署。
+
+2026-11-17，`61608c5`完整push/PR CI及Web/Wasm通过。[分类确认与读取失败的正式Web浅色复验](verification/mihon-cupertino-fidelity.md#分类确认与读取失败的正式-web-复验)已核对实际35条Web资源、七组九路快照和64条完成审计。正常保存说明通过；重排缺对象/目标位置、ACK成功后读取503仍称未确认并重发POST，均保留为失败。四条UI原命令各应用一次，额外相同正文重试零重复，两部作品及其它业务内容不变。修复在当前身份会话内保留已验证ACK，明确继续只重读，关闭后仍恢复读取阶段；重排保留冻结对象与目标位置，相关83项回归通过。新修复完整CI、正式Web双主题及其它门待验，本轮八张浅色图不增加成对主图，仍114/169（67.5%）；PR草稿未部署。
+
+2026-11-17，`94b7b82`完整push/PR CI及Web/Wasm通过。[正式CI客户端与独立夹具的双主题复验](verification/mihon-cupertino-fidelity.md#批量等待与暂停的正式-web-复验)补齐04.K3/K5：当前项提交后等待，请求暂停再确认后保留剩余清单；浅色明确继续、深色明确结束均按原范围处理。13组九路快照、五个相等区间与94条审计核对五次准备、八次UI原操作及一次零重复重试，sequence17首次交付未完成单列、其余93条完成。新增两对主图，跨版本114/169（67.5%），剩余55个主状态及全部变体。实拍发现分类保存期间提前显示“重试”和未确认指引，四项既有主题/字号流程复现后修复，相关35项回归通过；新提示完整CI及正式Web、其余状态/生产仍待，PR草稿未部署。
+
+2026-11-17，[分类目录与批量故障入口](verification/mihon-cupertino-fidelity.md#分类目录与批量操作的故障验收入口)已接入现有官方editor-ui，42项Workers/D1/R2回归通过：目录和作品分类实际提交后才挂起/丢确认，精确重试零重复，旧版本新请求仍真实409，读取取消和拒绝/失效保持原状态。进度及收藏继续透传，首段书架读回仅在相应范围内拦截；普通验收和生产不启用。相关正式Web尚未执行，不增加112/169主图计数；API/test严格类型、全范围格式和依赖分层通过，新提交完整CI与正式Web仍待。
+
+2026-11-17，`ef5f3dd`完整push/PR CI及Web/Wasm成功。[正式Web双主题复验](verification/mihon-cupertino-fidelity.md#勾选身份与目标列表加载的正式-web-双主题复验)确认同名作品勾选框完整身份与键盘取消、英文/法文空分类对象分组，以及真实MangaDex热门/搜索和两种追加的准确说明；未提交输入不改变原查询，等待时保留列表。九组九路快照、七个相等区间及43条完成审计核对仅三次准备和一次明确UI主题保存，没有其它业务POST；Source偏好未改，运行时请求不在审计范围。实际交付35条Web清单与CI相等，23张实拍中八张真实加载图新增20.K10一对主图，跨版本112/169（66.3%），仅单侧8、双侧均缺49。剩余57个主状态、全部变体/最终产物和生产继续验收，PR仍草稿未部署。
+
+2026-11-17，`25be6f5`完整push/PR CI与Web/Wasm通过；[正式Web双主题复验](verification/mihon-cupertino-fidelity.md#分类对象与迁移页脚的正式-web-双主题复验)确认分类面完整对象身份、名称点击/取消/保存、批量添加/移除，以及迁移待确认/书架重开/精确重试后的阶段页脚。21组九路快照、13个相等区间和107条完成审计核对实际写入、零重复与取消零附写；四次独立准备单列，目录准备不在审计范围。首次本地遗漏acceptance重建交付旧客户端，旧记录排除；纠正后实际HTTP的35条Web清单与CI严格相等。25张图是现有状态补充，主图仍111/169；独立勾选框无名称、加载说明缺具体操作的六项既有流程先复现并修复，相关51项回归与四文件严格分析通过，新完整CI/正式Web、空分类新分组、全部剩余状态与生产仍待，PR草稿未部署。Mihon环境记录纠正为配置2GB但启动日志提升至2560MB，实际内存未测；普通UI尚未触发纯空源列表，不补通过。
+
+2026-11-17，复用`a12c779`正式CI Web完成[受阻进度重开与同名书架的双主题复验](verification/mihon-cupertino-fidelity.md#受阻草稿重开与同名书架的正式-web-复验)。原迁移明确确认后，从书架重开及刷新仍保留草稿并等待明确重试；两次明确进度保存及两次后续自动保存各推进一次版本，双主题新文档续读均恢复第2页。30组九路快照、20个完全相等区间及172条含进度JSON的完成审计已核对，旧失败保留且不追溯补全旧审计。中文目标两次中断单列；33张图是转换分项，主图仍111/169。分类对象身份与迁移阶段旧说明两个实拍缺口已在八项既有主题/字号流程复现并修复，相关51项回归及四文件严格分析通过；新完整CI、修复后正式Web、全部剩余状态/变体和生产仍待，PR草稿未部署。`d5a0bc8`完整push/PR CI与Web/Wasm已通过。
+
+2026-11-17，`a12c779`完整push/PR CI与Web/Wasm成功；[正式Web双主题复验](verification/mihon-cupertino-fidelity.md#source-与选源的正式-web-双主题复验)确认Source拒绝采用错误色、原值保留、明确重读清反馈，文本与多选取消/应用/重开和恢复初值，以及选源名称/键盘/隐藏选择保留与真实五源排队。新增14.K6、15.K3、15.K4，跨版本成对主图111/169（65.7%），仅单侧8、双侧均缺50；38张实拍不是38个新状态。10组六路快照、3条Source偏好响应及87条完成审计核对仅两次准备和两次明确UI主题保存，其余业务零附写；审计不含Source调用和偏好API。受阻进度重开、同名书架、全部剩余状态/变体和生产仍待，PR保持草稿未部署。
+
+2026-11-17，`0a02ee6`完整push/PR CI与Web/Wasm通过，[内置浏览器恢复后实测](verification/mihon-cupertino-fidelity.md#内置浏览器恢复后的-source-实测与拒绝提示修复)浅色选源名称/键盘、空查询、真实xkcd结果及MangaDex多选/文本偏好。三组六路快照完全相等，23条范围内审计仅两次独立准备POST；会话操作不附写账户。Source拒绝提示按普通正文显示的实拍保留，已修复错误角色与旧成功说明清除，47项回归及三文件严格分析通过。15.K3仅新增浅色，成对主图仍108/169；新完整CI、修复后双主题、全部变体与生产仍待，PR保持草稿未部署。
+
+2026-11-17，`83e32fd`完整push/PR CI及Web/Wasm成功。[结果区字号与参考补图](verification/mihon-cupertino-fidelity.md#结果区字号角色与复制参考补图)取消源名16px硬编码、采用官方正文和13px次级角色，23项既有页面回归与单文件严格分析通过。Mihon 0.21.3参考28.04补齐应用浅/深的可读复制预览，仅确认可见片段，完整剪贴板仍待；恢复设置后参考模拟器已关闭。内置浏览器尚未取得新页面，Karuyomi主图仍108/169，新字号完整CI、正式Web与生产继续待验。
+
+2026-11-17，[选择行与搜索反馈的Cupertino收敛](verification/mihon-cupertino-fidelity.md#选择行与搜索反馈的-cupertino-收敛)已接入官方选源分组、完整选择行与表单输入、次级页脚、整行/键盘选择及系统错误色；单作品/批量分类名称点击也已复现并修复。本轮78项不同回归与七文件严格分析通过。上一轮`39a55f7`完整push/PR CI及Web/Wasm成功。内置浏览器控制接口再次超时，面板打开入口仅排队，没有新正式页面；新提交CI、正式Web与生产仍待，不增加108/169主图计数。
+
+2026-11-17，[Source偏好子编辑器](verification/mihon-cupertino-fidelity.md#source-偏好子编辑器的分组与失效)修复文本/多选身份失效仍留旧输入与应用入口、多选文字点击未切换及分组说明缺口，43项定向回归与两文件严格分析通过。editor-ui补齐进度等原样业务命令审计，24项官方Workers/D1/R2回归、API/test严格类型和依赖分层通过。`3a3976d`完整push/PR CI及Web/Wasm现已成功；本轮内置浏览器两次连接超时，新的正式Web、生产与原生均未执行，主图保持108/169，PR继续草稿未部署。
+
+2026-11-16，`19c2260`正式Web双主题实看[阅读进度被迁移阻塞的反馈](verification/mihon-cupertino-fidelity.md#阅读进度阻塞的正式-web-复验与重开修复)，浅色明确恢复后另行保存/续读通过；深色从书架重开却自动保存，记录为失败。19组九路快照、13个完全相等区间和121条范围内审计通过核对，进度POST不在该审计范围，写入增量由快照确认。新门控修复的45项回归、同名书架身份修复的38项回归通过，完整CI与新Web仍待。主状态覆盖仍108/169（63.9%），PR仍草稿未部署；`35559fb`已有完整push/PR CI及Web/Wasm成功。
+
+2026-11-16，`19c2260`的58项连接/进度定向回归、完整push/PR CI及Web/Wasm通过。[连接状态正式Web复验](verification/mihon-cupertino-fidelity.md#连接状态的正式-web-复验)补27.K5双主题主图与27.K2/K3/K4有效深色图，跨版本覆盖107→108/169（63.9%）。7组六路快照和29条完成审计确认连接等待、受控401/403/503和显式恢复不写业务状态，主题草稿零附写、一次明确UI保存单列；20项官方Workers夹具回归、严格类型和依赖检查通过。连接故障浅色、未配置地址、进度新提示、全部变体及真实生产Access仍待，PR仍草稿未部署。
+
+2026-11-16，`e8646f5`完整push/PR CI及Web/Wasm通过。[新读取提示正式Web复验](verification/mihon-cupertino-fidelity.md#迁移读取提示及失效状态的正式-web-复验)在浅/深主题分别验证未知及拒绝期间的读取失败反馈；33组九路快照和202条完成审计核对原请求保留、两次精确重试零重复、拒绝/只读零附写。三个失效状态的名义浅色图实际均为深色，只登记有效深色图，跨版本双主题主图仍107/169（63.3%）。真实图片和显式处理拒绝迁移后的进度保存已恢复，连接阶段与迁移阻塞原因的提示缺口正修复；新提示正式产物、其余状态和生产继续待验，不能把覆盖率解释为PR整体完成率。
+
+2026-11-16，`3a57cdf`完整push/PR CI及Web/Wasm通过。[迁移加载与故障正式Web复验](verification/mihon-cupertino-fidelity.md#迁移加载与故障的正式-web-复验)新增九对双主题主图，跨版本覆盖98→107/169（63.3%）。33组九路快照与256条审计确认三条迁移原命令各应用一次、两次精确重试无重复、两次真实409及四次迁移/封面400零覆盖；API准备与UI写入分别计数。浅色挂起未正常释放、夹具满额后的重读均单独排除。已复现并修正待确认期间的新读取失败被旧迁移提示遮蔽，34项迁移回归通过；新修复完整CI、正式Web和生产仍待，不以主图覆盖代表整体完成。
+
+2026-11-16，[明确拒绝状态与迁移故障入口](verification/mihon-cupertino-fidelity.md#明确拒绝状态与迁移故障验收入口)修正封面和迁移拒绝后仍建议重试的说明，迁移400流程先复现再通过。52项封面/共享编辑面/迁移回归、17项官方Workers/D1/R2回归、三文件Dart与API/test严格类型及依赖分层通过。拒绝必须明确重读，结果未知继续精确重试；完整CI和正式Web双主题的后续分项见上项。
+
+2026-11-16，`a9d880a`完整push/PR CI及Web/Wasm通过。[封面正式Web故障复验](verification/mihon-cupertino-fidelity.md#封面故障状态的正式-web-复验)补齐六对双主题主图；32组六路API快照与154条审计核对四次UI清除各应用一次、原请求精确重试无重复、真实409与明确400零覆盖，以及私有图片失败重试同一资源。浅色首次挂起审计未完成单列，深色等待正常释放；拒绝辅助说明、剩余变体与生产继续待，不以主图覆盖代表PR整体完成。
+
+2026-11-16，`42bc9bb`完整push/PR CI和Web/Wasm通过。[正式Web浅色设置故障流程](verification/mihon-cupertino-fidelity.md#正式-web-浅色故障流程与关闭反馈修复)在官方Wrangler临时D1中执行，七路独立快照和43条设置审计确认三条成功漫画原命令、一次精确重试不重复应用、冲突/拒绝零覆盖。故障夹具12项Workers/D1回归通过。实拍暴露读取不能关闭、长表单反馈不在视口；修复后54项定向回归与两文件严格分析通过，读取关闭无迟到跳转或提交、保存仍禁止关闭。浅色过渡帧和旧字段帧保留且排除，新修复完整CI、正式Web双主题与生产继续待验。
+
+2026-11-16，[本漫画阅读设置的状态呈现](verification/mihon-cupertino-fidelity.md#本漫画阅读设置的阶段与确认)在浅/深×1x/2x四项组件流程中先复现读取阶段无说明且误提示连接身份；分开reading/saving，并补齐源收藏和阅读器快捷设置的等待提示后，50项定向回归与七文件严格分析通过。原请求丢确认后精确重试只应用一次，重读零写入、冲突不自动重基、身份失效隐藏旧字段与旧确认；继承说明改为官方Cupertino分组页脚。24.K1–K11目标图与最小信息已补，正式Web双主题及完整CI继续待验，不以组件结果填主图格。
+
+2026-11-16，[迁移返回焦点与位置的正式Web复验](verification/mihon-cupertino-fidelity.md#迁移返回焦点与位置的正式-web-复验)：`86d27e7`完整push/PR CI通过（868项Dart、531项Vitest、Web/Wasm）。浅/深正式Web以实际点击打开和取消章节选择、确认弹窗，跨独立API读取后原按钮位置保持且焦点恢复，九路API确认零写入；补齐深色范围、仅分类和搜索空态主图。语义定位点击后的位置变化仍有观察，可能包含工具自动滚动影响，不据此认定唯一原因；全部输入、变体、故障和生产仍待。临时标签已关闭、视口恢复，官方harness正常退出0。
+
+2026-11-16，[迁移行宽、语言与语义的正式Web复验](verification/mihon-cupertino-fidelity.md#迁移行宽语言与语义的正式-web-复验)：`9228c11`完整push/PR CI通过（868项Dart、531项Vitest、Web/Wasm），正式Web双主题确认整行右侧点击、精确源语言和独立预览语义；补齐51–100映射分页、章节当前项/占用禁用/无匹配/清空及无原标记。九路API确认两次明确迁移各推进一次版本、零新增章节标记，查询/分页/取消零附写。该版延迟返回位置变化的原图保留；四种主题/字号先复现章节选择和确认取消未恢复按钮焦点，Hooks修复后19项迁移回归通过，后续完整CI和实际点击复验见上项。加载/故障/全部变体及生产继续按状态图推进。
+
+2026-11-16，[迁移向导的Cupertino状态呈现](verification/mihon-cupertino-fidelity.md#迁移向导的-cupertino-状态呈现)通过65项不同定向回归、最终格式的三文件严格分析与完整格式校验。浅/深×1x/2x实际组件流程区分首次读取/失败/重读、只读预览、保存阻塞/丢确认、诊断、重开只读等待和精确重试；原请求两次发送只应用一次。官方分组、次级说明、标准绿色开关与系统错误色已接入，失效后隐藏旧操作。完整CI、正式Web全部双主题主图及生产仍待，不以组件证据替代。
+
+2026-11-16，[Mihon 全界面重构](verification/mihon-cupertino-fidelity.md)进行中，最终统一Cupertino导航、控件、动态语义配色与转场，尚未通过全范围视觉或生产验收。`c5f6759`完整push/PR CI通过，含864项Dart、531项Vitest及Web/Wasm；[正式Web分项](verification/mihon-cupertino-fidelity.md#封面与选择语义的正式-web-分项)补齐双主题短/长列表当前项DOM语义，封面草稿、保存/替换、取消/确认清除及新文档读回。独立API确认六次封面提交各写一次、草稿/取消零附写，四次确认图片字节核对通过。[状态机](verification/mihon-state-coverage.md)19.K3/K4/K6/K7正常主图和K5非法输入变体已有；加载/等待、未知/拒绝/失效、图片失败、禁用项与手动系统取消仍待。浅色清除首张缺帧保留且排除主图，不外推全部转场通过。资料故障、迁移、空偏好、全部变体及生产Access/续读仍待；Komiic失败不记兼容通过，Karuyomi原生现场验收保持停止。
+
+分类与批量分组`a9fb310`已有正式Web双主题菜单、名称/校验、草稿/取消、危险预览、分类选择与结果分项，独立API核对十次UI写入及各取消区间零附写。`bbf69d7`确认正文与新建语义修复的57项书架/主题回归、五文件严格分析和正式Web双主题空态/列表、Tab/Return、草稿取消及批量结果通过，独立API核对九次UI写入。未确认、暂停、拒绝和身份失效等主图仍待。
+
 2026-11-13，[Liquid Glass](verification/liquid-glass.md)已按用户决定终止，[统一 Cupertino 已恢复并生产上线](verification/cupertino-ui.md#恢复-cupertino-后的生产复验)。PR #7 合入后主线 CI、742 项 Dart 回归、46 条公开资源与匿名 Access 门禁通过；内置浏览器确认导航、真实图片、翻页保存、主题保存及独立新文档第 2 页续读，独立 D1 核对续读前后状态一致。玻璃库、专用设置及资源已移除。原玻璃性能对照未完成，不宣称能耗结论；代码削减另立重构，原生现场验证保持停止。
 
 2026-11-13，[Cupertino UI 迁移](verification/cupertino-ui.md)完成应用壳、业务页面、阅读器、诊断与原生 Access 页的代码切换，并由主线 CI 自动上线；三项目严格分析、742 项单并发 Dart 回归及完整 CI / Web 构建通过。移除应用直接 Material 依赖，生产手写 Dart 计入新增组件后净减 58 行；缺失组件通过重整选择、筛选、编辑与反馈流程解决。隔离内置浏览器与独立 API 已验证扩展维护、章节输入、真实两页阅读/缩放、设置草稿取消及确认保存、360px 分类/主题和独立新文档续读；发现的字体、焦点和弹层问题复验通过。[生产 Access 下](verification/cupertino-ui.md#生产发布)的真实阅读、翻页确认、设置覆盖/继承与独立新文档第 2 页续读均通过，独立 D1 核对一致；46 条公开资源与匿名 Access 门禁通过。原生现场验证仍停止。
@@ -312,7 +578,7 @@ Access 本人策略覆盖 `/api` 和 `/api/*`。匿名 `/api`、`/api/bootstrap`
 
 同一 `1bfc97f` Arknights Comics 原版扩展已在 Codex 内置浏览器 Chromium 156 经产品 Worker、隔离 D1、真实 workerd 和 HTTP v2 完成在线元数据检查：热门 17 项，搜索首个标题返回同名 1 项，详情成功，章节 3 项，真实章节 pages 返回 51 页；latest 按 `supportsLatest=false` 明确跳过。网络使用显式 `arknights.global` 白名单及真实 RS256 测试身份，不是生产 Access。未请求图片字节，未修改 Source/JAR，也未据此判定图片、Cache/JVM 等价或完整阅读通过。
 
-真实 Flutter + flutter_inappwebview 6.1.5 + iOS 26.4 Simulator 已在本地受信 HTTPS 通过内置运行时验证：控制页真实 307 从 `/runtime/host.html` 到 `/runtime/host`；document-start 内置 host 与 Blob Worker 完成 Arknights Comics 的 `hostInit` / `hostLoad`，返回 Source `5973713386239249589`，IndexedDB 可用，API 携带同源 HttpOnly cookie。服务器故意将远端 host.js、worker.js 和材料路径设为 503，这些路径请求数仍为 0。旧 cache/file 构建明确拒绝并提示升级扩展；同长度篡改 AOT 被 `integrity_error` 拦截，重建容器后正常恢复。实测同时修复 WK 返回 HTTP status `200.0` 的有限整数转换边界，并加入负例回归。临时入口、HTTPS 服务、证书与原始记录均留在 ignored `.local`，正式 app 代码、资源校验及 iOS CocoaPods 集成入库。
+真实 Flutter + flutter_inappwebview 6.1.5 + iOS 26.4 Simulator 已在本地受信 HTTPS 通过内置运行时验证：控制页真实 307 从 `/runtime/host.html` 到 `/runtime/host`；document-start 内置 host 与 Blob Worker 完成 Arknights Comics 的 `hostInit` / `hostLoad`，返回 Source `5973713386239249589`，IndexedDB 可用，API 携带同源 HttpOnly cookie。服务器故意将远端 host.js、worker.js 和材料路径设为 503，这些路径请求数仍为 0。旧 cache/file 构建明确拒绝并提示升级扩展；同长度篡改 AOT 被 `integrity_error` 拦截，重建容器后正常恢复。实测同时修复 WK 返回 HTTP status `200.0` 的有限整数转换边界，并加入负例回归。正式 app 代码、资源校验及 iOS CocoaPods 集成入库。
 
 这项验证覆盖真实 Flutter 原生控制容器和本地 cookie 恢复，不是 Cloudflare Access 正向会话、物理 iPhone、图片通道或 Source 在线语义验收。
 
@@ -344,13 +610,13 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 [Zstd 错误摘要](verification/runtime-evidence.md) 对照实际编译的原版和产品 `Bridge.zstd`。两者对真实 WASM 无效压缩流都返回 `Truncated Zstd frame`；显式注入 rejected host Promise 时，原版生成代码因局部变量名碰撞抛出 `TypeError` 并等待超时，产品实现改用 `failureReason` 后恢复 Java RuntimeException。历史原版对照保留在本地研究归档。
 
-临时独立研究工程和脚本已移入本机被忽略的 `runtime/teavm/.local/research/`，保留原始本地资料，不进入源码仓库。上面的精简文档记录历史机制证据；正式产品与发布回归需要独立测试，不能依赖临时工程存在。
+上面的精简文档记录历史机制证据；正式产品与发布回归需要独立测试，不能依赖临时工程存在。
 
 产品代码现已加入 [HTTP v2](HTTP-BRIDGE.md)：严格帧、Worker 按需响应、JS operation/generation handle、Java Okio Source 与有界上传 Sink。新增协议 38 项及 JS transport 9 项测试；完整 TypeScript 套件 192 项通过。Java 完整 javac 与 `tools/teavm/HttpBodyTest.java` 的 1,051 项断言通过，包括 64 MiB 分块读取与 8 MiB 上传上限（`pnpm teavm:check` 同时运行 DTO 与 body oracle）。真实 TeaVM 0.16 编译 JS 在 Node 的模拟六函数 supplier 下，验证 131,079 字节 GET/POST（00/ff、64 KiB 分块）、空 POST、pending-read 取消、超时、超请求块与 EOF 长度错共七例，handle 最终归零；这仍不是实际 HTTP、浏览器或 Access 验收。
 
 当前构建、注册清单、Java、Worker 和 API 只维护 HTTP v2，旧 v1 传输分支已删除。Java 重新经过真实 TeaVM 编译后的 18 例模拟 supplier 回归，覆盖 GET/POST、空正文、取消/超时、受控重试及错误分类；这些仍是模拟环境证据。
 
-`pnpm test:http-bridge` 已通过真实 workerd 与受控 HTTP origin 的 24 项检查：夹具真正发送 gzip（3,164 字节）与 Brotli（657 字节），解码后均为 131,089 字节且 SHA-256 一致；覆盖 200/206/403、HEAD、重复 Cookie、手动重定向、流式 POST、早响应仍验证上传 END，以及消费取消、请求取消和超时关闭 origin。分项实际验证 204/205/304 无正文与 304 表示元数据、显式 Range 的精确 19 字节返回、Unicode/重复 urlencoded 字段及跨 64 KiB 的 multipart 文件。表单由标准 Request/FormData codec 生成和解析；origin 在消费者已读到正确前缀后真实截断，bridge 返回 `upstream_body_error` 而非成功 END。入口通过固定 Undici 直连用户 Worker socket，origin 经明确启用 signal flag 的辅助 Worker 和原生 external HTTP proxy；没有修改生产入口。四个主动取消场景均使用 30 秒请求期限、1 秒取消窗口，本次本地取消及 origin 关闭用时约 12–22 毫秒；持续发送时使用普通 body cancel / AbortSignal，首块后 idle 的场景明确使用 TCP reset，不能把本地 destroy 当成远端已取消。该门已纳入 `pnpm check`，完整输出留在忽略目录 `.local/probes/http-bridge-v2.json`，合同见 [HTTP bridge](HTTP-BRIDGE.md)。提交 `7e57a74` 的[项目 CI](https://github.com/Wybxc/karuyomi/actions/runs/41760712045) 已全部通过，包括通用检查、Flutter、构建与本地 D1。它不涉及实际 Source、生产 Access 或 CacheInterceptor；原 Source/cache 同版对照和图片/移动内存链路仍需验收，P0-B 尚未通过。上面的部署版本属于旧版本历史记录，当前代码尚不能据此声称已部署或通过生产 Access 正向会话。
+`pnpm test:http-bridge` 已通过真实 workerd 与受控 HTTP origin 的 24 项检查：夹具真正发送 gzip（3,164 字节）与 Brotli（657 字节），解码后均为 131,089 字节且 SHA-256 一致；覆盖 200/206/403、HEAD、重复 Cookie、手动重定向、流式 POST、早响应仍验证上传 END，以及消费取消、请求取消和超时关闭 origin。分项实际验证 204/205/304 无正文与 304 表示元数据、显式 Range 的精确 19 字节返回、Unicode/重复 urlencoded 字段及跨 64 KiB 的 multipart 文件。表单由标准 Request/FormData codec 生成和解析；origin 在消费者已读到正确前缀后真实截断，bridge 返回 `upstream_body_error` 而非成功 END。入口通过固定 Undici 直连用户 Worker socket，origin 经明确启用 signal flag 的辅助 Worker 和原生 external HTTP proxy；没有修改生产入口。四个主动取消场景均使用 30 秒请求期限、1 秒取消窗口，本次本地取消及 origin 关闭用时约 12–22 毫秒；持续发送时使用普通 body cancel / AbortSignal，首块后 idle 的场景明确使用 TCP reset，不能把本地 destroy 当成远端已取消。该门已纳入 `pnpm check`，合同见 [HTTP bridge](HTTP-BRIDGE.md)。提交 `7e57a74` 的[项目 CI](https://github.com/Wybxc/karuyomi/actions/runs/41760712045) 已全部通过，包括通用检查、Flutter、构建与本地 D1。它不涉及实际 Source、生产 Access 或 CacheInterceptor；原 Source/cache 同版对照和图片/移动内存链路仍需验收，P0-B 尚未通过。上面的部署版本属于旧版本历史记录，当前代码尚不能据此声称已部署或通过生产 Access 正向会话。
 
 共享 CacheInterceptor 的截断/半途取消另有[实际 TeaVM 与原 JVM 对照](verification/cache-http-failures.md)，与上述模拟 supplier、独立 HTTP bridge 门分别计证据；生产网络取消仍未通过。
 
@@ -370,7 +636,7 @@ node apps/api/test/source-metadata-probe.ts PATH_TO_OUTPUT/manifest.json PATH_TO
 
 实际 Flutter Web release 构建在同一边界经“浏览→扩展→Source→漫画详情→DREAM”进入 ReaderScreen，真实首图、单双页翻页、缩放/重置、连续阅读模式切换与放大层打开/关闭通过交互检查；模式切换保留逻辑页，连续下一页可前进至第 3 页。它是本地产品链路，不是 Cloudflare Access 正向会话、完整章逐页验收、下一章/进度持久化或手机性能。
 
-正式回归还覆盖：保留原始/子类 Page、cacheless/progress 与本地 XOR 拦截器的 JVM 对照；双完成后才公开资源；单块 ACK；取消与迟到发布、解码预算 tombstone、Java 退出后解锁；资源公开后迟到 cancel/close 不撤销已返回 Blob；详情退出动画期间迟到 pages 不重开 Reader。真实 Flutter 退出还暴露了两端 mock 掩盖的应答漂移，现关闭会话统一为 `{closed:true}`，取消/释放为 `{released:true}`，公开 API→Worker 延迟确认与浏览器 Source 门均明确检查相应 ACK。原始日志与截图留在 ignored `.local/image-session-review/`，复验入口见 [Source 门](../apps/api/test/source-metadata-probe.md)。
+正式回归还覆盖：保留原始/子类 Page、cacheless/progress 与本地 XOR 拦截器的 JVM 对照；双完成后才公开资源；单块 ACK；取消与迟到发布、解码预算 tombstone、Java 退出后解锁；资源公开后迟到 cancel/close 不撤销已返回 Blob；详情退出动画期间迟到 pages 不重开 Reader。真实 Flutter 退出还暴露了两端 mock 掩盖的应答漂移，现关闭会话统一为 `{closed:true}`，取消/释放为 `{released:true}`，公开 API→Worker 延迟确认与浏览器 Source 门均明确检查相应 ACK。历史测试方法见 [Source 门](../apps/api/test/source-metadata-probe.md)。
 
 `pnpm check`、`pnpm flutter:check` 与产品 Web/API dry-run 构建通过；Java 图片 oracle 对 seed 和正式 HttpSource 两套签名均通过。该历史输入的 Web 终端有 encoded/pixel/resource 总预算、头部预检与实际 decode；随后内部 Bitmap/ImageDecoder 的二进制与合计账本进展见下节。不能据此声称图片解密/重排、动画/超长图、进程/GPU 合计峰值、Native 受管文件或 P0 已通过。
 

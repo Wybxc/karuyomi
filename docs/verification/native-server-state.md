@@ -66,7 +66,7 @@
 
 ## 工程检查
 
-增强后的集成测试通过 `flutter analyze --no-pub integration_test/server_sync_test.dart`；`pnpm check:dependencies` 通过。含既有生产三包快照的 `EXTENSION_ASSETS_DIR="$PWD/.local/v4-production/snapshot" pnpm build` 完成正式 Flutter Web release、Native 材料组装、62 文件静态资源检查和 Worker dry-run。共享材料版本不变，没有启动新 AOT 或部署生产。`fe43afd` 的开发分支与 main CI 均已成功；本轮最远进度断言另由上述实际反向测试覆盖。
+增强后的集成测试通过 `flutter analyze --no-pub integration_test/server_sync_test.dart`；`pnpm check:dependencies` 通过。以既有生产三包快照运行 `pnpm build`，完成 Flutter Web release、Native 材料组装、62 文件静态资源检查和 Worker dry-run。共享材料版本不变，没有启动新 AOT 或部署生产。`fe43afd` 的开发分支与 main CI 均已成功；本轮最远进度断言另由上述实际反向测试覆盖。
 
 ## 复验与剩余门
 
@@ -87,6 +87,6 @@ flutter test integration_test/server_sync_test.dart --no-pub \
 
 复验反向恢复时，先从 Web 正常 UI 保存第 2 页并通过独立 API 确认，再在全新 Native 安装中将 `SYNC_START_PAGE` 设为 2、`SYNC_TARGET_PAGE` 设为 1；不能以默认第 1 页启动代替这一门。
 
-必要原始证据位于忽略的 `.local/server-sync-native/`：`ios-first.log`、`ios-second.log`、`web-favorite.json`、`ios-first-state.json`、`web-back-state.json`、`ios-second-state.json` 与首轮 `network.json`；反向结果保留在 `reverse-web-state.json`、`ios-reverse.log`、`reverse-native-state.json` 与 `reverse-network.json`。两轮服务日志分别为 `harness.log`、`reverse-harness.log`。文档只保留有用结论；不复制正文、详细日志或凭据。
+反向结果保留在 `reverse-web-state.json`、`ios-reverse.log`、`reverse-native-state.json` 与 `reverse-network.json`。两轮服务日志分别为 `harness.log`、`reverse-harness.log`。文档只保留有用结论；不复制正文、详细日志或凭据。
 
 尚待单独完成：Web↔Android 和 iOS↔Android、实际并发/前台重取/Access 恢复、生产正向登录、物理设备触控与性能，以及分类、书签和同步设置。基础 API 幂等/冲突与 Web 独立会话证据见[服务端状态记录](server-state.md)，生产部署边界见[生产记录](server-state-production.md)。少量 xkcd 实测不提升其它扩展的 `compiled_unverified` / `runtimeReady=false` 状态。

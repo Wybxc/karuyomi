@@ -36,7 +36,7 @@ Codex 内置浏览器 Chromium 156 当前通过 **39 组**。其中原 27 组保
 - 普通 pending 4 满时 reader-close 仍能完成；真实 IDB commit abort 后记录和 usage 同步回滚，再独立清理本 editor；两个 namespace 相互隔离。
 - 单块 read 只发生一个 chunk lookup，未扫描记录；结构/目录元数据操作不读取正文值。
 
-最终编译身份由正式 runner 对实际服务字节计算，报告位于忽略的 `.local/cache-lifecycle/namespace-final.json`：
+正式 runner 对实际服务字节计算了最终编译身份：
 
 | 字节                          | SHA-256                                                            |
 | ----------------------------- | ------------------------------------------------------------------ |
@@ -79,7 +79,7 @@ pnpm exec vitest run packages/runtime-host/test/bridge.test.ts
 pnpm teavm:check
 ```
 
-39 组浏览器桥机制已有正式入口。安装固定 Node/pnpm 依赖后运行以下命令；用 Codex 内置浏览器打开 stdout 的 URL，页面自动运行。命令在报告通过后退出 0，失败、超时或中断退出非零并关闭监听端口；默认报告为 `.local/cache-lifecycle/browser-result.json`。每轮先写未运行状态，避免误用旧成功报告；可用 `--report PATH`、`--timeout-ms 300000`、`--port 0` 指定输出与期限。成功/失败报告包含实际桥、Worker 和 suite 摘要，临时测试 namespace 在退出时清理。
+39 组浏览器桥机制已有正式入口。安装固定 Node/pnpm 依赖后运行以下命令；用 Codex 内置浏览器打开 stdout 的 URL，页面自动运行。命令在报告通过后退出 0，失败、超时或中断退出非零并关闭监听端口；每轮先写未运行状态，避免误用旧成功报告；可用 `--report PATH`、`--timeout-ms 300000`、`--port 0` 指定输出与期限。成功/失败报告包含实际桥、Worker 和 suite 摘要，临时测试 namespace 在退出时清理。
 
 ```sh
 node tools/teavm/check-cache-storage.ts --timeout-ms 300000
@@ -87,15 +87,7 @@ node tools/teavm/check-cache-storage.ts --timeout-ms 300000
 
 正式 runner 的实际成功退出已通过；未打开浏览器的期限失败与 SIGTERM 中断均退出 1、留下明确失败报告并释放端口。没有自动启动外部浏览器，也未把该手动机制门冒称 CI 浏览器检查。
 
-Java 浏览器编排与产物仍留在忽略的 `.local/cache-java/`，以下临时驱动不随干净检出提供：
-
-```sh
-node .local/cache-java/build.ts
-node .local/cache-java/server-policy.ts
-# 内置浏览器打开 stdout 的 loopback URL，运行共享 Java Cache 场景。
-```
-
-改桥或测试后重新运行命令以生成新产物；改 Java 后先重新运行 build。Java runner 使用正式 `prepareSources`、`compileExtension`、`compileBridge`，隔离自身 Maven/workerd state；不要复用正在运行的发布器目录。新 Java 报告为 `.local/cache-java/policy-browser-result.json`，维护文档只保留有用结论。
+Java runner 使用正式 `prepareSources`、`compileExtension`、`compileBridge`，隔离自身 Maven/workerd state；不要复用正在运行的发布器目录。
 
 ## Native 引擎分项
 

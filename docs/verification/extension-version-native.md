@@ -15,7 +15,7 @@
 
 | 工件 | 来源                                                                                 | buildId                                                                                                          |
 | ---- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| 旧   | 本地既有 `.local/details-fault.WdZHpi/dist/public`                                   | `ext-all.xkcd-31777c287c69f021ac4ebcdcd0a35cac-43d97485f779b768af7861a6a25522db433ab6d229a6d989e70e3f3c88a848a3` |
+| 旧   | 先前隔离验收的静态快照                                                               | `ext-all.xkcd-31777c287c69f021ac4ebcdcd0a35cac-43d97485f779b768af7861a6a25522db433ab6d229a6d989e70e3f3c88a848a3` |
 | 新   | 从 clab 只读取既有 `linux-smoke-xkcd` 指定工件，经正式 `prepare-snapshot` 校验与装配 | `ext-all.xkcd-31777c287c69f021ac4ebcdcd0a35cac-792d491c6e1169cc165332d0e21723c53e5ed964574af99614e4ce5d034257bb` |
 
 新清单的官方序列化补出空的 `preferenceSyncRules`；除此及构建、bundle 字段外，两份清单一致。两份静态目录经官方 Vite 构建各自只含当前构建，未启动 AOT，未改 clab 冻结输入或正式发布状态。
@@ -35,8 +35,8 @@
 
 ## 复验与范围
 
-仓库忽略目录 `.local/native-xkcd-build-replacement-426536d/` 的 `REPRODUCE.md` 保存固定输入、双快照装配、正式 HTTPS 配置、专用设备、三阶段 Flutter 参数和独立采样命令。旧快照从固定产品副本用 `EXTENSION_ASSETS_DIR="$old" pnpm acceptance:build:native` 装配；新快照经 `prepare-snapshot`、正式 runtime-host/native assets 构建后，用 `EXTENSION_ASSETS_DIR="$new" pnpm --filter @karuyomi/api build` 和该包的 `vite.acceptance.config.ts --mode native-acceptance` 生成。使用 `ACCEPTANCE_NEXT_CONFIG` 运行官方 `pnpm acceptance:serve`；每端保留同一个运行时贯穿旧构建阅读、切换和缓存清理，确认后再新开进程续读。
+旧快照从固定产品副本用 `EXTENSION_ASSETS_DIR="$old" pnpm acceptance:build:native` 装配；新快照经 `prepare-snapshot`、正式 runtime-host/native assets 构建后，用 `EXTENSION_ASSETS_DIR="$new" pnpm --filter @karuyomi/api build` 和该包的 `vite.acceptance.config.ts --mode native-acceptance` 生成。使用 `ACCEPTANCE_NEXT_CONFIG` 运行官方 `pnpm acceptance:serve`；每端保留同一个运行时贯穿旧构建阅读、切换和缓存清理，确认后再新开进程续读。
 
-iOS 目录保留三阶段 Flutter 日志、四次六路快照、独立验证和两次在确认前中止的记录。Android 使用同一对已装配快照，在 `.local/native-android-xkcd-build-replacement-426536d/REPRODUCE.md` 保存设备参数、驱动差异、TLS、切换与只读 D1 采样步骤；`evidence/` 包含三阶段 Flutter 日志、新旧 gzip 实下载摘要、四组 HTTPS 和 D1 快照、`d1-audit.json` 与 `verified.json`。两轮各自的三个 Flutter 阶段、驱动分析/格式和独立校验均通过；专用模拟器、临时服务及私钥已清理。
+iOS 目录保留三阶段 Flutter 日志、四次六路快照、独立验证和两次在确认前中止的记录。`evidence/` 包含三阶段 Flutter 日志、新旧 gzip 实下载摘要、四组 HTTPS 和 D1 快照、`d1-audit.json` 与 `verified.json`。两轮各自的三个 Flutter 阶段、驱动分析/格式和独立校验均通过；专用模拟器、临时服务及私钥已清理。
 
 此记录覆盖默认仓库在 iOS、Android 模拟器上的同上游版本换构建。Native 上游版本升级、停用与卸载等完整生命周期、真机和生产 Access 仍待独立验收。[历史 Web Arknights 1.6.1 → 1.6.2](extension-version-web.md)是另一套固定输入的上游版本升级记录。

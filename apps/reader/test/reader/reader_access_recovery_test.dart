@@ -1,6 +1,7 @@
 import 'package:karuyomi/widgets/choice_field.dart';
 
 import '../test_app.dart';
+import '../../test_support/cupertino.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -270,6 +271,22 @@ void main() {
         fixture.platform.businessServer.appliedMutations,
         appliedBefore + 1,
       );
+      // The original request is acknowledged above. A subsequent viewport
+      // observation after the recovery row collapses is a separate mutation.
+      await tester.pump(writer.debounce);
+      await tester.pumpAndSettle();
+      final originalMutation = wire.decodeProtoJson(
+        wire.StateMutation(),
+        jsonDecode(originalBody!),
+      );
+      for (final request in fixture.progressPosts.skip(baselinePosts + 2)) {
+        expect(
+          wire
+              .decodeProtoJson(wire.StateMutation(), jsonDecode(request.body!))
+              .mutationId,
+          isNot(originalMutation.mutationId),
+        );
+      }
       expect(writer.unsaved, false);
       await fixture.close(tester);
     },
@@ -413,6 +430,8 @@ void main() {
       (tester) async {
         final fixture = _Fixture();
         await fixture.open(tester);
+        await tester.tap(find.byKey(const ValueKey('reader-chapter-options')));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('重新阅读本章'));
         await tester.pumpAndSettle();
         tester
@@ -422,10 +441,10 @@ void main() {
             .onChanged!(ReadingMode.rightToLeft);
         await tester.pumpAndSettle();
         tester
-            .widget<CupertinoSlidingSegmentedControl<int>>(
+            .widget<ChoiceField<bool>>(
               find.byKey(const ValueKey('reader-page-layout')),
             )
-            .onValueChanged(2);
+            .onChanged!(true);
         await tester.pumpAndSettle();
         final original = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
         final anchor = original.manifest.positionAt(1, offset: .4);
@@ -675,7 +694,7 @@ void main() {
       final oldKey = tester.widget<ReaderScreen>(find.byType(ReaderScreen)).key;
       final gate = Completer<void>();
       fixture.pagesGate = gate;
-      await tester.tap(find.text('下一章'));
+      await tester.tap(iconButton('下一章'));
       await tester.pump();
       fixture.expire = true;
       final session = fixture.catalog.session!;

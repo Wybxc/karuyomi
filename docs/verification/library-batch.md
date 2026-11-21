@@ -31,8 +31,6 @@
 - `pnpm flutter:check` 完整通过：reader_core 21、source_runtime 42、客户端 318 项；三个项目静态分析无问题。
 - `pnpm build` 通过：正式 Web/Native runtime 资源、Flutter Web 和 Worker/Static Assets 构建成功。这没有构建或运行新的 iOS/Android App，也不作为设备验收。
 
-本轮详细临时输出保留在忽略的 `.local/library-batch-*.log`，不将机器日志提交到文档或源码。
-
 ## 可复验入口与验收范围
 
 ```sh
@@ -61,7 +59,7 @@ flutter test test/library/library_batch_test.dart test/library/library_batch_pag
 
 原批次显示「已确认 1 / 3 部 · 未开始 1 部」，新批次显示「已确认 2 / 2 部 · 未开始 0 部」。停服后核对精确审计序列和五份独立 GET 快照；每次成功与对应 D1 回执相符，第三项直到重新确认才有请求。全局设置、作品元数据、收藏、书签和进度未变；分类目录没有修改。首次临时审计曾在夹具准备阶段因请求流已转交而失败，调整观察顺序后使用新 D1 重跑；正式产品未改。
 
-复验用新隔离 checkout，先运行 `pnpm acceptance:build`。本轮忽略目录 `.local/verification/library-batch-web-7cf596a/` 保存 `REPRODUCE.md`、仅验收使用的 Vite harness 观察补丁、严格 TypeScript 采样与核对入口、停服审计及 `verified.json`；按实际 UI 顺序提供标题，不能以 API 行顺序代替确认清单。此分项覆盖双 Web 的批量添加分类、部分提交和旧 CAS 恢复；未覆盖批量移出、断网或丢响应、Native、生产 Access 和真机。
+复验用新隔离 checkout，先运行 `pnpm acceptance:build`。按实际 UI 顺序提供标题，不能以 API 行顺序代替确认清单。此分项覆盖双 Web 的批量添加分类、部分提交和旧 CAS 恢复；未覆盖批量移出、断网或丢响应、Native、生产 Access 和真机。
 
 ## Android 批量移出与 iOS 读回
 
@@ -76,4 +74,4 @@ flutter test test/library/library_batch_test.dart test/library/library_batch_pag
 
 两个 Android 批次均显示「已确认 2 / 2 部 · 未开始 0 部」。独立只读查询实际 D1 SQLite 文件，回执数为 `10 → 12 → 14 → 14`；四条新增回执分别为乙、甲的 `setCategories` 和乙、甲的 `setFavorite`。以原 UUID 和作品／目录 CAS 重算每条规范化请求摘要，与 D1 匹配；丙的完整作品状态、分类目录、设置和原有章节标记保持。两个确认框打开时，书架、分类目录、设置以及三部作品的状态、进度和书签共十二路 API 原始响应，与本批次写前逐字节一致；iOS 读回前后均与 Android 完成后逐字节一致。宿主独立 HTTPS 采样每个检查点均 12/12 匹配。
 
-三个阶段各 1/1 通过，应用 PID 依次为 `4488`、`4810`、`53373`。复验步骤、原始响应和 `evidence/verified.json` 保留于本机忽略目录 `.local/library-batch-native-2c012db/`。服务、反代、私有 ADB、专用设备和临时 TLS 私钥已清理。本次覆盖 Android 正常批量移出和 iOS 新进程只读；未覆盖 iOS 写批次、Native 批量添加、跨端写冲突、断网或丢确认、真实 Source 阅读、生产 Access 和真机。
+三个阶段各 1/1 通过，应用 PID 依次为 `4488`、`4810`、`53373`。服务、反代、私有 ADB、专用设备和临时 TLS 私钥已清理。本次覆盖 Android 正常批量移出和 iOS 新进程只读；未覆盖 iOS 写批次、Native 批量添加、跨端写冲突、断网或丢确认、真实 Source 阅读、生产 Access 和真机。

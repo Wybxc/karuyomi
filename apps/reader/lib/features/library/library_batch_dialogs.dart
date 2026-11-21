@@ -1,4 +1,6 @@
+import '../../widgets/app_routes.dart';
 import '../../widgets/edit_sheet.dart';
+import '../../theme/app_theme.dart';
 
 import 'dart:async';
 
@@ -25,7 +27,7 @@ Future<Set<String>?> showLibraryBatchDialog({
     return Future.value(null);
   }
   FocusManager.instance.primaryFocus?.unfocus();
-  return showCupertinoSheet<Set<String>>(
+  return showAppSheet<Set<String>>(
     context: context,
     enableDrag: false,
     scrollableBuilder: (context, _) => _LibraryBatchDialog(
@@ -79,6 +81,17 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
   bool get _current {
     _checkSession();
     return mounted && !_expired;
+  }
+
+  void _selectCategory(String id, bool selected) {
+    if (!_current || _draft != null) return;
+    setState(() {
+      if (selected) {
+        _categoryIds.add(id);
+      } else {
+        _categoryIds.remove(id);
+      }
+    });
   }
 
   @override
@@ -194,24 +207,57 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
     final target = item?.categoryIds ?? _targetCategories(entry);
     return CupertinoListTile(
       key: ValueKey(('batch-item', entry.mangaKey)),
-      title: Text(entry.title),
-      subtitle: Text(
-        [
-          '${entry.sourceName} · ${entry.sourceLang}',
-          if (_needsCategories)
-            '${_categoryNames(entry.categoryIds)} → ${_categoryNames(target)}',
-          if (item != null)
-            switch (item.status) {
-              LibraryBatchItemStatus.notStarted => '未开始',
-              LibraryBatchItemStatus.sending => '正在等待服务端确认',
-              LibraryBatchItemStatus.confirmed => '已由服务端确认',
-              LibraryBatchItemStatus.uncertain => '尚未确认，需重试原操作',
-              LibraryBatchItemStatus.blocked => '未保存，需重新读取',
-            },
-          ?item?.error,
-        ].join('\n'),
+      title: DefaultTextStyle(
+        style: CupertinoTheme.of(context).textTheme.textStyle,
+        child: Text(entry.title),
       ),
-      padding: EdgeInsets.zero,
+      subtitle: DefaultTextStyle(
+        style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+          fontSize: 13,
+          color: AppColors.secondaryLabel.resolveFrom(context),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${entry.sourceName} · ${entry.sourceLang}'),
+            if (_needsCategories)
+              Text(
+                '${_categoryNames(entry.categoryIds)} → ${_categoryNames(target)}',
+              ),
+            if (item != null)
+              Text(
+                switch (item.status) {
+                  LibraryBatchItemStatus.notStarted => '未开始',
+                  LibraryBatchItemStatus.sending => '正在等待服务端确认',
+                  LibraryBatchItemStatus.reading => '修改已确认，正在读取最新书架',
+                  LibraryBatchItemStatus.confirmed => '已由服务端确认',
+                  LibraryBatchItemStatus.uncertain =>
+                    _expired ? '尚未确认' : '尚未确认，需重试原操作',
+                  LibraryBatchItemStatus.readFailed =>
+                    _expired ? '修改已确认，读取未完成' : '修改已确认，需重试读取',
+                  LibraryBatchItemStatus.blocked =>
+                    _expired ? '未保存' : '未保存，需重新读取',
+                },
+                style: TextStyle(
+                  color: switch (item.status) {
+                    LibraryBatchItemStatus.confirmed =>
+                      AppColors.label.resolveFrom(context),
+                    LibraryBatchItemStatus.uncertain ||
+                    LibraryBatchItemStatus.readFailed ||
+                    LibraryBatchItemStatus.blocked =>
+                      AppColors.error.resolveFrom(context),
+                    _ => AppColors.secondaryLabel.resolveFrom(context),
+                  },
+                ),
+              ),
+            if (item?.error case final error? when !_expired)
+              Text(
+                error,
+                style: TextStyle(color: AppColors.error.resolveFrom(context)),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -225,6 +271,14 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
     useOnListenableChange(_draft, _draftChanged);
     final draft = _draft;
     final locked = _expired || draft != null;
+    final canStart =
+        !locked &&
+        _entries.isNotEmpty &&
+        (!_needsCategories || _categoryIds.isNotEmpty);
+    final actionColor = !_expired && !_needsCategories
+        ? AppColors.error.resolveFrom(context)
+        : null;
+    final canClose = _expired || draft?.busy != true;
     return PopScope<Set<String>>(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -233,112 +287,194 @@ class _LibraryBatchDialogState extends State<_LibraryBatchDialog> {
       child: EditSheet(
         key: const ValueKey('library-batch-review'),
         title: Text(_title),
-        content: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Text('确认清单：${_entries.length} 部漫画'),
-            const SizedBox(height: 8),
-            const Text('逐部保存，以服务端确认结果为准；一项失败时暂停剩余操作。'),
-            if (!_needsCategories) const Text('移出书架后仍保留阅读进度、书签和分类。'),
-            if (_needsCategories && draft == null) ...[
-              const SizedBox(height: 12),
-              const Text('选择要添加或移出的分类；其它分类保持各漫画原有关联。'),
-              for (final category in _view.categories)
-                MergeSemantics(
-                  child: CupertinoFormRow(
-                    prefix: Expanded(flex: 3, child: Text(category.name)),
-                    padding: EdgeInsets.zero,
-                    child: CupertinoCheckbox(
-                      key: ValueKey(('batch-category', category.id)),
-                      value: _categoryIds.contains(category.id),
-                      onChanged: locked
-                          ? null
-                          : (selected) => setState(() {
-                              if (selected == true) {
-                                _categoryIds.add(category.id);
-                              } else {
-                                _categoryIds.remove(category.id);
-                              }
-                            }),
-                    ),
+        leading: !_expired && draft?.finished == true
+            ? null
+            : Semantics(
+                enabled: canClose,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: canClose ? _close : null,
+                  child: Text(
+                    _expired
+                        ? '关闭'
+                        : draft?.attempted == true
+                        ? '稍后'
+                        : '取消',
+                    semanticsLabel: !_expired && draft?.attempted == true
+                        ? '稍后处理'
+                        : null,
                   ),
                 ),
-            ],
-            if (_expired) const Text('身份或服务已变化，原窗口已停用。请关闭后重新打开。'),
-            if (_error case final error?) Text(error),
-            if (draft != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                '已确认 ${draft.confirmedCount} / ${draft.items.length} 部 · 未开始 ${draft.notStartedCount} 部',
               ),
-              if (draft.busy) const CupertinoActivityIndicator(),
-              if (draft.pauseRequested && draft.busy)
-                const Text('已请求暂停，等待当前操作结束后可关闭。'),
-              if (draft.error case final error?) Text(error),
-              if (!_expired && draft.completed) const Text('全部修改已由服务端确认。'),
-              if (!_expired && draft.finished && !draft.completed)
-                const Text('原批次已结束，剩余漫画未再发送。请按最新书架重新确认。'),
-              if (draft.attempted && !draft.finished)
-                const Text('当前会话保留原清单和未确认操作；关闭不会撤回已发请求。'),
-              for (final item in draft.items) _entry(item.entry, item: item),
-            ] else ...[
-              for (final entry in _entries) _entry(entry),
-            ],
-          ],
-        ),
-        actions: [
-          if (!_expired && draft?.busy == true)
-            CupertinoButton(
-              onPressed: draft!.pauseRequested ? null : draft.pause,
-              child: const Text('暂停剩余操作'),
-            ),
-          CupertinoButton(
-            onPressed: !_expired && draft?.busy == true ? null : _close,
-            child: Text(
-              draft == null || !draft.attempted
-                  ? '取消'
-                  : draft.finished
-                  ? '完成'
-                  : '稍后处理',
-            ),
-          ),
-          if (draft == null)
-            CupertinoButton.filled(
-              onPressed:
-                  locked ||
-                      _entries.isEmpty ||
-                      (_needsCategories && _categoryIds.isEmpty)
-                  ? null
-                  : _start,
-              child: const Text('确认并开始'),
-            )
-          else ...[
-            if (draft.canRetry)
-              CupertinoButton.filled(
-                onPressed: _expired ? null : _retry,
-                child: const Text('重试原未确认操作'),
+        trailing: _expired
+            ? null
+            : draft?.finished == true
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _close,
+                child: const Text('完成'),
+              )
+            : draft == null
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                foregroundColor: canStart ? actionColor : null,
+                onPressed: canStart ? _start : null,
+                child: const Text('开始', semanticsLabel: '确认并开始'),
+              )
+            : draft.canRetry
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                foregroundColor: actionColor,
+                onPressed: _retry,
+                child: Text(
+                  draft.retryNeedsRead ? '重试读取' : '重试',
+                  semanticsLabel: draft.retryNeedsRead
+                      ? '重试已确认修改的读取'
+                      : '重试原未确认操作',
+                ),
+              )
+            : draft.canContinue
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                foregroundColor: actionColor,
+                onPressed: _continue,
+                child: const Text('继续', semanticsLabel: '继续剩余原清单'),
+              )
+            : draft.canReloadAndFinish
+            ? CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _reload,
+                child: const Text('重读', semanticsLabel: '重新读取并结束原批次'),
+              )
+            : null,
+        content: ListView(
+          children: [
+            if (!_expired &&
+                _needsCategories &&
+                draft == null &&
+                _view.categories.isNotEmpty)
+              CupertinoFormSection.insetGrouped(
+                header: const Text('选择分类'),
+                footer: const Text('选择要添加或移出的分类；其它分类保持各漫画原有关联。'),
+                children: [
+                  for (final category in _view.categories)
+                    MergeSemantics(
+                      child: CupertinoListTile(
+                        onTap: locked
+                            ? null
+                            : () => _selectCategory(
+                                category.id,
+                                !_categoryIds.contains(category.id),
+                              ),
+                        title: Builder(
+                          builder: (context) => DefaultTextStyle(
+                            style: DefaultTextStyle.of(context).style,
+                            child: Text(category.name),
+                          ),
+                        ),
+                        trailing: CupertinoCheckbox(
+                          key: ValueKey(('batch-category', category.id)),
+                          value: _categoryIds.contains(category.id),
+                          onChanged: locked
+                              ? null
+                              : (selected) => _selectCategory(
+                                  category.id,
+                                  selected == true,
+                                ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            if (draft.canContinue)
-              CupertinoButton.filled(
-                onPressed: _expired ? null : _continue,
-                child: const Text('继续剩余原清单'),
+            if (_expired || _error != null || draft != null)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_expired)
+                      Text(
+                        '身份或服务已变化，原窗口已停用。请关闭后重新打开。',
+                        style: TextStyle(
+                          color: AppColors.error.resolveFrom(context),
+                        ),
+                      ),
+                    if (_error case final error? when !_expired)
+                      Text(
+                        error,
+                        style: TextStyle(
+                          color: AppColors.error.resolveFrom(context),
+                        ),
+                      ),
+                    if (draft != null) ...[
+                      Text(
+                        '已确认 ${draft.confirmedCount} / ${draft.items.length} 部 · 未开始 ${draft.notStartedCount} 部',
+                      ),
+                      if (draft.busy) const CupertinoActivityIndicator(),
+                      if (!_expired && draft.pauseRequested && draft.busy)
+                        const Text('已请求暂停，等待当前操作结束后可关闭。'),
+                      if (draft.error case final error? when !_expired)
+                        Text(
+                          error,
+                          style: TextStyle(
+                            color: AppColors.error.resolveFrom(context),
+                          ),
+                        ),
+                      if (!_expired && draft.completed)
+                        const Text('全部修改已由服务端确认。'),
+                      if (!_expired && draft.finished && !draft.completed)
+                        const Text('原批次已结束，剩余漫画未再发送。请按最新书架重新确认。'),
+                      if (!_expired && draft.attempted && !draft.finished)
+                        Text(
+                          draft.retryNeedsRead
+                              ? '该项修改已保存；当前会话保留原清单，可稍后继续读取最新书架。'
+                              : '当前会话保留原清单和当前操作；关闭不会撤回已发请求。',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.secondaryLabel.resolveFrom(
+                              context,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
               ),
-            if (draft.canContinue)
-              CupertinoButton(
-                onPressed: _expired
+            if (_entries.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('确认清单：0 部漫画'),
+              )
+            else
+              CupertinoFormSection.insetGrouped(
+                header: Text('确认清单：${_entries.length} 部漫画'),
+                footer: _expired
                     ? null
-                    : () {
-                        if (_current) draft.finishRemaining();
-                      },
+                    : Text(
+                        '逐部保存，以服务端确认结果为准；一项失败时暂停剩余操作。${_needsCategories ? '' : '\n移出书架后仍保留阅读进度、书签和分类。'}',
+                      ),
+                children: [
+                  if (draft != null)
+                    for (final item in draft.items)
+                      _entry(item.entry, item: item)
+                  else
+                    for (final entry in _entries) _entry(entry),
+                ],
+              ),
+            if (!_expired && draft?.busy == true)
+              CupertinoButton(
+                onPressed: draft!.pauseRequested ? null : draft.pause,
+                child: const Text('暂停剩余操作'),
+              ),
+            if (!_expired && draft?.canContinue == true)
+              CupertinoButton(
+                onPressed: () {
+                  if (_current) draft!.finishRemaining();
+                },
                 child: const Text('结束剩余操作'),
               ),
-            if (draft.canReloadAndFinish)
-              CupertinoButton.filled(
-                onPressed: _expired ? null : _reload,
-                child: const Text('重新读取并结束原批次'),
-              ),
           ],
-        ],
+        ),
       ),
     );
   }

@@ -1,13 +1,15 @@
 import '../../test_support/cupertino.dart';
 
-import 'package:karuyomi/widgets/choice_field.dart';
-
 import '../test_app.dart';
 
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/gestures.dart' show PointerScrollEvent;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
 import 'package:karuyomi/data/reading_progress.dart';
@@ -42,6 +44,7 @@ List<wire.Chapter> get _chapters => [
     name: '同名章',
     chapterNumber: 7.25,
     scanlator: '乙组',
+    dateUpload: DateTime(2020, 3, 7, 12).millisecondsSinceEpoch.toString(),
     sourceOrder: 8,
     memoJson: '{"edition":"b"}',
   ),
@@ -55,12 +58,12 @@ ChapterSequence get _sequence => ChapterSequence(
   chapters: _chapters,
 );
 
-TestPlatform _platform() =>
+TestPlatform _platform({List<wire.Chapter>? chapters}) =>
     TestPlatform()
       ..invokeHandler = (call) async => switch (call.whichRequest()) {
         wire.SourceCall_Request.details => wire.SourceResult(manga: testManga),
         wire.SourceCall_Request.chapters => wire.SourceResult(
-          chapters: wire.ChapterList(chapters: _chapters),
+          chapters: wire.ChapterList(chapters: chapters ?? _chapters),
         ),
         wire.SourceCall_Request.pages => wire.SourceResult(
           pageList: wire.PageList(
@@ -84,8 +87,10 @@ Future<CatalogController> _details(
   WidgetTester tester,
   TestPlatform platform, {
   bool settleDetails = true,
+  Size viewport = const Size(1100, 2400),
+  bool openOptions = true,
 }) async {
-  tester.view.physicalSize = const Size(1100, 2400);
+  tester.view.physicalSize = viewport;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -122,6 +127,9 @@ Future<CatalogController> _details(
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byType(MangaDetailsPage), findsOneWidget);
   }
+  if (settleDetails && openOptions) {
+    await _tap(tester, find.byKey(const ValueKey('chapter-options')));
+  }
   return tester
       .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))
       .controller;
@@ -129,7 +137,10 @@ Future<CatalogController> _details(
 
 Finder get _tiles => find.descendant(
   of: find.byType(MangaDetailsPage),
-  matching: find.byType(CupertinoListTile),
+  matching: find.byWidgetPredicate(
+    (widget) => widget is CupertinoListTile && widget.key is ValueKey<String>,
+    description: 'chapter rows with occurrence keys',
+  ),
 );
 
 Finder _row(int sourceIndex) =>
@@ -182,6 +193,176 @@ Future<void> _leaveReader(
 }
 
 void main() {
+  for (final brightness in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'chapter text and independent keyboard actions remain readable in $brightness at ${scale}x',
+        (tester) async {
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(
+            tester.platformDispatcher.clearPlatformBrightnessTestValue,
+          );
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final semantics = tester.ensureSemantics();
+          try {
+            final platform = _platform();
+            final catalog = await _details(
+              tester,
+              platform,
+              viewport: const Size(360, 800),
+              openOptions: false,
+            );
+            final chapter = _sequence.entries[2];
+            final row = _row(2);
+            await tester.scrollUntilVisible(
+              row,
+              250,
+              scrollable: find
+                  .descendant(
+                    of: find.byType(MangaDetailsPage),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+            final button = find
+                .ancestor(of: row, matching: find.byType(CupertinoButton))
+                .first;
+            expect(
+              tester.getSemantics(button).getSemanticsData().label,
+              isNot(contains('标记章节书签')),
+              reason:
+                  'opening and bookmarking must announce independent actions',
+            );
+            final subtitle = find.descendant(
+              of: row,
+              matching: find.textContaining('来源第 3 项'),
+            );
+            expect(
+              tester.widget<Text>(subtitle).data,
+              startsWith('2020/3/7 ·'),
+            );
+            expect(
+              tester.renderObject<RenderParagraph>(subtitle).didExceedMaxLines,
+              false,
+              reason: 'duplicate occurrence identity and read status must remain visible',
+            );
+            final name = find.descendant(of: row, matching: find.text('同名章'));
+            expect(tester.getTopLeft(name).dx, 30);
+            expect(tester.getTopLeft(subtitle).dx, 16);
+            expect(
+              find.descendant(
+                of: row,
+                matching: find.byIcon(CupertinoIcons.circle_fill),
+              ),
+              findsOneWidget,
+            );
+            final bookmark = find.byKey(
+              ValueKey('chapter-bookmark-${chapter.key}'),
+            );
+            expect(find.ancestor(of: bookmark, matching: button), findsNothing);
+            Focus.of(tester.element(name)).requestFocus();
+            await tester.pumpAndSettle();
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.pumpAndSettle();
+            await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+            await tester.pumpAndSettle();
+            expect(
+              platform.businessServer.bookmarked(
+                _sequence.mangaKey,
+                chapter.key,
+              ),
+              true,
+            );
+            expect(find.byType(ReaderScreen), findsNothing);
+            expect(
+              platform.businessServer.bookmarked(
+                _sequence.mangaKey,
+                _sequence.entries.first.key,
+              ),
+              false,
+            );
+            await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+            await tester.pumpAndSettle();
+            await tester.runAsync(() async {
+              await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+              await Future<void>.delayed(Duration.zero);
+            });
+            await tester.pumpAndSettle();
+            expect(find.byType(ReaderScreen), findsOneWidget);
+            expect(
+              tester
+                  .widget<ChapterReaderRoute>(find.byType(ChapterReaderRoute))
+                  .initialChapter
+                  .key,
+              chapter.key,
+            );
+            await _leaveReader(tester, catalog);
+            await _finish(tester, catalog);
+          } finally {
+            semantics.dispose();
+          }
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'chapter rows render actual upload dates using local calendar days',
+    (tester) async {
+      final now = DateTime(2026, 11, 17, 0, 15);
+      String timestamp(DateTime date) => date.millisecondsSinceEpoch.toString();
+      final dates = [
+        (timestamp(DateTime(2026, 11, 17, 19)), '今天'),
+        (timestamp(DateTime(2026, 11, 16, 23, 45)), '1 天前'),
+        (timestamp(DateTime(2026, 11, 11, 19)), '6 天前'),
+        (timestamp(DateTime(2026, 11, 10, 19)), '2026/11/10'),
+        (timestamp(DateTime(2026, 11, 24, 19)), '7 天后'),
+        (timestamp(DateTime(2026, 11, 25, 19)), '2026/11/25'),
+        (timestamp(DateTime(1969, 11, 20, 12)), '1969/11/20'),
+        ('', null),
+        ('0', null),
+        ('9223372036854775807', null),
+        ('-9223372036854775808', null),
+      ];
+      final chapters = [
+        for (final (index, date) in dates.indexed)
+          wire.Chapter(
+            url: '/dated/$index',
+            name: '日期测试 ${index + 1}',
+            dateUpload: date.$1,
+          ),
+      ];
+      final sequence = ChapterSequence(
+        packageName: 'eu.kanade.source.test',
+        sourceId: sourceId,
+        mangaUrl: testManga.url,
+        chapters: chapters,
+      );
+      final platform = _platform(chapters: chapters);
+
+      await withClock(Clock.fixed(now), () async {
+        final catalog = await _details(tester, platform, openOptions: false);
+        for (final (index, date) in dates.indexed) {
+          final subtitle = find.descendant(
+            of: find.byKey(ValueKey(sequence.entries[index].key)),
+            matching: find.textContaining('未读'),
+          );
+          expect(subtitle, findsOneWidget);
+          expect(
+            tester.widget<Text>(subtitle).data,
+            [?date.$2, '未读'].join(' · '),
+            reason: 'dateUpload ${date.$1}',
+          );
+        }
+        await _finish(tester, catalog);
+      });
+    },
+  );
+
   testWidgets(
     'chapter list preserves duplicate occurrences and Source order with absent and fractional numbers',
     (tester) async {
@@ -226,6 +407,77 @@ void main() {
     },
   );
 
+  testWidgets('tapping a disabled chapter bookmark never opens the chapter', (
+    tester,
+  ) async {
+    final platform = _platform();
+    final readStarted = Completer<void>();
+    final releaseRead = Completer<void>();
+    addTearDown(() {
+      if (!releaseRead.isCompleted) releaseRead.complete();
+    });
+    platform.businessServer.beforeRequest = (request) async {
+      if (request.method == 'GET' &&
+          request.uri.path ==
+              '/api/state/manga/${_sequence.mangaKey}/bookmarks' &&
+          !readStarted.isCompleted) {
+        readStarted.complete();
+        await releaseRead.future;
+      }
+      return null;
+    };
+    final catalog = await _details(
+      tester,
+      platform,
+      settleDetails: false,
+      viewport: const Size(360, 800),
+      openOptions: false,
+    );
+    await tester.runAsync(
+      () => readStarted.future.timeout(const Duration(seconds: 2)),
+    );
+    final chapter = _sequence.entries[2];
+    final bookmark = find.byKey(ValueKey('chapter-bookmark-${chapter.key}'));
+    await tester.scrollUntilVisible(
+      bookmark,
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(MangaDetailsPage),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pump();
+    expect(tester.widget<CupertinoButton>(bookmark).enabled, isFalse);
+    await tester.runAsync(() async {
+      await tester.tap(bookmark);
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(
+      platform.invocations.where(
+        (call) => call.whichRequest() == wire.SourceCall_Request.pages,
+      ),
+      isEmpty,
+    );
+    expect(find.byType(MangaDetailsPage), findsOneWidget);
+    expect(find.byType(ChapterReaderRoute), findsNothing);
+    await tester.runAsync(() async {
+      releaseRead.complete();
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pumpAndSettle();
+    expect(tester.widget<CupertinoButton>(bookmark).enabled, isTrue);
+    await _tap(tester, bookmark);
+    expect(
+      platform.businessServer.bookmarked(_sequence.mangaKey, chapter.key),
+      isTrue,
+    );
+    expect(find.byType(MangaDetailsPage), findsOneWidget);
+    await _finish(tester, catalog);
+  });
+
   testWidgets(
     'chapter search matches name scanlator and displayed number locally and can clear an empty result',
     (tester) async {
@@ -261,6 +513,82 @@ void main() {
     },
   );
 
+  testWidgets('scrolling chapters preserves the filter and ends editing', (
+    tester,
+  ) async {
+    final platform = _platform(
+      chapters: [
+        for (var index = 0; index < 34; index++)
+          wire.Chapter(url: '/chapter-$index', name: '待查章节 $index'),
+        for (var index = 0; index < 16; index++)
+          wire.Chapter(url: '/excluded-$index', name: '其他章节 $index'),
+      ],
+    );
+    final catalog = await _details(
+      tester,
+      platform,
+      viewport: const Size(360, 480),
+      openOptions: false,
+    );
+    final field = find.byKey(const ValueKey('chapter-search'));
+    final scrollView = find.descendant(
+      of: find.byKey(const ValueKey('details-scroll')),
+      matching: find.byType(CustomScrollView),
+    );
+    SemanticsData chapterListSemantics() {
+      final root = tester.getSemantics(scrollView);
+      final scrollNodes = [if (root.scrollExtentMax != null) root];
+      root.visitChildren((node) {
+        if (node.scrollExtentMax != null) scrollNodes.add(node);
+        return true;
+      });
+      return scrollNodes.single.getSemanticsData();
+    }
+
+    await tester.ensureVisible(field);
+    await tester.pumpAndSettle();
+    final position = Scrollable.of(tester.element(field)).position;
+    final originalExtent = position.maxScrollExtent;
+    expect(chapterListSemantics().scrollChildCount, 50);
+    await _search(tester, '待查');
+    final filteredSemantics = chapterListSemantics();
+    expect(filteredSemantics.scrollChildCount, 34);
+    expect(filteredSemantics.scrollExtentMax, position.maxScrollExtent);
+    expect(filteredSemantics.scrollExtentMax, lessThan(originalExtent));
+    final editor = find.descendant(
+      of: field,
+      matching: find.byType(EditableText),
+    );
+    final focus = tester.widget<EditableText>(editor).focusNode;
+    final fieldOffset = position.pixels;
+    expect(focus.hasPrimaryFocus, isTrue);
+
+    position.jumpTo(fieldOffset - 8);
+    await tester.pumpAndSettle();
+    expect(focus.hasPrimaryFocus, isTrue);
+    final viewport = tester.getRect(
+      find.byKey(const ValueKey('details-scroll')),
+    );
+    tester.binding.handlePointerEvent(
+      PointerScrollEvent(
+        position: Offset(viewport.center.dx, viewport.bottom - 16),
+        scrollDelta: const Offset(0, 320),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(position.pixels, greaterThan(fieldOffset));
+    expect(focus.hasFocus, isFalse);
+
+    position.jumpTo(fieldOffset);
+    await tester.pumpAndSettle();
+    expect(tester.widget<EditableText>(editor).controller.text, '待查');
+    final searchSemantics = tester.getSemantics(editor).getSemanticsData();
+    expect(searchSemantics.label, '筛选章节');
+    expect(searchSemantics.value, '待查');
+    expect(find.text('显示 34 / 50 章'), findsOneWidget);
+    await _finish(tester, catalog);
+  });
+
   testWidgets(
     'reversed search and bookmarks open the exact duplicate Source occurrence',
     (tester) async {
@@ -269,7 +597,10 @@ void main() {
       final calls = platform.invocations.length;
       await _tap(
         tester,
-        find.descendant(of: _row(2), matching: iconLabel('标记章节书签 同名章')),
+        find.descendant(
+          of: find.byKey(ValueKey(('chapter-row', _sequence.entries[2].key))),
+          matching: iconLabel('标记章节书签 同名章'),
+        ),
       );
       expect(
         platform.businessServer.bookmarked(
@@ -379,14 +710,20 @@ void main() {
       gate.complete();
       await tester.runAsync(() => Future<void>.delayed(Duration.zero));
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<ChoiceField<ChapterOrder>>(
-              find.byType(ChoiceField<ChapterOrder>),
-            )
-            .value,
-        ChapterOrder.reversed,
-      );
+      final options = find.byKey(const ValueKey('reader-chapter-options'));
+      await tester.tap(options);
+      await tester.pumpAndSettle();
+      for (final order in ChapterOrder.values) {
+        final item = tester.widget<CupertinoMenuItem>(
+          find.byKey(ValueKey(('reader-chapter-order', order))),
+        );
+        expect(
+          item.trailing,
+          order == ChapterOrder.reversed ? isA<Icon>() : isNull,
+        );
+      }
+      await tester.tap(options);
+      await tester.pumpAndSettle();
       await _leaveReader(tester, catalog);
       expect(_visibleKeys(tester), _keys([3, 2, 1, 0]));
       await _finish(tester, catalog);

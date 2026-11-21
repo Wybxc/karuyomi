@@ -1,3 +1,5 @@
+import '../../theme/app_theme.dart';
+import '../../widgets/app_routes.dart';
 import '../../widgets/choice_field.dart';
 
 import 'dart:async';
@@ -14,6 +16,7 @@ import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
 
 import '../../diagnostics/reader_baseline.dart';
+import 'reader_page_navigation.dart';
 import 'reader_preferences.dart';
 import 'resource_image.dart';
 import 'resource_pool.dart';
@@ -43,6 +46,183 @@ final class ReaderViewportState {
   final bool? doublePage;
 }
 
+enum ReaderChapterEdge {
+  previous(-1),
+  next(1);
+
+  const ReaderChapterEdge(this.delta);
+  final int delta;
+}
+
+class const ReaderChapterTransition({
+  super.key,
+  required final ReaderChapterEdge edge,
+  required final ({String name, String scanlator}) currentChapter,
+  required final ({String name, String scanlator})? targetChapter,
+  required final ReaderBackground background,
+  required final int dimPercent,
+  required final bool loading,
+  required final String? error,
+  required final VoidCallback? onContinue,
+  required final VoidCallback? onRetry,
+  required final VoidCallback? onReturn,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final canvas = _readerCanvasColor(context, background, dimPercent);
+    return _ReaderCanvas(
+      color: canvas,
+      child: LayoutBuilder(
+        builder: (context, bounds) => _buildPanel(context, bounds, canvas),
+      ),
+    );
+  }
+
+  Widget _buildPanel(
+    BuildContext context,
+    BoxConstraints bounds,
+    Color canvas,
+  ) {
+    final previous = edge == ReaderChapterEdge.previous;
+    final direction = previous ? '上一章' : '下一章';
+    final foreground = AppColors.label.resolveFrom(context);
+    final muted = foreground.withValues(alpha: .75);
+    final secondary = _readerContrast(muted, canvas) >= _readerTextContrast
+        ? muted
+        : foreground;
+
+    Color roleOnCanvas(CupertinoDynamicColor role) {
+      final color = role.resolveFrom(context);
+      if (_readerContrast(color, canvas) >= _readerTextContrast) return color;
+      final highContrast =
+          CupertinoTheme.brightnessOf(context) == Brightness.dark
+          ? role.darkHighContrastColor
+          : role.highContrastColor;
+      return _readerContrast(highContrast, canvas) >= _readerTextContrast
+          ? highContrast
+          : foreground;
+    }
+
+    final theme = CupertinoTheme.of(context).textTheme;
+    final body = theme.textStyle.copyWith(color: foreground);
+    final caption = theme.actionSmallTextStyle.copyWith(color: secondary);
+    const actionTarget = Size.square(kMinInteractiveDimensionCupertino);
+
+    Widget chapter(String label, ({String name, String scanlator}) entry) =>
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: caption),
+            const SizedBox(height: 4),
+            Text(entry.name, style: body),
+            if (entry.scanlator.trim().isNotEmpty)
+              Text(entry.scanlator, style: caption),
+          ],
+        );
+
+    final target = targetChapter;
+    final neighbor = target == null
+        ? Text(
+            previous ? '前面没有章节' : '后面没有章节',
+            style: caption,
+            textAlign: TextAlign.center,
+          )
+        : chapter(direction, target);
+    final scale = MediaQuery.textScalerOf(context).scale(17) / 17;
+    final inset = (bounds.maxWidth * (scale > 1.5 ? .08 : .18)).clamp(
+      12.0,
+      64.0,
+    );
+    final chapterSpacing = (bounds.maxHeight * .07 / scale).clamp(24.0, 56.0);
+    return Center(
+      child: SingleChildScrollView(
+        primary: false,
+        padding: EdgeInsets.symmetric(horizontal: inset, vertical: 16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Semantics(
+            container: true,
+            label: '章节过渡',
+            explicitChildNodes: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (previous) neighbor else chapter('本章', currentChapter),
+                SizedBox(height: chapterSpacing),
+                if (previous) chapter('本章', currentChapter) else neighbor,
+                if (loading) ...[
+                  const SizedBox(height: 8),
+                  Semantics(
+                    liveRegion: true,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CupertinoActivityIndicator(color: secondary),
+                        const SizedBox(height: 8),
+                        Text(
+                          '正在加载章节页面',
+                          style: caption,
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (error case final message?) ...[
+                  const SizedBox(height: 8),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      message,
+                      style: caption.copyWith(
+                        color: roleOnCanvas(AppColors.error),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    CupertinoButton(
+                      sizeStyle: CupertinoButtonSize.medium,
+                      minimumSize: actionTarget,
+                      autofocus: onReturn != null,
+                      foregroundColor: onReturn == null
+                          ? null
+                          : roleOnCanvas(AppColors.accent),
+                      onPressed: onReturn,
+                      child: const Text('返回本章'),
+                    ),
+                    if (onRetry != null)
+                      CupertinoButton.filled(
+                        sizeStyle: CupertinoButtonSize.medium,
+                        minimumSize: actionTarget,
+                        onPressed: onRetry,
+                        child: const Text('重试'),
+                      )
+                    else if (onContinue != null)
+                      CupertinoButton.filled(
+                        sizeStyle: CupertinoButtonSize.medium,
+                        minimumSize: actionTarget,
+                        onPressed: onContinue,
+                        child: Text('进入$direction'),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// An online chapter view. Images are exclusively acquired through the Source's
 /// PageProvider; this screen never downloads raw Source image URLs itself.
 class const ReaderScreen({
@@ -51,6 +231,8 @@ class const ReaderScreen({
   required final PageProvider provider,
   required final String generation,
   final String title = '阅读',
+  final String? subtitle,
+  final Widget? chapterActions,
   final ReadingPosition? initialPosition,
 
   /// A confirmed resume can render at a clamped placement without replacing
@@ -58,8 +240,8 @@ class const ReaderScreen({
   final bool preserveInitialPlacement = false,
   final ReadingMode initialMode = ReadingMode.leftToRight,
 
-  /// Defaults to automatic width-based layout. An in-reader selection lasts for
-  /// this chapter unless this input changes; changing to null resumes automatic.
+  /// Defaults to automatic width-based layout. Without a request handler, a
+  /// selection lasts for this chapter. A null input resumes automatic layout.
   final bool? doublePage,
   final ReaderFit fit = ReaderFit.contain,
   final bool cropBorders = false,
@@ -70,9 +252,10 @@ class const ReaderScreen({
   final ReaderInputPreset tapZones = ReaderInputPreset.standard,
   final ReaderInputPreset keyboard = ReaderInputPreset.standard,
 
-  /// User selections only; applying parent settings and resizing do not save.
-  final ValueChanged<ReadingMode>? onModeChanged,
-  final ValueChanged<bool?>? onDoublePageChanged,
+  /// When provided, a handler receives the choice and the screen applies it
+  /// once it arrives as a parent setting. Otherwise choices apply locally.
+  final ValueChanged<ReadingMode>? onModeRequested,
+  final ValueChanged<bool?>? onDoublePageRequested,
 
   /// Only disables settings edits; chapter navigation and zoom remain usable.
   final bool layoutSettingsEnabled = true,
@@ -85,9 +268,14 @@ class const ReaderScreen({
 
   /// Publishes the complete cleanup future as soon as this leaf unmounts.
   final ValueChanged<Future<void>>? onClosing,
+  final ({Widget previous, Widget next})? chapterNavigation,
   final Widget? chapterControls,
+  final Widget? settingsStatus,
+  final Widget? readingSettings,
   final VoidCallback? onAttached,
   final VoidCallback? onExit,
+  final ReaderChapterTransition? chapterTransition,
+  final ValueChanged<ReaderChapterEdge>? onChapterEdge,
   final ValueChanged<ReaderViewportState>? onViewportChanged,
 
   /// Explicit navigation such as a persisted reading-epoch reset. It changes
@@ -120,9 +308,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
   late ReaderResourcePool _resourcePool;
   late ScrollController _scroll;
   late TransformationController _transform;
+  late AnimationController _toolbarAnimation;
   final _horizontal = <String, ScrollController>{};
   final _pointers = <int>{};
   Offset? _dragStart;
+  double _edgePull = 0;
   bool _toolbar = true;
   bool _restoring = false;
   late ReadingPosition? _preferredPlacement = widget.preserveInitialPlacement
@@ -130,6 +320,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       : null;
   double _viewportWidth = 0;
   double _viewportHeight = 0;
+  double? _pageCenterY;
   Size? _windowSize;
   int _restoreEpoch = 0;
   ReadingPosition? _pendingRestorePosition;
@@ -237,7 +428,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _viewportScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _viewportScheduled = false;
-      if (!mounted || _restoring || _reader.position == null) return;
+      if (!mounted ||
+          _restoring ||
+          widget.chapterTransition != null ||
+          _reader.position == null) {
+        return;
+      }
       final snapshot = _scheduler.snapshot;
       final manifest = _reader.manifest;
       if (ModalRoute.of(context)?.isCurrent == false) {
@@ -423,6 +619,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void didUpdateWidget(ReaderScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.chapterTransition != null &&
+        widget.chapterTransition == null) {
+      _scheduleViewport();
+    }
     if (oldWidget.background != widget.background ||
         oldWidget.dimPercent != widget.dimPercent ||
         oldWidget.fit != widget.fit ||
@@ -454,6 +654,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
         _publishAppearance();
       }
       _reader.updateManifest(widget.manifest);
+      if (!_toolbar && _reader.position == null) {
+        _toolbar = true;
+        _toolbarAnimation.value = 1;
+      }
       _scheduleDimensions();
       _scheduleRestore();
     }
@@ -574,6 +778,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _reader.spreads[_reader.spreadIndex].displayPages(_reader.mode),
     _viewport,
     widget.fit,
+    centerY: _pageCenterY,
   );
 
   double _horizontalOffset(String key) {
@@ -807,7 +1012,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   void _onScroll() {
-    if (_restoring || !_scroll.hasClients || _viewportWidth <= 0) return;
+    if (_restoring ||
+        widget.chapterTransition != null ||
+        !_scroll.hasClients ||
+        _viewportWidth <= 0) {
+      return;
+    }
     _captureViewportAnchor();
     final position = _reader.position;
     if (position != null) {
@@ -889,10 +1099,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _selectMode(ReadingMode mode) {
     if (_reader.mode == mode) return;
-    _preferredPlacement = null;
     _navigation('layout', {'mode': mode.name});
+    if (widget.onModeRequested case final request?) {
+      request(mode);
+      return;
+    }
+    _preferredPlacement = null;
     _applyMode(mode);
-    widget.onModeChanged?.call(mode);
   }
 
   void _applyMode(ReadingMode mode) {
@@ -905,14 +1118,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   void _selectDoublePage(bool? value) {
     if (_doublePagePreference == value) return;
-    _preferredPlacement = null;
     _navigation('layout', {'doublePage': value});
+    if (widget.onDoublePageRequested case final request?) {
+      request(value);
+      return;
+    }
+    _preferredPlacement = null;
     setState(() => _doublePagePreference = value);
     _restoring = true;
     _transform.value = Matrix4.identity();
     _applyDoublePagePreference();
     _scheduleRestore();
-    widget.onDoublePageChanged?.call(value);
   }
 
   void _applyDoublePagePreference() {
@@ -960,6 +1176,80 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _scheduleRestore();
   }
 
+  void _turn(bool forward) {
+    final edge = forward ? ReaderChapterEdge.next : ReaderChapterEdge.previous;
+    if (widget.chapterTransition case final transition?) {
+      if (edge == transition.edge) {
+        transition.onContinue?.call();
+      } else {
+        transition.onReturn?.call();
+      }
+      return;
+    }
+    if (_reader.isContinuous &&
+        widget.onChapterEdge != null &&
+        _scroll.hasClients &&
+        _scroll.position.hasContentDimensions) {
+      final offset = _scroll.position;
+      final remaining = forward ? offset.extentAfter : offset.extentBefore;
+      if (remaining <= 1) {
+        _offerChapterEdge(edge);
+        return;
+      }
+    }
+    if (forward ? _reader.canAdvance : _reader.canGoBack) {
+      forward ? _advance() : _back();
+    } else if (!_reader.isContinuous) {
+      _offerChapterEdge(edge);
+    }
+  }
+
+  void _offerChapterEdge(ReaderChapterEdge edge) {
+    if (!widget.paused &&
+        !_zoomed &&
+        _reader.position != null &&
+        widget.chapterTransition == null) {
+      widget.onChapterEdge?.call(edge);
+    }
+  }
+
+  bool _onChapterOverscroll(ScrollNotification notification) {
+    if (notification.depth != 0 || widget.onChapterEdge == null) return false;
+    if (notification is ScrollStartNotification) {
+      _edgePull = 0;
+    } else if (notification is OverscrollNotification &&
+        notification.dragDetails != null) {
+      _edgePull += notification.overscroll;
+    } else if (notification is ScrollUpdateNotification &&
+        notification.dragDetails != null) {
+      final metrics = notification.metrics;
+      _edgePull =
+          metrics.pixels -
+          metrics.pixels.clamp(
+            metrics.minScrollExtent,
+            metrics.maxScrollExtent,
+          );
+    } else if (notification is ScrollEndNotification &&
+        _edgePull.abs() >= kMinInteractiveDimensionCupertino) {
+      final edge = _edgePull > 0
+          ? ReaderChapterEdge.next
+          : ReaderChapterEdge.previous;
+      final controller = _scroll;
+      // Scroll notifications arrive after layout. Only the current attached
+      // viewport can turn this completed drag into a chapter boundary.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            _reader.isContinuous &&
+            identical(controller, _scroll) &&
+            controller.hasClients) {
+          _offerChapterEdge(edge);
+        }
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
+    }
+    return false;
+  }
+
   void _selectPage(int index) {
     _reader.goToPage(index, normalizedX: _leadingX, viewportX: _leadingX);
     // The page identity is already valid before its image arrives. Late
@@ -1001,12 +1291,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
     WidgetsBinding.instance.ensureVisualUpdate();
   }
 
-  Widget _image(ReaderPage page, {BoxFit fit = BoxFit.contain}) {
+  Widget _image(
+    BuildContext context,
+    ReaderPage page, {
+    BoxFit fit = BoxFit.contain,
+  }) {
     final snapshot = _scheduler.snapshot;
     final resource = snapshot.resources[page.key];
+    final number = _reader.manifest.pages.indexOf(page) + 1;
     if (resource != null) {
       return Semantics(
-        label: '第 ${_reader.manifest.pages.indexOf(page) + 1} 页',
+        label: '第 $number 页',
         image: true,
         child: NotificationListener<ReaderImageDecoded>(
           onNotification: (notification) {
@@ -1056,8 +1351,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
               }
               return true;
             },
-            child: ReaderImageCropScope(
-              enabled: widget.cropBorders,
+            child: ReaderImageAppearance(
+              cropBorders: widget.cropBorders,
+              dimPercent: widget.dimPercent,
               child: NotificationListener<ReaderImageCrop>(
                 onNotification: (notification) {
                   _afterImageNotification(
@@ -1084,34 +1380,48 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (snapshot.cleanupError != null) {
       return const Center(child: Text('图片资源清理失败，请重新打开章节。'));
     }
-    if (snapshot.errors.containsKey(page.key)) {
+    if (snapshot.errors[page.key] case final error?) {
+      final detail = switch (error) {
+        RuntimeException(code: RuntimeErrorCode.unsupportedCapability) =>
+          '当前平台尚未支持图片阅读',
+        RuntimeException(code: RuntimeErrorCode.accessRequired) =>
+          '访问验证已失效，请返回重新登录',
+        RuntimeException(code: RuntimeErrorCode.runtimeLost) =>
+          '漫画源已中断，请返回重新连接',
+        ImageBudgetExceeded(:final message) => message,
+        _ => null,
+      };
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(switch (snapshot.errors[page.key]) {
-              RuntimeException(code: RuntimeErrorCode.unsupportedCapability) =>
-                '当前平台尚未支持图片阅读',
-              RuntimeException(code: RuntimeErrorCode.accessRequired) =>
-                '访问验证已失效，请返回重新登录',
-              RuntimeException(code: RuntimeErrorCode.runtimeLost) =>
-                '漫画源已中断，请返回重新连接',
-              ImageBudgetExceeded(:final message) => message,
-              _ => '图片未能加载',
-            }),
-            const SizedBox(height: 8),
-            CupertinoButton.filled(
-              onPressed: widget.paused
-                  ? null
-                  : () => _scheduler.retry(page.key),
-              child: const Text('重试'),
-            ),
-          ],
+        child: SingleChildScrollView(
+          primary: false,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('第 $number 页未能加载', textAlign: TextAlign.center),
+              if (detail != null) Text(detail, textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              CupertinoButton.filled(
+                onPressed: widget.paused
+                    ? null
+                    : () => _scheduler.retry(page.key),
+                child: const Text('重试'),
+              ),
+            ],
+          ),
         ),
       );
     }
     return snapshot.loading.contains(page.key)
-        ? const Center(child: CupertinoActivityIndicator())
+        ? Center(
+            child: Semantics(
+              container: true,
+              label: '正在加载第 $number 页',
+              child: CupertinoActivityIndicator(
+                color: DefaultTextStyle.of(context).style.color,
+              ),
+            ),
+          )
         : const SizedBox.shrink();
   }
 
@@ -1123,7 +1433,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final scheduler = _scheduler;
     final pin = pool.pin(resource.id);
     unawaited(
-      showCupertinoDialog<void>(
+      showAppDialog<void>(
         context: context,
         builder: (dialogContext) => NotificationListener<ReaderImageDecoded>(
           onNotification: (notification) {
@@ -1179,38 +1489,84 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
-  Widget _continuous() => ListView.builder(
-    key: const ValueKey('continuous-reader'),
-    controller: _scroll,
-    scrollCacheExtent: const ScrollCacheExtent.viewport(1),
-    itemCount: _reader.manifest.pages.length,
-    itemExtentBuilder: (index, dimensions) =>
-        _pageHeight(_reader.manifest.pages[index]) + _gap,
-    itemBuilder: (context, index) {
-      final page = _reader.manifest.pages[index];
-      final size = _pageSize(page);
-      return Padding(
-        padding: EdgeInsets.only(bottom: _gap),
-        child: _ContinuousImage(
-          key: ValueKey('continuous-image-${page.key}'),
-          pageKey: page.key,
-          viewportWidth: _viewportWidth,
-          imageSize: size,
-          onAttached: (controller) => _horizontal[page.key] = controller,
-          onDetached: (controller) {
-            if (identical(_horizontal[page.key], controller)) {
-              _horizontal.remove(page.key);
-            }
-          },
-          onMoved: _onHorizontalScroll,
-          onDoubleTap: () => _openZoom(page),
-          child: _image(page),
-        ),
-      );
-    },
+  void _toggleToolbar() {
+    if (_reader.position == null) return;
+    setState(() => _toolbar = !_toolbar);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _toolbarAnimation.value = _toolbar ? 1 : 0;
+    } else if (_toolbar) {
+      _toolbarAnimation.forward();
+    } else {
+      _toolbarAnimation.reverse();
+    }
+  }
+
+  void _onCanvasTap(TapUpDetails details) {
+    // Disposing a page's double-tap recognizer can release a pending single tap.
+    if (!mounted ||
+        WidgetsBinding.instance.schedulerPhase ==
+            SchedulerPhase.persistentCallbacks) {
+      return;
+    }
+    final fraction = details.localPosition.dx / _viewportWidth;
+    if (fraction > 1 / 3 && fraction < 2 / 3) {
+      _toggleToolbar();
+    } else if (!_reader.isContinuous &&
+        !_zoomed &&
+        widget.tapZones != ReaderInputPreset.disabled) {
+      final forward = _reader.mode == ReadingMode.rightToLeft
+          ? fraction < 1 / 3
+          : fraction > 2 / 3;
+      final advance = widget.tapZones == ReaderInputPreset.reversed
+          ? !forward
+          : forward;
+      _turn(advance);
+    }
+  }
+
+  Widget _continuous() => NotificationListener<ScrollNotification>(
+    onNotification: _onChapterOverscroll,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      excludeFromSemantics: true,
+      onTapUp: _onCanvasTap,
+      child: ListView.builder(
+        key: const ValueKey('continuous-reader'),
+        controller: _scroll,
+        physics: widget.onChapterEdge == null
+            ? null
+            : const AlwaysScrollableScrollPhysics(),
+        scrollCacheExtent: const ScrollCacheExtent.viewport(1),
+        itemCount: _reader.manifest.pages.length,
+        itemExtentBuilder: (index, dimensions) =>
+            _pageHeight(_reader.manifest.pages[index]) + _gap,
+        itemBuilder: (context, index) {
+          final page = _reader.manifest.pages[index];
+          final size = _pageSize(page);
+          return Padding(
+            padding: EdgeInsets.only(bottom: _gap),
+            child: _ContinuousImage(
+              key: ValueKey('continuous-image-${page.key}'),
+              pageKey: page.key,
+              viewportWidth: _viewportWidth,
+              imageSize: size,
+              onAttached: (controller) => _horizontal[page.key] = controller,
+              onDetached: (controller) {
+                if (identical(_horizontal[page.key], controller)) {
+                  _horizontal.remove(page.key);
+                }
+              },
+              onMoved: _onHorizontalScroll,
+              onDoubleTap: () => _openZoom(page),
+              child: _image(context, page),
+            ),
+          );
+        },
+      ),
+    ),
   );
 
-  Widget _paged() {
+  Widget _paged(BuildContext context) {
     final spread = _reader.spreads[_reader.spreadIndex];
     final scene = _pagedScene;
     final pannable =
@@ -1232,7 +1588,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         final forward = _reader.mode == ReadingMode.rightToLeft
             ? delta.dx > 0
             : delta.dx < 0;
-        forward ? _advance() : _back();
+        _turn(forward);
       },
       onPointerCancel: (event) {
         _pointers.remove(event.pointer);
@@ -1241,21 +1597,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onDoubleTap: () => _zoom(_zoomed ? 0.2 : 2),
-        onTapUp: (details) {
-          final fraction = details.localPosition.dx / _viewportWidth;
-          if (fraction > 1 / 3 && fraction < 2 / 3) {
-            setState(() => _toolbar = !_toolbar);
-          } else if (!_zoomed &&
-              widget.tapZones != ReaderInputPreset.disabled) {
-            final forward = _reader.mode == ReadingMode.rightToLeft
-                ? fraction < 1 / 3
-                : fraction > 2 / 3;
-            final advance = widget.tapZones == ReaderInputPreset.reversed
-                ? !forward
-                : forward;
-            advance ? _advance() : _back();
-          }
-        },
+        onTapUp: _onCanvasTap,
         child: InteractiveViewer(
           key: ValueKey('spread-${spread.pages.first.key}'),
           transformationController: _transform,
@@ -1274,7 +1616,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     rect: scene.images[page.key]!,
                     child: SizedBox(
                       key: ValueKey('image-rect-${page.key}'),
-                      child: _image(page),
+                      child: _image(context, page),
                     ),
                   ),
               ],
@@ -1290,17 +1632,222 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final advance = widget.keyboard == ReaderInputPreset.reversed
         ? !forward
         : forward;
-    advance ? _advance() : _back();
+    _turn(advance);
   }
 
   void _keyboardGoTo(int index) {
-    if (widget.keyboard != ReaderInputPreset.disabled) _goTo(index);
+    if (widget.keyboard != ReaderInputPreset.disabled &&
+        widget.chapterTransition == null) {
+      _goTo(index);
+    }
+  }
+
+  Widget _title() {
+    final title = Text(
+      widget.title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+    final subtitle = widget.subtitle;
+    if (subtitle == null || subtitle.isEmpty) return title;
+    return Semantics(
+      label: '${widget.title} · $subtitle',
+      excludeSemantics: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) => FittedBox(
+          fit: BoxFit.scaleDown,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                title,
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: CupertinoTheme.of(context).textTheme.textStyle
+                      .copyWith(
+                        color: AppColors.secondaryLabel.resolveFrom(context),
+                        fontSize: 13,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pageIndicator() {
+    final count = '${_reader.pageIndex + 1} / ${_reader.manifest.pages.length}';
+    return Semantics(
+      key: const ValueKey('reader-page-indicator'),
+      container: true,
+      label: '显示阅读工具',
+      value: count,
+      child: CupertinoButton(
+        onPressed: _toggleToolbar,
+        alignment: Alignment.bottomCenter,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: ExcludeSemantics(
+          child: DecoratedBox(
+            decoration: ShapeDecoration(
+              color: CupertinoColors.black.withValues(alpha: .8),
+              shape: const StadiumBorder(),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: Text(
+                count,
+                style: const TextStyle(
+                  color: CupertinoColors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: [ui.FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _readingCanvas(double centerY, Color canvas) {
+    final needsPositionNotice = _reader.requiresPositionNotice;
+    return _ReaderCanvas(
+      color: canvas,
+      child: Column(
+        children: [
+          if (needsPositionNotice) const Text('页面清单发生变化，已定位到最接近的页码。'),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final window = MediaQuery.sizeOf(context);
+                final sameWindow = _windowSize == window;
+                if (_windowSize != null && !sameWindow) {
+                  _preferredPlacement = null;
+                }
+                _windowSize = window;
+                final pageCenterY = needsPositionNotice ? null : centerY;
+                if (_viewportWidth != constraints.maxWidth ||
+                    _viewportHeight != constraints.maxHeight ||
+                    _pageCenterY != pageCenterY) {
+                  final chromeOnly =
+                      sameWindow && _viewportWidth == constraints.maxWidth;
+                  _viewportWidth = constraints.maxWidth;
+                  _viewportHeight = constraints.maxHeight;
+                  _pageCenterY = pageCenterY;
+                  _scheduleRestore(preservePlacement: chromeOnly);
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    _applyDoublePagePreference();
+                    _scheduleRestore(preservePlacement: chromeOnly);
+                  });
+                }
+                if (_reader.manifest.pages.isEmpty) {
+                  return const Center(child: Text('这一章没有页面'));
+                }
+                final transition = widget.chapterTransition;
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ExcludeSemantics(
+                      excluding: transition != null,
+                      child: ExcludeFocus(
+                        excluding: transition != null,
+                        child: IgnorePointer(
+                          ignoring: transition != null,
+                          child: _reader.isContinuous
+                              ? _continuous()
+                              : _paged(context),
+                        ),
+                      ),
+                    ),
+                    if (widget.onChapterEdge != null)
+                      _chapterTransitionLayer(transition),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chapterTransitionLayer(ReaderChapterTransition? transition) {
+    final reduceMotion =
+        MediaQuery.disableAnimationsOf(context) ||
+        MediaQuery.reduceMotionOf(context);
+    return IgnorePointer(
+      ignoring: transition == null,
+      child: ExcludeFocus(
+        excluding: transition == null,
+        child: ExcludeSemantics(
+          excluding: transition == null,
+          child: AnimatedSwitcher(
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
+            child: transition == null
+                ? const SizedBox.expand()
+                : GestureDetector(
+                    key: ValueKey(transition.edge),
+                    behavior: HitTestBehavior.opaque,
+                    excludeFromSemantics: true,
+                    onTapUp: _onCanvasTap,
+                    onHorizontalDragEnd: !_reader.isContinuous
+                        ? (details) {
+                            final velocity = details.primaryVelocity;
+                            if (velocity != null && velocity != 0) {
+                              _turn(
+                                _reader.mode == ReadingMode.rightToLeft
+                                    ? velocity > 0
+                                    : velocity < 0,
+                              );
+                            }
+                          }
+                        : null,
+                    onVerticalDragEnd: _reader.isContinuous
+                        ? (details) {
+                            final velocity = details.primaryVelocity;
+                            if (velocity != null && velocity != 0) {
+                              _turn(velocity < 0);
+                            }
+                          }
+                        : null,
+                    child: transition,
+                  ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     _scroll = useScrollController();
     _transform = useTransformationController();
+    _toolbarAnimation = useAnimationController(
+      duration: const Duration(milliseconds: 200),
+      initialValue: 1,
+    );
+    useEffect(() {
+      final animation = _toolbarAnimation;
+      void update(AnimationStatus status) {
+        if (mounted &&
+            (status == AnimationStatus.completed ||
+                status == AnimationStatus.dismissed)) {
+          setState(() {});
+        }
+      }
+
+      animation.addStatusListener(update);
+      return () => animation.removeStatusListener(update);
+    }, [_toolbarAnimation]);
     _appearance = useValueNotifier<_ReaderAppearance>((
       background: widget.background,
       dimPercent: widget.dimPercent,
@@ -1317,6 +1864,39 @@ class _ReaderScreenState extends State<ReaderScreen> {
     useOnListenableChange(_scroll, _onScroll);
     useOnListenableChange(_transform, _onTransform);
     useOnListenableChange(widget.positionRequest, _applyPositionRequest);
+    // Keep the canvas constraints steady while painting the exit transition.
+    final toolbarMounted = _toolbar || !_toolbarAnimation.isDismissed;
+    final toolbarInteractive = _toolbar && _toolbarAnimation.isCompleted;
+    final toolbarProgress = _toolbarAnimation.drive(
+      CurveTween(curve: Curves.easeInOutCubic),
+    );
+    final chapterTransition = widget.chapterTransition;
+    final canvas = _readerCanvasColor(
+      context,
+      widget.background,
+      widget.dimPercent,
+    );
+    final navigationBar = toolbarMounted
+        ? _ReaderNavigationBar(
+            progress: toolbarProgress,
+            interactive: toolbarInteractive,
+            bar: CupertinoNavigationBar(
+              automaticBackgroundVisibility: false,
+              automaticallyImplyLeading: chapterTransition == null,
+              backgroundColor: AppColors.toolbar.resolveFrom(context),
+              leading:
+                  widget.onExit == null ||
+                      (chapterTransition != null &&
+                          chapterTransition.onReturn == null)
+                  ? null
+                  : CupertinoNavigationBarBackButton(onPressed: widget.onExit),
+              middle: _title(),
+              trailing: chapterTransition == null
+                  ? widget.chapterActions
+                  : null,
+            ),
+          )
+        : null;
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
@@ -1332,86 +1912,52 @@ class _ReaderScreenState extends State<ReaderScreen> {
         const SingleActivator(LogicalKeyboardKey.home): () => _keyboardGoTo(0),
         const SingleActivator(LogicalKeyboardKey.end): () =>
             _keyboardGoTo(_reader.manifest.pages.length - 1),
+        if (chapterTransition case final transition?)
+          const SingleActivator(LogicalKeyboardKey.escape): () =>
+              transition.onReturn?.call(),
+        if (widget.keyboard != ReaderInputPreset.disabled)
+          const SingleActivator(LogicalKeyboardKey.keyT, includeRepeats: false):
+              _toggleToolbar,
       },
       child: Focus(
         autofocus: true,
         child: CupertinoPageScaffold(
-          backgroundColor: _readerBackgroundColor(context, widget.background),
-          navigationBar: _toolbar
-              ? CupertinoNavigationBar(
-                  automaticBackgroundVisibility: false,
-                  leading: widget.onExit == null
-                      ? null
-                      : CupertinoNavigationBarBackButton(
-                          onPressed: widget.onExit,
-                        ),
-                  middle: Text(widget.title),
-                )
-              : null,
+          backgroundColor: canvas,
+          navigationBar: navigationBar,
           child: SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: DefaultTextStyle.merge(
-                    style: TextStyle(
-                      color: _readerForegroundColor(context, widget.background),
-                    ),
-                    child: SafeArea(
-                      child: Column(
-                        children: [
-                          if (_reader.requiresPositionNotice)
-                            const Text('页面清单发生变化，已定位到最接近的页码。'),
-                          Expanded(
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                final window = MediaQuery.sizeOf(context);
-                                final sameWindow = _windowSize == window;
-                                if (_windowSize != null && !sameWindow) {
-                                  _preferredPlacement = null;
-                                }
-                                _windowSize = window;
-                                if (_viewportWidth != constraints.maxWidth ||
-                                    _viewportHeight != constraints.maxHeight) {
-                                  final chromeOnly =
-                                      sameWindow &&
-                                      _viewportWidth == constraints.maxWidth;
-                                  _viewportWidth = constraints.maxWidth;
-                                  _viewportHeight = constraints.maxHeight;
-                                  _scheduleRestore(
-                                    preservePlacement: chromeOnly,
-                                  );
-                                  WidgetsBinding.instance.addPostFrameCallback((
-                                    _,
-                                  ) {
-                                    if (!mounted) return;
-                                    // A user or parent can change the preference before
-                                    // this layout callback runs.
-                                    _applyDoublePagePreference();
-                                    _scheduleRestore(
-                                      preservePlacement: chromeOnly,
-                                    );
-                                  });
-                                }
-                                if (_reader.manifest.pages.isEmpty) {
-                                  return const Center(child: Text('这一章没有页面'));
-                                }
-                                return _ReaderContent(
-                                  background: widget.background,
-                                  dimPercent: widget.dimPercent,
-                                  child: _reader.isContinuous
-                                      ? _continuous()
-                                      : _paged(),
-                                );
-                              },
+            child: LayoutBuilder(
+              builder: (context, bounds) {
+                // The scaffold already consumed the navigation bar's height.
+                // Express the full safe area's center in the canvas's coordinates.
+                final barHeight = navigationBar?.preferredSize.height ?? 0;
+                final centerY = (bounds.maxHeight - barHeight) / 2;
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Column(
+                      children: [
+                        Expanded(child: _readingCanvas(centerY, canvas)),
+                        if (toolbarMounted)
+                          _ReaderToolbarTransition(
+                            progress: toolbarProgress,
+                            interactive:
+                                toolbarInteractive && chapterTransition == null,
+                            slideFrom: const Offset(0, 1),
+                            child: Opacity(
+                              opacity: chapterTransition == null ? 1 : .5,
+                              child: _controls(),
                             ),
                           ),
-                        ],
-                      ),
+                      ],
                     ),
-                  ),
-                ),
-                ?(_toolbar ? _controls() : null),
-              ],
+                    if (!toolbarMounted && _reader.position != null)
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: _pageIndicator(),
+                      ),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -1431,137 +1977,201 @@ class _ReaderScreenState extends State<ReaderScreen> {
       3 * kMinInteractiveDimensionCupertino,
       available / 2,
     );
+    final controlsHeight = available - readingHeight;
     return ColoredBox(
-      color: CupertinoTheme.of(context).scaffoldBackgroundColor,
+      color: AppColors.toolbar.resolveFrom(context),
       child: SafeArea(
         top: false,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: available - readingHeight),
-          child: _scrollableControls(),
+          constraints: BoxConstraints(maxHeight: controlsHeight),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (widget.settingsStatus case final status?)
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: controlsHeight / 2),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: AppColors.separator.resolveFrom(context),
+                        ),
+                      ),
+                    ),
+                    child: SingleChildScrollView(
+                      primary: false,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      child: status,
+                    ),
+                  ),
+                ),
+              Flexible(
+                key: const ValueKey('reader-controls-content'),
+                child: _scrollableControls(),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
+  Widget _pageStep({
+    required bool enabled,
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+  }) => Semantics(
+    container: true,
+    enabled: enabled,
+    child: CupertinoButton(
+      onPressed: enabled ? onPressed : null,
+      padding: const EdgeInsets.all(8),
+      child: Icon(icon, semanticLabel: label),
+    ),
+  );
+
+  Widget _pageTools(TextDirection direction) {
+    final rtl = direction == TextDirection.rtl;
+    return Row(
+      textDirection: direction,
+      children: [
+        _pageStep(
+          enabled: _reader.canGoBack,
+          onPressed: _back,
+          icon: rtl ? CupertinoIcons.forward_end : CupertinoIcons.backward_end,
+          label: '上一页',
+        ),
+        Expanded(
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              ChoiceField<ReadingMode>(
+                label: '阅读模式',
+                value: _reader.mode,
+                icon: switch (_reader.mode) {
+                  ReadingMode.leftToRight => CupertinoIcons.arrow_right,
+                  ReadingMode.rightToLeft => CupertinoIcons.arrow_left,
+                  ReadingMode.continuous => CupertinoIcons.arrow_down,
+                  ReadingMode.webtoon => CupertinoIcons.rectangle_grid_1x2,
+                },
+                options: const {
+                  ReadingMode.leftToRight: '从左到右',
+                  ReadingMode.rightToLeft: '从右到左',
+                  ReadingMode.continuous: '竖向连续',
+                  ReadingMode.webtoon: '条漫',
+                },
+                onChanged: widget.layoutSettingsEnabled
+                    ? (mode) {
+                        if (mode != null) _selectMode(mode);
+                      }
+                    : null,
+              ),
+              if (!_reader.isContinuous)
+                ChoiceField<bool>(
+                  key: const ValueKey('reader-page-layout'),
+                  label: '分页布局',
+                  value: _doublePagePreference,
+                  icon: switch (_doublePagePreference) {
+                    null => CupertinoIcons.rectangle,
+                    false => CupertinoIcons.doc,
+                    true => CupertinoIcons.book,
+                  },
+                  options: const {null: '自动', false: '单页', true: '双页'},
+                  onChanged: widget.layoutSettingsEnabled
+                      ? _selectDoublePage
+                      : null,
+                ),
+              if (_reader.isContinuous)
+                CupertinoButton(
+                  onPressed: _reader.position == null
+                      ? null
+                      : () => _openZoom(
+                          _reader.manifest.pages[_reader.pageIndex],
+                        ),
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(
+                    CupertinoIcons.zoom_in,
+                    semanticLabel: '放大当前图片',
+                  ),
+                )
+              else ...[
+                for (final (factor, icon, label) in [
+                  (0.5, CupertinoIcons.zoom_out, '缩小'),
+                  (2.0, CupertinoIcons.zoom_in, '放大'),
+                ])
+                  CupertinoButton(
+                    onPressed: () => _zoom(factor),
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(icon, semanticLabel: label),
+                  ),
+                CupertinoButton(
+                  onPressed: () {
+                    _preferredPlacement = null;
+                    _restoring = true;
+                    _transform.value = Matrix4.identity();
+                    _scheduleRestore();
+                  },
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(
+                    CupertinoIcons.arrow_up_left_arrow_down_right,
+                    semanticLabel: '重置缩放',
+                  ),
+                ),
+              ],
+              if (widget.readingSettings case final Widget settings) settings,
+            ],
+          ),
+        ),
+        _pageStep(
+          enabled: _reader.canAdvance,
+          onPressed: _advance,
+          icon: rtl ? CupertinoIcons.backward_end : CupertinoIcons.forward_end,
+          label: '下一页',
+        ),
+      ],
+    );
+  }
+
   Widget _scrollableControls() {
+    final direction = _reader.mode == ReadingMode.rightToLeft
+        ? TextDirection.rtl
+        : TextDirection.ltr;
     return SingleChildScrollView(
       primary: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                CupertinoButton(
-                  onPressed: _reader.canGoBack ? _back : null,
-                  padding: const EdgeInsets.all(8),
-                  child: const Icon(
-                    CupertinoIcons.backward_end,
-                    semanticLabel: '上一页',
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    _reader.position == null
-                        ? '0 / 0'
-                        : '${_reader.pageIndex + 1} / ${_reader.manifest.pages.length}',
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                CupertinoButton(
-                  onPressed: _reader.canAdvance ? _advance : null,
-                  padding: const EdgeInsets.all(8),
-                  child: const Icon(
-                    CupertinoIcons.forward_end,
-                    semanticLabel: '下一页',
-                  ),
-                ),
-                if (_reader.isContinuous)
-                  CupertinoButton(
-                    onPressed: _reader.position == null
-                        ? null
-                        : () => _openZoom(
-                            _reader.manifest.pages[_reader.pageIndex],
-                          ),
-                    padding: const EdgeInsets.all(8),
-                    child: const Icon(
-                      CupertinoIcons.zoom_in,
-                      semanticLabel: '放大当前图片',
-                    ),
-                  ),
-                if (!_reader.isContinuous) ...[
-                  for (final (factor, icon, label) in [
-                    (0.5, CupertinoIcons.zoom_out, '缩小'),
-                    (2.0, CupertinoIcons.zoom_in, '放大'),
-                  ])
-                    CupertinoButton(
-                      onPressed: () => _zoom(factor),
-                      padding: const EdgeInsets.all(8),
-                      child: Icon(icon, semanticLabel: label),
-                    ),
-                  CupertinoButton(
-                    onPressed: () {
-                      _preferredPlacement = null;
-                      _restoring = true;
-                      _transform.value = Matrix4.identity();
-                      _scheduleRestore();
-                    },
-                    padding: const EdgeInsets.all(8),
-                    child: const Icon(
-                      CupertinoIcons.arrow_up_left_arrow_down_right,
-                      semanticLabel: '重置缩放',
-                    ),
-                  ),
-                ],
-              ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: ReaderPageNavigation(
+              key: ValueKey((
+                widget.provider,
+                widget.generation,
+                widget.manifest,
+                widget.paused,
+                _reader.mode,
+              )),
+              pageIndex: _reader.pageIndex,
+              pageCount: _reader.manifest.pages.length,
+              direction: direction,
+              onSelect: widget.paused ? null : _goTo,
+              keyboardEnabled: widget.keyboard != ReaderInputPreset.disabled,
+              chapters: widget.chapterNavigation,
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: ChoiceField<ReadingMode>(
-                    label: '阅读模式',
-                    value: _reader.mode,
-                    options: {
-                      ReadingMode.leftToRight: '从左到右',
-                      ReadingMode.rightToLeft: '从右到左',
-                      ReadingMode.continuous: '竖向连续',
-                      ReadingMode.webtoon: '条漫',
-                    },
-                    onChanged: widget.layoutSettingsEnabled
-                        ? (mode) {
-                            if (mode != null) _selectMode(mode);
-                          }
-                        : null,
-                  ),
-                ),
-                if (!_reader.isContinuous)
-                  CupertinoSlidingSegmentedControl<int>(
-                    key: const ValueKey('reader-page-layout'),
-                    groupValue: _doublePagePreference == null
-                        ? 0
-                        : _doublePagePreference!
-                        ? 2
-                        : 1,
-                    children: const {
-                      0: Text('自动'),
-                      1: Text('单页'),
-                      2: Text('双页'),
-                    },
-                    disabledChildren: widget.layoutSettingsEnabled
-                        ? const {}
-                        : const {0, 1, 2},
-                    onValueChanged: (value) {
-                      if (widget.layoutSettingsEnabled && value != null) {
-                        _selectDoublePage(value == 0 ? null : value == 2);
-                      }
-                    },
-                  ),
-              ],
+          ),
+          _pageTools(direction),
+          if (widget.chapterControls case final Widget controls)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: controls,
             ),
-            if (widget.chapterControls case final Widget controls) controls,
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -1602,6 +2212,63 @@ class _ReaderScreenState extends State<ReaderScreen> {
     unawaited(_reader.dispose());
     super.dispose();
   }
+}
+
+class _ReaderToolbarTransition extends StatelessWidget {
+  const _ReaderToolbarTransition({
+    required this.progress,
+    required this.interactive,
+    required this.slideFrom,
+    required this.child,
+  });
+
+  final Animation<double> progress;
+  final bool interactive;
+  final Offset slideFrom;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    excluding: !interactive,
+    child: ExcludeFocus(
+      excluding: !interactive,
+      child: IgnorePointer(
+        ignoring: !interactive,
+        child: ClipRect(
+          clipBehavior: interactive ? Clip.none : Clip.hardEdge,
+          child: FadeTransition(
+            opacity: progress,
+            child: SlideTransition(
+              position: MediaQuery.reduceMotionOf(context)
+                  ? const AlwaysStoppedAnimation(Offset.zero)
+                  : progress.drive(
+                      Tween<Offset>(begin: slideFrom, end: Offset.zero),
+                    ),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _ReaderNavigationBar extends _ReaderToolbarTransition
+    implements ObstructingPreferredSizeWidget {
+  const _ReaderNavigationBar({
+    required this.bar,
+    required super.progress,
+    required super.interactive,
+  }) : super(slideFrom: const Offset(0, -1), child: bar);
+
+  final CupertinoNavigationBar bar;
+
+  @override
+  Size get preferredSize => bar.preferredSize;
+
+  @override
+  bool shouldFullyObstruct(BuildContext context) =>
+      bar.shouldFullyObstruct(context);
 }
 
 /// Each lazily built page owns its horizontal position and disposes it when
@@ -1719,8 +2386,9 @@ Size _fitImageSize(double aspectRatio, Size cell, ReaderFit fit) {
 _ReaderScene _spreadScene(
   List<ReaderPage> pages,
   Size viewport,
-  ReaderFit fit,
-) {
+  ReaderFit fit, {
+  double? centerY,
+}) {
   final cellWidth = viewport.width / pages.length;
   final sizes = [
     for (final page in pages)
@@ -1729,13 +2397,20 @@ _ReaderScene _spreadScene(
   final contentWidth = fit == ReaderFit.height
       ? sizes.fold(0.0, (width, size) => width + size.width)
       : viewport.width;
+  final tallest = sizes.fold(
+    0.0,
+    (height, size) => math.max(height, size.height),
+  );
   final scene = Size(
     math.max(viewport.width, contentWidth),
-    sizes.fold(
-      viewport.height,
-      (height, size) => math.max(height, size.height),
-    ),
+    math.max(viewport.height, tallest),
   );
+  final containedCenter = fit == ReaderFit.contain
+      ? (centerY ?? viewport.height / 2).clamp(
+          tallest / 2,
+          viewport.height - tallest / 2,
+        )
+      : null;
   final images = <String, Rect>{};
   var left = (scene.width - contentWidth) / 2;
   for (var index = 0; index < pages.length; index++) {
@@ -1743,7 +2418,9 @@ _ReaderScene _spreadScene(
     final width = fit == ReaderFit.height ? size.width : cellWidth;
     images[pages[index].key] = Rect.fromLTWH(
       left + (width - size.width) / 2,
-      math.max(0, (viewport.height - size.height) / 2),
+      containedCenter == null
+          ? math.max(0, (viewport.height - size.height) / 2)
+          : containedCenter - size.height / 2,
       size.width,
       size.height,
     );
@@ -1777,52 +2454,52 @@ bool _sameAnchor(ReadingPosition first, ReadingPosition second) =>
     (first.viewportX - second.viewportX).abs() < 0.000001 &&
     (first.viewportY - second.viewportY).abs() < 0.000001;
 
-Color _readerBackgroundColor(
+Color _readerCanvasColor(
   BuildContext context,
   ReaderBackground background,
-) => switch (background) {
-  ReaderBackground.black => CupertinoColors.black,
-  ReaderBackground.white => CupertinoColors.white,
-  ReaderBackground.theme => CupertinoTheme.of(context).scaffoldBackgroundColor,
-};
+  int dimPercent,
+) => Color.alphaBlend(
+  CupertinoColors.black.withValues(alpha: dimPercent / 100),
+  switch (background) {
+    ReaderBackground.black => CupertinoColors.black,
+    ReaderBackground.white => CupertinoColors.white,
+    ReaderBackground.theme => CupertinoTheme.of(
+      context,
+    ).scaffoldBackgroundColor,
+  },
+);
 
-Color _readerForegroundColor(
-  BuildContext context,
-  ReaderBackground background,
-) => switch (background) {
-  ReaderBackground.black => CupertinoColors.white,
-  ReaderBackground.white => CupertinoColors.black,
-  ReaderBackground.theme => CupertinoColors.label.resolveFrom(context),
-};
+const _readerTextContrast = 4.5;
 
-/// Applies appearance only to reading content, preserving input and controls.
-class const _ReaderContent({
-  required final ReaderBackground background,
-  required final int dimPercent,
+double _readerContrast(Color ink, Color canvas) {
+  final surface = canvas.computeLuminance();
+  final painted = Color.alphaBlend(ink, canvas).computeLuminance();
+  return (math.max(surface, painted) + .05) /
+      (math.min(surface, painted) + .05);
+}
+
+/// Resolves Cupertino feedback against the displayed reading surface.
+class const _ReaderCanvas({
+  required final Color color,
   required final Widget child,
 }) extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: _readerBackgroundColor(context, background),
-    child: DefaultTextStyle.merge(
-      style: TextStyle(color: _readerForegroundColor(context, background)),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          child,
-          if (dimPercent > 0)
-            IgnorePointer(
-              child: ColoredBox(
-                key: const ValueKey('reader-content-dimming'),
-                color: CupertinoColors.black.withValues(
-                  alpha: dimPercent / 100,
-                ),
-              ),
-            ),
-        ],
+  Widget build(BuildContext context) {
+    final dark =
+        _readerContrast(CupertinoColors.black, color) < _readerTextContrast;
+    return CupertinoTheme(
+      data: readerAppTheme(dark ? Brightness.dark : Brightness.light),
+      child: ColoredBox(
+        color: color,
+        child: DefaultTextStyle.merge(
+          style: TextStyle(
+            color: dark ? CupertinoColors.white : CupertinoColors.black,
+          ),
+          child: child,
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class const _ZoomImageDialog({
@@ -1953,8 +2630,9 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
           children: [
             Positioned.fromRect(
               rect: rect,
-              child: ReaderImageCropScope(
-                enabled: appearance.cropBorders,
+              child: ReaderImageAppearance(
+                cropBorders: appearance.cropBorders,
+                dimPercent: appearance.dimPercent,
                 child: _CroppedImage(
                   bounds: crop,
                   child: NotificationListener<ReaderImageDecoded>(
@@ -1992,9 +2670,14 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
   Widget build(BuildContext context) {
     _transform = useTransformationController();
     final appearance = useValueListenable(widget.appearance);
+    final canvas = _readerCanvasColor(
+      context,
+      appearance.background,
+      appearance.dimPercent,
+    );
     return CupertinoPageScaffold(
       key: const ValueKey('reader-image-viewer'),
-      backgroundColor: _readerBackgroundColor(context, appearance.background),
+      backgroundColor: canvas,
       navigationBar: CupertinoNavigationBar(
         automaticBackgroundVisibility: false,
         leading: CupertinoButton(
@@ -2028,9 +2711,8 @@ class _ZoomImageDialogState extends State<_ZoomImageDialog> {
         ),
       ),
       child: SafeArea(
-        child: _ReaderContent(
-          background: appearance.background,
-          dimPercent: appearance.dimPercent,
+        child: _ReaderCanvas(
+          color: canvas,
           child: LayoutBuilder(
             builder: (context, constraints) =>
                 _content(appearance, constraints),

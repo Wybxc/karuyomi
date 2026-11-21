@@ -32,22 +32,6 @@ SQLite WASM 与 Drift worker 的实际文件摘要均符合固定官方资源清
 
 ## 复验与材料
 
-```sh
-# 固定 checkout，使用锁定 Node 与 Flutter SDK
-pnpm install --frozen-lockfile
-pnpm flutter:setup
-pnpm --filter @karuyomi/runtime-host build
-node scripts/flutter.ts build
-
-# 原 xkcd 产物路径来自固定 31555 Source 验证树，不能替换成不同 seed 的同名包
-SOURCE_PROBE_SOURCE_ID=1538249443376436084 \
-SOURCE_PROBE_ALLOWED_HOSTS=xkcd.com,imgs.xkcd.com \
-SOURCE_PROBE_IMAGES=1 SOURCE_PROBE_PORT=8927 \
-SOURCE_PROBE_READER_DIR="$PWD/apps/reader/build/web" \
-SOURCE_PROBE_EVIDENCE="$PWD/.local/reader-frame-web/network.json" \
-node apps/api/test/source-metadata-probe.ts Xkcd_MANIFEST Xkcd_ARTIFACT_DIRECTORY
-```
-
 内置浏览器打开正式入口，按上述真实 UI 流程复验。需先构建 runtime-host，否则新 checkout 缺少 `dist/host.js` 无法连接；本轮首次测试树遗漏已记录在 ignored `server.log`，补齐后重载，未更改产品来规避错误。官方 Drift 首次下载遇到 HTTP/2 错误，保留 `build-download-failed.log`；随后预热既有、逐项摘要匹配的官方缓存，由未修改的构建器再次验证并生成。
 
-本轮材料在固定树 ignored `.local/reader-frame-web/`：`input.json`、`ui-report.json`、`network.json`、构建日志与 `first.png`、`completed.png`、`next-first.png`、`next-completed.png`、`restored-first.png`。旧 main `.local/cache-v3-reader/xkcd-ui-report.json` 的失败和旧截图不改。临时材料不提交，也不把桌面分项扩展为生产 Access、Source Cache、Native 真机或性能通过。
+临时材料不提交，也不把桌面分项扩展为生产 Access、Source Cache、Native 真机或性能通过。

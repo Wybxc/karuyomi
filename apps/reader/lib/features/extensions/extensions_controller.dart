@@ -10,10 +10,18 @@ import '../../data/business_state_validation.dart';
 import '../../data/settings_repository.dart';
 import '../browse/catalog_controller.dart';
 import '../settings/settings_controller.dart';
+import 'extension_listing.dart';
 
 /// Account intent reuses the identity-bound global settings queue. Artifacts
 /// remain disposable local copies; preparation never opens a Source.
-enum ExtensionActivity { reading, preparing, saving, cleaning }
+enum ExtensionActivity { reading, previewing, preparing, saving, cleaning }
+
+typedef ExtensionLocalCopy = ({String sha256, String name});
+typedef ExtensionPreparationFailure = ({
+  CatalogBuild build,
+  String reason,
+  wire.InstalledExtension? localCopyOf,
+});
 
 final class ExtensionsController extends ChangeNotifier {
   ExtensionsController({
@@ -43,13 +51,24 @@ final class ExtensionsController extends ChangeNotifier {
   SettingsController get _settingsCommands =>
       container.read(settingsControllerProvider(catalog, repository).notifier);
   wire.ExtensionCacheState? cache;
-  String? error;
+  ({String reason, CatalogBuild? build, wire.InstalledExtension? localCopyOf})?
+  _failure;
+  String? get error => _failure?.reason;
+  set error(String? value) {
+    _failure = value == null
+        ? null
+        : (reason: value, build: null, localCopyOf: null);
+  }
+
   String? message;
   String? _preparationId;
+  CatalogBuild? _preparationBuild;
+  Future<void>? _preparationCancellation;
   ExtensionActivity? activity;
+  ({String name, String catalogUrl})? repositoryTarget;
   RuntimeErrorCode? operationFailure;
-  String? cleanupSha256;
-  String? cleanupError;
+  ExtensionLocalCopy? _cleanupTarget;
+  String? _cleanupError;
   bool _busy = false;
   bool _disposed = false;
   bool _retired = false;
@@ -62,12 +81,32 @@ final class ExtensionsController extends ChangeNotifier {
       {ServiceStatus.ready, ServiceStatus.failed}.contains(catalog.status);
   bool get busy => _busy || settings.busy;
   bool get canEdit => available && !busy && !catalog.busy && settings.canEdit;
-  bool get preparing => _preparationId != null;
+  bool get preparing => available && _preparationId != null;
+  CatalogBuild? get preparationBuild => available ? _preparationBuild : null;
+  ExtensionPreparationFailure? get preparationFailure => switch (_failure) {
+    (reason: final reason, build: final build?, localCopyOf: final localCopyOf)
+        when available =>
+      (build: build, reason: reason, localCopyOf: localCopyOf),
+    _ => null,
+  };
+  ExtensionLocalCopy? get cleanupTarget => available ? _cleanupTarget : null;
+  String? get cleanupError => available ? _cleanupError : null;
   List<wire.InstalledExtension> get installed =>
       settings.snapshot?.global.installedExtensions ?? const [];
 
+  String _installedName(wire.InstalledExtension extension) =>
+      ExtensionListing(catalog: catalog, installed: extension).name;
+
+  String artifactName(String sha256) {
+    final match = installed
+        .where((extension) => extension.bundleSha256 == sha256)
+        .firstOrNull;
+    return match == null ? '未使用的扩展副本' : _installedName(match);
+  }
+
   void _retire() {
     _retired = true;
+    repositoryTarget = null;
     error = '身份或服务已改变，请关闭后重新打开扩展管理。';
     if (!_cancelled.isCompleted) _cancelled.complete();
   }
@@ -79,7 +118,10 @@ final class ExtensionsController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  Future<void> refresh({bool catalogToo = false}) async {
+  Future<void> refresh({
+    bool catalogToo = false,
+    bool reportCatalogCheck = true,
+  }) async {
     if (!available || busy) return;
     await _run(() async {
       final refreshed = await _settingsCommands.refresh();
@@ -96,7 +138,14 @@ final class ExtensionsController extends ChangeNotifier {
       }
       if (!available) return;
       cache = await catalog.runtime.extensionCache();
-      if (available) message = catalogToo ? '已检查当前目录，账户构建选择未改变。' : null;
+      if (available &&
+          catalogToo &&
+          reportCatalogCheck &&
+          refreshed &&
+          catalog.repositoryErrors.isEmpty &&
+          (catalog.builds.isNotEmpty || installed.isNotEmpty)) {
+        message = '已检查当前目录，账户构建选择未改变。';
+      }
     });
   }
 
@@ -144,24 +193,12 @@ final class ExtensionsController extends ChangeNotifier {
     }
     // This first snapshot and CAS stay fixed while the candidate downloads.
     final revision = initial.globalRevision;
+    final previousCopy = previous == null
+        ? null
+        : (sha256: previous.bundleSha256, name: _installedName(previous));
     await _run(() async {
-      final id = const Uuid().v4();
-      _preparationId = id;
-      activity = ExtensionActivity.preparing;
-      _changed();
-      wire.PreparedBuild prepared;
-      try {
-        prepared = await catalog.runtime.prepareBuild(
-          preparationId: id,
-          catalog: build.catalog,
-          build: build.toProto(),
-        );
-      } catch (_) {
-        if (_preparationId != id) return;
-        rethrow;
-      }
-      if (!available || _preparationId != id) return;
-      _preparationId = null;
+      final prepared = await _prepare(build);
+      if (prepared == null || !available) return;
       if (!settings.canEdit) {
         throw StateError('另一个全局设置操作尚未确认，请先处理原请求。');
       }
@@ -182,15 +219,22 @@ final class ExtensionsController extends ChangeNotifier {
       _changed();
       final saved = await _settingsCommands.saveGlobal(values, revision);
       if (!available) return;
-      if (saved) await catalog.applyConfirmedInstallations(settings.snapshot!);
+      if (saved) {
+        final confirmed = settings.snapshot!;
+        if (previousCopy != null &&
+            previousCopy.sha256 != prepared.bundleSha256) {
+          message = '账户扩展选择已确认，本机产物已准备。';
+          await _cleanup(previousCopy, confirmed: confirmed);
+          return;
+        }
+        activity = ExtensionActivity.reading;
+        _changed();
+        await catalog.applyConfirmedInstallations(confirmed);
+      }
       if (!available) return;
       cache = await catalog.runtime.extensionCache();
-      if (saved) {
+      if (saved && available) {
         message = '账户扩展选择已确认，本机产物已准备。';
-        if (previous != null &&
-            previous.bundleSha256 != prepared.bundleSha256) {
-          await _cleanup(previous.bundleSha256);
-        }
       }
     });
   }
@@ -200,7 +244,12 @@ final class ExtensionsController extends ChangeNotifier {
     RepositoryPreview? result;
     final baseline = settings.snapshot!;
     await _run(() async {
-      final uri = Uri.parse(url.trim());
+      final uri = Uri.tryParse(url.trim());
+      if (uri == null ||
+          !uri.hasAuthority ||
+          !{'http', 'https'}.contains(uri.scheme)) {
+        throw const FormatException('请填写有效的 HTTPS 仓库地址。');
+      }
       if (uri.userInfo.isNotEmpty) {
         throw const FormatException('仓库地址不能包含用户名或密码。');
       }
@@ -210,7 +259,19 @@ final class ExtensionsController extends ChangeNotifier {
               !uri.hasFragment
           ? '${uri.origin}/extensions/index.json'
           : url.trim();
-      validateBusinessCatalogUrl(canonical);
+      try {
+        validateBusinessCatalogUrl(canonical);
+      } on FormatException {
+        throw const FormatException(
+          '请使用 HTTPS 仓库地址，目录路径须为 /extensions/index.json。',
+        );
+      }
+      repositoryTarget = (
+        name: name.trim().isEmpty ? uri.host : name.trim(),
+        catalogUrl: canonical,
+      );
+      activity = ExtensionActivity.previewing;
+      _changed();
       final document = await catalog.previewRepository(
         canonical,
         shouldContinue: () => available,
@@ -249,6 +310,10 @@ final class ExtensionsController extends ChangeNotifier {
     await _run(() async {
       _validateNewRepository(preview.repository, values.repositories);
       values.repositories.add(preview.repository.deepCopy());
+      repositoryTarget = (
+        name: preview.repository.name,
+        catalogUrl: preview.repository.catalogUrl,
+      );
       activity = ExtensionActivity.saving;
       _changed();
       final saved = await _settingsCommands.saveGlobal(
@@ -256,6 +321,8 @@ final class ExtensionsController extends ChangeNotifier {
         preview.baseline.globalRevision,
       );
       if (!saved || !available) return;
+      activity = ExtensionActivity.reading;
+      _changed();
       await catalog.applyConfirmedInstallations(settings.snapshot!);
       if (!available) return;
       await catalog.refreshCatalog(
@@ -281,6 +348,10 @@ final class ExtensionsController extends ChangeNotifier {
           value.repoId == repository.repoId,
     );
     await _run(() async {
+      repositoryTarget = (
+        name: repository.name,
+        catalogUrl: repository.catalogUrl,
+      );
       activity = ExtensionActivity.saving;
       _changed();
       final saved = await _settingsCommands.saveGlobal(
@@ -288,6 +359,8 @@ final class ExtensionsController extends ChangeNotifier {
         initial.globalRevision,
       );
       if (!saved || !available) return;
+      activity = ExtensionActivity.reading;
+      _changed();
       message = '仓库已移除；安装选择、书架和来源数据保留，对应运行槽将关闭。';
       await catalog.applyConfirmedInstallations(settings.snapshot!);
     });
@@ -310,6 +383,8 @@ final class ExtensionsController extends ChangeNotifier {
       _changed();
       if (await _settingsCommands.saveGlobal(values, initial.globalRevision) &&
           available) {
+        activity = ExtensionActivity.reading;
+        _changed();
         await catalog.applyConfirmedInstallations(settings.snapshot!);
         message = enabled ? '账户已确认启用。' : '账户已确认停用。';
       }
@@ -324,6 +399,15 @@ final class ExtensionsController extends ChangeNotifier {
         .where((value) => value.packageName == extension.packageName)
         .firstOrNull;
     if (removed == null) return;
+    if (removed.catalogUrl != extension.catalogUrl ||
+        removed.repoId != extension.repoId ||
+        removed.buildId != extension.buildId ||
+        removed.bundleSha256 != extension.bundleSha256) {
+      error = '扩展版本或仓库已改变，请核对后重新卸载。';
+      _changed();
+      return;
+    }
+    final copy = (sha256: removed.bundleSha256, name: _installedName(removed));
     values.installedExtensions.removeWhere(
       (value) => value.packageName == extension.packageName,
     );
@@ -335,13 +419,14 @@ final class ExtensionsController extends ChangeNotifier {
         return;
       }
       message = '账户已确认卸载；书架、阅读进度和漫画源数据保留。';
-      await catalog.applyConfirmedInstallations(settings.snapshot!);
-      await _cleanup(removed.bundleSha256);
+      await _cleanup(copy, confirmed: settings.snapshot!);
     });
   }
 
   Future<void> prepareInstalled(wire.InstalledExtension extension) async {
-    if (!available || busy || catalog.busy) return;
+    if (!available || busy || catalog.busy || !installed.contains(extension)) {
+      return;
+    }
     final build = catalog.builds
         .where(
           (build) =>
@@ -357,76 +442,106 @@ final class ExtensionsController extends ChangeNotifier {
       return;
     }
     await _run(() async {
-      final id = const Uuid().v4();
-      _preparationId = id;
-      activity = ExtensionActivity.preparing;
-      _changed();
-      wire.PreparedBuild prepared;
-      try {
-        prepared = await catalog.runtime.prepareBuild(
-          preparationId: id,
-          catalog: build.catalog,
-          build: build.toProto(),
-        );
-      } catch (_) {
-        if (_preparationId != id) return;
-        rethrow;
-      }
-      if (!available || _preparationId != id) return;
-      _preparationId = null;
+      final prepared = await _prepare(build);
+      if (prepared == null || !available) return;
       if (prepared.bundleSha256 != extension.bundleSha256) {
         throw const FormatException('产物与账户所选构建不匹配。');
       }
+      activity = ExtensionActivity.reading;
+      _changed();
       cache = await catalog.runtime.extensionCache();
       if (available) message = '本机产物已准备，账户选择未改变。';
-    });
+    }, localCopyOf: extension);
+  }
+
+  Future<wire.PreparedBuild?> _prepare(CatalogBuild build) async {
+    final id = const Uuid().v4();
+    _preparationId = id;
+    _preparationBuild = build;
+    activity = ExtensionActivity.preparing;
+    _changed();
+    wire.PreparedBuild prepared;
+    try {
+      prepared = await catalog.runtime.prepareBuild(
+        preparationId: id,
+        catalog: build.catalog,
+        build: build.toProto(),
+      );
+    } catch (_) {
+      if (_preparationId != id) return null;
+      rethrow;
+    }
+    if (!available || _preparationId != id) return null;
+    _preparationId = null;
+    _preparationBuild = null;
+    return prepared;
   }
 
   Future<void> cancelPreparation() async {
     final id = _preparationId;
     if (id == null || !available) return;
     _preparationId = null;
+    final cancellation = _confirmPreparationCancellation(id);
+    _preparationCancellation = cancellation;
     _changed();
+    await cancellation;
+  }
+
+  Future<void> _confirmPreparationCancellation(String id) async {
     try {
       await catalog.runtime.cancelPreparation(id);
       if (available) message = '已取消准备；账户设置未更改。';
     } catch (_) {
       if (available) error = '取消尚未确认，请重新读取本机缓存。';
     }
-    _changed();
   }
 
   Future<void> forget(String sha256) async {
     if (!available || busy || catalog.busy) return;
-    await _run(() => _cleanup(sha256));
+    final copy = (sha256: sha256, name: artifactName(sha256));
+    await _run(() => _cleanup(copy));
   }
 
-  Future<void> _cleanup(String sha256) async {
+  Future<void> _cleanup(
+    ExtensionLocalCopy copy, {
+    SettingsSnapshot? confirmed,
+  }) async {
     activity = ExtensionActivity.cleaning;
-    cleanupSha256 = sha256;
-    cleanupError = null;
+    _cleanupTarget = copy;
+    _cleanupError = null;
     _changed();
     try {
-      await catalog.retireUnavailableExtension();
+      if (confirmed == null) {
+        await catalog.retireUnavailableExtension();
+      } else {
+        await catalog.applyConfirmedInstallations(confirmed);
+      }
       if (!available) return;
-      await catalog.closeManagedBuild(sha256);
+      await catalog.closeManagedBuild(copy.sha256);
       if (!available) return;
-      await catalog.runtime.forgetExtensionArtifact(sha256);
+      await catalog.runtime.forgetExtensionArtifact(copy.sha256);
       if (!available) return;
       cache = await catalog.runtime.extensionCache();
-      cleanupSha256 = null;
-    } catch (_) {
-      cleanupError = '账户已确认；本机副本清理未完成，请重试清理。';
-      rethrow;
+      _cleanupTarget = null;
+    } catch (failure) {
+      if (!available) return;
+      operationFailure = failure is RuntimeException ? failure.code : null;
+      _cleanupError = switch (failure) {
+        RuntimeException(code: RuntimeErrorCode.storageBusy) =>
+          '本机副本仍在使用。请关闭正在使用此扩展的标签页或窗口后重试。',
+        RuntimeException(code: RuntimeErrorCode.runtimeLost) =>
+          '运行时已断开，请恢复连接后重试清理。',
+        _ => catalog.extensionCleanupError ?? _operationError(failure),
+      };
     }
   }
 
   Future<void> retryCleanup() async {
     if (!available || busy || catalog.busy) return;
     await _run(() async {
-      final sha256 = cleanupSha256;
-      if (sha256 != null) {
-        await _cleanup(sha256);
+      final copy = _cleanupTarget;
+      if (copy != null) {
+        await _cleanup(copy);
       } else {
         await catalog.retireUnavailableExtension();
         if (available) cache = await catalog.runtime.extensionCache();
@@ -447,7 +562,13 @@ final class ExtensionsController extends ChangeNotifier {
   Future<void> retry() async {
     if (!available || busy) return;
     await _run(() async {
+      activity = settings.pending?.acknowledged == true
+          ? ExtensionActivity.reading
+          : ExtensionActivity.saving;
+      _changed();
       if (await _settingsCommands.retry() && available) {
+        activity = ExtensionActivity.reading;
+        _changed();
         await catalog.applyConfirmedInstallations(settings.snapshot!);
         cache = await catalog.runtime.extensionCache();
         message = '原设置操作已由服务端确认；请检查本机缓存状态。';
@@ -455,9 +576,13 @@ final class ExtensionsController extends ChangeNotifier {
     });
   }
 
-  Future<void> _run(Future<void> Function() operation) async {
+  Future<void> _run(
+    Future<void> Function() operation, {
+    wire.InstalledExtension? localCopyOf,
+  }) async {
     _busy = true;
     activity = ExtensionActivity.reading;
+    repositoryTarget = null;
     operationFailure = null;
     error = null;
     message = null;
@@ -467,22 +592,19 @@ final class ExtensionsController extends ChangeNotifier {
     } catch (failure) {
       if (available) {
         operationFailure = failure is RuntimeException ? failure.code : null;
-        error = switch (failure) {
-          RuntimeException(code: RuntimeErrorCode.limitExceeded) =>
-            '本机存储达到限额，请释放空间后重试。',
-          RuntimeException(code: RuntimeErrorCode.storageBusy) =>
-            '扩展仍在使用，请关闭相关阅读后重试。',
-          RuntimeException(code: RuntimeErrorCode.unsupportedCapability) =>
-            '当前应用不支持此扩展材料，请更新应用。',
-          RuntimeException(code: RuntimeErrorCode.integrityError) =>
-            '扩展下载校验失败，请检查更新后重试。',
-          FormatException(:final message) => message,
-          StateError(:final message) => message.toString(),
-          _ => '操作未完成，请重试。',
-        };
+        final reason = _operationError(failure);
+        if (_preparationBuild case final build?) {
+          _failure = (reason: reason, build: build, localCopyOf: localCopyOf);
+        } else {
+          error = reason;
+        }
       }
     } finally {
+      if (_preparationCancellation case final cancellation?) await cancellation;
+      _preparationCancellation = null;
       _preparationId = null;
+      _preparationBuild = null;
+      repositoryTarget = null;
       if (!_disposed) {
         _busy = false;
         activity = null;
@@ -491,11 +613,28 @@ final class ExtensionsController extends ChangeNotifier {
     }
   }
 
+  static String _operationError(Object failure) => switch (failure) {
+    RuntimeException(code: RuntimeErrorCode.limitExceeded) =>
+      '本机存储达到限额，请释放空间后重试。',
+    RuntimeException(code: RuntimeErrorCode.storageBusy) =>
+      '扩展仍在使用，请关闭相关阅读后重试。',
+    RuntimeException(code: RuntimeErrorCode.unsupportedCapability) =>
+      '当前应用不支持此扩展材料，请更新应用。',
+    RuntimeException(code: RuntimeErrorCode.integrityError) =>
+      '扩展下载校验失败，请检查更新后重试。',
+    RuntimeException(code: RuntimeErrorCode.extensionAssetUnavailable) =>
+      '无法从仓库读取扩展材料。',
+    FormatException(:final message) => message,
+    StateError(:final message) => message.toString(),
+    _ => '操作未完成，请重试。',
+  };
+
   @override
   void dispose() {
     if (!_cancelled.isCompleted) _cancelled.complete();
     final id = _preparationId;
     _preparationId = null;
+    repositoryTarget = null;
     _disposed = true;
     if (id != null) {
       unawaited(

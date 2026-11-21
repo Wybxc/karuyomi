@@ -60,12 +60,23 @@ export class VerifiedLoader {
         'Extension assets must belong to the selected static catalog',
       );
     }
-    const response = await this.fetcher(url.href, {
-      signal,
-      credentials: 'omit',
-      redirect: 'manual',
-      cache: immutable ? 'force-cache' : 'no-cache',
-    });
+    let response: Response;
+    try {
+      response = await this.fetcher(url.href, {
+        signal,
+        credentials: 'omit',
+        redirect: 'manual',
+        cache: immutable ? 'force-cache' : 'no-cache',
+      });
+    } catch (failure) {
+      signal.throwIfAborted();
+      if (!(failure instanceof TypeError)) throw failure;
+      throw new RuntimeFailure(
+        'extension_asset_unavailable',
+        'Could not fetch the static extension asset',
+        true,
+      );
+    }
     if (
       response.type === 'opaqueredirect' ||
       (response.status >= 300 && response.status < 400)
@@ -79,7 +90,7 @@ export class VerifiedLoader {
     if (!response.ok) {
       void response.body?.cancel().catch(() => {});
       throw new RuntimeFailure(
-        'runtime_lost',
+        'extension_asset_unavailable',
         `Static extension asset returned HTTP ${response.status}`,
         response.status >= 500,
       );

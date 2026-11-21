@@ -2,6 +2,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/cover_repository.dart';
+import '../../theme/app_theme.dart';
 
 /// Private cover bytes are read through the verified business identity. No
 /// Source thumbnail URL or unauthenticated image URL enters this widget.
@@ -9,8 +10,11 @@ class const CustomCover({
   super.key,
   required final CoverRepository repository,
   required final wire.CustomCover? cover,
-  final double width = 48,
-  final double height = 64,
+  final BoxConstraints constraints = const BoxConstraints.tightFor(
+    width: 48,
+    height: 64,
+  ),
+  final BoxFit fit = BoxFit.cover,
 }) extends StatefulWidget {
   @override
   State<CustomCover> createState() => _CustomCoverState();
@@ -40,7 +44,7 @@ class _CustomCoverState extends State<CustomCover> {
   }
 
   Widget _placeholder({bool failed = false}) => ColoredBox(
-    color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
+    color: AppColors.groupedSurface.resolveFrom(context),
     child: failed
         ? CupertinoButton(
             onPressed: () => setState(() {
@@ -50,12 +54,11 @@ class _CustomCoverState extends State<CustomCover> {
             padding: const EdgeInsets.all(8),
             child: const Icon(CupertinoIcons.refresh, semanticLabel: '重试读取封面'),
           )
-        : const Center(child: Icon(CupertinoIcons.book)),
+        : const Center(heightFactor: 1, child: Icon(CupertinoIcons.book)),
   );
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: widget.width,
-    height: widget.height,
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: widget.constraints,
     child: ClipRRect(
       borderRadius: BorderRadius.circular(6),
       child: FutureBuilder(
@@ -68,12 +71,14 @@ class _CustomCoverState extends State<CustomCover> {
           return Image.memory(
             bytes,
             key: ValueKey(_identity),
-            fit: BoxFit.cover,
-            cacheHeight:
-                (widget.height * MediaQuery.devicePixelRatioOf(context))
-                    .ceil()
-                    .clamp(1, 1024)
-                    .toInt(),
+            fit: widget.fit,
+            cacheHeight: widget.constraints.hasBoundedHeight
+                ? (widget.constraints.maxHeight *
+                          MediaQuery.devicePixelRatioOf(context))
+                      .ceil()
+                      .clamp(1, 1024)
+                      .toInt()
+                : null,
             gaplessPlayback: false,
             excludeFromSemantics: true,
             errorBuilder: (context, error, stack) => _placeholder(failed: true),

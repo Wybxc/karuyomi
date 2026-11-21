@@ -20,7 +20,7 @@
 - `pnpm flutter:check` 完整通过：reader_core 21、source_runtime 42、客户端 291 项，静态检查无问题。现有进度导航回归通过正式设置命令选择布局，并验证迟到 viewport 报告不能覆盖已确认偏好；更新测试未移除原进度、远端重开和来源顺序断言。
 - `pnpm format`、完整 `pnpm format:check` 与 `pnpm build` 通过；正式 Web/Native runtime 资源、Flutter Web 和 Worker/Static Assets 构建成功。
 
-这些客户端结果使用受控 Source/业务 supplier，不是独立浏览器、模拟器、生产 Access 或真机验收。官方 workerd/D1 证据与组件导航分开计算。详细临时输出保留在忽略的 `.local/settings-*.log`。
+这些客户端结果使用受控 Source/业务 supplier，不是独立浏览器、模拟器、生产 Access 或真机验收。官方 workerd/D1 证据与组件导航分开计算。
 
 ## 2026-11-07：独立 Web 文档与双 iOS 模拟器
 
@@ -67,24 +67,24 @@ Codex 内置浏览器打开 A、B 两个独立文档，随后新建 C 文档。�
 
 ```sh
 pnpm --filter @karuyomi/api exec vite build --config vite.acceptance.config.ts --mode native-acceptance
-NODE_EXTRA_CA_CERTS="$PWD/.local/category-native/tls/rootCA.pem" \
-  WRANGLER_HTTPS_KEY_PATH="$PWD/.local/category-native/tls/key.pem" \
-  WRANGLER_HTTPS_CERT_PATH="$PWD/.local/category-native/tls/cert.pem" \
+NODE_EXTRA_CA_CERTS="${TEST_CA_PEM:?请指定设备信任的验收 CA}" \
+  WRANGLER_HTTPS_KEY_PATH="${TEST_KEY_PEM:?请指定验收服务私钥}" \
+  WRANGLER_HTTPS_CERT_PATH="${TEST_CERT_PEM:?请指定验收服务证书}" \
   pnpm acceptance:serve
 ```
 
-从该服务 GET 当前完整 ProtoJSON，用 JSON 工具生成忽略的本地阶段配置文件。`APP_ORIGIN`、`SETTINGS_SUBJECT`、`SETTINGS_PHASE` 和 `SETTINGS_EXPECT_JSON` 都是字符串；最后一项是完整 `SettingsResponse` 的 JSON 字符串，不能只填写 revision。验证阶段使用 `SETTINGS_PHASE=verify` 且不设置 preset；写阶段使用 `SETTINGS_PHASE=write`，并填写 `SETTINGS_PRESET=dark-rtl-double-width-crop` 或 `light-webtoon-auto-height-no-crop`。配置文件通过绝对路径传入，避免把任意完整 JSON 内嵌到 shell：
+从该服务 GET 当前完整 ProtoJSON，用 JSON 工具在本轮临时目录生成阶段配置文件。`APP_ORIGIN`、`SETTINGS_SUBJECT`、`SETTINGS_PHASE` 和 `SETTINGS_EXPECT_JSON` 都是字符串；最后一项是完整 `SettingsResponse` 的 JSON 字符串，不能只填写 revision。验证阶段使用 `SETTINGS_PHASE=verify` 且不设置 preset；写阶段使用 `SETTINGS_PHASE=write`，并填写 `SETTINGS_PRESET=dark-rtl-double-width-crop` 或 `light-webtoon-auto-height-no-crop`。配置文件通过绝对路径传入，避免把任意完整 JSON 内嵌到 shell：
 
 ```sh
 cd apps/reader
 flutter test integration_test/settings_sync_test.dart --no-pub -d <simulator-udid> \
-  --dart-define-from-file=/绝对路径/.local/settings-native/phase.json \
+  --dart-define-from-file="${PHASE_JSON:?请指定本阶段生成的配置文件}" \
   --reporter expanded
 ```
 
-每阶段须以新的当前快照为前置，不盲目重跑写阶段。实际五份配置文件 `{a1-verify,b1-write-dark,a2-verify,a3-write-light,b2-verify}.defines.json` 和各阶段原始 GET 留在 `.local/settings-native-20261107/`。
+每阶段须以新的当前快照为前置，不盲目重跑写阶段。
 
-本轮日志和临时快照保留在忽略目录：`.local/settings-defaults-{format,format-check,flutter-check,build}.log`、`.local/settings-native-20261107/` 与 `/private/tmp/karuyomi-settings-{web-fixed,native}-*.json`；修复前红测试为 `/private/tmp/karuyomi-settings-protojson-defaults-red.log`，完整设置仓储绿测试为 `/private/tmp/karuyomi-settings-protojson-defaults-final.log`。Native 汇总为 `.local/settings-native-20261107/results.json`，含设备、输入摘要、五阶段完整结果与清理记录。详细机器输出和截图不入库。Web / Native 两个 harness 均正常 exit 0，端口 60778 / 61168 已释放，本轮测试进程无残留；Native 两台专用模拟器已关闭并删除。
+Web / Native 两个 harness 均正常 exit 0，端口 60778 / 61168 已释放，本轮测试进程无残留；Native 两台专用模拟器已关闭并删除。
 
 上述新证据覆盖全局设置的 Web↔Web、iOS 模拟器↔iOS 模拟器在线读写。漫画继承/覆盖/清空、实际丢响应原操作恢复、可靠前台恢复、Web↔Native、Android、生产 Access、真机手势及性能仍须分别验收。
 
@@ -100,7 +100,7 @@ flutter test integration_test/settings_sync_test.dart --no-pub -d <simulator-udi
 - 三种无效地址：额外路径、HTTP 与畸形 URI。修复前 3/3 均因设置面板丢失失败；修复后配置被拒而旧 pending 保持可处理，改回原服务再明确重试成功，原 POST 正文不变。
 - 真正切换服务、同服务切换 subject：旧编辑不能重试，也不向新身份发送旧命令；新写使用新 UUID、当前身份和独立 CAS。
 
-独立验收只读审查产品差异，并核对红日志与最终 `All tests passed`。修复前证据在 `/private/tmp/karuyomi-settings-invalid-origin-red.log`，完整导航绿日志在 `/private/tmp/karuyomi-settings-reconnect-final-green.log`。最终完整 `pnpm flutter:check` 通过：reader_core 22、source_runtime 78、客户端 584，三个项目静态分析无问题，日志为 `.local/settings-reconnect-final-flutter-check.log`。这是正式 AppShell 与受控 TestPlatform / 业务 supplier 的组件回归，未新增真实设备丢响应、Access 续期或网络故障验收。
+独立验收只读审查产品差异，并核对红日志与最终 `All tests passed`。修复前证据在 `/private/tmp/karuyomi-settings-invalid-origin-red.log`，完整导航绿日志在 `/private/tmp/karuyomi-settings-reconnect-final-green.log`。最终完整 `pnpm flutter:check` 通过：reader_core 22、source_runtime 78、客户端 584，三个项目静态分析无问题。这是正式 AppShell 与受控 TestPlatform / 业务 supplier 的组件回归，未新增真实设备丢响应、Access 续期或网络故障验收。
 
 固定提交 `2123b5b7d6fcf897f0120e1873001f398363b968` 的 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42288468310) 和本节修复提交 `eee2b8115ccf215bb8d1c57dd7bec76d16333195` 的 [CI](https://github.com/Wybxc/karuyomi/actions/runs/42292436578) 均已独立核对为 completed / success。上述 AppShell 修复与固定 `2123b5b` 的设备副本是不同输入，不能用旧设备运行证明本节新修复已在设备执行。
 
@@ -114,9 +114,9 @@ Dart 的正式 `TransportSourceRuntime` 用生成的 `ControlResponse` 和受控
 
 正式 AppShell 新增两项零 Source 设置回归，全导航文件 12/12 通过：受控业务 supplier 已应用设置后返回 typed Access required/denied 错误，UI 显示正式登录入口，暂停编辑并保留原命令；登录恢复保留原 BusinessStateClient，不自动重发写入；明确点击“重试原设置操作”才重发逐字相同的 UUID / 正文 / CAS，累计只应用一次。该组件测试直接提供结构化错误，未把它记作实际 Fetch、登录弹窗或生产 Access 续期。日志为 `/private/tmp/karuyomi-settings-access-navigation.log`。
 
-扩大回归执行完整 `packages/runtime-host/test`，14 个文件 / 217 项全部通过，日志为 `.local/settings-api-access-host-all.log`；上述 95 项是其中的定向集合。全仓 `pnpm typecheck` 与 `pnpm check:dependencies` 通过，依赖检查为 179 模块 / 590 依赖无违规，分别记录在 `.local/settings-api-access-{typecheck,dependencies}.log`。
+扩大回归执行完整 `packages/runtime-host/test`，14 个文件 / 217 项全部通过；上述 95 项是其中的定向集合。全仓 `pnpm typecheck` 与 `pnpm check:dependencies` 通过，依赖检查为 179 模块 / 590 依赖无违规。
 
-最终完整 `pnpm check` 通过，包含 33 个文件 / 505 项 Vitest、协议 golden 和全部工具测试；完整 `pnpm flutter:check` 为 reader_core 22、source_runtime 86、客户端 586 项，三个项目静态分析无问题、172 个 Dart 文件格式零差异，日志为 `.local/settings-api-access-final-{check,flutter-check}.log`。完整 `pnpm build` 通过并核对 57 个静态文件 / 0 个当前扩展，日志为 `.local/settings-api-access-final-build.log`；该零扩展工程构建不计为在线 Source 或生产 Access 验收。
+最终完整 `pnpm check` 通过，包含 33 个文件 / 505 项 Vitest、协议 golden 和全部工具测试；完整 `pnpm flutter:check` 为 reader_core 22、source_runtime 86、客户端 586 项，三个项目静态分析无问题、172 个 Dart 文件格式零差异。完整 `pnpm build` 通过并核对 57 个静态文件 / 0 个当前扩展；该零扩展工程构建不计为在线 Source 或生产 Access 验收。
 
 ## 2026-11-07：Android↔iOS 同服务全局设置同步
 
@@ -136,9 +136,9 @@ Dart 的正式 `TransportSourceRuntime` 用生成的 `ControlResponse` 和受控
 
 首次 Android 写入尝试在进入表单前失败，D1 仍为 0；独立诊断取得 Dart `dart:io` 的 `CERTIFICATE_VERIFY_FAILED / unable to get local issuer certificate`，说明 WebView 的测试 CA 配置没有覆盖 Dart HTTP 的信任。正式集成驱动随后新增可选 `SETTINGS_TEST_CA_BASE64`：仅允许已校验的 Android `https://127.0.0.1` origin，用标准库解码本轮 CA 文件字节后，向测试进程默认 `SecurityContext` 追加信任，保留系统根与主机名校验。没有使用 `badCertificateCallback`、`HttpOverrides` 或修改产品 TLS。多行 PEM 参数曾在 Flutter Android 编译层失败，改用标准 Base64 后，先通过独立只读预检确认 revision 仍为 0，才重新进入正式写阶段；这些环境与准备失败日志均保留，没有计作额外业务写入，也没有声称修复了产品启动可靠性。
 
-复验沿上节官方 HTTPS harness 和[正式驱动说明](../../apps/reader/integration_test/README.md)，按每阶段前的完整 GET 生成本地 `--dart-define-from-file` 配置。Android 的配置额外填写本轮 CA 原始字节的标准 Base64 字符串；iOS 不传该字段。完整产品副本、源码身份、配置和运行日志保留在 `.local/settings-android-ios-20261107/`，独立原始响应与审计快照在 `/private/tmp/karuyomi-settings-android-ios-*.json`。这组证据覆盖模拟器 Android↔iOS 同服务的全局设置在线写入和新进程读回；没有验证 Web↔Native、并发竞争、网络故障、生产 Access、真实手动触控或真机性能。
+复验沿上节官方 HTTPS harness 和[正式驱动说明](../../apps/reader/integration_test/README.md)，按每阶段前的完整 GET 生成本地 `--dart-define-from-file` 配置。Android 的配置额外填写本轮 CA 原始字节的标准 Base64 字符串；iOS 不传该字段。这组证据覆盖模拟器 Android↔iOS 同服务的全局设置在线写入和新进程读回；没有验证 Web↔Native、并发竞争、网络故障、生产 Access、真实手动触控或真机性能。
 
-本轮汇总为 `.local/settings-android-ios-20261107/results.json`，保留完整报告、按阶段的驱动 SHA、失败分类、输入身份及清理记录。HTTPS harness 与 Android emulator 均正常 exit 0；端口 52754 已释放，专用 Android AVD 和 iOS 模拟器均已删除，确认 ADB 无设备后关闭本轮 server。独立只读检查未发现可归因本轮的测试、设备或服务进程残留；原有 iOS 设备的元数据差异按实际结果保留在汇总中。
+HTTPS harness 与 Android emulator 均正常 exit 0；端口 52754 已释放，专用 Android AVD 和 iOS 模拟器均已删除，确认 ADB 无设备后关闭本轮 server。独立只读检查未发现可归因本轮的测试、设备或服务进程残留；原有 iOS 设备的元数据差异按实际结果保留在汇总中。
 
 ## 2026-11-07：Web 全局设置的真实确认丢失与原样重试
 

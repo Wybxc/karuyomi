@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -68,30 +69,43 @@ const formatterDirectory = path.join(root, '.local/formatters');
 mkdirSync(formatterDirectory, { recursive: true });
 const hash = (file: string) =>
   createHash('sha256').update(readFileSync(file)).digest('hex');
-function jar(name: string, url: string, expected: string) {
+function jar(name: string, urls: readonly string[], expected: string) {
   const destination = path.join(formatterDirectory, name);
-  if (!existsSync(destination) || hash(destination) !== expected) {
-    const temporary = destination + '.download';
-    run('curl', [
-      '--fail',
-      '--location',
-      '--silent',
-      '--show-error',
-      '--retry',
-      '2',
-      '--max-filesize',
-      '134217728',
-      '--output',
-      temporary,
-      url,
-    ]);
-    if (hash(temporary) !== expected) {
-      rmSync(temporary);
-      throw Error('Formatter checksum mismatch: ' + name);
-    }
-    renameSync(temporary, destination);
+  if (existsSync(destination) && hash(destination) === expected) {
+    return destination;
   }
-  return destination;
+  const directory = mkdtempSync(path.join(formatterDirectory, 'download-'));
+  const temporary = path.join(directory, name);
+  try {
+    for (const url of urls) {
+      const result = run(
+        'curl',
+        [
+          '--fail',
+          '--location',
+          '--silent',
+          '--show-error',
+          '--retry',
+          '2',
+          '--max-filesize',
+          '134217728',
+          '--output',
+          temporary,
+          url,
+        ],
+        { reject: false },
+      );
+      if (result.failed) continue;
+      if (hash(temporary) !== expected) {
+        throw Error('Formatter checksum mismatch: ' + name);
+      }
+      renameSync(temporary, destination);
+      return destination;
+    }
+    throw Error('Could not download pinned formatter: ' + name);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 const javaCandidates = [
   process.env.JAVA_HOME && path.join(process.env.JAVA_HOME, 'bin/java'),
@@ -116,7 +130,10 @@ if (!(major >= 21))
 console.log('[format] Java');
 const gjf = jar(
   'google-java-format-2.0.0-all-deps.jar',
-  'https://repo.maven.apache.org/maven2/com/google/googlejavaformat/google-java-format/2.0.0/google-java-format-2.0.0-all-deps.jar',
+  [
+    'https://repo.maven.apache.org/maven2/com/google/googlejavaformat/google-java-format/2.0.0/google-java-format-2.0.0-all-deps.jar',
+    'https://github.com/google/google-java-format/releases/download/v2.0.0/google-java-format-2.0.0-all-deps.jar',
+  ],
   'c78feb48c549fa7114b7ea11db3b456808f7b371ffe84e6643a44dd2f9588639',
 );
 const javaFlags = [
@@ -140,7 +157,9 @@ run(java, [...javaFlags, '--dry-run', '--set-exit-if-changed', ...javaFiles]);
 console.log('[format] Kotlin / Gradle Kotlin DSL');
 const ktfmt = jar(
   'ktfmt-0.63-with-dependencies.jar',
-  'https://repo.maven.apache.org/maven2/com/facebook/ktfmt/0.63/ktfmt-0.63-with-dependencies.jar',
+  [
+    'https://repo.maven.apache.org/maven2/com/facebook/ktfmt/0.63/ktfmt-0.63-with-dependencies.jar',
+  ],
   'a015521ddb1c7a80c41edb56b91b4a231439592ffd2e85ac866ff8134c37c112',
 );
 run(java, [
@@ -215,7 +234,7 @@ for (const name of matching(/\.sql$/)) {
 console.log('[format] Ruby');
 const rufoGem = jar(
   'rufo-0.13.0.gem',
-  'https://rubygems.org/downloads/rufo-0.13.0.gem',
+  ['https://rubygems.org/downloads/rufo-0.13.0.gem'],
   '16266d7da8e024b04d296eefd433077d9003a657797a59d7ed153db3e631ed53',
 );
 const rufoDirectory = path.join(formatterDirectory, 'rufo-0.13.0');

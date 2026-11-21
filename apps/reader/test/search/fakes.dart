@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
-SourceSearchTarget searchTarget(int index) {
+SourceSearchTarget searchTarget(int index, {String? language}) {
   final source = wire.CatalogSource(
     id: index.toString(),
     name: '漫画源 $index',
-    lang: index.isEven ? 'zh' : 'en',
+    lang: language ?? (index.isEven ? 'zh' : 'en'),
   );
   return SourceSearchTarget(
     build: CatalogBuild.fromProto(
@@ -84,11 +84,20 @@ final class FakeSourceSearch extends CatalogSourceSearch {
   @override
   bool get available => alive;
   @override
+  bool get retired => !alive;
+  @override
   String? get unavailableReason => alive ? null : '原账户已失效';
+  @override
+  SourceSearchRetirement? retirement;
 
   void changeAvailability(bool value) {
     alive = value;
     notifyListeners();
+  }
+
+  void reportRetirement(SourceSearchRetirement status) {
+    retirement = status;
+    changeAvailability(false);
   }
 
   @override
@@ -155,6 +164,8 @@ final class FakeSourceSearch extends CatalogSourceSearch {
         buildId: target.build.id,
         sourceId: target.source.id,
         generation: 'generation-1',
+        sourceName: target.source.name,
+        sourceLang: target.source.lang,
       ),
     );
   }

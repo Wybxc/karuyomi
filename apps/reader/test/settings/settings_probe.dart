@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:karuyomi/data/settings_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
@@ -34,4 +35,21 @@ SettingsProbe globalSettings(WidgetTester tester) {
     ProviderScope.containerOf(tester.element(panel), listen: false),
     tester.widget<GlobalSettingsPanel>(panel).catalog,
   );
+}
+
+Future<void> openSettingsSection(WidgetTester tester, String id) async {
+  if (find.byType(MangaSettingsEditor).evaluate().isNotEmpty) return;
+  final destination = find.byKey(ValueKey('settings-section-$id'));
+  if (destination.evaluate().isEmpty) {
+    await tester.tap(
+      find.descendant(
+        of: find.byType(GlobalSettingsPanel),
+        matching: find.byType(CupertinoNavigationBarBackButton),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+  await tester.ensureVisible(destination);
+  await tester.tap(destination);
+  await tester.pumpAndSettle();
 }

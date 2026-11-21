@@ -19,6 +19,12 @@ final class ChapterPreparation {
   bool get ready => _ready != null;
   bool get blocked => _failedOwner != null;
 
+  int? pageCountFor(SequenceChapter chapter) => switch (_ready) {
+    (final key, final opened) when key == chapter.key =>
+      opened.manifest.pages.length,
+    _ => null,
+  };
+
   void _checkCleanup() {
     if (_cleanupError != null) {
       Error.throwWithStackTrace(_cleanupError!, _cleanupStack!);

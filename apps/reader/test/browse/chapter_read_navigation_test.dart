@@ -1,12 +1,15 @@
-import 'package:karuyomi/widgets/app_page_route.dart';
+import 'package:karuyomi/widgets/app_routes.dart';
 
 import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:karuyomi/data/bookmark_repository.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -58,12 +61,12 @@ ChapterSequence get _sequence => ChapterSequence(
   chapters: _chapters,
 );
 
-TestPlatform _platform() =>
+TestPlatform _platform({List<wire.Chapter>? chapters}) =>
     TestPlatform()
       ..invokeHandler = (call) async => switch (call.whichRequest()) {
         wire.SourceCall_Request.details => wire.SourceResult(manga: testManga),
         wire.SourceCall_Request.chapters => wire.SourceResult(
-          chapters: wire.ChapterList(chapters: _chapters),
+          chapters: wire.ChapterList(chapters: chapters ?? _chapters),
         ),
         wire.SourceCall_Request.pages => throw StateError(
           'Chapter marking must not fetch Source pages',
@@ -89,16 +92,21 @@ Finder _readFilter(String name) =>
     find.byKey(ValueKey(('chapter-read-filter', name)));
 Finder _preview(int index) =>
     find.byKey(ValueKey(('chapter-read-item', _sequence.entries[index].key)));
+Finder get _chaptersScrollable => find
+    .descendant(
+      of: find.descendant(
+        of: find.byType(MangaDetailsPage),
+        matching: find.byType(CustomScrollView),
+      ),
+      matching: find.byType(Scrollable),
+    )
+    .first;
 
 Future<void> _reveal(WidgetTester tester, Finder finder) async {
   if (finder.evaluate().isEmpty) {
-    final scrollable = find
-        .descendant(
-          of: find.byType(MangaDetailsPage),
-          matching: find.byType(Scrollable),
-        )
-        .first;
-    await tester.drag(scrollable, const Offset(0, 3000));
+    final scrollable = _chaptersScrollable;
+    final position = tester.state<ScrollableState>(scrollable).position;
+    position.jumpTo(position.minScrollExtent);
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(finder, 250, scrollable: scrollable);
   }
@@ -139,6 +147,7 @@ Future<CatalogController> _details(
     });
     await tester.pumpAndSettle();
   }
+  await _tap(tester, find.byKey(const ValueKey('chapter-options')));
   return tester
       .widget<MangaDetailsPage>(find.byType(MangaDetailsPage))
       .controller;
@@ -191,7 +200,7 @@ Future<void> _confirmFirstThree(WidgetTester tester) async {
   await _tap(tester, _control('chapter-select-range'));
   await _tap(tester, _control('chapter-mark-read'));
   expect(find.text('确认清单：3 章'), findsOneWidget);
-  await _tap(tester, find.text('确认并开始'));
+  await _tap(tester, find.text('开始'));
   expect(find.text('全部标记已由服务端确认。'), findsOneWidget);
 }
 
@@ -212,6 +221,208 @@ wire.StateMutation _command(TestBusinessRequest request) =>
     wire.decodeProtoJson(wire.StateMutation(), jsonDecode(request.body!));
 
 void main() {
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'chapter selection actions stay reachable on a short screen in $brightness',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final chapters = [
+          ..._chapters,
+          for (var index = 1; index <= 30; index++)
+            wire.Chapter(url: '/other/$index', name: '章节 $index'),
+        ];
+        final sequence = ChapterSequence(
+          packageName: 'eu.kanade.source.test',
+          sourceId: sourceId,
+          mangaUrl: testManga.url,
+          chapters: chapters,
+        );
+        final platform = _platform(chapters: chapters);
+        final catalog = await _details(tester, platform);
+        platform.businessServer.requests.clear();
+        final exit = _control('chapter-selection-toggle');
+        await _tap(tester, exit);
+        tester.view.physicalSize = const Size(360, 480);
+        await tester.pumpAndSettle();
+        final lastChapter = find.byKey(ValueKey(sequence.entries.last.key));
+        await _tap(tester, lastChapter);
+
+        final position = tester
+            .state<ScrollableState>(_chaptersScrollable)
+            .position;
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        final markRead = _control('chapter-mark-read');
+        expect(
+          exit.hitTestable(),
+          findsOneWidget,
+          reason: 'exit after scrolling to the last chapter',
+        );
+        expect(
+          markRead.hitTestable(),
+          findsOneWidget,
+          reason: 'preview from the last chapter',
+        );
+        expect(find.text('已选 1 章 · 当前隐藏 0 章').hitTestable(), findsOneWidget);
+        expect(tester.getRect(lastChapter).width, 360);
+        expect(
+          tester.widget<CupertinoListTile>(lastChapter).backgroundColor,
+          isNotNull,
+        );
+        final selection = find.byKey(
+          ValueKey(('chapter-select', sequence.entries.last.key)),
+        );
+        final semantics = tester.ensureSemantics();
+        try {
+          await tester.pump();
+          expect(
+            tester
+                .getSemantics(selection)
+                .getSemanticsData()
+                .flagsCollection
+                .isSelected,
+            Tristate.isTrue,
+          );
+        } finally {
+          semantics.dispose();
+        }
+        final exitRect = tester.getRect(exit);
+        final readRect = tester.getRect(markRead);
+        position.jumpTo(position.minScrollExtent);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(exit), exitRect);
+        expect(tester.getRect(markRead), readRect);
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        final offset = position.pixels;
+        await tester.tap(markRead);
+        await tester.pumpAndSettle();
+        expect(find.text('确认清单：1 章'), findsOneWidget);
+        expect(
+          find.byKey(
+            ValueKey(('chapter-read-item', sequence.entries.last.key)),
+          ),
+          findsOneWidget,
+        );
+        expect(_posts(platform), isEmpty);
+        await _tap(tester, find.text('取消'));
+        expect(position.pixels, offset);
+        expect(find.text('已选 1 章 · 当前隐藏 0 章'), findsOneWidget);
+        await tester.tap(exit);
+        await tester.pumpAndSettle();
+        expect(lastChapter.hitTestable(), findsOneWidget);
+        expect(find.text('已选 1 章 · 当前隐藏 0 章'), findsNothing);
+        await _tap(tester, exit);
+        await _tap(tester, lastChapter);
+        await _back(tester);
+        expect(find.byType(MangaDetailsPage), findsOneWidget);
+        expect(lastChapter.hitTestable(), findsOneWidget);
+        expect(find.text('已选 1 章 · 当前隐藏 0 章'), findsNothing);
+        expect(_posts(platform), isEmpty);
+        await _finish(tester, platform, catalog);
+      },
+    );
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'long duplicate range endpoints remain readable without submitting in $brightness at ${scale}x',
+        (tester) async {
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(
+            tester.platformDispatcher.clearPlatformBrightnessTestValue,
+          );
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          const name = '重复的很长章节标题，选择范围时需要完整保留来源序号';
+          final chapters = _chapters;
+          chapters[0].name = name;
+          chapters[2].name = name;
+          final platform = _platform(chapters: chapters);
+          final catalog = await _details(tester, platform);
+          platform.businessServer.requests.clear();
+          await _tap(tester, _control('chapter-selection-toggle'));
+          for (final (endpoint, occurrence) in [('start', 1), ('end', 3)]) {
+            final control = _control('chapter-range-$endpoint');
+            final label = '$name · 来源第 $occurrence 项';
+            await _tap(tester, control);
+            final option = find.text(label).last;
+            expect(
+              tester.renderObject<RenderParagraph>(option).didExceedMaxLines,
+              false,
+              reason: 'the menu must show the occurrence after the full name',
+            );
+            await _tap(tester, option);
+            await _reveal(tester, control);
+            final selected = find.descendant(
+              of: find.descendant(
+                of: control,
+                matching: find.byType(CupertinoListTile),
+              ),
+              matching: find.text(label),
+            );
+            expect(selected, findsOneWidget);
+            expect(
+              tester.renderObject<RenderParagraph>(selected).didExceedMaxLines,
+              false,
+              reason: 'the selected endpoint must retain the full occurrence',
+            );
+          }
+          await _tap(tester, _control('chapter-select-range'));
+          await _tap(tester, _control('chapter-mark-read'));
+          expect(find.text('确认清单：3 章'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: _control('chapter-read-review'),
+              matching: find.text(testManga.title),
+            ),
+            findsOneWidget,
+          );
+          final sequence = ChapterSequence(
+            packageName: 'eu.kanade.source.test',
+            sourceId: sourceId,
+            mangaUrl: testManga.url,
+            chapters: chapters,
+          );
+          final review = _control('chapter-read-review');
+          final scrollable = find.descendant(
+            of: review,
+            matching: find.byType(Scrollable),
+          );
+          for (final index in [0, 2]) {
+            final title = find.descendant(
+              of: find.byKey(
+                ValueKey(('chapter-read-item', sequence.entries[index].key)),
+              ),
+              matching: find.text(name),
+            );
+            await tester.scrollUntilVisible(title, 100, scrollable: scrollable);
+            expect(
+              tester.renderObject<RenderParagraph>(title).didExceedMaxLines,
+              false,
+            );
+          }
+          expect(_posts(platform), isEmpty);
+          await _tap(tester, find.text('取消'));
+          final selection = find.text('已选 3 章 · 当前隐藏 0 章');
+          await _reveal(tester, selection);
+          expect(selection, findsOneWidget);
+          expect(_posts(platform), isEmpty);
+          await _finish(tester, platform, catalog);
+        },
+      );
+    }
+  }
   for (final retire in [false, true]) {
     test(
       'a queued chapter refresh respects an in-flight read and retirement: $retire',
@@ -288,6 +499,21 @@ void main() {
         find.descendant(of: _row(0), matching: find.textContaining('已读')),
         findsOneWidget,
       );
+      expect(
+        tester
+            .getTopLeft(
+              find.descendant(of: _row(0), matching: find.text('同名章')),
+            )
+            .dx,
+        16,
+      );
+      expect(
+        find.descendant(
+          of: _row(0),
+          matching: find.byIcon(CupertinoIcons.circle_fill),
+        ),
+        findsNothing,
+      );
       await _reveal(tester, _row(1));
       expect(
         find.descendant(of: _row(1), matching: find.textContaining('未读')),
@@ -343,11 +569,14 @@ void main() {
       await _tap(tester, find.text('同名章 · 来源第 1 项').last);
       await _tap(tester, _control('chapter-select-range'));
       for (final index in [0, 1, 2, 3]) {
-        final checkbox = find.byKey(
+        final selection = find.byKey(
           ValueKey(('chapter-select', _sequence.entries[index].key)),
         );
-        await _reveal(tester, checkbox);
-        expect(tester.widget<CupertinoCheckbox>(checkbox).value, index != 3);
+        await _reveal(tester, selection);
+        expect(
+          tester.widget<Semantics>(selection).properties.selected,
+          index != 3,
+        );
       }
       await _search(tester, '同名');
       await _tap(tester, _control('chapter-mark-read'));
@@ -367,9 +596,20 @@ void main() {
         ],
       );
       for (final index in [2, 1, 0]) {
-        final item = tester.widget<CupertinoListTile>(_preview(index));
-        expect((item.title as Text).data, _chapters[index].name);
-        expect((item.subtitle! as Text).data, '来源第 ${index + 1} 项');
+        expect(
+          find.descendant(
+            of: _preview(index),
+            matching: find.text(_chapters[index].name),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: _preview(index),
+            matching: find.textContaining('来源第 ${index + 1} 项'),
+          ),
+          findsOneWidget,
+        );
       }
       expect(_posts(platform), isEmpty);
       await _tap(tester, find.text('取消'));
@@ -495,7 +735,7 @@ void main() {
       await _search(tester, '同名');
       await _selectAll(tester);
       await _tap(tester, _control('chapter-mark-read'));
-      await _tap(tester, find.text('确认并开始'));
+      await _tap(tester, find.text('开始'));
       expect(find.text('全部标记已由服务端确认。'), findsOneWidget);
       expect(
         _posts(platform).map(_command).map((value) => value.expectedRevision),
@@ -509,7 +749,7 @@ void main() {
       await _shown(tester, [2, 0]);
       await _selectAll(tester);
       await _tap(tester, _control('chapter-mark-unread'));
-      await _tap(tester, find.text('确认并开始'));
+      await _tap(tester, find.text('开始'));
       await _back(tester);
       await _search(tester, '');
       await _tap(tester, _readFilter('unread'));
@@ -558,18 +798,46 @@ void main() {
       };
       await _selectAll(tester);
       await _tap(tester, _control('chapter-mark-read'));
-      await _tap(tester, find.text('确认并开始'));
-      expect(find.text('已确认 1 / 4 章 · 未开始 2 章'), findsOneWidget);
+      await _tap(tester, find.text('开始'));
+      expect(find.text('已确认 1 / 4 章 · 尚未确认 1 章 · 未开始 2 章'), findsOneWidget);
+      for (final (index, state) in [
+        (0, '已由服务端确认'),
+        (1, '尚未确认，需重试原操作'),
+        (2, '未开始'),
+      ]) {
+        final label = find.descendant(
+          of: _preview(index),
+          matching: find.text(state),
+        );
+        expect(label, findsOneWidget);
+        await tester.ensureVisible(label);
+        expect(
+          tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+          false,
+        );
+      }
       expect(find.text('全部标记已由服务端确认。'), findsNothing);
       expect(_posts(platform), hasLength(2));
       final uncertain = _posts(platform).last.body;
-      await _tap(tester, find.text('稍后处理'));
+      await _tap(tester, find.text('稍后'));
       await _tap(tester, _control('chapter-read-resume'));
       expect(_posts(platform), hasLength(2));
-      await _tap(tester, find.text('重试原未确认操作'));
+      await _tap(tester, find.text('重试'));
       expect(_posts(platform), hasLength(3));
       expect(_posts(platform).last.body, uncertain);
       expect(find.text('已确认 2 / 4 章 · 未开始 2 章'), findsOneWidget);
+      final endButton = find.widgetWithText(CupertinoButton, '结束剩余操作');
+      final endNode = tester.getSemantics(endButton);
+      final end = endNode.getSemanticsData();
+      expect(end.label, '结束剩余操作');
+      expect(end.hasAction(SemanticsAction.tap), isTrue);
+      expect(endNode.rect.size, tester.getSize(endButton));
+      const retention = '当前会话保留原清单和未确认操作；关闭不会撤回已发请求。';
+      final noteNode = tester.getSemantics(find.text(retention));
+      final note = noteNode.getSemanticsData();
+      expect(note.label, retention);
+      expect(note.hasAction(SemanticsAction.tap), isFalse);
+      expect(noteNode.parent, isNot(same(endNode)));
       expect(
         platform.businessServer.progress(
           _sequence.mangaKey,
@@ -577,7 +845,7 @@ void main() {
         ),
         isNull,
       );
-      await _tap(tester, find.text('继续剩余原清单'));
+      await _tap(tester, find.text('继续'));
       expect(find.text('全部标记已由服务端确认。'), findsOneWidget);
       expect(
         _posts(platform).map(_command).map((value) => value.expectedRevision),
@@ -665,7 +933,7 @@ void main() {
       expect(_preview(0), findsOneWidget);
       expect(_preview(2), findsOneWidget);
       expect(_posts(platform), hasLength(beforePending + 1));
-      await _tap(tester, find.text('重试原未确认操作'));
+      await _tap(tester, find.text('重试'));
       expect(_posts(platform).last.body, frozenBody);
       expect(pending.remainingKeys, {_sequence.entries[2].key});
       await _tap(tester, find.text('结束剩余操作'));
@@ -697,6 +965,63 @@ void main() {
     },
   );
 
+  testWidgets('pausing and ending a batch have separate keyboard targets', (
+    tester,
+  ) async {
+    final platform = _platform();
+    final catalog = await _details(tester, platform);
+    platform.businessServer.requests.clear();
+    final received = Completer<void>();
+    final release = Completer<void>();
+    addTearDown(() {
+      if (!release.isCompleted) release.complete();
+    });
+    platform.afterBusinessReply = (request, reply) async {
+      if (request.method == 'POST' &&
+          request.uri.path == '/api/state/mutations') {
+        platform.afterBusinessReply = null;
+        received.complete();
+        await release.future;
+      }
+      return reply;
+    };
+    await _selectAll(tester);
+    await _tap(tester, _control('chapter-mark-read'));
+    await tester.runAsync(() async {
+      await tester.tap(find.text('开始'));
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pump(const Duration(milliseconds: 32));
+    await tester.runAsync(
+      () => received.future.timeout(const Duration(seconds: 5)),
+    );
+    final pause = find.text('暂停剩余操作');
+    Focus.of(tester.element(pause)).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(find.textContaining('已请求暂停'), findsOneWidget);
+    final pausedId = tester.getSemantics(pause).id;
+
+    await tester.runAsync(() async {
+      release.complete();
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pumpAndSettle();
+    final end = find.text('结束剩余操作');
+    final endFocus = Focus.of(tester.element(end));
+    expect(tester.getSemantics(end).id, isNot(pausedId));
+    expect(endFocus.hasFocus, false);
+    endFocus.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('剩余章节未再发送'), findsOneWidget);
+    expect(_posts(platform), hasLength(1));
+    await _tap(tester, find.text('完成'));
+    await _finish(tester, platform, catalog);
+  });
+
   testWidgets(
     'an open marking batch keeps its old revision and ends a conflict through readonly refresh',
     (tester) async {
@@ -714,10 +1039,10 @@ void main() {
         ),
       );
       platform.businessServer.requests.clear();
-      await _tap(tester, find.text('确认并开始'));
+      await _tap(tester, find.text('开始'));
       expect(find.textContaining('重新读取章节状态'), findsWidgets);
-      expect(find.text('重试原未确认操作'), findsNothing);
-      expect(find.text('继续剩余原清单'), findsNothing);
+      expect(find.text('重试'), findsNothing);
+      expect(find.text('继续'), findsNothing);
       expect(_posts(platform).length, lessThanOrEqualTo(1));
       expect(
         _posts(platform)
@@ -726,7 +1051,7 @@ void main() {
         true,
       );
       final posts = _posts(platform).length;
-      await _tap(tester, find.text('重新读取并结束原批次'));
+      await _tap(tester, find.text('重读'));
       expect(_posts(platform), hasLength(posts));
       expect(find.text('全部标记已由服务端确认。'), findsNothing);
       expect(
@@ -768,7 +1093,7 @@ void main() {
       await _selectAll(tester);
       await _tap(tester, _control('chapter-mark-read'));
       await tester.runAsync(() async {
-        await tester.tap(find.text('确认并开始'));
+        await tester.tap(find.text('开始'));
         await Future<void>.delayed(Duration.zero);
       });
       await tester.pump(const Duration(milliseconds: 32));
@@ -776,9 +1101,27 @@ void main() {
         () => received.future.timeout(const Duration(seconds: 5)),
       );
       expect(find.text('全部标记已由服务端确认。'), findsNothing);
+      final pauseButton = find.widgetWithText(CupertinoButton, '暂停剩余操作');
+      final pauseNode = tester.getSemantics(pauseButton);
+      final pause = pauseNode.getSemanticsData();
+      expect(pause.label, '暂停剩余操作');
+      expect(pause.hasAction(SemanticsAction.tap), isTrue);
+      expect(pauseNode.rect.size, tester.getSize(pauseButton));
+      final dismiss = find.widgetWithText(CupertinoButton, '稍后');
+      expect(
+        tester
+            .getSemantics(dismiss)
+            .getSemanticsData()
+            .flagsCollection
+            .isEnabled,
+        Tristate.isFalse,
+      );
       await tester.runAsync(catalog.connect);
       await tester.pump(const Duration(milliseconds: 32));
       expect(find.textContaining('原窗口已停用'), findsOneWidget);
+      expect(find.text('关闭'), findsOneWidget);
+      expect(find.text('稍后'), findsNothing);
+      expect(find.text('重试'), findsNothing);
       platform.bootstrapSubject = 'another-subject';
       await tester.runAsync(catalog.connect);
       await tester.pump(const Duration(milliseconds: 32));

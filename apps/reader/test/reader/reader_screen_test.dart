@@ -4,23 +4,33 @@ import 'package:karuyomi/widgets/choice_field.dart';
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show ImageByteFormat, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
+import 'package:flutter/rendering.dart'
+    show RenderParagraph, RenderRepaintBoundary;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:karuyomi/features/reader/reader_screen.dart';
+import 'package:karuyomi/features/reader/reader_page_navigation.dart';
 import 'package:karuyomi/features/reader/reader_preferences.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
 import 'package:karuyomi/features/reader/resource_image.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:reader_core/reader_core.dart';
 
 final class FixturePageProvider implements PageProvider {
-  FixturePageProvider({this.location, this.byteLength = 100});
+  FixturePageProvider({
+    this.location,
+    this.byteLength = 100,
+    this.beforeAcquire,
+  });
   final Uri? location;
   final int byteLength;
+  final Future<void> Function(PageRef)? beforeAcquire;
   final acquired = <PageRef>[];
   final released = <String>[];
   final cancelled = <String>[];
@@ -28,6 +38,7 @@ final class FixturePageProvider implements PageProvider {
   @override
   Future<ImageResource> acquire(PageRef ref) async {
     acquired.add(ref);
+    if (beforeAcquire case final gate?) await gate(ref);
     return ImageResource(
       id: '${ref.generation}-${ref.pageKey}',
       generation: ref.generation,
@@ -111,6 +122,7 @@ Widget screen({
   int dimPercent = 0,
   ReaderInputPreset tapZones = ReaderInputPreset.standard,
   ReaderInputPreset keyboard = ReaderInputPreset.standard,
+  ValueChanged<ReaderChapterEdge>? onChapterEdge,
 }) => CupertinoApp(
   home: ReaderScreen(
     manifest: manifest,
@@ -129,10 +141,11 @@ Widget screen({
     dimPercent: dimPercent,
     tapZones: tapZones,
     keyboard: keyboard,
+    onChapterEdge: onChapterEdge,
     onPositionChanged: onPosition,
     onViewportChanged: onViewport,
-    onModeChanged: onMode,
-    onDoublePageChanged: onDoublePage,
+    onModeRequested: onMode,
+    onDoublePageRequested: onDoublePage,
     imageBuilder: imageBuilder,
     imageEvictor: (_) async {},
   ),
@@ -158,17 +171,390 @@ void expectOriginalImageAnchor(
   );
 }
 
-bool? pageLayoutPreference(WidgetTester tester) => switch (tester
-    .widget<CupertinoSlidingSegmentedControl<int>>(
-      find.byKey(const ValueKey('reader-page-layout')),
-    )
-    .groupValue) {
-  1 => false,
-  2 => true,
-  _ => null,
-};
+final pageLayoutMenu = find.byKey(const ValueKey('reader-page-layout'));
+
+bool? pageLayoutPreference(WidgetTester tester) =>
+    tester.widget<ChoiceField<bool>>(pageLayoutMenu).value;
+
+Future<void> choosePageLayout(WidgetTester tester, String label) async {
+  await tester.tap(pageLayoutMenu);
+  await tester.pumpAndSettle();
+  await tester.tap(find.widgetWithText(CupertinoMenuItem, label));
+  await tester.pumpAndSettle();
+}
 
 void main() {
+  testWidgets(
+    'chapter transition stacks loading feedback and fits the two chapter actions',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      var continued = false;
+
+      Future<void> showTransition({required bool loading}) async {
+        await tester.pumpWidget(
+          CupertinoApp(
+            home: ReaderChapterTransition(
+              edge: ReaderChapterEdge.next,
+              currentChapter: (name: '3320', scanlator: ''),
+              targetChapter: (name: '3319', scanlator: ''),
+              background: ReaderBackground.black,
+              dimPercent: 0,
+              loading: loading,
+              error: null,
+              onContinue: loading ? null : () => continued = true,
+              onRetry: null,
+              onReturn: () {},
+            ),
+          ),
+        );
+        await tester.pump();
+      }
+
+      await showTransition(loading: true);
+      final current = find.text('本章');
+      final next = find.text('下一章');
+      final spinner = tester.getRect(find.byType(CupertinoActivityIndicator));
+      final caption = tester.getRect(find.text('正在加载章节页面'));
+      expect(spinner.top, greaterThan(tester.getBottomLeft(next).dy));
+      expect(caption.top, greaterThan(spinner.bottom));
+      expect(caption.center.dx, closeTo(spinner.center.dx, 1));
+      final portraitGap =
+          tester.getTopLeft(next).dy - tester.getTopLeft(current).dy;
+      expect(portraitGap, inInclusiveRange(92, 112));
+
+      await showTransition(loading: false);
+      final back = find.widgetWithText(CupertinoButton, '返回本章');
+      final forward = find.widgetWithText(CupertinoButton, '进入下一章');
+      expect(
+        tester.getCenter(back).dy,
+        closeTo(tester.getCenter(forward).dy, 1),
+      );
+      expect(
+        tester.getSize(forward).height,
+        greaterThanOrEqualTo(kMinInteractiveDimensionCupertino),
+      );
+
+      tester.view.physicalSize = const Size(844, 390);
+      await tester.pump();
+      final landscapeGap =
+          tester.getTopLeft(next).dy - tester.getTopLeft(current).dy;
+      expect(landscapeGap, lessThan(portraitGap));
+      await tester.tap(forward);
+      expect(continued, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'chapter transition keeps its feedback and actions readable on the dimmed canvas',
+    (tester) async {
+      final canvasCases = [
+        (Brightness.light, ReaderBackground.white, 80, const Color(0xFF333333)),
+        (Brightness.dark, ReaderBackground.white, 50, const Color(0xFF808080)),
+        (Brightness.dark, ReaderBackground.white, 0, CupertinoColors.white),
+        (Brightness.light, ReaderBackground.black, 80, CupertinoColors.black),
+      ];
+      for (final (appearance, background, dim, canvas) in canvasCases) {
+        for (final loading in [true, false]) {
+          var retried = false;
+          await tester.pumpWidget(
+            CupertinoApp(
+              theme: readerAppTheme(appearance),
+              home: ReaderChapterTransition(
+                edge: ReaderChapterEdge.previous,
+                currentChapter: (name: '3320', scanlator: ''),
+                targetChapter: (name: '3319', scanlator: ''),
+                background: background,
+                dimPercent: dim,
+                loading: loading,
+                error: loading ? null : '目标章节没有页面',
+                onContinue: null,
+                onRetry: loading ? null : () => retried = true,
+                onReturn: () {},
+              ),
+            ),
+          );
+          final chapter = find.text('3319');
+          final surface = find
+              .ancestor(of: chapter, matching: find.byType(ColoredBox))
+              .first;
+          final canvasColor = tester.widget<ColoredBox>(surface).color;
+          expect(canvasColor.toARGB32(), canvas.toARGB32());
+          final text = find.text(loading ? '正在加载章节页面' : '目标章节没有页面');
+          final back = find.widgetWithText(CupertinoButton, '返回本章');
+          for (final color in [
+            tester.widget<Text>(chapter).style!.color!,
+            tester.widget<Text>(text).style!.color!,
+            DefaultTextStyle.of(tester.element(find.text('返回本章'))).style.color!,
+          ]) {
+            final luminances = [
+              Color.alphaBlend(color, canvasColor).computeLuminance(),
+              canvasColor.computeLuminance(),
+            ]..sort();
+            expect(
+              (luminances.last + .05) / (luminances.first + .05),
+              greaterThanOrEqualTo(4.5),
+            );
+          }
+          expect(back.hitTestable(), findsOneWidget);
+          if (!loading) {
+            await tester.tap(find.widgetWithText(CupertinoButton, '重试'));
+            expect(retried, isTrue);
+          }
+        }
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final mode in [ReadingMode.continuous, ReadingMode.webtoon]) {
+    testWidgets(
+      '$mode only opens a chapter boundary after a drag beyond the scroll extent',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final edges = <ReaderChapterEdge>[];
+        final manifest = ChapterManifest(
+          chapterKey: 'chapter',
+          version: '1',
+          pages: [
+            for (var index = 0; index < 2; index++)
+              ReaderPage(key: 'page-$index', width: 600, height: 1200),
+          ],
+        );
+        await tester.pumpWidget(
+          screen(
+            provider: FixturePageProvider(),
+            manifest: manifest,
+            mode: mode,
+            onChapterEdge: edges.add,
+            imageBuilder: decodedImage(height: 1200),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final reader = find.byKey(const ValueKey('continuous-reader'));
+        final scroll = tester.widget<ListView>(reader).controller!.position;
+        scroll.jumpTo(scroll.maxScrollExtent);
+        await tester.pumpAndSettle();
+        expect(edges, isEmpty);
+        await tester.drag(reader, const Offset(0, -160));
+        await tester.pumpAndSettle();
+        expect(edges, [ReaderChapterEdge.next]);
+        scroll.jumpTo(scroll.minScrollExtent);
+        await tester.pumpAndSettle();
+        expect(edges, [ReaderChapterEdge.next]);
+        await tester.drag(reader, const Offset(0, 160));
+        await tester.pumpAndSettle();
+        expect(edges, [ReaderChapterEdge.next, ReaderChapterEdge.previous]);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'reader controls slide without moving the fitted page and can be reopened by keyboard',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 844);
+      tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetPadding);
+      await tester.pumpWidget(
+        screen(
+          provider: FixturePageProvider(),
+          manifest: fixtureChapter(),
+          doublePage: false,
+          imageBuilder: decodedImage(),
+          chapterControls: const Text('阅读进度已保存到服务端'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final viewport = find.byType(InteractiveViewer);
+      final image = find.byKey(const ValueKey('image-rect-page-0'));
+      final withControls = tester.getRect(image);
+      expect(withControls.center.dy, closeTo((24 + 844 - 34) / 2, 1));
+      expect(tester.getRect(viewport).contains(withControls.center), isTrue);
+      expect(withControls.bottom, lessThan(tester.getRect(viewport).bottom));
+      final navigationBar = find.byType(CupertinoNavigationBar);
+      final bottomControl = iconLabel('下一页');
+      final indicator = find.byKey(const ValueKey('reader-page-indicator'));
+      final shownTop = tester.getTopLeft(navigationBar).dy;
+      final shownBottom = tester.getCenter(bottomControl).dy;
+      final shownViewport = tester.getRect(viewport);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(tester.getTopLeft(navigationBar).dy, lessThan(shownTop));
+      expect(tester.getCenter(bottomControl).dy, greaterThan(shownBottom));
+      expect(tester.getRect(viewport), shownViewport);
+      expect(tester.getRect(image), withControls);
+      expect(pageLayoutMenu.hitTestable(), findsNothing);
+      expect(find.semantics.byLabel('下一页').evaluate(), isEmpty);
+      expect(indicator, findsNothing);
+      await tester.pumpAndSettle();
+      expect(pageLayoutMenu, findsNothing);
+      expect(find.text('1 / 20'), findsOneWidget);
+      expect(tester.getRect(image), withControls);
+      final pageControl = tester.getSemantics(indicator).getSemanticsData();
+      expect(pageControl.label, '显示阅读工具');
+      expect(pageControl.value, '1 / 20');
+      expect(pageControl.flagsCollection.isButton, isTrue);
+      expect(tester.getSize(indicator).shortestSide, greaterThanOrEqualTo(44));
+      expect(tester.getRect(indicator).bottom, lessThanOrEqualTo(810));
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getSemantics(indicator)
+            .getSemanticsData()
+            .flagsCollection
+            .isFocused,
+        Tristate.isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(image), withControls);
+      expect(pageLayoutMenu.hitTestable(), findsOneWidget);
+      expect(indicator, findsNothing);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+      await tester.pumpAndSettle();
+      expect(pageLayoutMenu.hitTestable(), findsOneWidget);
+      expect(tester.getRect(image), withControls);
+
+      tester.view.physicalSize = const Size(360, 420);
+      await tester.pumpAndSettle();
+      final shorter = tester.getRect(image);
+      final visible = tester.getRect(viewport);
+      expect(shorter.top, greaterThanOrEqualTo(visible.top - .1));
+      expect(shorter.bottom, lessThanOrEqualTo(visible.bottom + .1));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  for (final disabled in [false, true]) {
+    testWidgets(
+      'reader tool motion respects accessibility settings (disabled: $disabled)',
+      (tester) async {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            FakeAccessibilityFeatures(
+              reduceMotion: true,
+              disableAnimations: disabled,
+            );
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        await tester.pumpWidget(
+          screen(
+            provider: FixturePageProvider(),
+            manifest: fixtureChapter(),
+            doublePage: false,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final header = find.byType(CupertinoNavigationBar);
+        final original = tester.getRect(header);
+        await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+        await tester.pump();
+        if (disabled) {
+          expect(header, findsNothing);
+          expect(find.text('1 / 20'), findsOneWidget);
+        } else {
+          await tester.pump(const Duration(milliseconds: 80));
+          expect(tester.getRect(header), original);
+          final fades = tester.widgetList<FadeTransition>(
+            find.ancestor(of: header, matching: find.byType(FadeTransition)),
+          );
+          expect(
+            fades.any(
+              (fade) => fade.opacity.value > 0 && fade.opacity.value < 1,
+            ),
+            isTrue,
+          );
+          await tester.pumpAndSettle();
+          expect(header, findsNothing);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
+  for (final mode in [ReadingMode.continuous, ReadingMode.webtoon]) {
+    testWidgets(
+      'central tap toggles $mode tools and double tap still opens the image',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        final manifest = fixtureChapter();
+        final viewports = <ReaderViewportState>[];
+        await tester.pumpWidget(
+          screen(
+            provider: FixturePageProvider(),
+            manifest: manifest,
+            position: manifest.positionAt(5, offset: .3),
+            mode: mode,
+            tapZones: ReaderInputPreset.disabled,
+            imageBuilder: decodedImage(),
+            onViewport: viewports.add,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final current = viewports.last.current;
+        final list = find.byKey(const ValueKey('continuous-reader'));
+        final navigationBar = find.byType(CupertinoNavigationBar);
+        final indicator = find.byKey(const ValueKey('reader-page-indicator'));
+        await tester.tapAt(tester.getCenter(list));
+        await tester.pump(kDoubleTapTimeout);
+        await tester.pumpAndSettle();
+        expect(navigationBar, findsNothing);
+        expect(indicator.hitTestable(), findsOneWidget);
+        expect(find.text('6 / 20'), findsOneWidget);
+        expect(viewports.last.current, current);
+
+        await tester.tapAt(tester.getCenter(list));
+        await tester.pump(kDoubleTapTimeout);
+        await tester.pumpAndSettle();
+        expect(navigationBar, findsOneWidget);
+        expect(indicator, findsNothing);
+        expect(viewports.last.current, current);
+
+        final image = find.byKey(ValueKey('image-rect-${current.pageKey}'));
+        final imagePoint = tester
+            .getRect(image)
+            .intersect(tester.getRect(list))
+            .center;
+        await tester.tapAt(imagePoint);
+        await tester.pump(const Duration(milliseconds: 60));
+        await tester.tapAt(imagePoint);
+        await tester.pumpAndSettle();
+        expect(find.text('查看图片'), findsOneWidget);
+        await tester.tap(iconLabel('关闭图片'));
+        await tester.pumpAndSettle();
+        expect(navigationBar, findsOneWidget);
+        expect(viewports.last.current, current);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
   testWidgets(
     'default reader image pipeline trims actual file pixels and preserves original anchors',
     (tester) async {
@@ -672,8 +1058,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(viewports.last.observed?.pageKey, 'long');
       expect(viewports.last.atEnd, false);
-      await tester.tap(find.text('单页'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '单页');
       expect(pageLayoutPreference(tester), false);
       expect(viewports.last.observed, isNotNull);
       expect(viewports.last.atEnd, false);
@@ -1304,6 +1689,223 @@ void main() {
   );
 
   testWidgets(
+    'page slider previews without requesting pages and jumps only on release',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      final positions = <ReadingPosition>[];
+      final viewports = <ReaderViewportState>[];
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: manifest,
+          imageBuilder: decodedImage(),
+          doublePage: false,
+          onPosition: positions.add,
+          onViewport: viewports.add,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final slider = find.byType(CupertinoSlider);
+      final track = tester.getRect(slider);
+      final acquired = List.of(provider.acquired);
+      positions.clear();
+
+      Future<TestGesture> previewLastPage() async {
+        final gesture = await tester.startGesture(
+          Offset(
+            track.left + kMinInteractiveDimensionCupertino / 2,
+            track.center.dy,
+          ),
+        );
+        await gesture.moveBy(const Offset(30, 0));
+        await gesture.moveTo(track.centerRight + const Offset(40, 0));
+        await tester.pumpAndSettle();
+        expect(find.text('20 / 20'), findsOneWidget);
+        expect(viewports.last.observed?.pageKey, 'page-0');
+        expect(provider.acquired, acquired);
+        expect(positions, isEmpty);
+        return gesture;
+      }
+
+      final cancelled = await previewLastPage();
+      await cancelled.cancel();
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 20'), findsOneWidget);
+      expect(positions, isEmpty);
+
+      final released = await previewLastPage();
+      await released.up();
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed?.pageKey, 'page-19');
+      expect(positions.map((position) => position.pageKey).toSet(), {
+        'page-19',
+      });
+      expect(provider.acquired.skip(acquired.length).first.pageKey, 'page-19');
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'enlarged page numbers keep the slider position and focus across responsive layouts',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 480);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final selections = <int>[];
+      Widget rail(int index, int total) => CupertinoApp(
+        home: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: ReaderPageNavigation(
+              pageIndex: index,
+              pageCount: total,
+              direction: TextDirection.rtl,
+              onSelect: selections.add,
+              keyboardEnabled: true,
+              chapters: (
+                previous: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: null,
+                  child: const Icon(CupertinoIcons.chevron_right_2),
+                ),
+                next: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () {},
+                  child: const Icon(CupertinoIcons.chevron_left_2),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      void singleLine(String text) {
+        final paragraph = tester.renderObject<RenderParagraph>(find.text(text));
+        final lines = paragraph
+            .getBoxesForSelection(
+              TextSelection(baseOffset: 0, extentOffset: text.length),
+            )
+            .map((bounds) => bounds.top)
+            .toSet();
+        expect(lines, hasLength(1), reason: text);
+      }
+
+      final slider = find.byType(CupertinoSlider);
+      await tester.pumpWidget(rail(1, 3));
+      await tester.pumpAndSettle();
+      singleLine('2 / 3');
+      expect(
+        tester.getSize(slider).width,
+        greaterThanOrEqualTo(3 * kMinInteractiveDimensionCupertino),
+      );
+
+      await tester.pumpWidget(rail(8, 2048));
+      await tester.pumpAndSettle();
+      singleLine('9 / 2048');
+      expect(
+        tester.getBottomLeft(find.text('9 / 2048')).dy,
+        lessThanOrEqualTo(tester.getTopLeft(slider).dy),
+      );
+      final shortTrack = tester.getRect(slider);
+      await tester.pumpWidget(rail(1277, 2048));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .renderObject<RenderParagraph>(find.text('1278 / 2048'))
+            .didExceedMaxLines,
+        isFalse,
+      );
+      expect(tester.getRect(slider), shortTrack);
+      Focus.of(tester.element(slider)).requestFocus();
+      await tester.pumpAndSettle();
+      expect(Focus.of(tester.element(slider)).hasFocus, isTrue);
+
+      tester.view.physicalSize = const Size(720, 480);
+      await tester.pumpAndSettle();
+      expect(Focus.of(tester.element(slider)).hasFocus, isTrue);
+      expect(
+        tester.getCenter(find.text('1278 / 2048')).dy,
+        closeTo(tester.getCenter(slider).dy, .01),
+      );
+      final wideTrack = tester.getRect(slider);
+      await tester.pumpWidget(rail(2, 2048));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(slider), wideTrack);
+      await tester.sendKeyEvent(LogicalKeyboardKey.end);
+      await tester.pumpAndSettle();
+      expect(selections, [2047]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'RTL slider offers page numbers and supports touch, keyboard and semantics',
+    (tester) async {
+      final provider = FixturePageProvider();
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: fixtureChapter(),
+          mode: ReadingMode.rightToLeft,
+          doublePage: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final slider = find.byType(CupertinoSlider);
+      final label = find.semantics.byLabel('页码跳转');
+      final data = label.evaluate().single.getSemanticsData();
+      expect(data.identifier, readerPageSliderIdentifier);
+      expect(data.flagsCollection.isSlider, isTrue);
+      expect(data.value, '1');
+      expect(data.minValue, '1');
+      expect(data.maxValue, '20');
+      expect(data.increasedValue, '2');
+      final next = iconLabel('下一页');
+      final previous = iconLabel('上一页');
+      expect(
+        tester.getCenter(next).dx,
+        lessThan(tester.getCenter(previous).dx),
+      );
+      expect(tester.widget<Icon>(next).icon, CupertinoIcons.backward_end);
+      expect(tester.widget<Icon>(previous).icon, CupertinoIcons.forward_end);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      expect(
+        label.evaluate().single.getSemanticsData().flagsCollection.isFocused,
+        Tristate.isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(find.text('2 / 20'), findsOneWidget);
+      tester.semantics.increase(label);
+      await tester.pumpAndSettle();
+      expect(find.text('3 / 20'), findsOneWidget);
+      tester.semantics.decrease(label);
+      await tester.pumpAndSettle();
+      expect(find.text('2 / 20'), findsOneWidget);
+
+      final track = tester.getRect(slider);
+      await tester.tapAt(Offset(track.left + 4, track.center.dy));
+      await tester.pumpAndSettle();
+      expect(find.text('20 / 20'), findsOneWidget);
+      await tester.tapAt(Offset(track.right - 4, track.center.dy));
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 20'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'tap presets respect reading direction while disabled keeps toolbar and swipes usable',
     (tester) async {
       final provider = FixturePageProvider();
@@ -1447,111 +2049,246 @@ void main() {
     },
   );
 
-  testWidgets(
-    'content appearance updates preserve anchor and resource residency without fabricating observation',
-    (tester) async {
-      final provider = FixturePageProvider();
-      final manifest = fixtureChapter();
-      final viewports = <ReaderViewportState>[];
-      Color? textColor;
-      void expectTitleContrast() {
-        final bar = find.byType(CupertinoNavigationBar);
-        final decoration =
-            tester
-                    .widget<DecoratedBox>(
-                      find
-                          .descendant(
-                            of: bar,
-                            matching: find.byType(DecoratedBox),
-                          )
-                          .first,
-                    )
-                    .decoration
-                as BoxDecoration;
-        final title = DefaultTextStyle.of(tester.element(find.text('阅读')))
-            .style
-            .color!;
-        final luminances = [
-          decoration.color!.computeLuminance(),
-          title.computeLuminance(),
-        ]..sort();
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'content appearance updates preserve anchor and resource residency in $brightness',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        final provider = FixturePageProvider();
+        final manifest = fixtureChapter();
+        final viewports = <ReaderViewportState>[];
+        Color? textColor;
+        void expectTitleContrast() {
+          final bar = find.byType(CupertinoNavigationBar);
+          final decoration =
+              tester
+                      .widget<DecoratedBox>(
+                        find
+                            .descendant(
+                              of: bar,
+                              matching: find.byType(DecoratedBox),
+                            )
+                            .first,
+                      )
+                      .decoration
+                  as BoxDecoration;
+          final title = DefaultTextStyle.of(tester.element(find.text('阅读')))
+              .style
+              .color!;
+          expect(
+            decoration.color,
+            CupertinoColors.systemBackground.resolveFrom(tester.element(bar)),
+            reason: 'all confirmed canvases use the same opaque Cupertino toolbar surface',
+          );
+          final controls = find
+              .ancestor(of: iconLabel('下一页'), matching: find.byType(ColoredBox))
+              .first;
+          expect(tester.widget<ColoredBox>(controls).color, decoration.color);
+          expect(
+            decoration.color!.a,
+            1,
+            reason: 'bars do not require a blur pass',
+          );
+          final luminances = [
+            decoration.color!.computeLuminance(),
+            title.computeLuminance(),
+          ]..sort();
+          expect(
+            (luminances.last + .05) / (luminances.first + .05),
+            greaterThan(4.5),
+          );
+        }
+
+        Widget configured(ReaderBackground background, int dimPercent) =>
+            screen(
+              provider: provider,
+              manifest: manifest,
+              position: manifest.positionAt(5, offset: .35),
+              doublePage: false,
+              background: background,
+              dimPercent: dimPercent,
+              onViewport: viewports.add,
+              imageBuilder: (context, resource, fit) {
+                textColor = DefaultTextStyle.of(context).style.color;
+                return fixtureImage(context, resource, fit);
+              },
+            );
+        await tester.pumpWidget(configured(ReaderBackground.black, 0));
+        await tester.pumpAndSettle();
         expect(
-          (luminances.last + .05) / (luminances.first + .05),
-          greaterThan(4.5),
+          tester
+              .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
+              .backgroundColor,
+          CupertinoColors.black,
         );
+        expect(textColor, CupertinoColors.white);
+        expectTitleContrast();
+        final acquired = provider.acquired.map((page) => page.pageKey).toList();
+        final released = provider.released.toList();
+        final anchor = viewports.last.current;
+        expect(viewports.last.observed, isNull);
+        await tester.pumpWidget(configured(ReaderBackground.white, 80));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
+              .backgroundColor!
+              .toARGB32(),
+          0xFF333333,
+        );
+        expect(textColor, CupertinoColors.white);
+        expectTitleContrast();
+        final imageAppearance = find.byType(ReaderImageAppearance);
+        expect(imageAppearance, findsWidgets);
+        expect(
+          tester
+              .widgetList<ReaderImageAppearance>(imageAppearance)
+              .map((scope) => scope.dimPercent),
+          everyElement(80),
+        );
+        expect(viewports.last.current.pageKey, anchor.pageKey);
+        expect(
+          viewports.last.current.normalizedOffset,
+          closeTo(anchor.normalizedOffset, .001),
+        );
+        expect(viewports.last.observed, isNull);
+        expect(viewports.last.atEnd, false);
+        expect(provider.acquired.map((page) => page.pageKey), acquired);
+        expect(provider.released, released);
+        await tester.pumpWidget(configured(ReaderBackground.theme, 0));
+        await tester.pumpAndSettle();
+        final readerContext = tester.element(find.byType(ReaderScreen));
+        expect(
+          tester
+              .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
+              .backgroundColor,
+          CupertinoTheme.of(readerContext).scaffoldBackgroundColor,
+        );
+        expect(
+          textColor!.toARGB32(),
+          AppColors.label.resolveFrom(readerContext).toARGB32(),
+        );
+        expectTitleContrast();
+        expect(
+          tester
+              .widgetList<ReaderImageAppearance>(imageAppearance)
+              .map((scope) => scope.dimPercent),
+          everyElement(0),
+        );
+        expect(provider.acquired.map((page) => page.pageKey), acquired);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
+  testWidgets(
+    'image dimming preserves transparency in the reader and zoom viewer',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final directory = Directory.systemTemp.createTempSync('karuyomi.');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final png = img.Image(width: 60, height: 20, numChannels: 4);
+      for (final pixel in png) {
+        pixel.setRgba(255, 0, 0, switch (pixel.x) {
+          < 20 => 255,
+          < 40 => 128,
+          _ => 0,
+        });
+      }
+      final file = File('${directory.path}/page.png')
+        ..writeAsBytesSync(img.encodePng(png));
+      final provider = FixturePageProvider(location: file.uri);
+      final chapter = ChapterManifest(
+        chapterKey: 'transparent',
+        version: '1',
+        pages: [ReaderPage(key: 'page-0', width: 60, height: 20)],
+      );
+      const captureKey = ValueKey('transparency-capture');
+      Widget configured(int dimPercent, ReadingMode mode) => RepaintBoundary(
+        key: captureKey,
+        child: screen(
+          provider: provider,
+          manifest: chapter,
+          mode: mode,
+          background: ReaderBackground.white,
+          dimPercent: dimPercent,
+          imageBuilder: buildResourceImage,
+        ),
+      );
+      final image = find.byWidgetPredicate(
+        (widget) => widget is RawImage && widget.image != null,
+      );
+
+      Future<List<int>> sample(Finder frame) async {
+        final rect = tester.getRect(frame);
+        final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byKey(captureKey),
+        );
+        return (await tester.runAsync(() async {
+          final raster = await boundary.toImage();
+          try {
+            final bytes = (await raster.toByteData(
+              format: ImageByteFormat.rawRgba,
+            ))!;
+            final y = rect.center.dy.floor();
+            return [
+              for (final column in [1, 3, 5])
+                bytes.getUint32(
+                  4 *
+                      (y * raster.width +
+                          (rect.left + column * rect.width / 6).floor()),
+                ),
+            ];
+          } finally {
+            raster.dispose();
+          }
+        }))!;
       }
 
-      Widget configured(ReaderBackground background, int dimPercent) => screen(
-        provider: provider,
-        manifest: manifest,
-        position: manifest.positionAt(5, offset: .35),
-        doublePage: false,
-        background: background,
-        dimPercent: dimPercent,
-        onViewport: viewports.add,
-        imageBuilder: (context, resource, fit) {
-          textColor = DefaultTextStyle.of(context).style.color;
-          return fixtureImage(context, resource, fit);
-        },
-      );
-      await tester.pumpWidget(configured(ReaderBackground.black, 0));
+      await tester.pumpWidget(configured(0, ReadingMode.leftToRight));
+      final wait = Stopwatch()..start();
+      while (image.evaluate().isEmpty &&
+          wait.elapsed < const Duration(seconds: 5)) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+      expect(image, findsOneWidget);
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
-            .backgroundColor,
-        CupertinoColors.black,
-      );
-      expect(textColor, CupertinoColors.white);
-      expectTitleContrast();
-      final acquired = provider.acquired.map((page) => page.pageKey).toList();
-      final released = provider.released.toList();
-      final anchor = viewports.last.current;
-      expect(viewports.last.observed, isNull);
-      await tester.pumpWidget(configured(ReaderBackground.white, 80));
+      final undimmed = await sample(image);
+      expect(undimmed, [0xFF0000FF, 0xFF7F7FFF, 0xFFFFFFFF]);
+      final acquired = List.of(provider.acquired);
+      await tester.pumpWidget(configured(80, ReadingMode.leftToRight));
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
-            .backgroundColor,
-        CupertinoColors.white,
-      );
-      expect(textColor, CupertinoColors.black);
-      expectTitleContrast();
-      final dimmer = find.byKey(const ValueKey('reader-content-dimming'));
-      expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.8, .001));
-      expect(
-        tester.getRect(dimmer),
-        tester.getRect(find.byType(InteractiveViewer)),
-      );
-      expect(
-        tester.getRect(dimmer).overlaps(tester.getRect(iconLabel('下一页'))),
-        false,
-      );
-      expect(viewports.last.current.pageKey, anchor.pageKey);
-      expect(
-        viewports.last.current.normalizedOffset,
-        closeTo(anchor.normalizedOffset, .001),
-      );
-      expect(viewports.last.observed, isNull);
-      expect(viewports.last.atEnd, false);
-      expect(provider.acquired.map((page) => page.pageKey), acquired);
-      expect(provider.released, released);
-      await tester.pumpWidget(configured(ReaderBackground.theme, 0));
+      final dimmed = await sample(image);
+      expect(dimmed.first, 0x330000FF);
+      expect(dimmed[1], anyOf(0x331919FF, 0x331A1AFF));
+      expect(dimmed.last, 0x333333FF);
+      expect(provider.acquired, acquired);
+
+      await tester.pumpWidget(configured(80, ReadingMode.continuous));
       await tester.pumpAndSettle();
-      final readerContext = tester.element(find.byType(ReaderScreen));
-      expect(
-        tester
-            .widget<CupertinoPageScaffold>(find.byType(CupertinoPageScaffold))
-            .backgroundColor,
-        CupertinoTheme.of(readerContext).scaffoldBackgroundColor,
+      expect(await sample(image), dimmed);
+      await tester.tap(iconLabel('放大当前图片'));
+      await tester.pumpAndSettle();
+      final zoomImage = find.descendant(
+        of: find.byKey(const ValueKey('reader-image-viewer')),
+        matching: image,
       );
-      expect(textColor, CupertinoColors.label.resolveFrom(readerContext));
-      expect(dimmer, findsNothing);
-      expect(provider.acquired.map((page) => page.pageKey), acquired);
-      expect(tester.takeException(), isNull);
+      expect(await sample(zoomImage), dimmed);
+      await tester.tap(iconLabel('关闭图片'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 1'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -1595,17 +2332,26 @@ void main() {
       await tester.pumpAndSettle();
       final dialog = find.byKey(const ValueKey('reader-image-viewer'));
       expect(
-        tester.widget<CupertinoPageScaffold>(dialog).backgroundColor,
-        CupertinoColors.white,
+        tester
+            .widget<CupertinoPageScaffold>(dialog)
+            .backgroundColor!
+            .toARGB32(),
+        0xFF333333,
       );
-      final dimmer = find.descendant(
+      final imageAppearance = find.descendant(
         of: dialog,
-        matching: find.byKey(const ValueKey('reader-content-dimming')),
+        matching: find.byType(ReaderImageAppearance),
       );
-      expect(tester.widget<ColoredBox>(dimmer).color.a, closeTo(.8, .001));
       expect(
-        tester.getRect(dimmer).overlaps(tester.getRect(iconLabel('放大'))),
-        false,
+        tester.widget<ReaderImageAppearance>(imageAppearance).dimPercent,
+        80,
+      );
+      expect(
+        find.ancestor(
+          of: iconLabel('放大'),
+          matching: find.byType(ReaderImageAppearance),
+        ),
+        findsNothing,
       );
       await tester.tap(iconLabel('放大'));
       await tester.pumpAndSettle();
@@ -1751,8 +2497,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(pageLayoutPreference(tester), isNull);
-      await tester.tap(find.text('单页'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '单页');
       expect(pageLayoutPreference(tester), false);
       expect(find.text('51 / 51'), findsOneWidget);
       expect(find.byKey(const ValueKey('runtime-1-page-49')), findsNothing);
@@ -1794,12 +2539,19 @@ void main() {
       final provider = FixturePageProvider();
       final manifest = fixtureChapter();
       final selections = <bool?>[];
+      bool? confirmedLayout;
       await tester.pumpWidget(
-        screen(
-          provider: provider,
-          manifest: manifest,
-          position: manifest.positionAt(1),
-          onDoublePage: selections.add,
+        StatefulBuilder(
+          builder: (context, confirm) => screen(
+            provider: provider,
+            manifest: manifest,
+            position: manifest.positionAt(1),
+            doublePage: confirmedLayout,
+            onDoublePage: (value) {
+              selections.add(value);
+              confirm(() => confirmedLayout = value);
+            },
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -1810,18 +2562,15 @@ void main() {
       expect(pageLayoutPreference(tester), isNull);
       expect(find.byKey(const ValueKey('runtime-1-page-2')), findsOneWidget);
       expect(selections, isEmpty);
-      await tester.tap(find.text('单页'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '单页');
       expect(pageLayoutPreference(tester), false);
       expect(find.byKey(const ValueKey('runtime-1-page-2')), findsNothing);
       tester.view.physicalSize = const Size(800, 900);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('双页'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '双页');
       expect(pageLayoutPreference(tester), true);
       expect(find.byKey(const ValueKey('runtime-1-page-2')), findsOneWidget);
-      await tester.tap(find.text('自动'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '自动');
       expect(pageLayoutPreference(tester), isNull);
       expect(find.byKey(const ValueKey('runtime-1-page-2')), findsNothing);
       tester.view.physicalSize = const Size(1200, 900);
@@ -1849,8 +2598,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(pageLayoutPreference(tester), true);
-      await tester.tap(find.text('单页'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '单页');
       expect(pageLayoutPreference(tester), false);
       // Rebuilding an unchanged parent input must preserve the local choice.
       await tester.pumpWidget(
@@ -1867,8 +2615,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(pageLayoutPreference(tester), true);
-      await tester.tap(find.text('单页'));
-      await tester.pumpAndSettle();
+      await choosePageLayout(tester, '单页');
       await tester.pumpWidget(screen(provider: provider, manifest: manifest));
       await tester.pumpAndSettle();
       expect(pageLayoutPreference(tester), isNull);
@@ -1896,8 +2643,7 @@ void main() {
     final manifest = fixtureChapter();
     await tester.pumpWidget(screen(provider: provider, manifest: manifest));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('单页'));
-    await tester.pumpAndSettle();
+    await choosePageLayout(tester, '单页');
     expect(pageLayoutPreference(tester), false);
     await tester.pumpWidget(
       screen(
@@ -1979,8 +2725,8 @@ void main() {
       expect(modes, [ReadingMode.rightToLeft]);
       expect(viewports.last.current.pageKey, 'page-5');
       expect(viewports.last.current.normalizedOffset, closeTo(.35, .001));
-      // A parent rebuild with its unchanged value cannot roll back a selection
-      // while the asynchronous settings acknowledgement is outstanding.
+      // The request leaves the confirmed layout in place while awaiting the
+      // parent, including across an unrelated parent rebuild.
       await tester.pumpWidget(configured(ReadingMode.webtoon, null));
       await tester.pumpAndSettle();
       expect(
@@ -1989,10 +2735,11 @@ void main() {
               find.byType(ChoiceField<ReadingMode>),
             )
             .value,
-        ReadingMode.rightToLeft,
+        ReadingMode.webtoon,
       );
       await tester.pumpWidget(configured(ReadingMode.rightToLeft, true));
       await tester.pumpAndSettle();
+      expect(viewports.last.mode, ReadingMode.rightToLeft);
       expect(pageLayoutPreference(tester), true);
       expect(modes, [ReadingMode.rightToLeft]);
       expect(pagePolicies, isEmpty);
@@ -2035,12 +2782,8 @@ void main() {
         isNull,
       );
       expect(
-        tester
-            .widget<CupertinoSlidingSegmentedControl<int>>(
-              find.byKey(const ValueKey('reader-page-layout')),
-            )
-            .disabledChildren,
-        {0, 1, 2},
+        tester.widget<ChoiceField<bool>>(pageLayoutMenu).onChanged,
+        isNull,
       );
       await tester.tap(iconLabel('下一页'));
       await tester.pumpAndSettle();
@@ -2111,15 +2854,21 @@ void main() {
   );
 
   testWidgets(
-    'decoder error clears observed progress and rejects a queued late frame',
+    'loading, failure and decoded retry preserve the same page without false observation',
     (tester) async {
-      final provider = FixturePageProvider();
+      final acquireGate = Completer<void>();
+      final provider = FixturePageProvider(
+        beforeAcquire: (ref) =>
+            ref.pageKey == 'page-0' ? acquireGate.future : Future.value(),
+      );
       final viewports = <ReaderViewportState>[];
       BuildContext? imageContext;
       await tester.pumpWidget(
         screen(
           provider: provider,
           manifest: fixtureChapter(),
+          background: ReaderBackground.white,
+          dimPercent: 80,
           onViewport: viewports.add,
           imageBuilder: (context, resource, fit) {
             if (resource.id == 'runtime-1-page-0') imageContext = context;
@@ -2127,6 +2876,26 @@ void main() {
           },
         ),
       );
+      await tester.pump();
+      final loading = find.semantics.byLabel('正在加载第 1 页');
+      expect(loading.evaluate(), hasLength(1));
+      expect(
+        tester
+            .widget<CupertinoActivityIndicator>(
+              find.descendant(
+                of: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Semantics &&
+                      widget.properties.label == '正在加载第 1 页',
+                ),
+                matching: find.byType(CupertinoActivityIndicator),
+              ),
+            )
+            .color,
+        CupertinoColors.white,
+      );
+      expect(viewports.where((viewport) => viewport.observed != null), isEmpty);
+      acquireGate.complete();
       await tester.pumpAndSettle();
       expect(viewports.last.observed, isNull);
       ReaderImageDecoded(
@@ -2149,8 +2918,30 @@ void main() {
       expect(viewports.last.observed, isNull);
       expect(viewports.last.windowReady, false);
       expect(viewports.last.atEnd, false);
-      expect(find.text('图片未能加载'), findsOneWidget);
+      final failure = find.text('第 1 页未能加载');
+      expect(failure, findsOneWidget);
+      expect(
+        DefaultTextStyle.of(tester.element(failure)).style.color,
+        CupertinoColors.white,
+      );
       expect(provider.released, contains('runtime-1-page-0'));
+      await tester.tap(find.text('重试'));
+      await tester.pump(kDoubleTapTimeout);
+      await tester.pumpAndSettle();
+      final attempts = provider.acquired.where(
+        (ref) => ref.pageKey == 'page-0',
+      );
+      expect(attempts.map((ref) => ref.requestId).toSet(), hasLength(2));
+      expect(find.text('第 1 页未能加载'), findsNothing);
+      expect(viewports.last.current.pageKey, 'page-0');
+      expect(viewports.last.observed, isNull);
+      ReaderImageDecoded(
+        'runtime-1-page-0',
+        width: 600,
+        height: 900,
+      ).dispatch(imageContext!);
+      await tester.pumpAndSettle();
+      expect(viewports.last.observed?.pageKey, 'page-0');
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);

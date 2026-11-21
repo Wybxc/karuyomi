@@ -142,6 +142,7 @@ void main() {
     await attachFixture();
     var controller = fixture.editor();
     expect(await controller.refresh(), true);
+    final previous = fixture.state().snapshot!.global;
     final favorite = _values(favorites: [_source('source.a')]);
     server.loseNextResponse = true;
     expect(await controller.saveGlobal(favorite, 0), false);
@@ -160,6 +161,8 @@ void main() {
     );
     expect(sent.expectedRevision, 0);
     expect(fixture.state().pending!.global, favorite);
+    expect(fixture.state().pending!.previousGlobal, previous);
+    expect(fixture.state().pending!.previousGlobal!.isFrozen, true);
     fixture.invalidate();
     final recreated = SettingsRepository(client);
     controller = fixture.editor();
@@ -167,6 +170,7 @@ void main() {
     expect(_writes(server), hasLength(1));
     expect(fixture.state().pending!.global, favorite);
     expect(fixture.state().pending!.basedOnRevision, 0);
+    expect(fixture.state().pending!.previousGlobal, previous);
     expect(fixture.state().canEdit, false);
     expect(fixture.state().canRetry, true);
     final changed = favorite.deepCopy()..favoriteSources.clear();
@@ -340,14 +344,7 @@ void main() {
       final controller = fixture.editor();
       await tester.runAsync(controller.refresh);
       await tester.pumpApp(
-        CupertinoApp(
-          home: CupertinoPageScaffold(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: GlobalSettingsPanel(catalog: fixture.catalog),
-            ),
-          ),
-        ),
+        CupertinoApp(home: GlobalSettingsPanel(catalog: fixture.catalog)),
         container: fixture.container,
       );
       await tester.pumpAndSettle();
@@ -360,6 +357,10 @@ void main() {
         await tester.pumpAndSettle();
       }
 
+      final appearance = find.byKey(
+        const ValueKey('settings-section-appearance'),
+      );
+      await tap(appearance);
       await tap(find.byType(ChoiceField<wire.AppTheme>));
       await tap(find.text('浅色').last);
       await tap(find.text('保存全局设置'));

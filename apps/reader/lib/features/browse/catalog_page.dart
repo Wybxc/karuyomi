@@ -1,4 +1,5 @@
-import '../../widgets/app_page_route.dart';
+import '../../widgets/app_routes.dart';
+import '../../widgets/app_empty_state.dart';
 
 import 'dart:async';
 
@@ -52,7 +53,7 @@ class const CatalogPage({
     final catalog = controller;
     final repository = catalog?.sourcePreferences;
     if (catalog == null || repository == null || catalog.busy) return;
-    await showCupertinoSheet<void>(
+    await showAppSheet<void>(
       context: context,
       enableDrag: false,
       scrollableBuilder: (context, _) => SourcePreferencesSheet(
@@ -63,15 +64,22 @@ class const CatalogPage({
     );
   }
 
-  Future<void> _search(BuildContext context) async {
+  Future<void> _search(
+    BuildContext context,
+    VoidCallback openExtensions,
+  ) async {
     final catalog = controller;
     final client = catalog?.library?.client;
     if (catalog == null || client == null || catalog.busy) return;
+    bool currentIdentity() =>
+        context.mounted &&
+        !catalog.accessPaused &&
+        identical(catalog.library?.client, client);
     final CatalogSourceSearch service;
     try {
       service = catalog.createSourceSearch();
     } catch (error) {
-      showCupertinoDialog<void>(
+      showAppDialog<void>(
         context: context,
         builder: (context) => CupertinoAlertDialog(
           title: const Text('无法搜索'),
@@ -79,7 +87,7 @@ class const CatalogPage({
             error is StateError ? error.message.toString() : error.toString(),
           ),
           actions: [
-            CupertinoDialogAction(
+            CupertinoButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('关闭'),
             ),
@@ -88,16 +96,13 @@ class const CatalogPage({
       );
       return;
     }
-    await Navigator.of(context).push<void>(
+    final manageExtensions = await Navigator.of(context).push<bool>(
       AppPageRoute(
         builder: (_) => CrossSourceSearchPage(
           service: service,
           onOpen: (details) async {
             bool current() =>
-                context.mounted &&
-                !catalog.accessPaused &&
-                identical(catalog.library?.client, client) &&
-                catalog.isCurrentSource(details.source);
+                currentIdentity() && catalog.isCurrentSource(details.source);
             if (!current()) return;
             await Navigator.of(context).push<void>(
               AppPageRoute(
@@ -125,6 +130,7 @@ class const CatalogPage({
         ),
       ),
     );
+    if (manageExtensions == true && currentIdentity()) openExtensions();
   }
 
   @override
@@ -144,52 +150,45 @@ class const CatalogPage({
         catalog?.settings != null &&
         {ServiceStatus.ready, ServiceStatus.failed}.contains(status);
     if (!ready) {
+      final connecting = catalog?.busy == true;
+      final needsLogin =
+          status == ServiceStatus.loginRequired ||
+          status == ServiceStatus.denied;
       return Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
           child: ListView(
             shrinkWrap: true,
-            padding: const EdgeInsets.all(24),
             children: [
-              const Icon(CupertinoIcons.globe, size: 56),
-              const SizedBox(height: 20),
-              Text(
-                switch (status) {
+              AppEmptyState(
+                leading: connecting
+                    ? const CupertinoActivityIndicator()
+                    : const Icon(CupertinoIcons.globe),
+                title: switch (status) {
                   ServiceStatus.loginRequired => '登录后继续浏览',
                   ServiceStatus.denied => '当前账号无法访问',
                   ServiceStatus.connecting => '正在连接服务',
                   ServiceStatus.failed => '服务连接未完成',
                   _ => '连接漫画服务',
                 },
-                style: CupertinoTheme.of(context)
-                    .textTheme
-                    .navLargeTitleTextStyle,
-                textAlign: TextAlign.center,
+                message:
+                    configurationError ??
+                    catalog?.error ??
+                    (catalog == null
+                        ? '填写 HTTPS 服务地址后即可浏览漫画源。'
+                        : '连接服务后，安装扩展并选择漫画源。'),
+                announce: true,
+                action: connecting
+                    ? null
+                    : (
+                        label: needsLogin
+                            ? '登录'
+                            : catalog == null
+                            ? '填写服务地址'
+                            : '连接服务',
+                        onPressed: needsLogin ? onAuthenticate : onConnect,
+                      ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                configurationError ?? catalog?.error ?? '连接服务后，安装扩展并选择漫画源。',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              if (catalog?.busy == true)
-                const CupertinoActivityIndicator()
-              else
-                Center(
-                  child: CupertinoButton.filled(
-                    onPressed:
-                        status == ServiceStatus.loginRequired ||
-                            status == ServiceStatus.denied
-                        ? onAuthenticate
-                        : onConnect,
-                    child: Text(
-                      status == ServiceStatus.loginRequired ||
-                              status == ServiceStatus.denied
-                          ? '登录'
-                          : '连接服务',
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
@@ -228,7 +227,8 @@ class const CatalogPage({
                       onManage: () => tabs.value = 1,
                       onOpen: (extension, source) =>
                           _open(context, extension, source),
-                      onSearch: () => unawaited(_search(context)),
+                      onSearch: () =>
+                          unawaited(_search(context, () => tabs.value = 1)),
                       onPreferences: (target) =>
                           unawaited(_preferences(context, target)),
                     )

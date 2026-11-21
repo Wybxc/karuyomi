@@ -233,7 +233,10 @@ void main() {
         works: works,
       );
       await tester.pumpWidget(page(false));
+      expect(find.semantics.byLabel('正在加载图片').evaluate(), hasLength(1));
+      expect(decoded, isEmpty);
       await finishDecode(tester, provider);
+      expect(find.semantics.byLabel('正在加载图片').evaluate(), isEmpty);
       expect(crops, isEmpty);
       expect(works, isEmpty);
       await tester.pumpWidget(page(true));

@@ -4,7 +4,7 @@ Static Assets 是 Web 与 Native 的扩展权威来源。每个包只部署最�
 
 ## 静态快照与传输合同
 
-快照根目录默认为 `.local/extensions-assets`，公开目录结构如下：
+通过 `--assets-dir` 选择快照根目录，客户端使用以下公开路径：
 
 | 路径                                         | 内容与缓存                                                     |
 | -------------------------------------------- | -------------------------------------------------------------- |
@@ -41,16 +41,20 @@ Source host 的第三方源码输入包含已初始化、HEAD 与已提交 gitli
 
 ## 首次本地全量与恢复
 
-先提交稳定的当前 host，使用固定提交、干净的独立 clone。下列命令在该 clone 内执行；长批次必须同时固定 supervisor、verifier、builder 和 submodules，不能只固定 builder 却让其它阶段读取持续变化的开发目录。state、plan、builds 和 snapshot 可以使用绝对路径放在统一的忽略目录。
+2026-11-15 用户补充构建位置：AOT 可 offload 到 `ssh macbook-pro-4`。该机为 M4 MacBook Pro，用户说明其性能强于 clab；为节约当前本机电量，后续重编可优先使用该机，仍不使用 pku-dasys。本节的“本地”指非 CI 的开发/构建机，包含已授权的 SSH 主机；不是要求在当前笔记本执行。开始实际构建前在目标机核对固定工具链、仓库提交和 checkpoint，并按实测资源确定并发；本次仅记录授权及设备信息，尚未运行该机上的 AOT 或性能比较。
+
+先提交稳定的当前 host，使用固定提交、干净的独立 clone。下列命令在该 clone 内执行；长批次必须同时固定 supervisor、verifier、builder 和 submodules，不能只固定 builder 却让其它阶段读取持续变化的开发目录。执行前将 `AOT_DIR` 设为本次发布专用的持久目录绝对路径，并在同一 shell 运行以下命令。首次构建、恢复与部署使用同一个目录，保存状态、冻结计划、逐包结果和候选快照。
 
 ```sh
+: "${AOT_DIR:?请设置本次发布的持久目录绝对路径}"
+mkdir -p "$AOT_DIR"
 git submodule update --init vendor/extensions-source vendor/suwayomi-server vendor/teavm vendor/libwebp
 pnpm install --frozen-lockfile
 node scripts/prepare-runtime.ts --android
 node tools/extensions/pipeline.ts bootstrap \
-  --state .local/extensions-current/state.json \
-  --output .local/extensions-current/plan.json \
-  --assets-dir .local/extensions-assets \
+  --state "$AOT_DIR/state.json" \
+  --output "$AOT_DIR/plan.json" \
+  --assets-dir "$AOT_DIR/assets" \
   --jobs 1 --finalize
 ```
 
@@ -62,11 +66,11 @@ node tools/extensions/pipeline.ts bootstrap \
 
 ```sh
 node tools/extensions/pipeline.ts bootstrap \
-  --plan .local/extensions-current/plan.json \
+  --plan "$AOT_DIR/plan.json" \
   --build-checkout "$PWD" \
-  --state .local/extensions-current/state.json \
-  --output .local/extensions-current/resume-plan.json \
-  --assets-dir .local/extensions-assets \
+  --state "$AOT_DIR/state.json" \
+  --output "$AOT_DIR/resume-plan.json" \
+  --assets-dir "$AOT_DIR/assets" \
   --jobs 1 --finalize
 ```
 
@@ -82,18 +86,18 @@ runner 检查冻结 checkout 的提交、干净 host 输入、指纹、submodule
 
 ```sh
 node tools/extensions/pipeline.ts prepare-snapshot \
-  --plan .local/extensions-current/plan.json \
-  --state .local/extensions-current/state.json \
-  --results .local/extensions-current/builds \
-  --assets-dir .local/extensions-assets
-EXTENSION_ASSETS_DIR="$PWD/.local/extensions-assets" pnpm build
+  --plan "$AOT_DIR/plan.json" \
+  --state "$AOT_DIR/state.json" \
+  --results "$AOT_DIR/builds" \
+  --assets-dir "$AOT_DIR/assets"
+EXTENSION_ASSETS_DIR="$AOT_DIR/assets" pnpm build
 node tools/extensions/pipeline.ts check-base \
-  --assets-dir .local/extensions-assets
+  --assets-dir "$AOT_DIR/assets"
 pnpm --filter @karuyomi/api exec wrangler deploy
 pnpm --filter @karuyomi/api exec wrangler d1 migrations apply DB --remote
 node tools/extensions/pipeline.ts commit-snapshot \
-  --state .local/extensions-current/state.json \
-  --assets-dir .local/extensions-assets
+  --state "$AOT_DIR/state.json" \
+  --assets-dir "$AOT_DIR/assets"
 ```
 
 `bootstrap` 已生成候选时可跳过上面的 `prepare-snapshot`。`check-base` 应紧邻部署，确认远端 revision 仍为计划基线；首次替换已知旧 SPA 时可在本地显式增加 `--initialize`，它不接受任意错误响应，也不能在 CI 使用。网络命令默认 origin 为 `https://karuyomi.wybxc.cc`，可用 `--origin` 明确指定。
@@ -162,16 +166,17 @@ pnpm --filter @karuyomi/api exec wrangler r2 bucket domain list karuyomi-covers
 
 plan/build/deploy 三个 jobs 只需 GitHub `contents: read`，均安装固定 Node 和锁定 npm 依赖。AOT 在隔离 matrix 中执行；deploy 汇总结果、生成完整快照、构建客户端、检查基线、部署并确认 checkpoint。即使本轮没有待编译包，catalog 变化（例如删除模块）仍会生成并部署新快照。Cloudflare 凭据仅提供给可信部署步骤，所有增量发布使用同一 concurrency group。
 
-增量调度使用以下命令，再以本批结果执行上面的 `prepare-snapshot` 和部署流程；`INPUT_FINGERPRINT` 来自 plan 的 selected 条目：
+为本次增量批次设置独立的 `AOT_DIR`。增量调度使用以下命令，再以本批结果执行上面的 `prepare-snapshot` 和部署流程；`INPUT_FINGERPRINT` 来自 plan 的 selected 条目：
 
 ```sh
-node tools/extensions/pipeline.ts pull-state --state .local/extensions/state.json
+: "${AOT_DIR:?请设置本次增量批次的持久目录绝对路径}"
+node tools/extensions/pipeline.ts pull-state --state "$AOT_DIR/state.json"
 pnpm --filter @karuyomi/runtime-host build:materials
 node tools/extensions/pipeline.ts plan --ci \
-  --state .local/extensions/state.json --output .local/extensions/plan.json --limit 12
+  --state "$AOT_DIR/state.json" --output "$AOT_DIR/plan.json" --limit 12
 node tools/extensions/pipeline.ts build \
-  --plan .local/extensions/plan.json --key INPUT_FINGERPRINT \
-  --output output/INPUT_FINGERPRINT
+  --plan "$AOT_DIR/plan.json" --key INPUT_FINGERPRINT \
+  --output "$AOT_DIR/builds/INPUT_FINGERPRINT"
 ```
 
 编译成功可以交付为 `compiled_unverified`，保持 `runtimeReady=false`。只有匹配 buildId/manifest SHA 的真实 Worker/browser gate 均通过才为 `browser_verified`；初始化成功不证明在线 Source、图片或真机支持。当前完整性验证使用 gzip 目录，先准备匹配的共享材料：

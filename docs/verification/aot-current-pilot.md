@@ -47,23 +47,23 @@ pnpm acceptance:serve
 
 2026-11-07 17:20（UTC+8），从固定 `952bbab` 的隔离 checkout 启动本地全量。正式入口记录 `discovered=1448`、`selected=1448`；以完整计划复用三个输入身份匹配的成功检查点，首个新包 `all.ahottie` 已进入上游 Gradle 构建。这里记录的是启动证据，不能据此认定任何新包完成。
 
-本机忽略目录 `.local/extensions-baseline-952bbab/` 保存冻结计划、独立 checkout、已核对的生产 parent state/index、逐包结果、恢复计划及日志。使用单并发 `bootstrap --plan frozen-plan.json --build-checkout checkout --state state.json --output resume-plan.json --assets-dir candidate --jobs 1 --finalize`（路径按该目录解析）。若中断，先确认原发布器已退出，再按 [恢复约束](../EXTENSIONS.md#首次本地全量与恢复)使用相同冻结输入和检查点。此命令只准备本地候选，不部署，不更新生产 checkpoint，不启用增量 CI。
+本轮使用单并发 `bootstrap --jobs 1 --finalize` 准备候选，未部署。旧批次已关闭；当前构建从匹配宿主和已确认父状态的[冻结计划](../EXTENSIONS.md#首次本地全量与恢复)启动。
 
 ## 当前宿主全量启动
 
-2026-11-08，原 `952bbab` 批次的图形桥摘要与当前宿主不同，正式装配不能混用。旧 runner 按正式取消路径收到 SIGTERM，退出码 143，锁释放；保留 867 个成功、76 个失败检查点作为该提交的证据，另有 505 包未尝试。未生成、部署旧全量快照。
+2026-11-08，原 `952bbab` 批次的图形桥摘要与当前宿主不同，正式装配不能混用。旧 runner 按正式取消路径收到 SIGTERM，退出码 143，锁释放；停止时有 867 个成功、76 个失败检查点，另有 505 包未尝试。未生成、部署旧全量快照。
 
 新的独立 checkout 固定为 `c04d436`；上游扩展提交仍为 `efa93f5a`，宿主指纹为 `d9990e66a60fa830c943dcceb07a2fa5558e053d5f40f4b74d48bc3977fa496b`。通过匿名读取生产 index/state 核对真实父 revision `702cc6bfb2974682bf1c83325458535a`、三包和 index SHA。固定 Node 24.15.0、pnpm 12.6.0、三子模块及工具链锁，以正式 `prepare-runtime.ts --android --seed` 校验准备工具链和 seed。
 
-本地忽略目录 `.local/extensions-prototype-v6.n7bHUj/` 保存原样父状态、固定计划、构建结果和日志。按[首次全量与恢复](../EXTENSIONS.md#首次本地全量与恢复)生成 `frozen-plan.json` 后，单并发 `bootstrap --plan … --build-checkout … --jobs 1 --finalize` 发现并选择 1,448 包，首包 `all.ahottie` 已写入正式 built 检查点。此次不使用旧宿主结果，仍只准备本地候选。后续需要用匹配的产品材料装配，验证静态及 Source 分项、生产 Access 和网络政策；候选未部署，增量发布继续停用。
+按[首次全量与恢复](../EXTENSIONS.md#首次本地全量与恢复)生成 `frozen-plan.json` 后，单并发 `bootstrap --plan … --build-checkout … --jobs 1 --finalize` 发现并选择 1,448 包，首包 `all.ahottie` 已写入正式 built 检查点。此次不使用旧宿主结果，仍只准备本地候选。后续需要用匹配的产品材料装配，验证静态及 Source 分项、生产 Access 和网络政策；候选未部署，增量发布继续停用。
 
-同日，为释放 Mac 的 CPU，将该冻结批次迁至独立 Fedora x86_64 构建机。先用固定提交和锁定工具链在 Linux 重建材料，`materials.json` SHA-256 与 Mac 完全一致；在独立输出目录重新编译 xkcd，编译与产物完整性通过。Mac 调度器收到 SIGTERM 后等待 builder 退出并释放状态锁。停机后将父状态、计划和逐包结果同步至 Fedora；传输前后 295 个成功、16 个失败检查点的记录逐项摘要一致，剩余 1,137 个输入。Fedora 用同一冻结计划单并发恢复，保留原失败结果，并为首个待处理输入 `d68d5c0f…` 写入新 `built` 检查点。Mac 目录保留为交接备份，恢复只生成待验收候选，未部署。
+同日，为释放 Mac 的 CPU，将该冻结批次迁至独立 Fedora x86_64 构建机。先用固定提交和锁定工具链在 Linux 重建材料，`materials.json` SHA-256 与 Mac 完全一致；在独立输出目录重新编译 xkcd，编译与产物完整性通过。Mac 调度器收到 SIGTERM 后等待 builder 退出并释放状态锁。停机后将父状态、计划和逐包结果同步至 Fedora；传输前后 295 个成功、16 个失败检查点的记录逐项摘要一致，剩余 1,137 个输入。Fedora 用同一冻结计划单并发恢复，保留原失败结果，并为首个待处理输入 `d68d5c0f…` 写入新 `built` 检查点。当时在 Fedora 恢复的是待验收候选。Mac 上的迁移副本已清理。
 
 ## clab 在途失败抽样
 
 2026-11-09 23:08（UTC+8），在固定 `c04d436` 的 clab 批次仍运行时，只读核对当时已完成的 1,088 个逐包 `pipeline-result.json`：1,036 成功、52 失败（16 条由 Mac 迁入、36 条在 clab 生成）。1,036 个成功均为 `compiled_unverified`。同次公开读取确认生产仍是三个包，`build-state.json` 的 revision 仍等于该批次的生产 parent，`bootstrap.complete=false`。这些是固定时点的观察，不是最终候选或部署结果。
 
-52 条结果均为 AOT 阶段的 `ExecaError`，对应的上游 Gradle 均已成功。逐包 `logs/aot.log` 显示其中 50 条为 TeaVM 缺类或方法，另有 `en.manhwaread` 的编译 JVM `Java heap space`，以及 `all.lunaranime` 的无栈 `Unexpected error occurred: 2/2`；后一条不能单凭文本套用下节旧批次的定位。逐包摘要和只读复验方法保存在本机忽略目录 `.local/aot-clab-triage/`，重采样结果与原摘要逐字节一致。
+52 条结果均为 AOT 阶段的 `ExecaError`，对应的上游 Gradle 均已成功。逐包 `logs/aot.log` 显示其中 50 条为 TeaVM 缺类或方法，另有 `en.manhwaread` 的编译 JVM `Java heap space`，以及 `all.lunaranime` 的无栈 `Unexpected error occurred: 2/2`；后一条不能单凭文本套用下节旧批次的定位。只读重采样与原摘要逐字节一致。
 
 链接缺口包括 Android API（21 包，其中 10 包涉及 WebView）、JCA 加解密（10 包）和 OkHttp 接口（8 包），同一包可有多项。11 包缺 `Class.getResource(String)`，其中 5 包当次只报这一项。核对原始 JAR 和调用点，Webnex、CapibaraTraductor、MangaFire 用它读取打包在 `assets/` 内的文本。全量结束后可先在隔离 AOT 实现并验证此资源读取模式，保留缺失资源、字符集和流关闭的语义；仍需对代表包验证实际读取，不能据一次编译认定兼容。没有修改冻结输入、重试同指纹失败包或启动第二个发布器。
 
@@ -73,7 +73,7 @@ pnpm acceptance:serve
 
 冻结 AOT 的清单未生成当前的 Source 设置同步规则。首发前补编 Komiic、Asura Scans 和 MangaKatana，再核对成品清单与正式设置读写。冻结 MangaFire 是已记录的编译失败，仍保留原结果。三包补编及真实候选尚未生成。
 
-新增的[本地候选组装入口](../EXTENSIONS.md#首次全量候选的定向补编)用这两份固定计划、同一生产父快照和两个空结果目录预检，确认缺少首个冻结结果时退出且不生成快照。定向回归另覆盖成功合入及保留冻结失败、父索引不符、材料不符、缺失与损坏结果，以及上游输入不一致。真实两份计划和原始预检日志保存在 `.local/baseline-supplement-a382be1/`。当前 clab 队列与生产均未改动。
+新增的[本地候选组装入口](../EXTENSIONS.md#首次全量候选的定向补编)用这两份固定计划、同一生产父快照和两个空结果目录预检，确认缺少首个冻结结果时退出且不生成快照。定向回归另覆盖成功合入及保留冻结失败、父索引不符、材料不符、缺失与损坏结果，以及上游输入不一致。当前 clab 队列与生产均未改动。
 
 2026-11-10，在 clab 用固定 `2a07fc2` 补编 checkout、真实 `c04d436` 冻结结果目录、同一生产父快照及上述三个精确包名执行正式 `prepare-baseline`。两个 checkout 与六份共享材料一致，线上 state/index 校验通过；入口到达冻结终态检查，报告 `tr.eskimangalar` 尚无结果，未生成快照。原始结果在 clab 的补编目录 `candidate-preflight.4IUnji/prepare.log`。冻结 supervisor 持续运行；未启动补编、未改生产。该结果验证的是实际输入预检和缺结果时停止，完整候选仍待生成。
 
@@ -81,11 +81,11 @@ pnpm acceptance:serve
 
 2026-11-10，另建固定 `2c012db` 产品 checkout，回摘本机服务地址保存 `98d78aa` 和 Native 登录修复 `016a5d0` 的生产源码路径。正式 `hostFingerprint()` 完整结果应用前后逐字节一致（`1ba88f82…18dc`）；保留冻结与补编扩展各自原始宿主指纹。空索引 `pnpm build` 成功，六份共享材料、Web host/worker 及 Native host/worker/manifest 与原 `2c012db` 成品逐字节一致，材料版本仍为 `5d1260e5…92e4`。
 
-该归档的正式 Wrangler harness 核对登录 303 携带同一 UUID、回跳 GET/HEAD 无脚本且 no-store、随后 bootstrap 200。旧 Native 回跳参数返回 400，首发必须使用新版配套安装包。服务地址正式 AppShell 回归 1/1 通过；`wrangler versions upload --dry-run` 通过且未上传。复验命令、补丁和原始比对保存在本机忽略目录 `.local/six-material-product-2c012db.3549L2/`。
+该归档的正式 Wrangler harness 核对登录 303 携带同一 UUID、回跳 GET/HEAD 无脚本且 no-store、随后 bootstrap 200。旧 Native 回跳参数返回 400，首发必须使用新版配套安装包。服务地址正式 AppShell 回归 1/1 通过；`wrangler versions upload --dry-run` 通过且未上传。
 
 本轮空索引不能发布。等待冻结结果和三个补编结果后，用同一产品归档装配正式扩展快照并重跑构建、dry-run、双端 Native 安装与实际 Source 门；未改冻结运行目录、候选 state 或生产。
 
-2026-11-10，从上述归档独立复制源码，再回摘阅读中 Access 恢复的显式重试和视口保留两项修复。回摘的七个产品源码文件与通过隔离 iOS 复验的文件逐字节一致。完整 `hostFingerprint()` JSON、Web 材料清单与 host/worker、Native host/worker/manifest 与旧归档逐字节相同，仍使用冻结 v6 的六份材料。空索引的正式 Web/Worker 构建和 Wrangler 上传 dry-run 通过；使用完整快照的最终构建、发行签名与生产验收另做。本机忽略目录 `.local/prototype-reader-recovery.mw5OJU/` 保留补丁、构建和核对日志。
+2026-11-10，从上述归档独立复制源码，再回摘阅读中 Access 恢复的显式重试和视口保留两项修复。回摘的七个产品源码文件与通过隔离 iOS 复验的文件逐字节一致。完整 `hostFingerprint()` JSON、Web 材料清单与 host/worker、Native host/worker/manifest 与旧归档逐字节相同，仍使用冻结 v6 的六份材料。空索引的正式 Web/Worker 构建和 Wrangler 上传 dry-run 通过；使用完整快照的最终构建、发行签名与生产验收另做。
 
 ### 六材料 Native 发布构建
 
@@ -94,15 +94,15 @@ pnpm acceptance:serve
 - Android APK 为 23,480,920 B，SHA-256 `ed057058cd4a6d1f4424ab5d93514af0f336d8fe28dd85f3542fb47ea19e02e5`，仅 `arm64-v8a`，不可调试。项目当前 Gradle 配置生成的本机 Android Debug 证书通过 APK v2 校验；没有发行签名，也不能以该证书覆盖旧的不同证书侧载包。
 - iOS Runner 和 `App.framework/App` 均为 iPhoneOS Mach-O arm64，应用 ID `dev.karuyomi.karuyomi`。成品无签名和 provisioning profile，尚不能安装到真机。
 
-从两份实际成品分别取出 `host.js`、`worker.js`、`manifest.json`，均与归档 Vite Native 输出逐字节一致；从 Worker 核对实际嵌入的五个桥脚本和 zstd WASM 全部匹配六材料 `5d1260e5…92e4`。构建未改变 Dart 依赖锁或平台跟踪文件。命令、产物和核对日志见本机忽略目录 `.local/six-material-product-2c012db.3549L2/NATIVE_RELEASE.md`。两包未安装或运行；最终扩展快照、发行签名、真机和生产 Access 另验。
+从两份实际成品分别取出 `host.js`、`worker.js`、`manifest.json`，均与归档 Vite Native 输出逐字节一致；从 Worker 核对实际嵌入的五个桥脚本和 zstd WASM 全部匹配六材料 `5d1260e5…92e4`。构建未改变 Dart 依赖锁或平台跟踪文件。两包未安装或运行；最终扩展快照、发行签名、真机和生产 Access 另验。
 
-同日，从加入两次阅读恢复修复的六材料归档重建 Android arm64-v8a release APK 和未签名 iPhoneOS arm64 App。两份实际包内的三项 Native 资源逐字节匹配，清单 SHA-256 仍为 `c0839e9a5af816ccb0681a8187558cc80f7cc16b641daa20bde744b4418c31f5`，Worker 确认内嵌同一六份材料；Dart 锁文件未变。Android APK CRC 和本地测试签名验证通过，在无默认网络的专用模拟器侧载并冷启动显示书架。iOS 未签名。本轮复验命令与成品记录见 `.local/prototype-reader-recovery.mw5OJU/REPRODUCE.md`；在线阅读使用独立调试验收包，发行签名、生产和真机另验。
+同日，从加入两次阅读恢复修复的六材料归档重建 Android arm64-v8a release APK 和未签名 iPhoneOS arm64 App。两份实际包内的三项 Native 资源逐字节匹配，清单 SHA-256 仍为 `c0839e9a5af816ccb0681a8187558cc80f7cc16b641daa20bde744b4418c31f5`，Worker 确认内嵌同一六份材料；Dart 锁文件未变。Android APK CRC 和本地测试签名验证通过，在无默认网络的专用模拟器侧载并冷启动显示书架。iOS 未签名。在线阅读使用独立调试验收包，发行签名、生产和真机另验。
 
 ### 六材料首发修复合并预检
 
 2026-11-10，在带本机服务地址、登录回跳及阅读恢复修复的 `2c012db` 归档副本中，回摘 `a430647` 的 Android 发行签名配置和 `ab46c3b` 的短窗口阅读修复。以冻结 `c04d436` 的 Arknights Comics 1.6.2 单包静态快照运行 `EXTENSION_ASSETS_DIR=<单包快照> pnpm build`，部署输出的扩展索引与输入相同，六份 Web 材料和三个 Native 运行时文件均与原归档逐字节一致。使用实际生成的 Wrangler 配置执行 `deploy --dry-run` 通过；阅读恢复与 ReaderScreen 的 43 项定向回归通过。
 
-从正式 `lib/main.dart` 和生产默认服务地址构建 Android arm64-v8a release APK 和 iPhoneOS arm64 App。两包均未签名，包内运行时文件与 Vite 输出逐字节一致，Worker 内嵌六份材料，Native 清单摘要与原归档相同。构建未更改 Dart 依赖锁。Android 在测试后用正常 release 命令重新生成插件注册；iOS 首次受 SwiftPM 缓存写权限阻断，允许 Xcode 写构建缓存后通过。复现步骤、失败记录、产物及核对结果见本机忽略目录 `.local/prototype-six-material-rc.XbbXZW/REPRODUCE.md`。
+从正式 `lib/main.dart` 和生产默认服务地址构建 Android arm64-v8a release APK 和 iPhoneOS arm64 App。两包均未签名，包内运行时文件与 Vite 输出逐字节一致，Worker 内嵌六份材料，Native 清单摘要与原归档相同。构建未更改 Dart 依赖锁。Android 在测试后用正常 release 命令重新生成插件注册；iOS 首次受 SwiftPM 缓存写权限阻断，允许 Xcode 写构建缓存后通过。
 
 此预检只覆盖单包装配、工程回归和未签名构建。完整快照到位后复用同一归档重跑构建及部署预演，执行真实 Source 验收，并使用正式签名在真机验证；本轮未安装这两个包或切换生产。
 
@@ -112,7 +112,7 @@ pnpm acceptance:serve
 
 按[定向补编流程](../EXTENSIONS.md#首次全量候选的定向补编)执行 `prepare-baseline`，生成本地 revision `3c24b0d7c0a745a58de4bd6b5ffb7654`，父 revision 为 `702cc6bfb2974682bf1c83325458535a`。索引 SHA-256 为 `b819024786b18fa87be8f9f16b350cf4e70564268e592d28946866d24ccf11eb`。与冻结索引相比只有三个补编包的 buildId 变化，实际清单包含预期类型的五项 Source 设置规则；保留现网 xkcd、Arknights Comics、CuuTruyen。候选目录含 1,371 个可分发包，77 个失败只留在构建状态，所有可分发记录仍为 `compiled_unverified`、`runtimeReady=false`。
 
-拉取候选到六材料归档的独立副本，以 `EXTENSION_ASSETS_DIR=<完整候选>` 运行正式 `pnpm build`，Vite 检查引用产物和传输摘要。输出的索引和构建状态与候选逐字节一致，Web 共享材料和 Native 内置运行时文件与合并预检归档逐字节一致。以实际生成配置运行 Wrangler `deploy --dry-run` 通过，读取 4,194 个静态文件；`check-base` 确认公开生产父状态仍匹配。原始日志和复验命令保存在本机忽略目录 `.local/prototype-full-six-material.tLNTHI/`。
+拉取候选到六材料归档的独立副本，以 `EXTENSION_ASSETS_DIR=<完整候选>` 运行正式 `pnpm build`，Vite 检查引用产物和传输摘要。输出的索引和构建状态与候选逐字节一致，Web 共享材料和 Native 内置运行时文件与合并预检归档逐字节一致。以实际生成配置运行 Wrangler `deploy --dry-run` 通过，读取 4,194 个静态文件；`check-base` 确认公开生产父状态仍匹配。
 
 #### 完整目录的 Android 阅读验收
 
@@ -130,11 +130,11 @@ CuuTruyen 1.6.2 经正式目录安装，使用越南语 Source 搜索并收藏�
 
 iOS 首次从同库书架进入第 141 章，第 3 页未在 120 秒内显示解码帧；随后 Android 新进程从书架恢复到第 3 页并显示真实图片。iOS 超时和 Android 读回前后的独立响应逐字节一致，账户 revision 均为 30。用未加诊断的正式入口复验，iOS 新进程首次显示第 3 页，翻到第 4 页并确认保存；Android 再次以新进程从书架首次显示第 4 页。独立读回核对第 142 章完成状态和锚点保持，第 141 章当前和最远均为第 4 页；账户 revision 为 `30 → 32 → 32`，最后一次 Android 续读前后各路原始响应逐字节一致。
 
-MANGA Plus Creators 1.6.1 在 iOS 从完整目录安装并收藏《Sense Life》，成功加载 `#001` 的 72 页清单。首图等待 120 秒未得到解码帧，D1 只保存所选第 1 页、无最远锚；临时诊断副本重开时观察到第 1 页资源从等待进入可用，并显示 815 × 509 解码帧。首轮超时未定位原因，本轮没有通过整章或续读。以[正式 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)复验，命令、逐页日志和独立读回留在本机忽略目录 `.local/prototype-full-source.lFCJ9v/`。以上分项不提升扩展的 `compiled_unverified` 状态。
+MANGA Plus Creators 1.6.1 在 iOS 从完整目录安装并收藏《Sense Life》，成功加载 `#001` 的 72 页清单。首图等待 120 秒未得到解码帧，D1 只保存所选第 1 页、无最远锚；临时诊断副本重开时观察到第 1 页资源从等待进入可用，并显示 815 × 509 解码帧。首轮超时未定位原因，本轮没有通过整章或续读。复验使用[正式 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)。以上分项不提升扩展的 `compiled_unverified` 状态。
 
-2026-11-10，后续两轮复验在详情阶段中断；其中一次对应的上游 `200` 正文最长到达间隔约 19.4 秒，超过原请求的 10 秒空闲预算。该观测不解释此前的首图失败。保留失败环境和原始日志 `.local/prototype-full-mpc.UAdlwR/`，没有放宽超时或改写原 Source。
+2026-11-10，后续两轮复验在详情阶段中断；其中一次对应的上游 `200` 正文最长到达间隔约 19.4 秒，超过原请求的 10 秒空闲预算。该观测不解释此前的首图失败。该轮保留了超时设置和原 Source 行为。
 
-同日，用与首发源码 `0f43779` 相同的正式客户端、完整候选和新隔离 D1 复验通过。iPhone 17 Pro / iOS 26.4 模拟器逐页显示 `#001` 的 72 页，确认读完，切到 `#002` 并保存第 7 页。新 App 进程首次续读显示第 7 页，继续读到第 35 页。独立 API 读回确认首章的完成状态及末页锚不变，次章当前及最远页从 7 变为 35，账户 revision 为 `12 → 15`。两章分别观测到 72 和 38 次真实图片请求，Referer 均与所属章节精确匹配，均收到上游 `200` 响应头。复用上述正式驱动及临时 HTTPS 证书，日志和独立读回位于本机忽略目录 `.local/first-release-0.1.0.7lGF2d/mpc/`。本分项不代表生产、签名真机或首图性能，也不提升扩展的 `compiled_unverified` 状态。
+同日，用与首发源码 `0f43779` 相同的正式客户端、完整候选和新隔离 D1 复验通过。iPhone 17 Pro / iOS 26.4 模拟器逐页显示 `#001` 的 72 页，确认读完，切到 `#002` 并保存第 7 页。新 App 进程首次续读显示第 7 页，继续读到第 35 页。独立 API 读回确认首章的完成状态及末页锚不变，次章当前及最远页从 7 变为 35，账户 revision 为 `12 → 15`。两章分别观测到 72 和 38 次真实图片请求，Referer 均与所属章节精确匹配，均收到上游 `200` 响应头。本分项不代表生产、签名真机或首图性能，也不提升扩展的 `compiled_unverified` 状态。
 
 该六材料快照随后随 [0.1.0 Web 与 API](first-web-release.md)切换生产；生产实测覆盖 xkcd，原生仍按实际平台证据验收。
 
@@ -232,7 +232,7 @@ Android 35 native Skia 对照发现普通 Canvas 2D 旋转裁剪边缘有半透�
 
 正式入口安装并收藏《Sense Life》，进程 `5170` 逐页显示 `#001` 的全部 72 页，显式确认读完，并通过「下一章」在 `#002` 确认保存第 7 页。进程 `5443` 从书架首次显示同一清单的第 7 页（实际解码 812 × 1275），再逐页读到第 35 页。独立正常 HTTPS 读回确认首章当前／最远第 72 页且完成，次章当前／最远第 7 → 35 页、未完成，反向章序保留，设置、收藏和书签的业务字段保持。账户／作品 revision `2/1 → 10/9 → 23/22`。
 
-用 [通用 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)复验。固定输入、两个进程的逐帧结果、独立读回和机器核对保存在 `.local/manga-plus-android-68e5e08/`；首轮只解码第 1 页，因驱动误选 Tooltip 在翻页前停止，新 D1 复验时已修正。此门只覆盖该作品的 Android 模拟器功能，未测真机、性能、生产或其它 Source；AOT 产物仍为 `compiled_unverified`。
+用 [通用 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)复验。首轮只解码第 1 页，因驱动误选 Tooltip 在翻页前停止，新 D1 复验时已修正。此门只覆盖该作品的 Android 模拟器功能，未测真机、性能、生产或其它 Source；AOT 产物仍为 `compiled_unverified`。
 
 ## ToonLook 的长图重排、完整章节与续读
 
@@ -250,13 +250,13 @@ Codex 内置浏览器通过正式 UI 安装并加载英文源，搜索和收藏 
 
 同日诊断复验使用同一快照、同一 iOS 模拟器和全新 HTTPS/D1。仅在独立产品副本的 Worker driver 和测试 UI 增加观察，六份共享材料及 AOT 未变。同一次首图请求中，`ImageDecoder` 缺失导致 `openDecoder` 抛错，但 Source 捕获后通过 `createImageBitmap` 静态解码，创建并绘制重排后的 Bitmap。`OffscreenCanvas.convertToBlob({type: 'image/webp'})` 对 720 × 5,000 surface 返回 `image/png`，桥按约定拒绝格式不匹配，原 Source 抛出 `java.io.IOException`（`Could not encode descrambled image`），尚未打开图片交付通道。driver 优先呈现了之前已回退的解码能力错误，因此界面提示不指向真正的失败步骤。独立 D1 再次确认只记录首图选中、无最远锚或完成状态（账户／作品 `3/2`）。
 
-复验沿用[通用 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)。构建输入、诊断补丁、准备与阅读日志、独立读回和界面截图见 `.local/ios-toonlook-v6-68e5e0.t6QMCa/evidence/`。此门确认该 iOS WebView 缺少 Canvas WebP 编码路径，未验证其它 WebKit 版本、修复或真机；AOT 产物仍为 `compiled_unverified`。
+复验沿用[通用 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)。此门确认该 iOS WebView 缺少 Canvas WebP 编码路径，未验证其它 WebKit 版本、修复或真机；AOT 产物仍为 `compiled_unverified`。
 
 ## ToonLook 的 iOS WebP 编码探针
 
-用官方 libwebp 1.6.0 和 Zig 0.17.0 构建独立单线程 encoder-only WASM。质量 90 的探针为 168,745 B（gzip 83,415 B），限制 3,600,000 像素、4 MiB 输出和 96 MiB 线性内存；一个 720 × 5,000 的合成 RGBA 输入编码为 1,000,214 B，WASM 线性内存容量高点 68.875 MiB，官方 `dwebp` 成功解码。超像素、输出空间不足、非法质量及越过内存上限有负对照。该内存只指 WASM 线性内存；Node 的单次编码结果不代表 Canvas、WebKit 或设备峰值。上游、命令、ABI、摘要和负对照见 `.local/libwebp-wasm-1.6.0.8SnXZg/REPRODUCE.md`。
+用官方 libwebp 1.6.0 和 Zig 0.17.0 构建独立单线程 encoder-only WASM。质量 90 的探针为 168,745 B（gzip 83,415 B），限制 3,600,000 像素、4 MiB 输出和 96 MiB 线性内存；一个 720 × 5,000 的合成 RGBA 输入编码为 1,000,214 B，WASM 线性内存容量高点 68.875 MiB，官方 `dwebp` 成功解码。超像素、输出空间不足、非法质量及越过内存上限有负对照。该内存只指 WASM 线性内存；Node 的单次编码结果不代表 Canvas、WebKit 或设备峰值。
 
-在上节同一 iOS 模拟器、同一 ToonLook v6 AOT 和新的隔离 HTTPS/D1 中，仅在独立副本的 Worker 用该探针替换 Canvas 的错误格式输出：从已经由 Source 绘制完的 surface 读 RGBA，以原质量参数编码，校验 RIFF/WebP 签名，再经原图形桥和原图片交付。共享材料 catalog SHA-256 仍为 `eec7701e311b37ac3c03005a128d98b8f54f65d8a873c549ccf860f8fbb765ae`。真实《Doomed》首章 10 页逐页显示并显式确认完成，经「下一章」保存第二章第 7 页（720 × 5,000）；新进程从书架首次显示第 7 页并读到第 10 页。独立 HTTPS 读回确认首章保持完成，当前和最远均为第 10 页；第二章当前和最远从第 7 页到第 10 页，仍未完成，反向章序保留。账户／作品 revision `2/1 → 9/8 → 11/10`。诊断对照、探针补丁、复验参数、帧日志和机器核验见 `.local/ios-toonlook-v6-68e5e0.t6QMCa/evidence/`。
+在上节同一 iOS 模拟器、同一 ToonLook v6 AOT 和新的隔离 HTTPS/D1 中，仅在独立副本的 Worker 用该探针替换 Canvas 的错误格式输出：从已经由 Source 绘制完的 surface 读 RGBA，以原质量参数编码，校验 RIFF/WebP 签名，再经原图形桥和原图片交付。共享材料 catalog SHA-256 仍为 `eec7701e311b37ac3c03005a128d98b8f54f65d8a873c549ccf860f8fbb765ae`。真实《Doomed》首章 10 页逐页显示并显式确认完成，经「下一章」保存第二章第 7 页（720 × 5,000）；新进程从书架首次显示第 7 页并读到第 10 页。独立 HTTPS 读回确认首章保持完成，当前和最远均为第 10 页；第二章当前和最远从第 7 页到第 10 页，仍未完成，反向章序保留。账户／作品 revision `2/1 → 9/8 → 11/10`。
 
 此门证明通用编码可恢复这一真实 Source 的阅读，不代表生产已经修复。探针的临时 Canvas 包装及内联 WASM 不进入产品；正式共享材料装配、图形账本、取消与释放、其它平台及真机仍待验收。未修改冻结输入或部署，产物仍为 `compiled_unverified`。
 
@@ -276,13 +276,13 @@ Codex 内置浏览器通过正式 UI 安装并加载英文源，搜索和收藏 
 
 从空书架经正式界面安装并收藏《Prelude Suite: The Lone Walker》。章节清单确认来源原序中《DREAM》的下一章是《HEARTBEAT》。阅读进程逐页显示《DREAM》51 页（实解码尺寸 1200 × 1691），显式标记完成后用「下一章」进入《HEARTBEAT》，显示并保存第 3 页。独立 Android 新进程从书架直接续读，首次显示《HEARTBEAT》第 3 页，无需经过详情。
 
-独立 HTTPS 读回确认账户／作品 revision 为 `2/1 → 58/57 → 58/57`，重开前后的完整响应相同。《DREAM》的当前与最远页均为 51 且已完成，《HEARTBEAT》的当前与最远页均为 3、未完成，保留来源章序。复验使用[通用 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)，逐页日志和读回摘要见本机忽略目录 `.local/arknights-android-2c012db/evidence/`。本分项未部署产物，不改变静态快照的 `compiled_unverified` 状态；生产和真机另验。
+独立 HTTPS 读回确认账户／作品 revision 为 `2/1 → 58/57 → 58/57`，重开前后的完整响应相同。《DREAM》的当前与最远页均为 51 且已完成，《HEARTBEAT》的当前与最远页均为 3、未完成，保留来源章序。本轮使用[通用 Native 驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)。本分项未部署产物，不改变静态快照的 `compiled_unverified` 状态；生产和真机另验。
 
 ## Arknights Comics 的 Android 与 iOS 模拟器接力
 
 沿用上节同一隔离 HTTPS / D1、静态快照、产品与测试身份。iPhone 17 Pro / iOS 26.4 专用模拟器信任本轮证书，从正式书架首次续读到 Android 已确认的《HEARTBEAT》第 3 页，显示真实解码帧，再操作一次「下一页」，确认第 4 页。实际 iOS App 的 host、worker、清单与正式构建字节一致。随后独立 Android 进程从书架首次显示第 4 页，不再翻页。
 
-独立 HTTPS 读回确认账户／作品 revision 为 `58/57 → 60/59 → 60/59`。《DREAM》第 51 页的完成状态和两份锚点全程相同；《HEARTBEAT》保留原清单和章序，当前与最远均为第 4 页、未完成。只读检查实际 D1 的三条回执：`58/57` 当前／最远为 `3/3`，`59/58` 为 `4/3`，`60/59` 为 `4/4`，且后两条的当前锚完全相同。两次提交分别确认用户导航和第 4 页真实解码后推进的最远位置；iOS 打开第 3 页没有附带提交。Android 回读前后各路原始响应正文逐字节一致。复验日志、快照与回执见 `.local/arknights-ios-handoff-2c012db.Gp8GbB/` 和上节 Android 证据目录。此分项覆盖同一作品的真实跨端续读，生产 Access、真机和其它 Source 另验。
+独立 HTTPS 读回确认账户／作品 revision 为 `58/57 → 60/59 → 60/59`。《DREAM》第 51 页的完成状态和两份锚点全程相同；《HEARTBEAT》保留原清单和章序，当前与最远均为第 4 页、未完成。只读检查实际 D1 的三条回执：`58/57` 当前／最远为 `3/3`，`59/58` 为 `4/3`，`60/59` 为 `4/4`，且后两条的当前锚完全相同。两次提交分别确认用户导航和第 4 页真实解码后推进的最远位置；iOS 打开第 3 页没有附带提交。Android 回读前后各路原始响应正文逐字节一致。此分项覆盖同一作品的真实跨端续读，生产 Access、真机和其它 Source 另验。
 
 ## CuuTruyen 的 Native 完整章节与跨端续读
 
@@ -292,4 +292,4 @@ Pixel 7 / Android 16 API 36 模拟器在正式界面搜索并收藏《Spy x Fami
 
 独立 API 和实际 D1 回执确认账户／作品 revision 为 `2/1 → 8/7 → 9/8 → 9/8`。第 142 章的第 23 页完成标记及两份锚点保持不变；第 141 章未完成，当前和最远位置均由第 3 页推进到第 4 页。iOS 接力期间只新增一条进度回执，Android 读回前后的 API 原始正文和九条持久回执逐字节一致。
 
-复验使用[通用 Native 阅读驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)。准备阶段在隔离副本传入越南语断言和实际完整标题，保留两次因驱动预期不匹配而停止的记录；最终从空 D1 开始。逐页尺寸、快照、回执与独立 `verify.ts` 见本机忽略目录 `.local/prototype-cuutruyen.vYTzzD/`。本分项未发布单包快照，不提升 `compiled_unverified`；第 141 章剩余页、生产 Access、真机和完整候选另验。
+复验使用[通用 Native 阅读驱动](../../apps/reader/integration_test/README.md#真实-source-完整章跨章和新进程续读)。准备阶段在隔离副本传入越南语断言和实际完整标题，保留两次因驱动预期不匹配而停止的记录；最终从空 D1 开始。本分项未发布单包快照，不提升 `compiled_unverified`；第 141 章剩余页、生产 Access、真机和完整候选另验。

@@ -38,7 +38,7 @@
 
 六次 pages 均返回原 2 页，PageList SHA-256 均为 `cf4df2da1b455de6533e8a3563e764ef414857c49b3f574f27b702bed0665bd4`。所有阶段 store/观察器错误为 0，双端 `passed=true`、`finished=true`。实际流的分块数不同：iOS cold 写 2 次、热读含 EOF 共 3 次；Android 为 3 / 4 次。正文长度、EOF、关闭确认与实际网络流水是验收依据。
 
-完整报告留在该固定树 `.local/native-source-cache/`：
+本轮按平台分别核对以下结果：
 
 | 报告                        | SHA-256                                                            |
 | --------------------------- | ------------------------------------------------------------------ |
@@ -49,30 +49,11 @@
 
 ## 复验入口与首轮问题
 
-临时 Flutter 工程、观察器与 HTTPS 编排均保留在上述 ignored 目录，不作为维护源码。复验需有效且正常受信的 localhost 测试证书、锁定工具链及相同正式构建输入；另用新 App ID / 数据目录并另存报告，避免把已有 Cache 当作 cold。保留的主要命令如下，iOS 与 Android 分别使用 `8924/9449`、`8925/9450`：
+当轮使用受设备信任的 HTTPS、锁定工具链和相同构建输入。每轮启用新的 App ID 和数据目录，区分首次请求与已有 Cache。
 
-```sh
-SOURCE_PROBE_SOURCE_ID=1538249443376436084 \
-SOURCE_PROBE_ALLOWED_HOSTS=xkcd.com,imgs.xkcd.com SOURCE_PROBE_IMAGES=1 \
-SOURCE_PROBE_PORT=8924 SOURCE_PROBE_EVIDENCE=.local/native-source-cache/ios-http.json \
-node .local/network-cache-source/cache-observation/server.ts \
-  .local/network-cache-source/xkcd/manifest.json \
-  .local/network-cache-source/xkcd/artifacts
-SOURCE_GATE_PLATFORM=ios SOURCE_GATE_UPSTREAM=8924 SOURCE_GATE_HTTPS_PORT=9449 \
-node .local/native-source-cache/https.ts
+App 自动执行并将结果写入正式 Application Support 目录；iOS 用 `simctl get_app_container` 定位，Android 用隔离 App 的 `adb exec-out run-as` 读取。完成后正常结束本轮四个服务并移除 `tcp:9450` 映射；本轮已完成这些回收。
 
-# 在 .local/native-source-cache/app/apps/reader 中，固定 Flutter SDK：
-flutter analyze --fatal-infos --no-pub lib/fixture/cache_main.dart
-flutter build ios --simulator --debug --no-codesign --no-pub \
-  --target lib/fixture/cache_main.dart
-flutter build apk --debug --no-pub --target lib/fixture/cache_main.dart
-# 分别正常安装至模拟器；Android 仅映射本轮 HTTPS 端口。
-adb -s emulator-5556 reverse tcp:9450 tcp:9450
-```
-
-App 自动执行并将结果写入正式 Application Support 目录；iOS 用 `simctl get_app_container` 定位，Android 用隔离 App 的 `adb exec-out run-as` 读取。将报告另存为上表文件后，在固定树执行 `node .local/native-source-cache/validate-results.ts`。完成后正常结束本轮四个服务并移除 `tcp:9450` 映射；本轮已完成这些回收。
-
-首轮 iOS 报告 `ios-report-first.json` 保留 `passed=false`：fixture 将初始 archive 操作与重建阶段都标为 `metadata`，错误累计了早先网络流水。其 cold/warm 及重建后真实 store 读取均已完成；修复仅发生在 ignored fixture，改为网络 before/after 增量，并以新 App ID 重跑，未修改产品。Android 首次构建因公开 Maven/Google 依赖的 DNS/TLS 下载失败；之后设置 `GRADLE_USER_HOME` 为既有 `/Users/wybxc/karuyomi/runtime/teavm/.local/gradle`，复用相同官方依赖缓存后构建成功，未修改依赖或 TLS。
+首轮 iOS 报告 `ios-report-first.json` 保留 `passed=false`：fixture 将初始 archive 操作与重建阶段都标为 `metadata`，错误累计了早先网络流水。其 cold/warm 及重建后真实 store 读取均已完成；修复仅发生在 ignored fixture，改为网络 before/after 增量，并以新 App ID 重跑，未修改产品。Android 首次构建因公开 Maven/Google 依赖的 DNS/TLS 下载失败；之后通过 `GRADLE_USER_HOME` 复用相同的官方依赖缓存，构建成功，依赖和 TLS 保持原配置。
 
 本项没有发生 304；store 事件不等于 Java CacheInterceptor 精确计数。只证明原 xkcd 元数据在双端模拟器正式 Native runtime 中的 fresh 正文复用和容器重建保留，没有重启 App/系统进程，没有验收图片 Cache、完整阅读 UI、跨版本/身份切换、真机、生产 Access 或性能。其它 Source 的 Native Cache 仍待独立验收。
 
@@ -87,7 +68,7 @@ App 自动执行并将结果写入正式 Application Support 目录；iOS 用 `s
 
 正文 SHA-256 为 `84b5ec9e298592fae99387773f9c1ee3eb2c80399e0ee83ef93089e0fa4daaae`。D1 提供续读页位；实际章节仍由原 Source 解析，图像请求显示新的运行 generation。独立 `verify-cache.ts` 核对两次不同 PID、退出后无 App 进程、完整中继增量、缓存条目与正文块长度及摘要。两次通过的 XCTest、Worker/夹具类型检查和只读对照脚本的类型检查均通过。早先两次 XCTest 未打开目标章（收藏按钮尚未就绪时滚动、滚动未稳定时点章卡），保留失败日志，未计为 Cache 结果。
 
-复验见 ignored `.local/prototype-native-source-cache-restart.OieLuQ/REPRODUCE.md`。原始中继样本、进程记录与截图在同目录 `evidence/`；`cache-disk-check.json` 的 SHA-256 为 `440fc27164b5d28d3327c8ab7da677bb172c1936f1acf610c91953d99bb634f0`。此项只验收首发六材料的原 xkcd HTML fresh 复用；Android 的独立验收见下节。浏览器进程重启、过期重验证、换版、更多 Source、生产 Access 和真机另验。原图保持 cacheless。
+`cache-disk-check.json` 的 SHA-256 为 `440fc27164b5d28d3327c8ab7da677bb172c1936f1acf610c91953d99bb634f0`。此项只验收首发六材料的原 xkcd HTML fresh 复用；Android 的独立验收见下节。浏览器进程重启、过期重验证、换版、更多 Source、生产 Access 和真机另验。原图保持 cacheless。
 
 ## 2026-11-10：Android 正式 App 强制停止后复用章节正文
 
@@ -101,7 +82,7 @@ Pixel 7 / Android API 36 arm64 模拟器（WebView `133.0.6943.137`）使用同�
 
 两次 HTML 响应的 SHA-256 均为 `84b5ec9e298592fae99387773f9c1ee3eb2c80399e0ee83ef93089e0fa4daaae`。三次 App PID 与 Source generation 各不相同；冷启动两页有实际截图。清除数据的对照表明 D1 仍可提供页位，但不能代替 Source 重新获取章节正文。Android 未直接解码 LevelDB 正文块；证据来自真实中继增量、独立同库对照和正式 App 冷启动。
 
-复验见 ignored `.local/prototype-android-source-cache-restart.H2hyLM/REPRODUCE.md`。正式 APK 构建、验收 Worker 类型检查、独立断言脚本的严格类型检查和三阶段断言均通过；`evidence/cache-restart-check.json` SHA-256 为 `66c73bdd51fb48e35d6f4a22e48aaf9e6557ba2ab6d950c9aa63146edfede2e1`。本项仍不覆盖浏览器进程重启、过期重验证、换版、更多 Source、生产 Access 或真机。
+正式 APK 构建、验收 Worker 类型检查、独立断言脚本的严格类型检查和三阶段断言均通过；`evidence/cache-restart-check.json` SHA-256 为 `66c73bdd51fb48e35d6f4a22e48aaf9e6557ba2ab6d950c9aa63146edfede2e1`。本项仍不覆盖浏览器进程重启、过期重验证、换版、更多 Source、生产 Access 或真机。
 
 ## 2026-11-10：Android 同版本换构建后复用章节正文
 
@@ -114,6 +95,6 @@ Pixel 7 / Android API 36 arm64 模拟器（WebView `133.0.6943.137`）使用同�
 | 明确更新后冷启动续读 | 点「准备并确认更新」只修改安装项的构建、摘要及设置相关版本。新进程首次进入即显示第 2 页文字图，六路状态与确认后相同；主动返回第 1 页后显示原图 | 新 generation 的原图请求一次 200，距旧构建读取章节约 133 秒；目标章节 HTML **零次** |
 | 清除本地数据后的对照 | 仅清除专用模拟器的 App 数据，第三个进程以同一账号读回同章第 1 页；前后六路状态逐字节相同                                                       | 恢复一次无条件 HTML 200，无 `If-None-Match` / `If-Modified-Since`；原图一次 200     |
 
-清除前首次读取与清除后的完整正文均为 7,151 B，SHA-256 同为 `84b5ec9e298592fae99387773f9c1ee3eb2c80399e0ee83ef93089e0fa4daaae`。三次 App PID 和 Source generation 均不同。独立脚本断言静态快照身份、界面页位、六路业务读回和真实中继增量；复验命令、两页截图与审计保留在 ignored `.local/prototype-android-cache-build-update.5NnnxA/REPRODUCE.md` 同目录。报告 `evidence/cache-update-check.json` SHA-256 为 `947f8126f28a5c1437488b30abcf4b3ecffe8f454546c2faa6d706d60145ee6c`，采样与校验脚本通过严格 TypeScript 检查。
+清除前首次读取与清除后的完整正文均为 7,151 B，SHA-256 同为 `84b5ec9e298592fae99387773f9c1ee3eb2c80399e0ee83ef93089e0fa4daaae`。三次 App PID 和 Source generation 均不同。独立脚本断言静态快照身份、界面页位、六路业务读回和真实中继增量；报告 `evidence/cache-update-check.json` SHA-256 为 `947f8126f28a5c1437488b30abcf4b3ecffe8f454546c2faa6d706d60145ee6c`，采样与校验脚本通过严格 TypeScript 检查。
 
 本项只证明 Android 模拟器同上游版本、同 storage schema 换构建后复用未过期的原 xkcd 章节 HTML，原图继续请求网络。未覆盖上游版本或 schema 变化、普通文件、过期重验证、Web / iOS 换版、生产 Access 和真机。

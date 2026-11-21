@@ -24,16 +24,7 @@
 
 在确认没有并发发布器后，紧邻部署执行 `check-base`，再执行 Wrangler deploy。部署成功后运行正式网络政策同步、逐包显式登记，最后查询 D1 核对。匿名验收完成后，正式 `commit-snapshot` 再次读取远端 index/state；本地 state 与候选 build-state 逐字节一致，revision 已前进至上表值。没有手写 checkpoint 或仅凭 Wrangler 成功更新状态。
 
-部署与恢复入口以 [EXTENSIONS](../EXTENSIONS.md#候选部署与-checkpoint) 为准。本次复核命令为：
-
-```sh
-node tools/extensions/pipeline.ts commit-snapshot \
-  --state .local/v4-production/state.json \
-  --assets-dir .local/v4-production/snapshot
-pnpm --filter @karuyomi/api exec wrangler d1 execute DB --remote \
-  --command 'SELECT package_name,build_id,bundle_sha256,status,allowed_hosts_json FROM extension_builds ORDER BY package_name' \
-  --json
-```
+部署与恢复入口以 [EXTENSIONS](../EXTENSIONS.md#候选部署与-checkpoint) 为准。
 
 生产 parent 已前进，旧 v1/v3 冻结候选不能直接部署覆盖当前快照。后续发布必须从已确认的新 checkpoint 规划当前 v4 输入，并继续串行发布；历史批次保留其当时证据。
 
@@ -61,4 +52,4 @@ Codex 内置浏览器的生产 Flutter 首页可加载，进入浏览后实际�
 
 真实登录后仍须核对 protocolVersion 2 的 bootstrap、本人身份、动态 Source HTTP、正式阅读与进度，以及单独的 Access 失效/重新认证恢复门。Native 必须重建正式 `lib/main.dart` 并单独登录 WebView；本次 Web 部署不会更新已安装 App，IAB 会话也不等于 Native 会话。Native 主入口、真机和完整 P0 验收均保持待完成。
 
-计划、候选、checkpoint、构建/部署日志、策略查询、匿名报告及浏览器截图保存在 ignored `.local/v4-production/`。原始 JSON 和临时验收工具不纳入源码。核对后无本轮 pipeline、Wrangler D1、Source probe、workerd 或 TeaCompiler 活动进程；该进程检查不作为性能或资源峰值证据。
+原始 JSON 和临时验收工具不纳入源码。核对后无本轮 pipeline、Wrangler D1、Source probe、workerd 或 TeaCompiler 活动进程；该进程检查不作为性能或资源峰值证据。

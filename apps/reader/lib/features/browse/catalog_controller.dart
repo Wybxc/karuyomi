@@ -161,10 +161,14 @@ final class CatalogSourceRef {
     required this.buildId,
     required this.sourceId,
     required this.generation,
+    required this.sourceName,
+    required this.sourceLang,
   });
   final String buildId;
   final String sourceId;
   final String generation;
+  final String sourceName;
+  final String sourceLang;
 }
 
 final class SourcePreferencesTarget {
@@ -179,12 +183,10 @@ final class OpenedChapter {
     required this.manifest,
     required this.provider,
     required this.generation,
-    required this.title,
   });
   final ChapterManifest manifest;
   final ChapterPageProvider provider;
   final String generation;
-  final String title;
 }
 
 String _readingKey(Object value) =>
@@ -380,6 +382,7 @@ final class CatalogController extends ChangeNotifier {
         )
         .toSet();
     _catalogBuilds.removeWhere((key, _) => !allowed.contains(key));
+    repositoryErrors.removeWhere((key, _) => !allowed.contains(key));
     builds = List.unmodifiable(
       _catalogBuilds.values.expand((values) => values),
     );
@@ -686,8 +689,10 @@ final class CatalogController extends ChangeNotifier {
         );
       } catch (_) {
         if (!current()) return;
-        repositoryErrors[catalogReferenceKey(reference)] =
-            '仓库读取失败；账户选择未改变，可单独重试。';
+        if (isRepositoryRegistered(reference)) {
+          repositoryErrors[catalogReferenceKey(reference)] =
+              '仓库读取失败；账户选择未改变，可单独重试。';
+        }
       }
       if (!current()) return;
     }
@@ -983,6 +988,7 @@ final class CatalogController extends ChangeNotifier {
           RuntimeErrorCode.runtimeLost => _runtimeReconnectMessage,
           RuntimeErrorCode.unsupportedCapability => '这个漫画源功能暂未支持',
           RuntimeErrorCode.integrityError => '构建校验失败，请重新加载',
+          RuntimeErrorCode.extensionAssetUnavailable => '无法从仓库读取扩展材料，请重试',
           RuntimeErrorCode.sourceError => '漫画源请求失败，请重试',
           RuntimeErrorCode.storageBusy => '这个漫画源已在其他标签页或窗口运行，请先关闭后再连接',
           RuntimeErrorCode.protocolError => '漫画源返回的数据与当前版本不兼容',
@@ -1046,6 +1052,7 @@ final class CatalogController extends ChangeNotifier {
       email = null;
       builds = const [];
       _catalogBuilds.clear();
+      repositoryErrors.clear();
       _notify();
       // Confirm the cookie's current identity before attempting old drafts.
       // An old subject's rejected POST must not interrupt the new bootstrap.
@@ -1115,8 +1122,10 @@ final class CatalogController extends ChangeNotifier {
           );
         } catch (_) {
           if (_closed || epoch != _epoch) return;
-          repositoryErrors[catalogReferenceKey(reference)] =
-              '仓库读取失败；安装与业务记录保留。';
+          if (isRepositoryRegistered(reference)) {
+            repositoryErrors[catalogReferenceKey(reference)] =
+                '仓库读取失败；安装与业务记录保留。';
+          }
         }
       }
     });
@@ -1887,6 +1896,8 @@ final class CatalogController extends ChangeNotifier {
       buildId: build.id,
       sourceId: source.id,
       generation: current.generation,
+      sourceName: source.name,
+      sourceLang: source.lang,
     );
   }
 
@@ -2125,7 +2136,6 @@ final class CatalogController extends ChangeNotifier {
         ),
         provider: provider,
         generation: current.generation,
-        title: '${manga.title} · ${chapter.name}',
       );
       _openedChapters.add(opened);
       return opened;

@@ -53,6 +53,7 @@ Bebop 的版本边界也需明确：当前发布仓库的 latest 为 [v3.2.3](ht
 - TypeScript 采用 Protobuf-ES。生成 TS 后正常编译成 ESM 与声明，再供 Node 工具和浏览器使用；不依赖实验性的 erasable syntax，也不启用 ts-nocheck。默认 TS enum 不能直接交给 Node 24 的 strip-types 执行。[生成选项](https://protobufes.com/reference/plugin-options/)
 - Dart 采用 Google `protoc_plugin` / `protobuf`。控制边界使用 `toProto3Json` / `mergeFromProto3Json`，TS 使用 `toJson` / `fromJson`；不能混用 Dart 按字段编号编码的旧 `writeToJson`。[Dart ProtoJSON](https://pub.dev/documentation/protobuf/latest/protobuf/GeneratedMessage/toProto3Json.html)、[旧 JSON 区别](https://pub.dev/documentation/protobuf/latest/protobuf/GeneratedMessage/writeToJson.html)
 - 第一批覆盖 envelope、hello/session/error、Source 请求与结果、Page/image 控制消息，以及 Flutter 实际消费的 API/静态目录 DTO。已有 `operation + args: unknown`、`result: unknown` 要改为有明确类型的消息与 oneof；不能用 Struct/Any 原样搬运弱类型。
+- 扩展静态资产读取失败通过 `EXTENSION_ASSET_UNAVAILABLE` 表达。宿主保留诊断信息与可重试标记，客户端按错误类型显示本地化提示。调用取消沿用原信号。运行容器中断仍由 `RUNTIME_LOST` 表达。[控制协议](../../protocol/karuyomi/v1/control.proto)
 - Worker 使用生成 codec 处理可序列化控制信息。MessagePort / transferable ArrayBuffer 保持独立附件；图片与 HTTP 正文保留现有有界二进制流、ACK、取消和资源所有权，不进入 ProtoJSON 的 bytes 字段，不编码成整图 Base64。
 - 不引入 gRPC、Connect 服务框架或第二个 HTTP transport；当前选择只统一数据合同。以后只有测量证明必要，才在已支持二进制的边界使用同一 schema 的 binary codec。
 - Java 生成模型不放入第一批强制范围。其 protobuf runtime 在 TeaVM 的可达代码和每包 AOT 体积需要单独实测；第一批先在 TS 宿主校验 Java 结果，再转换为生成消息。不能把 JVM 库可用当作 TeaVM 已通过。

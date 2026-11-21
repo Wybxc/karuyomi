@@ -29,7 +29,7 @@ node tools/teavm/check-text-layout.ts
 
 Android runner继续固定 Robolectric4.17/API35/NATIVE、SDK与产物SHA，清理生成src/target后复制共同场景，断言原Android框架及native shadows；没有seed、owned Android替身或AWT。
 
-浏览器gate用正式prepareSources/compileExtension生成owned class覆盖的TeaVM0.16 JS，将测试POM mainClass设为BitmapLifetimeProbe；拼接正式compileBridge('graphics')产物、该Java入口JS与对应严格TS driver，在Worker执行。临时Maven工程、HTTP server及报告留在ignored .local/bitmap-lifetime{,-java}/，不将临时工程作为维护源码。测试不改官方扩展JAR。
+浏览器gate用正式prepareSources/compileExtension生成owned class覆盖的TeaVM0.16 JS，将测试POM mainClass设为BitmapLifetimeProbe；拼接正式compileBridge('graphics')产物、该Java入口JS与对应严格TS driver，在Worker执行。测试不改官方扩展JAR。
 
 ## 实测状态
 

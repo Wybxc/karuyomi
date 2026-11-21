@@ -50,17 +50,7 @@
 
 ## 复验入口与证据
 
-从冻结树运行，使用 `.node-version` 固定的 Node 24.15.0；依赖和构建入口见 [扩展构建说明](../EXTENSIONS.md)。本次完整计划及三包输出位于 ignored `.local/cache-v3-source/`，目录各含 `manifest.json`、唯一 `artifacts/<canonicalSHA>.gz`、provenance、构建和完整性报告。
-
-```sh
-SOURCE_PROBE_SOURCE_ID=1538249443376436084 \
-SOURCE_PROBE_ALLOWED_HOSTS=xkcd.com,imgs.xkcd.com \
-SOURCE_PROBE_IMAGES=1 SOURCE_PROBE_PORT=8897 \
-SOURCE_PROBE_EVIDENCE=.local/cache-v3-source/online/xkcd.json \
-node apps/api/test/source-metadata-probe.ts \
-  .local/cache-v3-source/xkcd/manifest.json \
-  .local/cache-v3-source/xkcd/artifacts
-```
+从冻结树运行，使用 `.node-version` 固定的 Node 24.15.0；依赖和构建入口见 [扩展构建说明](../EXTENSIONS.md)。当次三份交付分别核对了清单、gzip、provenance 和完整性报告。
 
 在内置浏览器打开输出的 loopback URL，点击 `Run real metadata operations`。另外两源使用相同入口与各自目录/报告：
 
@@ -81,6 +71,6 @@ ignored `build-summary.json` 保存完整 input/source 指纹、gzip 摘要与�
 
 关闭标签页后重新打开相同 origin，从详情“继续阅读”恢复 `3318` 的末页 current/furthest/completed，界面显示 `2 / 2`、本地进度已保存、本章已读完。但首次恢复的内容区域为空黑，等待后仍未显示；无 console warning/error。点击上一页显示直图，再下一页文字图正常。故本轮**持久状态恢复分项成立，首次恢复视觉门失败**，整轮 UI 报告保持 `passed:false`，不能用翻页后的成功覆盖初始失败。
 
-主树 ignored `.local/cache-v3-reader/` 保存 `xkcd-ui-report.json`、两章完成截图 `xkcd-{completed,next-completed}.png` 与首次空黑恢复图 `xkcd-restored.png`；冻结树 `online/xkcd-reader.json` 保留脱敏真实网络流水。完整浏览器进程重启、该视觉缺陷修复与后续材料仍需独立复验。
+冻结树 `online/xkcd-reader.json` 保留脱敏真实网络流水。完整浏览器进程重启、该视觉缺陷修复与后续材料仍需独立复验。
 
 本记录不提升流水线的 `compiled_unverified/runtimeReady=false` 状态，不替代生产、Native 或设备资源验收。

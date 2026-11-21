@@ -20,6 +20,6 @@
 
 ## 复验与范围
 
-本机忽略目录 `.local/ios-arknights-reader-baseline-2c012db.oOf5Bd/` 的 `REPRODUCE.md` 保存固定输入和命令。用正式 `bookmarks_sync_test.dart` 在新隔离 D1 安装并收藏，再通过 `run-ios.sh capture` 用相同材料、`READER_BASELINE=true` 和固定 `BASELINE_REVISION` 运行忽略目录里的驱动。驱动以正式面板开始、停止并复制报告，通过 Native Clipboard 读回原始 JSON；测试停止采集后将正文和 RSS 样本打包到编号日志，`extract.ts` 检查连续序号、原始报文 SHA-256 及事件数，再以 `summarize.ts` 派生指标。`evidence/` 保留原始 `baseline.json`、`probe.json`、`summary.json` 和完整日志。第一次流程虽通过，但 Flutter runner 退出时删除应用临时目录，原始报告未提取；该轮日志留在 `evidence-first-run/`，不计作有效采集。两轮服务和专用模拟器已清理，临时 TLS 私钥已删除。
+用正式 `bookmarks_sync_test.dart` 在新隔离 D1 安装并收藏，再用相同材料、`READER_BASELINE=true` 和固定 `BASELINE_REVISION` 运行当轮采集驱动。驱动以正式面板开始、停止并复制报告，通过 Native Clipboard 读回原始 JSON；测试停止采集后将正文和 RSS 样本打包到编号日志，`extract.ts` 检查连续序号、原始报文 SHA-256 及事件数，再以 `summarize.ts` 派生指标。`evidence/` 保留原始 `baseline.json`、`probe.json`、`summary.json` 和完整日志。第一次流程虽通过，但 Flutter runner 退出时删除应用临时目录，原始报告未提取；该轮日志留在 `evidence-first-run/`，不计作有效采集。两轮服务和专用模拟器已清理，临时 TLS 私钥已删除。
 
 这是一份单轮模拟器 debug 采集，翻页序列是六个不同目标页。真机 profile/release、同条件冷热重复分布、长图与其它格式、实际帧呈现以及 App/WebContent/GPU 合计峰值仍待实测，不据此决定解码、预取或分片优化。

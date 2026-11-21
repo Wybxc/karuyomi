@@ -17,7 +17,7 @@ ACCEPTANCE_SOURCE_POLICIES='[{"packageName":"eu.kanade.tachiyomi.extension.all.x
 pnpm acceptance:serve
 ```
 
-使用命令打印的实际 URL 和 `acceptance-owner` 测试身份；端口不是固定配置。本轮先完成完整 acceptance 构建，再为日志转发重建 runtime-host、带四包快照的 API 与 acceptance 输出，复用前一步的 Flutter Web 输出。实际构建日志为 `.local/source-stage-build.log`、`.local/source-stage-assets-build.log`、`.local/source-relay-build.log`；这里只记录已执行的构建，不声明尚未运行的新 Java trace 或后续全库检查通过。
+使用命令打印的实际 URL 和 `acceptance-owner` 测试身份；端口不是固定配置。本轮先完成完整 acceptance 构建，再为日志转发重建 runtime-host、带四包快照的 API 与 acceptance 输出，复用前一步的 Flutter Web 输出。这里只记录已执行的构建，不声明尚未运行的新 Java trace 或后续全库检查通过。
 
 诊断由实际加载后的缓存 API 包装与 HTTP 传输阶段产生，经 Worker、当前代 manager 转发到页面 console。只记录白名单操作、阶段、requestId / generation、随机 handle、长度与计数；不输出 Source 请求参数、URL、请求头、Cookie、正文、缓存键或原异常堆栈。转发严格解析并核 generation，日志 sink 失败不改变 Source 调用结果；原控制响应、取消、队列与默认 deadline 保持原合同。
 

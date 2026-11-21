@@ -51,6 +51,61 @@ BusinessStateClient client(
 );
 
 void main() {
+  test('an initial shelf read waits for its response while another manga read publishes', () async {
+    final server = TestBusinessServer();
+    final current = client(server);
+    final remote = client(server);
+    addTearDown(current.dispose);
+    addTearDown(remote.dispose);
+    final library = LibraryRepository(current);
+    await favorite(library);
+    final initial = (await library.watchEntries().first).single;
+    await favorite(
+      LibraryRepository(remote),
+      value: manga(title: 'Second', url: '/manga/second'),
+    );
+    final received = Completer<void>();
+    final release = Completer<void>();
+    server.beforeRequest = (request) async {
+      if (request.method == 'GET' && request.uri.path == '/api/library') {
+        if (!received.isCompleted) received.complete();
+        await release.future;
+      }
+      return null;
+    };
+    var completed = false;
+    final reading = library.watchEntries().first.then((entries) {
+      completed = true;
+      return entries;
+    });
+    try {
+      await received.future.timeout(const Duration(seconds: 5));
+      await current
+          .readManga(initial.mangaKey)
+          .timeout(const Duration(seconds: 5));
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        completed,
+        isFalse,
+        reason:
+            'a confirmed manga event cannot complete the pending shelf read',
+      );
+    } finally {
+      release.complete();
+      server.beforeRequest = null;
+    }
+    final entries = await reading;
+    expect(
+      entries.map((entry) => entry.title),
+      containsAll(['Original', 'Second']),
+    );
+    expect(entries, hasLength(2));
+    expect(
+      server.requests.where((request) => request.method == 'POST'),
+      hasLength(2),
+    );
+  });
+
   test('a second device reads a confirmed full Source snapshot', () async {
     final now = DateTime.utc(2026, 11, 5, 9, 10, 11);
     final server = TestBusinessServer(now: () => now);

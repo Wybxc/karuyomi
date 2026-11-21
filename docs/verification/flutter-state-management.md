@@ -32,7 +32,7 @@ pnpm flutter:check --concurrency=1 --reporter=expanded
 
 该链路中 KaruyomiApp 始终只构建一次；CatalogPage 和 SourceDirectory 各构建两次，其中各重建一次，GlobalSettingsPanel 构建一次。回调仅用于测试，结束时恢复原回调，没有进入生产路径。该观测属于组件 debug 行为，不能代表真实设备性能，也没有改动前的同口径构建计数可用于宣称降幅。
 
-原始输出和计数留在 ignored `.local/flutter-state-refactor/`。以上工程结果不代表生产 Access 或真机通过；实际 Web 证据单列如下。
+以上工程结果不代表生产 Access 或真机通过；实际 Web 证据单列如下。
 
 ## CI 构建与真实 Web 主流程
 
@@ -50,7 +50,7 @@ pnpm flutter:check --concurrency=1 --reporter=expanded
 
 本轮精确扩展构建为 `ext-all.xkcd-6fbce1478d2c16bf8f688f9e4bb711b0-d4c7fd8c83a3c5cdd43cb9de2a2a1ebcbbbb793e711794b4dfc13fbb21a60536`。抽样验收不改变其它扩展的 `compiled_unverified` / `runtimeReady=false` 声明。未执行“读完本章”，不将该操作算作本轮通过项。
 
-截图、AX 和独立 API 读回保留在 ignored `.local/flutter-state-refactor/`：`web-evidence/page-1.jpg`、`web-evidence/resume-page-2.jpg`、`web-progress-resumed.json` 及 `web-manga-{overridden,inherited}.json`。验收结束后正常关闭 harness 并释放端口。
+验收结束后正常关闭 harness 并释放端口。
 
 ## 交付与剩余门槛
 

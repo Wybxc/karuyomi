@@ -7,13 +7,16 @@ import 'dart:convert';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/business_state_validation.dart';
 import 'package:karuyomi/data/settings_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
+import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -93,16 +96,31 @@ void main() {
     return value;
   }
 
-  Future<void> show(WidgetTester tester) async {
-    await tester.binding.setSurfaceSize(const Size(480, 800));
+  Future<void> show(
+    WidgetTester tester, {
+    Brightness? appearance,
+    Size size = const Size(480, 800),
+    double textScale = 1,
+    PageStorageBucket? pageStorage,
+  }) async {
+    await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpApp(
       CupertinoApp(
+        theme: appearance == null ? null : readerAppTheme(appearance),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: CupertinoPageScaffold(
-          child: CatalogPage(
-            controller: catalog,
-            onConnect: () {},
-            onAuthenticate: () {},
+          child: PageStorage(
+            bucket: pageStorage ?? PageStorageBucket(),
+            child: CatalogPage(
+              controller: catalog,
+              onConnect: () {},
+              onAuthenticate: () {},
+            ),
           ),
         ),
       ),
@@ -118,7 +136,7 @@ void main() {
   Future<void> reveal(WidgetTester tester, Finder finder) async {
     final scrollable = find
         .descendant(
-          of: find.byType(ListView).first,
+          of: find.byKey(const PageStorageKey('source-directory-scroll')),
           matching: find.byType(Scrollable),
         )
         .first;
@@ -156,6 +174,83 @@ void main() {
       )
       .toList();
 
+  for (final appearance in Brightness.values) {
+    testWidgets(
+      'directory opening and favorite actions are separate keyboard targets in $appearance',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          await show(
+            tester,
+            appearance: appearance,
+            size: const Size(360, 800),
+          );
+          final source = open('eu.kanade.source.test');
+          final sourceNode = tester.getSemantics(source);
+          for (
+            var parent = tester.getSemantics(toggle()).parent;
+            parent != null;
+            parent = parent.parent
+          ) {
+            expect(
+              parent.id,
+              isNot(sourceNode.id),
+              reason:
+                  'the favorite action must not be nested in the open action',
+            );
+          }
+          CupertinoButton? focusedButton() => FocusManager
+              .instance
+              .primaryFocus
+              ?.context
+              ?.findAncestorWidgetOfExactType<CupertinoButton>();
+          for (
+            var attempt = 0;
+            attempt < 16 &&
+                focusedButton()?.key != toggle().evaluate().single.widget.key;
+            attempt++
+          ) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.pump();
+          }
+          expect(focusedButton(), tester.widget<CupertinoButton>(toggle()));
+          await tester.sendKeyEvent(LogicalKeyboardKey.space);
+          await tester.pumpAndSettle();
+          expect(platform.openedBuilds, isEmpty);
+          expect(posts(), hasLength(1));
+          expect(
+            (await remoteSettings.loadGlobal())
+                .global
+                .favoriteSources
+                .single
+                .sourceId,
+            sourceId,
+          );
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.pump();
+          expect(
+            find.descendant(
+              of: find.byWidget(focusedButton()!),
+              matching: source,
+            ),
+            findsOneWidget,
+          );
+          await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+          await tester.pumpAndSettle();
+          expect(platform.openedBuilds, ['build-1']);
+          expect(catalog.activeSource!.id, sourceId);
+          expect(posts(), hasLength(1));
+          expect(tester.takeException(), isNull);
+          await hide(tester);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
+
   testWidgets(
     'stars wait for account ACK and preserve all other global settings',
     (tester) async {
@@ -180,7 +275,15 @@ void main() {
         () => entered.future.timeout(const Duration(seconds: 5)),
       );
       expect(catalog.installationSettings!.global.favoriteSources, isEmpty);
-      expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(SettingsStatus),
+          matching: find.byType(CupertinoActivityIndicator),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('正在等待服务端确认设置修改'), findsOneWidget);
+      expect(toggle(), findsNothing);
       final command = wire.decodeProtoJson(
         wire.SettingsMutation(),
         jsonDecode(posts().last.body!),
@@ -189,6 +292,7 @@ void main() {
       expect(command.setGlobal.theme, original.theme);
       release.complete();
       await tester.pumpAndSettle();
+      expect(find.text('正在等待服务端确认设置修改'), findsNothing);
       expect(
         tester.widget<CupertinoButton>(toggle()).child,
         isA<Icon>().having(
@@ -315,7 +419,10 @@ void main() {
       subscription.close();
       await show(tester);
       expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
+      expect(find.textContaining('应用主题：深色'), findsNothing);
+      await tap(tester, find.text('查看未确认的原全局设置'));
       expect(find.textContaining('应用主题：深色'), findsOneWidget);
+      await reveal(tester, toggle());
       expect(tester.widget<CupertinoButton>(toggle()).onPressed, isNull);
       await tap(tester, find.text('重新读取设置'));
       expect(posts(), hasLength(1));
@@ -332,6 +439,103 @@ void main() {
       await hide(tester);
     },
   );
+
+  for (final appearance in Brightness.values) {
+    for (final expanded in [false, true]) {
+      testWidgets(
+        'source recovery keeps scroll storage separate in $appearance when expanded=$expanded',
+        (tester) async {
+          final bucket = PageStorageBucket();
+          await seed(_values(favorites: [_favorite()]));
+          await show(tester, appearance: appearance, pageStorage: bucket);
+          platform.businessServer.loseNextResponse = true;
+          await tap(tester, toggle());
+          final original = posts().last.body;
+          final postCount = posts().length;
+          final applied = platform.businessServer.appliedMutations;
+          await tap(tester, find.text('查看未确认的原全局设置'));
+          if (!expanded) {
+            await tap(tester, find.text('查看未确认的原全局设置'));
+          }
+          await hide(tester);
+          await show(tester, appearance: appearance, pageStorage: bucket);
+          expect(tester.takeException(), isNull);
+          expect(find.text('取消收藏源：旧来源名称'), findsOneWidget);
+          expect(
+            find.textContaining('应用主题：'),
+            expanded ? findsOneWidget : findsNothing,
+          );
+          expect(posts(), hasLength(postCount));
+          await tap(tester, find.text('重试原设置操作'));
+          expect(posts(), hasLength(postCount + 1));
+          expect(posts().last.body, original);
+          expect(platform.businessServer.appliedMutations, applied);
+          expect(catalog.settings!.pendingGlobal(), isNull);
+          await hide(tester);
+          await show(
+            tester,
+            appearance: appearance == Brightness.light
+                ? Brightness.dark
+                : Brightness.light,
+            pageStorage: bucket,
+          );
+          expect(tester.takeException(), isNull);
+          expect(toggle(), findsOneWidget);
+          expect(posts(), hasLength(postCount + 1));
+          await hide(tester);
+        },
+      );
+    }
+
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'pending source cancellation keeps its original object and natural insets in $appearance at $textScale',
+        (tester) async {
+          await seed(_values(favorites: [_favorite()]));
+          await show(
+            tester,
+            appearance: appearance,
+            size: const Size(360, 800),
+            textScale: textScale,
+          );
+          platform.businessServer.loseNextResponse = true;
+          await tap(tester, toggle());
+          final original = posts().last.body;
+          final postCount = posts().length;
+          final applied = platform.businessServer.appliedMutations;
+          final error = find.text('设置修改尚未确认，请明确重试原操作。');
+          expect(tester.getTopLeft(error).dx, greaterThanOrEqualTo(16));
+          expect(tester.getBottomRight(error).dx, lessThanOrEqualTo(344));
+          expect(find.text('取消收藏源：旧来源名称'), findsOneWidget);
+          expect(find.textContaining('应用主题：'), findsNothing);
+          await tap(tester, find.text('重新读取设置'));
+          expect(posts(), hasLength(postCount));
+          expect(find.text('取消收藏源：旧来源名称'), findsOneWidget);
+          await hide(tester);
+          await show(
+            tester,
+            appearance: appearance,
+            size: const Size(360, 800),
+            textScale: textScale,
+          );
+          expect(find.text('取消收藏源：旧来源名称'), findsOneWidget);
+          await tap(tester, find.text('查看未确认的原全局设置'));
+          expect(find.textContaining('应用主题：深色'), findsOneWidget);
+          await tap(tester, find.text('重试原设置操作'));
+          expect(posts(), hasLength(postCount + 1));
+          expect(posts().last.body, original);
+          expect(platform.businessServer.appliedMutations, applied);
+          expect(catalog.settings!.pendingGlobal(), isNull);
+          expect(
+            (await remoteSettings.loadGlobal()).global.favoriteSources,
+            isEmpty,
+          );
+          expect(tester.takeException(), isNull);
+          await hide(tester);
+        },
+      );
+    }
+  }
 
   testWidgets(
     'conflicts require a fresh read and changed identity discards old favorites',
@@ -352,6 +556,40 @@ void main() {
       expect(catalog.subject, 'another-owner');
       expect(open('remote.extension'), findsNothing);
       expect(posts(), hasLength(before));
+      expect(tester.takeException(), isNull);
+      await hide(tester);
+    },
+  );
+
+  testWidgets(
+    'frozen account operation remains identifiable from the source directory',
+    (tester) async {
+      final repository = catalog.settings!;
+      final provider = settingsControllerProvider(catalog, repository);
+      final subscription = container.listen(provider, (_, _) {});
+      final editor = container.read(provider.notifier);
+      expect(await editor.refresh(), true);
+      final before = container.read(provider).snapshot!;
+      final values = before.global.deepCopy()..installedExtensions.clear();
+      platform.businessServer.loseNextResponse = true;
+      expect(await editor.saveGlobal(values, before.globalRevision), false);
+      final original = posts().single.body;
+      final applied = platform.businessServer.appliedMutations;
+      subscription.close();
+      await show(tester);
+      expect(find.textContaining('卸载扩展：'), findsOneWidget);
+      expect(find.textContaining('eu.kanade.source.test'), findsWidgets);
+      await tap(tester, find.text('重新读取设置'));
+      await hide(tester);
+      await show(tester);
+      expect(find.textContaining('卸载扩展：'), findsOneWidget);
+      await tap(tester, find.text('查看未确认的原全局设置'));
+      expect(find.textContaining('扩展安装选择：空列表'), findsOneWidget);
+      expect(posts(), hasLength(1));
+      await tap(tester, find.text('重试原设置操作'));
+      expect(posts(), hasLength(2));
+      expect(posts().last.body, original);
+      expect(platform.businessServer.appliedMutations, applied);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },

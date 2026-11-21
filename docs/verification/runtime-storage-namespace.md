@@ -49,7 +49,7 @@ pnpm check:dependencies
 
 维护代码为上述 runner、`packages/runtime-host/test/storage-namespace-browser-suite.ts` 与 `fixtures/storage-namespace-host.ts`；两浏览器输入已纳入严格检查。静态服务直接使用锁定的 sirv，有限 gzip 夹具走标准 Node 原样字节响应；无新增通用工具包装、配额层或生产预算变更。39/14 组保持独立入口，本门没有把它们重新计入 11 组。
 
-成功原报保留在忽略的 `.local/runtime-storage/browser-manager-combined-passed.json`。实际服务字节摘要：
+实际服务字节摘要：
 
 | 输入                        | SHA-256                                                            |
 | --------------------------- | ------------------------------------------------------------------ |

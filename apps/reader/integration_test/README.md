@@ -65,9 +65,10 @@ Android 的 WebView 与 Dart HTTP 客户端分别维护证书信任；上面的 
 在 `apps/reader` 使用固定 SDK 运行：
 
 ```sh
+: "${PHASE_JSON:?请设置本阶段生成的 JSON 配置文件的绝对路径}"
 flutter test integration_test/settings_sync_test.dart --no-pub \
   -d DEVICE_ID \
-  --dart-define-from-file=/absolute/path/.local/settings-native/phase.json \
+  --dart-define-from-file="$PHASE_JSON" \
   --reporter expanded
 ```
 
@@ -110,9 +111,10 @@ flutter test integration_test/settings_sync_test.dart --no-pub \
 在 `apps/reader` 使用固定 SDK：
 
 ```sh
+: "${PHASE_JSON:?请设置本阶段生成的 JSON 配置文件的绝对路径}"
 flutter test integration_test/bookmarks_sync_test.dart --no-pub \
   -d DEVICE_ID \
-  --dart-define-from-file=/absolute/path/.local/bookmarks-native/phase.json \
+  --dart-define-from-file="$PHASE_JSON" \
   --reporter expanded
 ```
 

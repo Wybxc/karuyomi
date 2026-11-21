@@ -5,6 +5,7 @@ import '../test_app.dart';
 import 'dart:async';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/business_state_validation.dart';
@@ -13,6 +14,8 @@ import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/extensions/extensions_controller.dart';
 import 'package:karuyomi/features/extensions/extensions_page.dart';
 import 'package:karuyomi/runtime/catalog_transport.dart';
+import 'package:karuyomi/theme/app_theme.dart';
+import 'package:karuyomi/widgets/edit_sheet.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -110,6 +113,374 @@ void main() {
     await manager.addRepository(preview!);
     expect(manager.error, isNull);
     return catalog.builds.singleWhere((build) => build.catalogUrl == extraUrl);
+  }
+
+  Future<void> showRepositoryPage(
+    WidgetTester tester,
+    Brightness appearance,
+    double textScale, {
+    Size viewport = const Size(360, 800),
+  }) async {
+    await tester.binding.setSurfaceSize(viewport);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpApp(
+      CupertinoApp(
+        theme: readerAppTheme(appearance),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+        home: ExtensionRepositoriesPage(controller: manager),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  for (final appearance in Brightness.values) {
+    for (final (viewport, keyboardHeight) in [
+      (const Size(844, 390), 234.0),
+      (const Size(320, 560), 310.0),
+    ]) {
+      testWidgets(
+        'repository fields and preview stay reachable with the keyboard in $appearance at $viewport',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = viewport;
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetViewInsets);
+          await showRepositoryPage(tester, appearance, 2, viewport: viewport);
+          final add = find.byKey(const ValueKey('repositories-add'));
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+
+          final address = find.byKey(const ValueKey('repository-url'));
+          final name = find.byKey(const ValueKey('repository-name'));
+          final preview = find.byKey(
+            const ValueKey('repository-preview-submit'),
+          );
+          final cancel = find.text('取消');
+          await tester.ensureVisible(address);
+          await tester.pumpAndSettle();
+          await tester.enterText(address, 'https://community.example');
+          tester.view.viewInsets = FakeViewPadding(bottom: keyboardHeight);
+          await tester.pumpAndSettle();
+
+          void expectTopActions() {
+            for (final action in [cancel, preview]) {
+              expect(action.hitTestable(), findsOneWidget);
+              expect(
+                tester.getBottomLeft(action).dy,
+                lessThan(viewport.height - keyboardHeight),
+              );
+            }
+          }
+
+          expectTopActions();
+          expect(address.hitTestable(), findsOneWidget);
+          await tester.ensureVisible(name);
+          await tester.pumpAndSettle();
+          expect(name.hitTestable(), findsOneWidget);
+          await tester.enterText(name, '社区');
+          expectTopActions();
+
+          await tester.tap(preview);
+          tester.view.resetViewInsets();
+          await tester.pumpAndSettle();
+          expect(find.text('确认添加仓库'), findsOneWidget);
+          expect(find.textContaining('社区'), findsOneWidget);
+          expect(posts(), isEmpty);
+          expect(platform.preparations, isEmpty);
+          await tester.tap(cancel);
+          await tester.pumpAndSettle();
+          expect(find.byType(ExtensionRepositoriesPage), findsOneWidget);
+          expect(posts(), isEmpty);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'repository preview failure keeps its draft for retry in $appearance',
+      (tester) async {
+        const address = 'https://community.example';
+        const name = '测试仓库';
+        const error = '仓库暂时无法读取';
+        await showRepositoryPage(tester, appearance, 2);
+        platform.beforeApiFetch = (path) async {
+          if (path == '/extensions/index.json') throw StateError(error);
+        };
+        final urlField = find.byKey(const ValueKey('repository-url'));
+        final nameField = find.byKey(const ValueKey('repository-name'));
+        final submit = find.byKey(const ValueKey('repository-preview-submit'));
+        await tester.tap(find.byKey(const ValueKey('repositories-add')));
+        await tester.pumpAndSettle();
+        await tester.enterText(urlField, address);
+        await tester.enterText(nameField, name);
+        await tester.tap(submit);
+        await tester.pumpAndSettle();
+
+        final sheet = find.byType(EditSheet);
+        expect(
+          find.descendant(of: sheet, matching: find.text(error)),
+          findsOneWidget,
+        );
+        expect(
+          tester.widget<CupertinoTextField>(urlField).controller!.text,
+          address,
+        );
+        expect(
+          tester.widget<CupertinoTextField>(nameField).controller!.text,
+          name,
+        );
+        expect(posts(), isEmpty);
+        expect(platform.preparations, isEmpty);
+
+        platform.beforeApiFetch = null;
+        await tester.tap(submit);
+        await tester.pumpAndSettle();
+        expect(find.text('确认添加仓库'), findsOneWidget);
+        expect(find.textContaining(name), findsOneWidget);
+        await tester.tap(find.text('取消'));
+        await tester.pumpAndSettle();
+        expect(posts(), isEmpty);
+        expect(platform.preparations, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'public repository preview keeps its target and remains read only in $appearance at $textScale',
+        (tester) async {
+          const name = '准备预览的原社区仓库：完整名称与地址应在读取时继续可见';
+          final entered = Completer<void>();
+          final release = Completer<void>();
+          addTearDown(() {
+            if (!release.isCompleted) release.complete();
+          });
+          await showRepositoryPage(tester, appearance, textScale);
+          platform.beforeApiFetch = (path) async {
+            if (path == '/extensions/index.json') {
+              if (!entered.isCompleted) entered.complete();
+              await release.future;
+            }
+          };
+          await tester.tap(find.byKey(const ValueKey('repositories-add')));
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byKey(const ValueKey('repository-url')),
+            'https://community.example',
+          );
+          await tester.enterText(
+            find.byKey(const ValueKey('repository-name')),
+            name,
+          );
+          await tester.tap(
+            find.byKey(const ValueKey('repository-preview-submit')),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.pump(const Duration(milliseconds: 400));
+          await entered.future.timeout(const Duration(seconds: 5));
+          try {
+            expect(find.text('正在预览仓库'), findsOneWidget);
+            expect(find.text(name), findsOneWidget);
+            expect(find.text(extraUrl), findsOneWidget);
+            expect(
+              DefaultTextStyle.of(tester.element(find.text(name))).maxLines,
+              isNull,
+            );
+            expect(
+              DefaultTextStyle.of(tester.element(find.text(extraUrl))).maxLines,
+              isNull,
+            );
+            expect(posts(), isEmpty);
+            expect(platform.preparations, isEmpty);
+            expect(
+              tester
+                  .widget<CupertinoButton>(
+                    find.byKey(const ValueKey('repositories-add')),
+                  )
+                  .onPressed,
+              isNull,
+            );
+            expect(tester.takeException(), isNull);
+          } finally {
+            if (!release.isCompleted) release.complete();
+            await tester.pumpAndSettle();
+          }
+          expect(find.text('确认添加仓库'), findsOneWidget);
+          await tester.tap(find.text('取消'));
+          await tester.pumpAndSettle();
+          expect(posts(), isEmpty);
+        },
+      );
+
+      testWidgets(
+        'repository save keeps its original target before its ACK in $appearance at $textScale',
+        (tester) async {
+          const name = '提交中的社区仓库';
+          final preview = (await manager.previewRepository(extraUrl, name))!;
+          await showRepositoryPage(tester, appearance, textScale);
+          final entered = Completer<void>();
+          final release = Completer<void>();
+          addTearDown(() {
+            if (!release.isCompleted) release.complete();
+          });
+          platform.afterBusinessReply = (request, reply) async {
+            if (request.method == 'POST' &&
+                request.uri.path == '/api/settings/mutations') {
+              if (!entered.isCompleted) entered.complete();
+              await release.future;
+            }
+            return reply;
+          };
+          final saving = manager.addRepository(preview);
+          await entered.future.timeout(const Duration(seconds: 5));
+          await tester.pump();
+          try {
+            expect(find.text('正在保存账户选择，等待确认'), findsOneWidget);
+            expect(find.text(name), findsOneWidget);
+            expect(find.text(extraUrl), findsOneWidget);
+            expect(manager.settings.snapshot!.global.repositories, isEmpty);
+            expect(find.textContaining('结果待确认'), findsNothing);
+            expect(posts(), hasLength(1));
+            expect(tester.takeException(), isNull);
+          } finally {
+            if (!release.isCompleted) release.complete();
+            await saving;
+            await tester.pumpAndSettle();
+          }
+          expect(
+            manager.settings.snapshot!.global.repositories.single.name,
+            name,
+          );
+          expect(posts(), hasLength(1));
+        },
+      );
+
+      testWidgets(
+        'confirmed repository refresh does not return to waiting for a write in $appearance at $textScale',
+        (tester) async {
+          final preview = (await manager.previewRepository(extraUrl, '社区'))!;
+          await showRepositoryPage(tester, appearance, textScale);
+          final entered = Completer<void>();
+          final release = Completer<void>();
+          addTearDown(() {
+            if (!release.isCompleted) release.complete();
+          });
+          platform.beforeApiFetch = (path) async {
+            if (path == '/extensions/index.json') {
+              if (!entered.isCompleted) entered.complete();
+              await release.future;
+            }
+          };
+          final saving = manager.addRepository(preview);
+          await entered.future.timeout(const Duration(seconds: 5));
+          await tester.pump();
+          try {
+            expect(manager.settings.pending, isNull);
+            expect(
+              manager.settings.snapshot!.global.repositories,
+              hasLength(1),
+            );
+            expect(find.text('正在保存账户选择，等待确认'), findsNothing);
+            expect(find.text('正在读取账户、目录与本机副本'), findsOneWidget);
+            expect(posts(), hasLength(1));
+            expect(tester.takeException(), isNull);
+          } finally {
+            if (!release.isCompleted) release.complete();
+            await saving;
+            await tester.pumpAndSettle();
+          }
+          expect(posts(), hasLength(1));
+          expect(platform.businessServer.appliedMutations, 1);
+        },
+      );
+    }
+  }
+
+  for (final appearance in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      for (final adding in [false, true]) {
+        testWidgets(
+          'frozen account operation preserves the repository name and submitted list in $appearance at $textScale adding=$adding',
+          (tester) async {
+            const name = '原社区仓库的完整名称：漫画与图像来源；离开页面再返回也须保留原操作对象';
+            final preview = await manager.previewRepository(extraUrl, name);
+            expect(preview, isNotNull);
+            if (!adding) await manager.addRepository(preview!);
+            platform.businessServer.loseNextResponse = true;
+            if (adding) {
+              await manager.addRepository(preview!);
+            } else {
+              await manager.removeRepository(
+                manager.settings.snapshot!.global.repositories.single,
+              );
+            }
+            final original = posts().last.body;
+            final count = posts().length;
+            final applied = platform.businessServer.appliedMutations;
+            Future<void> showRepository() async {
+              await tester.binding.setSurfaceSize(const Size(360, 800));
+              await tester.pumpApp(
+                CupertinoApp(
+                  theme: readerAppTheme(appearance),
+                  builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(context)
+                        .copyWith(textScaler: TextScaler.linear(textScale)),
+                    child: child!,
+                  ),
+                  home: ExtensionRepositoriesPage(controller: manager),
+                ),
+              );
+              await tester.pumpAndSettle();
+            }
+
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final action = '${adding ? '添加' : '移除'}仓库：$name';
+            await showRepository();
+            expect(find.text(action), findsOneWidget);
+            await manager.refresh(catalogToo: true);
+            await tester.pumpAndSettle();
+            expect(
+              manager.settings.snapshot!.global.repositories,
+              hasLength(adding ? 1 : 0),
+            );
+            expect(find.text(action), findsOneWidget);
+            await tester.pumpApp(const SizedBox.shrink());
+            await tester.pumpAndSettle();
+            await showRepository();
+            expect(find.text(action), findsOneWidget);
+            expect(posts(), hasLength(count));
+            final expand = find.text('查看未确认的原操作');
+            await tester.ensureVisible(expand);
+            await tester.tap(expand);
+            await tester.pumpAndSettle();
+            expect(
+              find.textContaining(adding ? '额外仓库：$name' : '额外仓库：空列表'),
+              findsOneWidget,
+            );
+            if (adding) expect(find.textContaining(extraUrl), findsWidgets);
+            final retry = find.text('重试原设置操作');
+            await tester.ensureVisible(retry);
+            await tester.tap(retry);
+            await tester.pumpAndSettle();
+            expect(posts(), hasLength(count + 1));
+            expect(posts().last.body, original);
+            expect(platform.businessServer.appliedMutations, applied);
+            expect(find.text(action), findsNothing);
+            expect(tester.takeException(), isNull);
+            await tester.pumpApp(const SizedBox.shrink());
+            await tester.pumpAndSettle();
+          },
+        );
+      }
+    }
   }
 
   test('preview is read-only; confirming one global CAS synchronizes the repository without installing', () async {
@@ -298,6 +669,62 @@ void main() {
           .body,
       first.body,
     );
+  });
+
+  test(
+    'removing a repository clears prior and late directory errors',
+    () async {
+      await addExtra();
+      final repo = catalog.repositories.singleWhere(
+        (r) => r.catalogUrl == extraUrl,
+      );
+      platform.publicDocuments[extraUrl] = const <String, Object?>{};
+      await catalog.refreshCatalog();
+      expect(catalog.repositoryErrors, hasLength(1));
+
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      final uri = Uri.parse(extraUrl);
+      platform.beforeApiFetch = (path) async {
+        if (path != uri.path || platform.publicReads.last != uri) return;
+        entered.complete();
+        await release.future;
+        throw StateError('Repository unavailable');
+      };
+      final refreshing = catalog.refreshCatalog();
+      try {
+        await entered.future.timeout(const Duration(seconds: 5));
+        await manager.removeRepository(repo);
+        expect(catalog.repositories, hasLength(1));
+        expect(catalog.repositoryErrors, isEmpty);
+      } finally {
+        release.complete();
+        await refreshing;
+      }
+      expect(catalog.repositoryErrors, isEmpty);
+    },
+  );
+
+  test('invalid repository addresses explain the correction without reads or writes', () async {
+    final reads = platform.publicReads.length;
+    final before = manager.settings.snapshot!;
+    for (final (address, message) in [
+      ('987654321', '请填写有效的 HTTPS 仓库地址。'),
+      (
+        'https://community.example/not-catalog',
+        '请使用 HTTPS 仓库地址，目录路径须为 /extensions/index.json。',
+      ),
+      (
+        'http://community.example',
+        '请使用 HTTPS 仓库地址，目录路径须为 /extensions/index.json。',
+      ),
+    ]) {
+      expect(await manager.previewRepository(address, ''), isNull);
+      expect(manager.error, message, reason: address);
+      expect(platform.publicReads, hasLength(reads));
+      expect(posts(), isEmpty);
+      expect(manager.settings.snapshot, same(before));
+    }
   });
 
   test('invalid credentials, reserved and duplicate repository identities never mutate the account', () async {
@@ -557,47 +984,109 @@ void main() {
     expect(posts(), isEmpty);
   });
 
-  testWidgets(
-    'repository dialog previews before an explicit second confirmation writes the account',
-    (tester) async {
-      await tester.pumpApp(
-        CupertinoApp(
-          home: ExtensionsPage(catalog: catalog, repository: catalog.settings!),
-        ),
+  for (final appearance in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'repository dialog confirms account changes explicitly at $appearance / $scale',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          try {
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            await tester.binding.setSurfaceSize(const Size(360, 800));
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            await tester.pumpApp(
+              CupertinoApp(
+                theme: readerAppTheme(appearance),
+                home: ExtensionsPage(
+                  catalog: catalog,
+                  repository: catalog.settings!,
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const ValueKey('extensions-more')));
+            await tester.pumpAndSettle();
+            await tester.tap(find.text('仓库管理'));
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const ValueKey('repositories-add')));
+            await tester.pumpAndSettle();
+            await tester.enterText(
+              find.byKey(const ValueKey('repository-url')),
+              'https://community.example',
+            );
+            await tester.enterText(
+              find.byKey(const ValueKey('repository-name')),
+              '社区',
+            );
+            await tester.tap(
+              find.byKey(const ValueKey('repository-preview-submit')),
+            );
+            await tester.pumpAndSettle();
+            expect(find.text('确认添加仓库'), findsOneWidget);
+            expect(posts(), isEmpty);
+            expect(platform.preparations, isEmpty);
+            await tester.tap(
+              find.byKey(const ValueKey('repository-add-confirm')),
+            );
+            await tester.pumpAndSettle();
+            expect(posts(), hasLength(1));
+            expect(
+              catalog.repositories.any(
+                (repository) => repository.catalogUrl == extraUrl,
+              ),
+              true,
+            );
+            final remove = find.byKey(
+              ValueKey(('repository-remove', extraUrl)),
+            );
+            await tester.ensureVisible(remove);
+            expect(tester.getSemantics(remove).label, '移除仓库：社区');
+            await tester.tap(remove);
+            await tester.pumpAndSettle();
+            expect(find.textContaining('受影响扩展：无'), findsOneWidget);
+            final confirm = find.byKey(
+              const ValueKey('repository-remove-confirm'),
+            );
+            expect(
+              tester.widget<CupertinoButton>(confirm).foregroundColor,
+              AppColors.error.resolveFrom(tester.element(confirm)),
+            );
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+            await tester.pumpAndSettle();
+            expect(find.text('移除仓库'), findsNothing);
+            expect(posts(), hasLength(1));
+            expect(
+              catalog.repositories.any((item) => item.catalogUrl == extraUrl),
+              true,
+            );
+            await tester.tap(remove);
+            await tester.pumpAndSettle();
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.sendKeyEvent(LogicalKeyboardKey.space);
+            await tester.pumpAndSettle();
+            expect(posts(), hasLength(2));
+            expect(
+              catalog.repositories.any((item) => item.catalogUrl == extraUrl),
+              false,
+            );
+            expect(
+              catalog.installedExtensions.single,
+              testInstalledExtension(),
+            );
+            expect(tester.takeException(), isNull);
+            await tester.pumpApp(const SizedBox());
+          } finally {
+            semantics.dispose();
+          }
+        },
       );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('extensions-more')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('仓库管理'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('repositories-add')));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('repository-url')),
-        'https://community.example',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('repository-name')),
-        '社区',
-      );
-      await tester.tap(find.byKey(const ValueKey('repository-preview-submit')));
-      await tester.pumpAndSettle();
-      expect(find.text('确认添加仓库'), findsOneWidget);
-      expect(posts(), isEmpty);
-      expect(platform.preparations, isEmpty);
-      await tester.tap(find.byKey(const ValueKey('repository-add-confirm')));
-      await tester.pumpAndSettle();
-      expect(posts(), hasLength(1));
-      expect(
-        catalog.repositories.any(
-          (repository) => repository.catalogUrl == extraUrl,
-        ),
-        true,
-      );
-      expect(tester.takeException(), isNull);
-      await tester.pumpApp(const SizedBox());
-    },
-  );
+    }
+  }
 
   testWidgets(
     'installed source-name search keeps same-package repository identities separate',

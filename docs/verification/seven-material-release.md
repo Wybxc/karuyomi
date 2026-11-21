@@ -11,7 +11,7 @@
 - 以正式 `pull-state` 读取生产父 revision `3c24b0d7c0a745a58de4bd6b5ffb7654`；state SHA-256 为 `18dea38e6c99418eefdc85b2d640feb2566d12b02dc6aeb6ad750ae08dc35a22`，未修改父状态或历史检查点。
 - 完整计划发现并选择 1,448 包，零发现失败；plan SHA-256 为 `02e972028f0caa209867ec1f3b9ec74f81ace7299fa11f5ddc7c7442f8bf144c`。
 
-clab 独立目录为 `/home/fedora/.local/karuyomi-seven-2fa8a33.NxbBAV`，冻结 clone 位于 `source/`。依赖按锁文件安装，Node 24.15.0、pnpm 12.6.0；工具链、seed 和材料经过正式准备入口校验。已有依赖缓存只用于加速，未导入旧六材料 AOT 或修改旧冻结批次。
+clab 在独立目录中固定了源代码和构建输入。依赖按锁文件安装，Node 24.15.0、pnpm 12.6.0；工具链、seed 和材料经过正式准备入口校验。已有依赖缓存只用于加速，未导入旧六材料 AOT 或修改旧冻结批次。
 
 正式 `bootstrap --jobs 1 --finalize` 已启动，并通过实际 PID、首包日志及结果确认执行。clab 为 4 CPU、3.8 GiB 内存，Maven 和 Gradle heap 均限制为 1 GiB，JVM 活跃处理器为 3。进程使用 nohup，与本机 SSH 会话分离；逐包结果保存在 `builds/`，汇总日志为 `bootstrap.log`。恢复须先确认原进程及其子进程已退出，再按 [EXTENSIONS](../EXTENSIONS.md#首次本地全量与恢复)使用原计划；不能并行启动两个发布器。
 
@@ -37,7 +37,7 @@ Web 来自[通过全部检查的 CI](https://github.com/Wybxc/karuyomi/actions/r
 2. 英文 Source 返回真实热门、详情及章节；收藏 xkcd 后，API 独立读回 `favorite=true`。
 3. 实际显示 `3319: Elevators` 两页，翻至第 2 页并显示“阅读进度已保存到服务端”。
 4. 关闭原标签，在新标签的服务端书架直接继续阅读，恢复到第 2 页并显示真实图片及保存确认。
-5. 独立 GET 进度读回 `current.pageIndexHint=1`、`furthest.pageIndexHint=1`，与 UI 一致。书架和进度原始响应及两张截图保存在 ignored 发布目录。
+5. 独立 GET 进度读回 `current.pageIndexHint=1`、`furthest.pageIndexHint=1`，与 UI 一致。本轮同时核对了书架和进度响应。
 
 本次是 **Linux clab workerd + CI Flutter Web + Codex 内置浏览器的隔离验收**，没有经过生产 Access，也没有执行原生 App。清单仍为 `compiled_unverified/runtimeReady=false`；不能据此提升整个目录的兼容性。验收标签、SSH 隧道与临时 harness 已关闭，原全量构建未受验收清理影响。
 
@@ -84,7 +84,7 @@ clab 先执行完整 runtime-host 构建，再以首批候选运行正式 API Vi
 
 随后在 clab 运行新版正式 `commit-snapshot`，公开 state/index 确认后才更新原 `state.json`；检查点与候选逐字节一致，摘要如表。原冻结计划、原 source checkout 和逐包结果均保留。从该新检查点通过正式冻结计划恢复入口启动剩余 1,244 包，双并发、每个 JVM 两颗活跃处理器，输出独立的 `after-priority-plan.json` 和 `full-candidate/`，按用户要求每 10 分钟检查。
 
-切流、静态验证、检查点及两页/新标签截图保存在本机 ignored 发布目录；原始构建和恢复日志保存在 clab 的同一冻结目录。清单仍为 `compiled_unverified/runtimeReady=false`，首批生产 xkcd 证据不提升其它扩展的兼容性。
+首批确认后的状态用于全量恢复，见[首次本地全量与恢复](../EXTENSIONS.md#首次本地全量与恢复)。清单仍为 `compiled_unverified/runtimeReady=false`，首批生产 xkcd 证据不提升其它扩展的兼容性。
 
 ## 剩余验收
 
@@ -92,4 +92,4 @@ clab 先执行完整 runtime-host 构建，再以首批候选运行正式 API Vi
 2. 构建、部署并确认完整基线，核对生产目录、流量、客户端更新和正式检查点。
 3. 启用扩展工作流并运行真实有界增量，核对实际构建、完整快照部署、失败保留、已确认检查点与客户端更新；首批上线和启用开关均不等于增量发布通过。
 
-现网已从[首版六材料快照](first-web-release.md)前进到上述七材料首批。本记录不提升原生未通过项，也不声称已完成全量基线或增量验收。原始计划、日志和逐包结果留在上述 ignored 目录；本机交接入口为 `.local/production-seven-2fa8a33.7Js42X/REPRODUCE.md`。
+现网已从[首版六材料快照](first-web-release.md)前进到上述七材料首批。本记录不提升原生未通过项，也不声称已完成全量基线或增量验收。本机保留七材料发布已确认的状态。后续恢复使用[正式发布流程](../EXTENSIONS.md#首次本地全量与恢复)。

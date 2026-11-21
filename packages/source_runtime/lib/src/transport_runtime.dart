@@ -23,35 +23,38 @@ final class RuntimeException implements Exception {
   final bool retryable;
   final String? javaClass;
 
-  factory RuntimeException.fromProto(wire.RuntimeError error) =>
-      RuntimeException(
-        switch (error.code) {
-          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_CANCELLED =>
-            RuntimeErrorCode.cancelled,
-          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_TIMEOUT =>
-            RuntimeErrorCode.timeout,
-          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED =>
-            RuntimeErrorCode.accessRequired,
-          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_DENIED =>
-            RuntimeErrorCode.accessDenied,
-          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_SOURCE_ERROR =>
-            RuntimeErrorCode.sourceError,
-          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_UNSUPPORTED_CAPABILITY =>
-            RuntimeErrorCode.unsupportedCapability,
-          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_PROTOCOL_ERROR =>
-            RuntimeErrorCode.protocolError,
-          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_INTEGRITY_ERROR =>
-            RuntimeErrorCode.integrityError,
-          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_LIMIT_EXCEEDED =>
-            RuntimeErrorCode.limitExceeded,
-          wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_STORAGE_BUSY =>
-            RuntimeErrorCode.storageBusy,
-          _ => RuntimeErrorCode.runtimeLost,
-        },
-        error.message,
-        retryable: error.retryable,
-        javaClass: error.hasJavaClass() ? error.javaClass : null,
-      );
+  factory RuntimeException.fromProto(
+    wire.RuntimeError error,
+  ) => RuntimeException(
+    switch (error.code) {
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_CANCELLED =>
+        RuntimeErrorCode.cancelled,
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_TIMEOUT =>
+        RuntimeErrorCode.timeout,
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED =>
+        RuntimeErrorCode.accessRequired,
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_DENIED =>
+        RuntimeErrorCode.accessDenied,
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_SOURCE_ERROR =>
+        RuntimeErrorCode.sourceError,
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_UNSUPPORTED_CAPABILITY =>
+        RuntimeErrorCode.unsupportedCapability,
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_PROTOCOL_ERROR =>
+        RuntimeErrorCode.protocolError,
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_INTEGRITY_ERROR =>
+        RuntimeErrorCode.integrityError,
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_LIMIT_EXCEEDED =>
+        RuntimeErrorCode.limitExceeded,
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_STORAGE_BUSY =>
+        RuntimeErrorCode.storageBusy,
+      wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_EXTENSION_ASSET_UNAVAILABLE =>
+        RuntimeErrorCode.extensionAssetUnavailable,
+      _ => RuntimeErrorCode.runtimeLost,
+    },
+    error.message,
+    retryable: error.retryable,
+    javaClass: error.hasJavaClass() ? error.javaClass : null,
+  );
 
   @override
   String toString() => '$code: $message';

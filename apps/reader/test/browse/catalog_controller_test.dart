@@ -137,32 +137,33 @@ void main() {
     expect(controller.error, isNotNull);
   });
 
-  test(
-    'reconnect refreshes the current static index and drops old selection',
-    () async {
-      await open();
-      platform.inventory = {
-        'schemaVersion': 1,
-        'repoId': 'keiyoushi',
-        'builds': [
-          {
-            'buildId': 'build-2',
-            'packageName': 'eu.kanade.source.test',
-            'repoId': 'keiyoushi',
-            'sourceIds': [sourceId],
-            'sources': [wire.encodeProtoJson(testCatalogSource)],
-            'version': '2.0',
-            'manifestPath': '/extensions/builds/build-2/manifest.json',
-          },
-        ],
-      };
-      await controller.connect();
-      expect(controller.status, ServiceStatus.ready);
-      expect(controller.builds.single.id, 'build-2');
-      expect(controller.activeBuild, isNull);
-      expect(controller.session, isNull);
-    },
-  );
+  test('reconnect refreshes the current static index and drops old selection and errors', () async {
+    await open();
+    platform.inventory = {'schemaVersion': 1, 'builds': 'invalid'};
+    await controller.refreshCatalog();
+    expect(controller.repositoryErrors, hasLength(1));
+    platform.inventory = {
+      'schemaVersion': 1,
+      'repoId': 'keiyoushi',
+      'builds': [
+        {
+          'buildId': 'build-2',
+          'packageName': 'eu.kanade.source.test',
+          'repoId': 'keiyoushi',
+          'sourceIds': [sourceId],
+          'sources': [wire.encodeProtoJson(testCatalogSource)],
+          'version': '2.0',
+          'manifestPath': '/extensions/builds/build-2/manifest.json',
+        },
+      ],
+    };
+    await controller.connect();
+    expect(controller.status, ServiceStatus.ready);
+    expect(controller.repositoryErrors, isEmpty);
+    expect(controller.builds.single.id, 'build-2');
+    expect(controller.activeBuild, isNull);
+    expect(controller.session, isNull);
+  });
 
   for (final path in ['/api/bootstrap', '/extensions/index.json']) {
     test('container loss rejects late reconnect response at $path', () async {
@@ -446,16 +447,22 @@ void main() {
           buildId: 'different-build',
           sourceId: sourceId,
           generation: 'generation-1',
+          sourceName: '测试漫画源',
+          sourceLang: 'zh',
         ),
         CatalogSourceRef(
           buildId: 'build-1',
           sourceId: 'different-source',
           generation: 'generation-1',
+          sourceName: '另一个漫画源',
+          sourceLang: 'zh',
         ),
         CatalogSourceRef(
           buildId: 'build-1',
           sourceId: sourceId,
           generation: 'old-generation',
+          sourceName: '测试漫画源',
+          sourceLang: 'zh',
         ),
       ]) {
         expect(

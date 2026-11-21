@@ -123,7 +123,7 @@ void main() {
   Future<void> reveal(WidgetTester tester, Finder target) async {
     final scrollable = find
         .descendant(
-          of: find.byType(ListView).first,
+          of: find.byKey(const PageStorageKey('source-directory-scroll')),
           matching: find.byType(Scrollable),
         )
         .first;
@@ -145,7 +145,7 @@ void main() {
 
   Future<void> chooseLanguage(WidgetTester tester, String language) async {
     await tap(tester, languageFilter());
-    await tester.tap(find.text(language).last);
+    await tester.tap(find.widgetWithText(CupertinoMenuItem, language));
     await tester.pumpAndSettle();
   }
 

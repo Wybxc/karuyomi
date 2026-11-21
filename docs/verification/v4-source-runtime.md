@@ -62,25 +62,11 @@ CuuTruyen 的服务日志保留一次 `probe_client_disconnected`；后续完整
 
 ## 复验与证据位置
 
-完整计划、三包 descriptor/provenance、manifest/gzip、构建日志与报告均在 ignored `.local/v4-source-validation/`，没有将机器输出或图片正文提交为源码。三个不可变通过报告为 `xkcd-online-passed.json`、`arknights-online-passed.json`、`cuutruyen-online-passed.json`。编译与完整性验证依然记录 `compiled_unverified`、`runtimeReady=false`；本次人工分项没有改写流水线验证状态。
+三个不可变通过报告为 `xkcd-online-passed.json`、`arknights-online-passed.json`、`cuutruyen-online-passed.json`。编译与完整性验证依然记录 `compiled_unverified`、`runtimeReady=false`；本次人工分项没有改写流水线验证状态。
 
-在同一固定树中，可从新 planner 产出的 descriptor 重建至全新目录，再启动正式 probe：
+该轮从 planner 生成的 descriptor 构建扩展，再在 loopback 服务中加载。
 
-```sh
-node scripts/build-extension.ts \
-  --descriptor .local/v4-source-validation/xkcd/descriptor.json \
-  --output .local/v4-source-recheck/xkcd
-pnpm --filter @karuyomi/runtime-host build
-SOURCE_PROBE_SOURCE_ID=1538249443376436084 \
-SOURCE_PROBE_ALLOWED_HOSTS=xkcd.com,imgs.xkcd.com \
-SOURCE_PROBE_IMAGES=1 \
-SOURCE_PROBE_EVIDENCE=.local/v4-source-recheck/xkcd-online.json \
-node apps/api/test/source-metadata-probe.ts \
-  .local/v4-source-recheck/xkcd/manifest.json \
-  .local/v4-source-recheck/xkcd/artifacts
-```
-
-在 Codex 内置浏览器打开命令输出的 loopback URL，点击 `Run real metadata operations`。另两包更换 descriptor、目录及上表的 Source ID/主机集合。原产物目录已含不可变 manifest，不能作为重建输出；host 输入变化后必须重新运行 planner，不能沿用旧 descriptor。
+当时在 Codex 内置浏览器打开该服务的 loopback URL，点击 `Run real metadata operations`。另两包更换 descriptor、目录及上表的 Source ID/主机集合。原产物目录已含不可变 manifest，不能作为重建输出；host 输入变化后必须重新运行 planner，不能沿用旧 descriptor。
 
 测试结束后三个 Source 服务均已停止；另行核对原监听端口均无监听，且无本轮 Source probe、workerd、Gradle 或 TeaCompiler 进程。未将浏览器标签关闭或命令退出码本身视为完整资源账本或进程峰值清理证据。
 

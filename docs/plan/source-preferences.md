@@ -6,6 +6,8 @@
 
 交付范围是开关、文本/密码、单选、多选、分组、依赖项与修改后刷新。保留 Source 原 Preference 对象和回调语义，不修改官方扩展业务源码。Android 自定义 Activity、任意自定义对话框或 WebView 登录不因出现设置入口而视为已支持。正式消息、字段、数据表和流程以当前 IDL、产品代码及[设计](../design/source-preferences.md)为准。
 
+正式 Web 浅深色已核对受控分组中的空标题、祖先禁用和嵌套路径，实际 Komiic 监听与账户读回通过。[分组证据](../verification/source-preferences.md#分组与继承禁用的正式-web-验收)
+
 ## 实施前核实的基础
 
 以下记录实施前的 ABI 与行为调查，用于解释适配依据；当前已实现范围见下方任务和设计，不把历史缺口当成现状。
@@ -45,6 +47,7 @@
 - [x] 打开扩展时先有界读取该包所需的 D1 确认设置，在 hostLoad/createSources 之前注入 `source_$id`，覆盖构造函数、lazy client 和 headers 的读取。不能先构造 Source，再仅更新界面或依赖下一次读值碰巧生效。
 - [x] 一次编辑调用原 Source 回调，取得有界存储变化与更新后描述，再按明确同步策略形成业务草稿。确认前不显示已保存；不得用运行时内存中的新值冒充服务端确认。宿主编辑响应丢失时不自动重放回调，明确未知状态并重开读取确认值，不承诺 Source 任意外部副作用的恰好一次执行。
 - [x] 等待写入确认期间阻止继续使用受影响的 Source。丢 ACK 保留冻结 UUID/body/CAS，显式重试只重发业务请求，不能重跑 Source listener 或点击动作；另一客户端新 revision、旧 ACK 和重复 mutation 均按已有确认语义处理。
+- [x] 已校验的确认随原请求保留。随后读取失败时只重新读取整包，读取通过后按当前值重开。界面保留原请求的漫画源、语言、基线版本与可展开的原同步值。组件、数据和隔离夹具结果见[验收记录](../verification/mihon-cupertino-fidelity.md#source-偏好的原提交值与确认读取)。
 - [x] 冲突、放弃或无法确定回调收尾时回收受影响运行时，从 D1 当前状态重新注入并构造；不尝试通用回滚 Source 任意对象或外部网络副作用。哪些失败保留可重试草稿、哪些只允许读回/重开，在合同中明确。
 - [x] 非敏感设置刷新先走简单的排空/重开路径，清理旧 filters、分页和资源引用，避免旧 lazy 状态继续生效；复用现有阅读关闭与运行槽生命周期，处理仍在使用该 Source 的阅读页面。
 
@@ -82,6 +85,7 @@ AOT 清单承载已审核键，Worker 与运行时不再按扩展名配置。当
 - [x] 正式 Dart/Flutter 控制与业务链的工程回归：D1 值在 Source 构造前生效；丢 ACK 不重跑回调；只读刷新不重放 pending；关闭/取消/换身份及迟到响应不复活旧状态；未确认草稿有明确可恢复路径。
 - [x] 按 v6 ABI 在固定提交的独立目录本地重建 Komiic，通过完整性及静态装配门；候选保持 compiled_unverified/runtimeReady=false。
 - [x] Komiic 正式 Web 入口切换原镜像设置、确认到 D1、重开并加载真实热门；第二项保存保留前一值，新 Web 文档从确认状态恢复两项非默认值。实际范围见[记录](../verification/source-preferences.md#komiic-v6-真实-web-分项)。
+- [x] Komiic 正式 Web 浅、深色均验证整包读取、未知结果重开及精确重试、有效确认后的只读恢复。独立 Web 文档实际读回两项确认值。[正式验收](../verification/mihon-cupertino-fidelity.md#source-偏好读取与恢复的正式-web-双主题验收)
 - [x] 以未修改的 FoolSlide Customizable 和 MangaDex 原包完成固定提交的隔离 AOT，见[工程与构建证据](../verification/source-preferences.md#文本设置绑定与输入校验)。
 - [x] MangaDex 英文 Source 的正式 Web 设置入口验证无效 UUID 拒绝、有效值读回及新文档不继承会话值。
 - [x] FoolSlide Customizable 的正式 Web 设置入口验证默认值全选、无效 URL 拒绝、原回调归一化写入及新文档恢复默认；无 D1 设置行。后续按实际存储区分提示的变更由 Flutter 定向测试验证，详见[验收记录](../verification/source-preferences.md#双包正式-web-设置)。

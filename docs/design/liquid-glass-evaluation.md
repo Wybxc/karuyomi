@@ -188,6 +188,6 @@ Web 的实时捕获开启后存在主动 frame pump，静止页面也不能仅�
 ## 可复核方法与证据限制
 
 - 元数据入口为 `https://pub.dev/api/search?q=liquid%20glass%20platform%3Aweb%20platform%3Aios%20platform%3Aandroid`，跟随响应的 `next`；逐包版本与 archive 哈希来自 `https://pub.dev/api/packages/<name>`。页面缓存有时显示旧版，本次以 API 精确版本和对应发布 archive 为准。
-- 源码从 API 的 `latest.archive_url` 获取，校验 `latest.archive_sha256` 后解包阅读；未执行下载的第三方代码。原始 JSON、下载、源码与临时日志留在忽略目录 `.local/liquid-glass-evaluation/`，不复制进正式源码。
+- 源码从 API 的 `latest.archive_url` 获取，校验 `latest.archive_sha256` 后解包阅读；未执行下载的第三方代码。
 - 本次没有运行候选 demo、Flutter 编译、模拟器、浏览器视觉/帧率测试或 AOT；没有重新启动已停止的原生验证。本评估支持选型和任务范围，不构成三端性能或上线证据。
 - 最终依赖需经固定 SDK 的严格分析、交互回归和正式 Web 产物验收；上游截图、作者 FPS、下载量与编译成功均不能代替项目测量。

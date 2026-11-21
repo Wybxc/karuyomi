@@ -5,6 +5,7 @@ import 'package:karuyomi/widgets/choice_field.dart';
 import '../test_app.dart';
 
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,14 +70,8 @@ Future<void> _reveal(WidgetTester tester, Finder finder) async {
         )
         .first;
     final position = tester.state<ScrollableState>(scrollable).position;
-    for (
-      var attempt = 0;
-      position.pixels > position.minScrollExtent && attempt < 30;
-      attempt++
-    ) {
-      await tester.drag(scrollable, const Offset(0, 500));
-      await tester.pumpAndSettle();
-    }
+    position.jumpTo(position.minScrollExtent);
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(finder, 250, scrollable: scrollable);
   }
   await tester.ensureVisible(finder);
@@ -165,6 +160,333 @@ Future<void> _seed(TestPlatform platform, WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+    'refresh keeps the existing work and chapter list until the whole Source read succeeds',
+    (tester) async {
+      final platform = _platform();
+      final catalog = await _details(tester, platform);
+      final oldHandler = platform.invokeHandler!;
+      final chaptersGate = Completer<wire.SourceResult>();
+      addTearDown(() {
+        if (!chaptersGate.isCompleted) {
+          chaptersGate.complete(
+            wire.SourceResult(chapters: wire.ChapterList(chapters: _chapters)),
+          );
+        }
+      });
+      var chapterReads = 0;
+      platform.invokeHandler = (call) async {
+        switch (call.whichRequest()) {
+          case wire.SourceCall_Request.details:
+            return wire.SourceResult(manga: testManga..author = '资料更新后的作者');
+          case wire.SourceCall_Request.chapters:
+            if (++chapterReads == 1) return chaptersGate.future;
+            return wire.SourceResult(
+              chapters: wire.ChapterList(
+                chapters: [
+                  ..._chapters,
+                  wire.Chapter(
+                    url: '/new',
+                    name: '新章节',
+                    dateUpload: DateTime(
+                      2012,
+                      11,
+                      2,
+                      12,
+                    ).millisecondsSinceEpoch.toString(),
+                  ),
+                ],
+              ),
+            );
+          default:
+            return oldHandler(call);
+        }
+      };
+      final reload = find.byKey(const ValueKey('details-source-refresh'));
+      expect(reload, findsOneWidget);
+      await _reveal(tester, reload);
+      final oldHeading = find.text('章节（2）');
+      final headingY = tester.getTopLeft(oldHeading).dy;
+      final before = platform.businessServer.appliedMutations;
+      await tester.runAsync(() async {
+        await tester.tap(reload);
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pump();
+      expect(chapterReads, 1);
+      expect(find.text('正在刷新作品资料和章节'), findsOneWidget);
+      expect(find.text('作者：作者'), findsOneWidget);
+      expect(tester.getTopLeft(oldHeading).dy, headingY);
+      expect(find.text('作者：资料更新后的作者'), findsNothing);
+      expect(tester.widget<CupertinoButton>(reload).onPressed, isNull);
+
+      await tester.runAsync(() async {
+        chaptersGate.completeError(
+          const RuntimeException(RuntimeErrorCode.sourceError, 'test failure'),
+        );
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('作者：作者'), findsOneWidget);
+      expect(tester.getTopLeft(oldHeading).dy, headingY);
+      expect(find.textContaining('未能刷新作品资料和章节'), findsOneWidget);
+      expect(find.text('这个漫画源没有返回章节'), findsNothing);
+      expect(platform.businessServer.appliedMutations, before);
+
+      await _tap(tester, find.text('重试刷新'));
+      expect(chapterReads, 2);
+      expect(find.text('作者：资料更新后的作者'), findsOneWidget);
+      expect(find.text('章节（3）'), findsOneWidget);
+      expect(find.textContaining('未能刷新作品资料和章节'), findsNothing);
+      await _reveal(tester, find.text('新章节'));
+      expect(find.text('新章节'), findsOneWidget);
+      expect(find.text('2012/11/2 · 未读'), findsOneWidget);
+      expect(platform.businessServer.appliedMutations, before);
+      await _finish(tester, catalog);
+    },
+  );
+
+  testWidgets(
+    'refresh retry stays visible while the chapter list is scrolled',
+    (tester) async {
+      final platform = _platform();
+      final originalInvoke = platform.invokeHandler!;
+      final chapters = [
+        for (var index = 0; index < 40; index++)
+          wire.Chapter(url: '/chapter-$index', name: '章节 $index'),
+      ];
+      final result = wire.SourceResult(
+        chapters: wire.ChapterList(chapters: chapters),
+      );
+      final refresh = Completer<wire.SourceResult>();
+      addTearDown(() {
+        if (!refresh.isCompleted) refresh.complete(result);
+      });
+      var reads = 0;
+      platform.invokeHandler = (call) async {
+        if (!call.hasChapters()) return originalInvoke(call);
+        return ++reads == 2 ? refresh.future : result;
+      };
+      final catalog = await _details(tester, platform);
+      tester.view.physicalSize = const Size(360, 480);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+
+      final reload = find.byKey(const ValueKey('details-source-refresh'));
+      await _reveal(tester, reload);
+      final before = platform.businessServer.appliedMutations;
+      await tester.runAsync(() async {
+        await tester.tap(reload);
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pump();
+      expect(reads, 2);
+      final chapterScroll = tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(CustomScrollView),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position;
+      chapterScroll.jumpTo(1200);
+      await tester.pump();
+      expect(find.text('正在刷新作品资料和章节').hitTestable(), findsOneWidget);
+
+      await tester.runAsync(() async {
+        refresh.completeError(
+          const RuntimeException(RuntimeErrorCode.sourceError, 'test failure'),
+        );
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pumpAndSettle();
+      expect(chapterScroll.pixels, 1200);
+      final retry = find.text('重试刷新');
+      expect(retry.hitTestable(), findsOneWidget);
+      await _tap(tester, retry);
+      expect(reads, 3);
+      expect(chapterScroll.pixels, 1200);
+      expect(platform.businessServer.appliedMutations, before);
+      await _finish(tester, catalog);
+    },
+  );
+
+  testWidgets(
+    'a touch refresh disables the chapter control and keeps one progress indicator',
+    (tester) async {
+      final platform = _platform();
+      final catalog = await _details(tester, platform);
+      final original = platform.invokeHandler!;
+      final reached = Completer<void>();
+      final response = Completer<wire.SourceResult>();
+      platform.invokeHandler = (call) async {
+        if (call.hasChapters() && !reached.isCompleted) {
+          reached.complete();
+          return response.future;
+        }
+        return original(call);
+      };
+      final reload = find.byKey(const ValueKey('details-source-refresh'));
+      final retry = find.byKey(const ValueKey('details-source-retry'));
+      Tristate enabled(Finder control) => tester
+          .getSemantics(control)
+          .getSemanticsData()
+          .flagsCollection
+          .isEnabled;
+      final semantics = tester.ensureSemantics();
+      try {
+        final pull = await tester.startGesture(
+          const Offset(26, 162),
+          kind: PointerDeviceKind.touch,
+        );
+        await pull.moveBy(const Offset(0, 380));
+        await tester.pump();
+        await pull.up();
+        await tester.pump(const Duration(milliseconds: 250));
+        await tester.runAsync(
+          () => reached.future.timeout(const Duration(seconds: 5)),
+        );
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('正在刷新作品资料和章节'), findsOneWidget);
+        expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+        expect(find.text('第一版'), findsOneWidget);
+        expect(enabled(reload), Tristate.isFalse);
+
+        response.completeError(
+          const RuntimeException(RuntimeErrorCode.sourceError, '章节暂不可用'),
+        );
+        await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+        await tester.pumpAndSettle();
+        expect(find.text('第一版'), findsOneWidget);
+        expect(enabled(reload), Tristate.isFalse);
+        expect(enabled(retry), Tristate.isTrue);
+      } finally {
+        semantics.dispose();
+        if (!response.isCompleted) {
+          response.complete(
+            wire.SourceResult(chapters: wire.ChapterList(chapters: _chapters)),
+          );
+          await tester.pumpAndSettle();
+        }
+      }
+
+      await _tap(tester, retry);
+      expect(retry, findsNothing);
+      expect(find.text('第一版'), findsOneWidget);
+      await _finish(tester, catalog);
+    },
+  );
+
+  testWidgets(
+    'a filtered list can be reset and a genuine empty chapter list can be refreshed',
+    (tester) async {
+      final platform = _platform();
+      final catalog = await _details(tester, platform);
+      tester.view.physicalSize = const Size(360, 800);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+
+      final search = find.byKey(const ValueKey('chapter-search'));
+      await _reveal(tester, search);
+      await tester.enterText(search, '不存在的名称');
+      await tester.pumpAndSettle();
+      final clear = find.byKey(const ValueKey('clear-chapter-filters'));
+      expect(find.text('没有匹配的章节'), findsOneWidget);
+      expect(clear, findsOneWidget);
+      expect(find.text('这个漫画源没有返回章节'), findsNothing);
+      await _tap(tester, clear);
+      expect(find.text('显示 2 / 2 章'), findsOneWidget);
+      expect(clear, findsNothing);
+
+      final oldHandler = platform.invokeHandler!;
+      platform.invokeHandler = (call) async =>
+          call.whichRequest() == wire.SourceCall_Request.chapters
+          ? wire.SourceResult(chapters: wire.ChapterList())
+          : oldHandler(call);
+      final reload = find.byKey(const ValueKey('details-source-refresh'));
+      await _tap(tester, reload);
+      expect(find.text('章节（0）'), findsOneWidget);
+      expect(find.text('这个漫画源没有返回章节'), findsOneWidget);
+      expect(clear, findsNothing);
+      expect(reload, findsOneWidget);
+
+      platform.invokeHandler = oldHandler;
+      FocusManager.instance.primaryFocus?.unfocus();
+      final scrollable = find
+          .descendant(
+            of: find.byType(MangaDetailsPage),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final position = tester.state<ScrollableState>(scrollable).position;
+      position.jumpTo(position.minScrollExtent);
+      await tester.pumpAndSettle();
+      final pull = await tester.startGesture(const Offset(26, 162));
+      await pull.moveBy(const Offset(0, 380));
+      await tester.pump();
+      await pull.up();
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+      await _reveal(tester, find.text('章节（2）'));
+      expect(find.text('章节（2）'), findsOneWidget);
+      expect(find.text('这个漫画源没有返回章节'), findsNothing);
+      await _finish(tester, catalog);
+    },
+  );
+
+  testWidgets('leaving during a refresh discards a late Source reply', (
+    tester,
+  ) async {
+    final platform = _platform();
+    final catalog = await _details(tester, platform);
+    final oldHandler = platform.invokeHandler!;
+    final detailGate = Completer<wire.SourceResult>();
+    addTearDown(() {
+      if (!detailGate.isCompleted) {
+        detailGate.complete(wire.SourceResult(manga: testManga));
+      }
+    });
+    var detailReads = 0;
+    var chapterReads = 0;
+    platform.invokeHandler = (call) async {
+      if (call.hasDetails() && ++detailReads == 1) return detailGate.future;
+      if (call.hasChapters()) chapterReads++;
+      return oldHandler(call);
+    };
+    final reload = find.byKey(const ValueKey('details-source-refresh'));
+    await _reveal(tester, reload);
+    await tester.runAsync(() async {
+      await tester.tap(reload);
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pump();
+    expect(detailReads, 1);
+    expect(chapterReads, 0);
+    final route = ModalRoute.of(tester.element(find.byType(MangaDetailsPage)))!;
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(route.isCurrent, isFalse);
+
+    await tester.runAsync(() async {
+      detailGate.complete(
+        wire.SourceResult(manga: testManga..author = '已离开页面的回复'),
+      );
+      await Future<void>.delayed(Duration.zero);
+    });
+    await tester.pumpAndSettle();
+    expect(find.byType(MangaDetailsPage), findsNothing);
+    expect(chapterReads, 0);
+    expect(find.text('已离开页面的回复'), findsNothing);
+    await _tap(tester, find.text('真实源 DTO 测试'));
+    expect(chapterReads, 1);
+    expect(find.text('作者：作者'), findsOneWidget);
+    await _finish(tester, catalog);
+  });
+
   testWidgets(
     'a failed chapter opens only on explicit retry with the same occurrence DTO',
     (tester) async {

@@ -76,6 +76,7 @@ final class _PendingMutation {
   bool rejected = false;
   bool sent = false;
   BusinessStateException? failure;
+  wire.StateMutationResponse? confirmation;
 }
 
 final class BusinessLibrarySnapshot {
@@ -111,14 +112,22 @@ final class _PendingCategoryMutation {
   final String fingerprint;
   final wire.CategoryMutation request;
   final String body;
+  wire.CategoryMutationResponse? confirmation;
   BusinessStateException? rejection;
 }
 
 final class _PendingSettingsMutation {
-  _PendingSettingsMutation(this.fingerprint, this.request, this.body);
+  _PendingSettingsMutation(
+    this.fingerprint,
+    this.request,
+    this.body,
+    this.previousGlobal,
+  );
   final String fingerprint;
   final wire.SettingsMutation request;
   final String body;
+  final wire.GlobalSettingsValues? previousGlobal;
+  wire.SettingsMutationResponse? confirmation;
   BusinessStateException? rejection;
 }
 
@@ -127,6 +136,7 @@ final class _PendingSourcePreferencesMutation {
   final String fingerprint;
   final wire.SourcePreferencesMutation request;
   final String body;
+  wire.SourcePreferencesMutationResponse? confirmation;
   BusinessStateException? rejection;
 }
 
@@ -168,6 +178,18 @@ final class BusinessStateClient {
   bool _closed = false;
   Future<void>? _refreshing;
 
+  /// A verified ACK is retained while authoritative reads remain unfinished.
+  /// Resuming its original command reads again without another mutation POST.
+  bool get categoryMutationNeedsRead =>
+      !_closed &&
+      _pendingCategory?.confirmation != null &&
+      _pendingCategory?.rejection == null;
+
+  bool mutationNeedsRead(String mangaKey) =>
+      !_closed &&
+      _pending[mangaKey]?.confirmation != null &&
+      _pending[mangaKey]?.rejected == false;
+
   bool hasOnlyLocalChangesSince(
     String key, {
     required int basedOnRevision,
@@ -204,18 +226,26 @@ final class BusinessStateClient {
 
   Stream<BusinessLibrarySnapshot> watchLibrarySnapshot() =>
       Stream.multi((sink) {
+        // Another manga read can publish changes while this shelf is in flight.
+        // The first value must still come after this authoritative refresh.
+        var waitingForInitialRead = true;
         final subscription = _changes.stream.listen(
-          (_) => sink.add(_librarySnapshot),
+          (_) {
+            if (!waitingForInitialRead) sink.add(_librarySnapshot);
+          },
           onError: sink.addError,
           onDone: sink.close,
         );
         sink.onCancel = subscription.cancel;
         refreshLibrary().then(
           (_) {
+            waitingForInitialRead = false;
             if (!_closed) sink.add(_librarySnapshot);
           },
-          onError: (Object error, StackTrace stack) =>
-              sink.addError(error, stack),
+          onError: (Object error, StackTrace stack) {
+            waitingForInitialRead = false;
+            sink.addError(error, stack);
+          },
         );
       });
 
@@ -676,8 +706,9 @@ final class BusinessStateClient {
     return bytes;
   }
 
-  /// Operation objects contain no transport identity or revision. A failed
-  /// attempt retains its exact request and UUID, including after a lost reply.
+  /// Operation objects contain no transport identity or revision. An unknown
+  /// result retains its exact request and UUID. A validated ACK is retained
+  /// while read-back is unfinished, so its retry only repeats the reads.
   Future<wire.StateMutationResponse> mutate(
     wire.StateMutation operation, {
     int? basedOnRevision,
@@ -686,6 +717,7 @@ final class BusinessStateClient {
     Uint8List? coverBytes,
     bool Function(bool explicitRetry)? canSendProgress,
     bool explicitProgressRetry = false,
+    void Function()? onAcknowledged,
   }) {
     final command = operation.deepCopy();
     if (command.hasMigrateFrom()) {
@@ -777,6 +809,9 @@ final class BusinessStateClient {
           previous,
           explicitProgressRetry:
               explicitProgressRetry && canSendProgress != null,
+          onAcknowledged: previous.fingerprint == fingerprint
+              ? onAcknowledged
+              : null,
         );
         if (previous.fingerprint == fingerprint) return result;
       }
@@ -824,7 +859,11 @@ final class BusinessStateClient {
         canSendProgress: canSendProgress,
       );
       _pending[command.mangaKey] = pending;
-      return _send(pending, explicitProgressRetry: explicitProgressRetry);
+      return _send(
+        pending,
+        explicitProgressRetry: explicitProgressRetry,
+        onAcknowledged: onAcknowledged,
+      );
     });
   }
 
@@ -841,6 +880,7 @@ final class BusinessStateClient {
   Future<wire.StateMutationResponse> _send(
     _PendingMutation pending, {
     bool explicitProgressRetry = false,
+    void Function()? onAcknowledged,
   }) async {
     _ensureOpen();
     _checkProgressWrite(
@@ -854,157 +894,168 @@ final class BusinessStateClient {
     }
     final retry = pending.sent;
     pending.sent = true;
-    final upload = pending.coverBytes;
-    final ApiReply reply;
-    if (upload != null) {
-      final transport = _covers;
-      if (transport == null) throw StateError('Cover transport is unavailable');
-      reply = await transport.uploadCover(
-        mangaKey: pending.request.mangaKey,
-        mutation: pending.body,
-        subject: identity.subject,
-        bytes: upload,
-        contentType: pending.request.setCustomCover.cover.contentType,
-      );
-    } else {
-      reply = await api.fetchApi(
-        '/api/state/mutations',
-        method: 'POST',
-        headers: {..._headers, 'Content-Type': 'application/json'},
-        body: pending.body,
-      );
-    }
-    _ensureOpen();
-    _budget(reply);
-    final value = wire.decodeProtoJson(
-      wire.StateMutationResponse(),
-      jsonDecode(reply.body),
-      maxBytes: _responseLimit,
-    );
-    _version(value.schemaVersion);
-    validateBusinessRevision(value.accountRevision);
-    if (value.mutationId != pending.request.mutationId ||
-        (value.hasManga() &&
-            value.manga.mangaKey != pending.request.mangaKey)) {
-      throw const FormatException(
-        'Business mutation response identity mismatch',
-      );
-    }
-    if (value.hasBookmark()) {
-      validateBusinessBookmark(
-        value.bookmark,
-        chapterKey: _mutationChapter(pending.request),
-      );
-    }
-    if (value.hasError()) {
-      validateBusinessError(value.error);
-      if (value.hasCategoryCatalog()) {
-        _validateCatalog(true, value.categoryCatalog, value.accountRevision);
-      }
-      if (value.hasManga()) {
-        validateBusinessManga(value.manga);
-        _validateCatalog(
-          value.hasCategoryCatalog(),
-          value.categoryCatalog,
-          value.accountRevision,
-        );
-        validateBusinessMangaCategories(value.manga, value.categoryCatalog);
-      }
-      if (value.hasProgress()) {
-        validateBusinessProgress(
-          value.progress,
-          chapterKey: _operationChapter(pending.request),
-        );
-      }
-      pending.rejected = !value.error.retryable;
-      final failure = BusinessStateException(
-        value.error,
-        manga: value.hasManga() ? value.manga : null,
-        progress: value.hasProgress() ? value.progress : null,
-        bookmark: value.hasBookmark() ? value.bookmark : null,
-        conflictedChapterKey: _mutationChapter(pending.request),
-      );
-      pending.failure = failure;
-      throw failure;
-    }
-    _success(reply);
-    if (!value.hasManga() ||
-        (pending.requireExactRevision
-            ? value.manga.revision != pending.request.expectedRevision + 1
-            : value.manga.revision <= pending.request.expectedRevision) ||
-        value.accountRevision < value.manga.revision ||
-        value.accountRevision < pending.accountRevision) {
-      throw const FormatException('Mutation did not confirm a new revision');
-    }
-    if (pending.request.hasMigrateFrom()) {
-      _validateMigrationAck(pending.request.migrateFrom, value);
-    }
-    validateBusinessManga(value.manga);
-    _validateCatalog(
-      value.hasCategoryCatalog(),
-      value.categoryCatalog,
-      value.accountRevision,
-    );
-    validateBusinessMangaCategories(value.manga, value.categoryCatalog);
-    if (pending.requireExactRevision) {
-      final request = pending.request;
-      if (request.hasSetFavorite() &&
-          value.manga.favorite != request.setFavorite.favorite) {
-        throw const FormatException('Mutation response favorite mismatch');
-      }
-      if (request.hasSetCategories()) {
-        final expected = request.setCategories.categoryIds.toSet();
-        final actual = value.manga.categoryIds.toSet();
-        if (expected.length != actual.length || !actual.containsAll(expected)) {
-          throw const FormatException('Mutation response categories mismatch');
-        }
-      }
-    }
-    if (!_coverMatches(pending.request, value.manga)) {
-      throw const FormatException('Mutation response custom cover mismatch');
-    }
-    final expectedChapter = _operationChapter(pending.request);
-    final chapterRead = pending.request.hasSetChapterRead()
-        ? pending.request.setChapterRead
-        : null;
-    if (chapterRead != null &&
-        (!value.hasProgress() ||
-            value.progress.completed != chapterRead.read ||
-            value.progress.epoch == 0 ||
-            (!chapterRead.read &&
-                (value.progress.hasCurrent() ||
-                    value.progress.hasFurthest())))) {
-      throw const FormatException(
-        'Mutation response chapter read state mismatch',
-      );
-    }
     final bookmark = pending.request.hasSetBookmark()
         ? pending.request.setBookmark
         : null;
-    if (bookmark != null &&
-        (!value.hasBookmark() ||
-            value.bookmark.chapterKey != bookmark.chapterKey ||
-            value.bookmark.bookmarked != bookmark.bookmarked)) {
-      throw const FormatException('Mutation response bookmark mismatch');
-    }
-    if (bookmark == null && value.hasBookmark()) {
-      throw const FormatException('Unexpected mutation bookmark');
-    }
-    if (expectedChapter != null &&
-        (!value.hasProgress() ||
-            value.progress.chapterKey != expectedChapter ||
-            (chapterRead == null && !value.progress.hasCurrent()) ||
-            (value.progress.hasCurrent() &&
-                value.progress.current.chapterKey != expectedChapter) ||
-            (value.progress.hasFurthest() &&
-                value.progress.furthest.chapterKey != expectedChapter))) {
-      throw const FormatException(
-        'Mutation response progress identity mismatch',
+    var value = pending.confirmation;
+    if (value == null) {
+      final upload = pending.coverBytes;
+      final ApiReply reply;
+      if (upload != null) {
+        final transport = _covers;
+        if (transport == null) {
+          throw StateError('Cover transport is unavailable');
+        }
+        reply = await transport.uploadCover(
+          mangaKey: pending.request.mangaKey,
+          mutation: pending.body,
+          subject: identity.subject,
+          bytes: upload,
+          contentType: pending.request.setCustomCover.cover.contentType,
+        );
+      } else {
+        reply = await api.fetchApi(
+          '/api/state/mutations',
+          method: 'POST',
+          headers: {..._headers, 'Content-Type': 'application/json'},
+          body: pending.body,
+        );
+      }
+      _ensureOpen();
+      _budget(reply);
+      value = wire.decodeProtoJson(
+        wire.StateMutationResponse(),
+        jsonDecode(reply.body),
+        maxBytes: _responseLimit,
       );
+      _version(value.schemaVersion);
+      validateBusinessRevision(value.accountRevision);
+      if (value.mutationId != pending.request.mutationId ||
+          (value.hasManga() &&
+              value.manga.mangaKey != pending.request.mangaKey)) {
+        throw const FormatException(
+          'Business mutation response identity mismatch',
+        );
+      }
+      if (value.hasBookmark()) {
+        validateBusinessBookmark(
+          value.bookmark,
+          chapterKey: _mutationChapter(pending.request),
+        );
+      }
+      if (value.hasError()) {
+        validateBusinessError(value.error);
+        if (value.hasCategoryCatalog()) {
+          _validateCatalog(true, value.categoryCatalog, value.accountRevision);
+        }
+        if (value.hasManga()) {
+          validateBusinessManga(value.manga);
+          _validateCatalog(
+            value.hasCategoryCatalog(),
+            value.categoryCatalog,
+            value.accountRevision,
+          );
+          validateBusinessMangaCategories(value.manga, value.categoryCatalog);
+        }
+        if (value.hasProgress()) {
+          validateBusinessProgress(
+            value.progress,
+            chapterKey: _operationChapter(pending.request),
+          );
+        }
+        pending.rejected = !value.error.retryable;
+        final failure = BusinessStateException(
+          value.error,
+          manga: value.hasManga() ? value.manga : null,
+          progress: value.hasProgress() ? value.progress : null,
+          bookmark: value.hasBookmark() ? value.bookmark : null,
+          conflictedChapterKey: _mutationChapter(pending.request),
+        );
+        pending.failure = failure;
+        throw failure;
+      }
+      _success(reply);
+      if (!value.hasManga() ||
+          (pending.requireExactRevision
+              ? value.manga.revision != pending.request.expectedRevision + 1
+              : value.manga.revision <= pending.request.expectedRevision) ||
+          value.accountRevision < value.manga.revision ||
+          value.accountRevision < pending.accountRevision) {
+        throw const FormatException('Mutation did not confirm a new revision');
+      }
+      if (pending.request.hasMigrateFrom()) {
+        _validateMigrationAck(pending.request.migrateFrom, value);
+      }
+      validateBusinessManga(value.manga);
+      _validateCatalog(
+        value.hasCategoryCatalog(),
+        value.categoryCatalog,
+        value.accountRevision,
+      );
+      validateBusinessMangaCategories(value.manga, value.categoryCatalog);
+      if (pending.requireExactRevision) {
+        final request = pending.request;
+        if (request.hasSetFavorite() &&
+            value.manga.favorite != request.setFavorite.favorite) {
+          throw const FormatException('Mutation response favorite mismatch');
+        }
+        if (request.hasSetCategories()) {
+          final expected = request.setCategories.categoryIds.toSet();
+          final actual = value.manga.categoryIds.toSet();
+          if (expected.length != actual.length ||
+              !actual.containsAll(expected)) {
+            throw const FormatException(
+              'Mutation response categories mismatch',
+            );
+          }
+        }
+      }
+      if (!_coverMatches(pending.request, value.manga)) {
+        throw const FormatException('Mutation response custom cover mismatch');
+      }
+      final expectedChapter = _operationChapter(pending.request);
+      final chapterRead = pending.request.hasSetChapterRead()
+          ? pending.request.setChapterRead
+          : null;
+      if (chapterRead != null &&
+          (!value.hasProgress() ||
+              value.progress.completed != chapterRead.read ||
+              value.progress.epoch == 0 ||
+              (!chapterRead.read &&
+                  (value.progress.hasCurrent() ||
+                      value.progress.hasFurthest())))) {
+        throw const FormatException(
+          'Mutation response chapter read state mismatch',
+        );
+      }
+      if (bookmark != null &&
+          (!value.hasBookmark() ||
+              value.bookmark.chapterKey != bookmark.chapterKey ||
+              value.bookmark.bookmarked != bookmark.bookmarked)) {
+        throw const FormatException('Mutation response bookmark mismatch');
+      }
+      if (bookmark == null && value.hasBookmark()) {
+        throw const FormatException('Unexpected mutation bookmark');
+      }
+      if (expectedChapter != null &&
+          (!value.hasProgress() ||
+              value.progress.chapterKey != expectedChapter ||
+              (chapterRead == null && !value.progress.hasCurrent()) ||
+              (value.progress.hasCurrent() &&
+                  value.progress.current.chapterKey != expectedChapter) ||
+              (value.progress.hasFurthest() &&
+                  value.progress.furthest.chapterKey != expectedChapter))) {
+        throw const FormatException(
+          'Mutation response progress identity mismatch',
+        );
+      }
+      if (value.hasProgress()) {
+        validateBusinessProgress(value.progress, chapterKey: expectedChapter);
+      }
+      value.freeze();
+      pending.confirmation = value;
     }
-    if (value.hasProgress()) {
-      validateBusinessProgress(value.progress, chapterKey: expectedChapter);
-    }
+    onAcknowledged?.call();
     // Idempotency confirms that the original write happened, not that its
     // result is still current. Refresh ambiguous retries and known old replies
     // before acknowledging a draft, even if a shelf refresh evicted this key.
@@ -1083,10 +1134,13 @@ final class BusinessStateClient {
   }
 
   /// Catalog commands have their own queue, independent of manga progress and
-  /// associations. A retry retains the exact UUID, CAS and serialized body.
+  /// associations. An unconfirmed retry retains the exact UUID, CAS and body;
+  /// an acknowledged command only retries its authoritative reads.
+  /// The callback reports a validated ACK before its read-back completes.
   Future<wire.CategoryMutationResponse> mutateCategories(
-    wire.CategoryMutation operation,
-  ) {
+    wire.CategoryMutation operation, {
+    void Function()? onAcknowledged,
+  }) {
     _assertNoMigrationCatalog();
     final command = operation.deepCopy();
     command.clearMutationId();
@@ -1100,7 +1154,7 @@ final class BusinessStateClient {
         if (previous.fingerprint != fingerprint) {
           throw StateError('请先处理书架中的未确认分类修改。');
         }
-        return _sendCategories(previous);
+        return _sendCategories(previous, onAcknowledged: onAcknowledged);
       }
       command.mutationId = _uuid.v4();
       command.freeze();
@@ -1110,7 +1164,7 @@ final class BusinessStateClient {
         jsonEncode(wire.encodeProtoJson(command)),
       );
       _pendingCategory = pending;
-      return _sendCategories(pending);
+      return _sendCategories(pending, onAcknowledged: onAcknowledged);
     });
   }
 
@@ -1150,51 +1204,58 @@ final class BusinessStateClient {
   }
 
   Future<wire.CategoryMutationResponse> _sendCategories(
-    _PendingCategoryMutation pending,
-  ) async {
+    _PendingCategoryMutation pending, {
+    void Function()? onAcknowledged,
+  }) async {
     _ensureOpen();
     if (pending.rejection != null) throw pending.rejection!;
-    final reply = await api.fetchApi(
-      '/api/categories/mutations',
-      method: 'POST',
-      headers: {..._headers, 'Content-Type': 'application/json'},
-      body: pending.body,
-    );
-    _ensureOpen();
-    _budget(reply);
-    final value = wire.decodeProtoJson(
-      wire.CategoryMutationResponse(),
-      jsonDecode(reply.body),
-      maxBytes: _responseLimit,
-    );
-    _version(value.schemaVersion);
-    validateBusinessRevision(value.accountRevision);
-    if (value.mutationId != pending.request.mutationId) {
-      throw const FormatException(
-        'Category mutation response identity mismatch',
+    var value = pending.confirmation;
+    if (value == null) {
+      final reply = await api.fetchApi(
+        '/api/categories/mutations',
+        method: 'POST',
+        headers: {..._headers, 'Content-Type': 'application/json'},
+        body: pending.body,
       );
-    }
-    if (value.hasCategoryCatalog()) {
-      _validateCatalog(true, value.categoryCatalog, value.accountRevision);
-    }
-    if (value.hasError()) {
-      validateBusinessError(value.error);
-      final failure = BusinessStateException(value.error);
-      if (!value.error.retryable) pending.rejection = failure;
-      throw failure;
-    }
-    _success(reply);
-    _validateCatalog(
-      value.hasCategoryCatalog(),
-      value.categoryCatalog,
-      value.accountRevision,
-    );
-    if (value.categoryCatalog.revision !=
-        pending.request.expectedRevision + 1) {
-      throw const FormatException(
-        'Category mutation did not confirm a new revision',
+      _ensureOpen();
+      _budget(reply);
+      value = wire.decodeProtoJson(
+        wire.CategoryMutationResponse(),
+        jsonDecode(reply.body),
+        maxBytes: _responseLimit,
       );
+      _version(value.schemaVersion);
+      validateBusinessRevision(value.accountRevision);
+      if (value.mutationId != pending.request.mutationId) {
+        throw const FormatException(
+          'Category mutation response identity mismatch',
+        );
+      }
+      if (value.hasCategoryCatalog()) {
+        _validateCatalog(true, value.categoryCatalog, value.accountRevision);
+      }
+      if (value.hasError()) {
+        validateBusinessError(value.error);
+        final failure = BusinessStateException(value.error);
+        if (!value.error.retryable) pending.rejection = failure;
+        throw failure;
+      }
+      _success(reply);
+      _validateCatalog(
+        value.hasCategoryCatalog(),
+        value.categoryCatalog,
+        value.accountRevision,
+      );
+      if (value.categoryCatalog.revision !=
+          pending.request.expectedRevision + 1) {
+        throw const FormatException(
+          'Category mutation did not confirm a new revision',
+        );
+      }
+      value.freeze();
+      pending.confirmation = value;
     }
+    onAcknowledged?.call();
     // Even a successful ACK can be an old idempotency record. Read back the
     // current catalog before accepting it; a deleted category stays deleted.
     await _readCategories();
@@ -1236,22 +1297,44 @@ final class BusinessStateClient {
     if (_closed) sink.close();
   });
 
-  ({wire.SettingsMutation request, bool retryable})? pendingSettings({
-    String? mangaKey,
-  }) {
+  ({
+    wire.SettingsMutation request,
+    bool retryable,
+    wire.GlobalSettingsValues? previousGlobal,
+    bool acknowledged,
+    wire.BusinessStateErrorCode? rejectionCode,
+  })?
+  pendingSettings({String? mangaKey}) {
     if (_closed) return null;
     final pending = _pendingSettings[_settingsScope(mangaKey)];
     return pending == null
         ? null
-        : (request: pending.request, retryable: pending.rejection == null);
+        : (
+            request: pending.request,
+            retryable: pending.rejection == null,
+            previousGlobal: pending.previousGlobal,
+            acknowledged: pending.confirmation != null,
+            rejectionCode: pending.rejection?.error.code,
+          );
   }
 
   Future<wire.SettingsResponse> readSettings({String? mangaKey}) {
     if (mangaKey != null) validateBusinessMangaKey(mangaKey);
-    return _serial(
-      _settingsScope(mangaKey),
-      () => _readSettings(mangaKey: mangaKey, clearRejected: true),
-    );
+    return _serial(_settingsScope(mangaKey), () async {
+      final pending = _pendingSettings[_settingsScope(mangaKey)];
+      final current = await _readSettings(
+        mangaKey: mangaKey,
+        clearRejected: true,
+      );
+      _ensureOpen();
+      if (pending != null &&
+          identical(_pendingSettings[_settingsScope(mangaKey)], pending) &&
+          pending.confirmation != null &&
+          pending.rejection == null) {
+        return _finishSettingsRead(pending, current, mangaKey: mangaKey);
+      }
+      return current;
+    });
   }
 
   Future<wire.SettingsResponse> _readSettings({
@@ -1273,12 +1356,41 @@ final class BusinessStateClient {
       _success(reply);
       final previous = _settings[scope];
       final global = _latestGlobalSettings;
+      final pending = _pendingSettings[scope];
+      final acknowledged = pending?.confirmation;
       if (value.accountRevision < _accountRevision ||
           (global != null && value.global.revision < global.revision) ||
+          (acknowledged != null &&
+              (value.global.revision < acknowledged.global.revision ||
+                  (mangaKey != null &&
+                      value.manga.revision < acknowledged.manga.revision))) ||
           (mangaKey != null &&
               previous != null &&
               value.manga.revision < previous.manga.revision)) {
         continue;
+      }
+      if (pending != null && acknowledged != null) {
+        if (value.global.revision == acknowledged.global.revision &&
+            !_globalSettingsMatch(
+              value.global.values,
+              acknowledged.global.values,
+            )) {
+          throw const FormatException(
+            'Settings read differs from its confirmed global revision',
+          );
+        }
+        final revision = mangaKey == null
+            ? value.global.revision
+            : value.manga.revision;
+        final confirmedRevision = mangaKey == null
+            ? acknowledged.global.revision
+            : acknowledged.manga.revision;
+        if (revision == confirmedRevision &&
+            !_settingsMatch(pending.request, value)) {
+          throw const FormatException(
+            'Settings read differs from its confirmed mutation',
+          );
+        }
       }
       if (global != null &&
           value.global.revision == global.revision &&
@@ -1316,8 +1428,9 @@ final class BusinessStateClient {
   }
 
   Future<wire.SettingsResponse> mutateSettings(
-    wire.SettingsMutation operation,
-  ) {
+    wire.SettingsMutation operation, {
+    void Function()? onAcknowledged,
+  }) {
     final command = operation.deepCopy()
       ..schemaVersion = _schemaVersion
       ..clearMutationId();
@@ -1331,74 +1444,106 @@ final class BusinessStateClient {
         if (previous.fingerprint != fingerprint) {
           throw StateError('请先重试原设置修改；已确认冲突请刷新后重新编辑。');
         }
-        return _sendSettings(previous, mangaKey: mangaKey);
+        return _sendSettings(
+          previous,
+          mangaKey: mangaKey,
+          onAcknowledged: onAcknowledged,
+        );
       }
       command.mutationId = _uuid.v4();
       command.freeze();
+      final global = command.hasSetGlobal() ? _latestGlobalSettings : null;
       final pending = _PendingSettingsMutation(
         fingerprint,
         command,
         jsonEncode(
           wire.encodeProtoJson(command, maxBytes: wire.controlRequestLimit),
         ),
+        global != null && global.revision == command.expectedRevision
+            ? global.values
+            : null,
       );
       _pendingSettings[scope] = pending;
-      return _sendSettings(pending, mangaKey: mangaKey);
+      return _sendSettings(
+        pending,
+        mangaKey: mangaKey,
+        onAcknowledged: onAcknowledged,
+      );
     });
   }
 
   Future<wire.SettingsResponse> _sendSettings(
     _PendingSettingsMutation pending, {
     String? mangaKey,
+    void Function()? onAcknowledged,
   }) async {
     _ensureOpen();
     if (pending.rejection != null) throw pending.rejection!;
-    final reply = await api.fetchApi(
-      '/api/settings/mutations',
-      method: 'POST',
-      headers: {..._headers, 'Content-Type': 'application/json'},
-      body: pending.body,
-    );
-    _ensureOpen();
-    _budget(reply);
-    final value = wire.decodeProtoJson(
-      wire.SettingsMutationResponse(),
-      jsonDecode(reply.body),
-      maxBytes: _responseLimit,
-    );
-    if (value.mutationId != pending.request.mutationId &&
-        (!value.hasError() || value.mutationId.isNotEmpty)) {
-      throw const FormatException('Settings mutation identity mismatch');
-    }
-    final snapshot = wire.SettingsResponse(
-      schemaVersion: value.schemaVersion,
-      accountRevision: value.accountRevision,
-      global: value.hasGlobal() ? value.global : null,
-      manga: value.hasManga() ? value.manga : null,
-      effectiveReader: value.hasEffectiveReader()
-          ? value.effectiveReader
-          : null,
-      error: value.hasError() ? value.error : null,
-    );
-    validateBusinessSettingsResponse(snapshot, mangaKey: mangaKey);
-    if (value.hasError()) {
-      final failure = BusinessStateException(value.error);
-      if (!value.error.retryable) pending.rejection = failure;
-      throw failure;
-    }
-    _success(reply);
-    final revision = mangaKey == null
-        ? value.global.revision
-        : value.manga.revision;
-    if (revision != pending.request.expectedRevision + 1 ||
-        !_settingsMatch(pending.request, snapshot)) {
-      throw const FormatException(
-        'Settings ACK does not confirm the requested values',
+    var value = pending.confirmation;
+    if (value == null) {
+      final reply = await api.fetchApi(
+        '/api/settings/mutations',
+        method: 'POST',
+        headers: {..._headers, 'Content-Type': 'application/json'},
+        body: pending.body,
       );
+      _ensureOpen();
+      _budget(reply);
+      value = wire.decodeProtoJson(
+        wire.SettingsMutationResponse(),
+        jsonDecode(reply.body),
+        maxBytes: _responseLimit,
+      );
+      if (value.mutationId != pending.request.mutationId &&
+          (!value.hasError() || value.mutationId.isNotEmpty)) {
+        throw const FormatException('Settings mutation identity mismatch');
+      }
+      final snapshot = wire.SettingsResponse(
+        schemaVersion: value.schemaVersion,
+        accountRevision: value.accountRevision,
+        global: value.hasGlobal() ? value.global : null,
+        manga: value.hasManga() ? value.manga : null,
+        effectiveReader: value.hasEffectiveReader()
+            ? value.effectiveReader
+            : null,
+        error: value.hasError() ? value.error : null,
+      );
+      validateBusinessSettingsResponse(snapshot, mangaKey: mangaKey);
+      if (value.hasError()) {
+        final failure = BusinessStateException(value.error);
+        if (!value.error.retryable) pending.rejection = failure;
+        throw failure;
+      }
+      _success(reply);
+      final revision = mangaKey == null
+          ? value.global.revision
+          : value.manga.revision;
+      if (revision != pending.request.expectedRevision + 1 ||
+          !_settingsMatch(pending.request, snapshot)) {
+        throw const FormatException(
+          'Settings ACK does not confirm the requested values',
+        );
+      }
+      value.freeze();
+      pending.confirmation = value;
     }
+    if (value.accountRevision > _accountRevision) {
+      _accountRevision = value.accountRevision;
+    }
+    onAcknowledged?.call();
+    _ensureOpen();
     // A persisted idempotency ACK may predate another device's write. Confirm
     // current values with GET before exposing them as saved.
     final current = await _readSettings(mangaKey: mangaKey);
+    return _finishSettingsRead(pending, current, mangaKey: mangaKey);
+  }
+
+  wire.SettingsResponse _finishSettingsRead(
+    _PendingSettingsMutation pending,
+    wire.SettingsResponse current, {
+    String? mangaKey,
+  }) {
+    _ensureOpen();
     if (!_settingsMatch(pending.request, current)) {
       final failure = BusinessStateException(
         wire.BusinessStateError(
@@ -1415,7 +1560,7 @@ final class BusinessStateClient {
     return current;
   }
 
-  ({wire.SourcePreferencesMutation request, bool retryable})?
+  ({wire.SourcePreferencesMutation request, bool retryable, bool acknowledged})?
   pendingSourcePreferences(
     String packageName,
     String sourceId, {
@@ -1430,7 +1575,11 @@ final class BusinessStateClient {
         )];
     return pending == null
         ? null
-        : (request: pending.request, retryable: pending.rejection == null);
+        : (
+            request: pending.request,
+            retryable: pending.rejection == null,
+            acknowledged: pending.confirmation != null,
+          );
   }
 
   bool hasPendingSourcePreferences(
@@ -1465,6 +1614,7 @@ final class BusinessStateClient {
     required wire.CatalogReference catalog,
     bool clearRejected = false,
   }) async {
+    readAttempts:
     for (var attempt = 0; attempt < 3; attempt++) {
       final reply = await _get(
         Uri(
@@ -1504,6 +1654,33 @@ final class BusinessStateClient {
         }
       }
       if (stale) continue;
+      for (final pending in _pendingSourcePreferences.values) {
+        final confirmation = pending.confirmation;
+        if (confirmation == null ||
+            pending.request.catalog != catalog ||
+            pending.request.packageName != packageName) {
+          continue;
+        }
+        final source = value.sources
+            .where((source) => source.sourceId == pending.request.sourceId)
+            .firstOrNull;
+        if (source == null ||
+            source.revision < confirmation.preferences.revision) {
+          continue readAttempts;
+        }
+        // The server can project different keys when the permitted rules change.
+        if (source.revision == confirmation.preferences.revision &&
+            const ListEquality<wire.PreferenceSyncRule>().equals(
+              value.syncRules,
+              confirmation.syncRules,
+            ) &&
+            !samePreferenceEntries(
+              source.entries,
+              confirmation.preferences.entries,
+            )) {
+          throw const FormatException('Source settings read differs from ACK');
+        }
+      }
       _ensureOpen();
       final confirmed = value.deepCopy()..freeze();
       _sourcePreferences[_sourcePreferenceScope(catalog, packageName)] =
@@ -1523,8 +1700,9 @@ final class BusinessStateClient {
   }
 
   Future<wire.SourcePreferencesResponse> mutateSourcePreferences(
-    wire.SourcePreferencesMutation operation,
-  ) {
+    wire.SourcePreferencesMutation operation, {
+    void Function()? onAcknowledged,
+  }) {
     final command = operation.deepCopy()
       ..schemaVersion = _schemaVersion
       ..clearMutationId();
@@ -1552,7 +1730,10 @@ final class BusinessStateClient {
           if (previous.fingerprint != fingerprint) {
             throw StateError('请先处理这个漫画源未确认的原设置操作。');
           }
-          return _sendSourcePreferences(previous);
+          return _sendSourcePreferences(
+            previous,
+            onAcknowledged: onAcknowledged,
+          );
         }
         command.mutationId = _uuid.v4();
         final body = jsonEncode(
@@ -1565,7 +1746,7 @@ final class BusinessStateClient {
           body,
         );
         _pendingSourcePreferences[key] = pending;
-        return _sendSourcePreferences(pending);
+        return _sendSourcePreferences(pending, onAcknowledged: onAcknowledged);
       },
     );
   }
@@ -1574,6 +1755,7 @@ final class BusinessStateClient {
     String packageName,
     String sourceId, {
     required wire.CatalogReference catalog,
+    void Function()? onAcknowledged,
   }) => _serial(
     'source-preferences:${_sourcePreferenceScope(catalog, packageName)}',
     () {
@@ -1584,7 +1766,7 @@ final class BusinessStateClient {
             sourceId,
           )];
       if (pending == null) throw StateError('没有待确认的原漫画源设置。');
-      return _sendSourcePreferences(pending);
+      return _sendSourcePreferences(pending, onAcknowledged: onAcknowledged);
     },
   );
 
@@ -1607,55 +1789,67 @@ final class BusinessStateClient {
   );
 
   Future<wire.SourcePreferencesResponse> _sendSourcePreferences(
-    _PendingSourcePreferencesMutation pending,
-  ) async {
+    _PendingSourcePreferencesMutation pending, {
+    void Function()? onAcknowledged,
+  }) async {
     _ensureOpen();
     if (pending.rejection != null) throw pending.rejection!;
-    final reply = await api.fetchApi(
-      '/api/source-preferences/mutations',
-      method: 'POST',
-      headers: {..._headers, 'Content-Type': 'application/json'},
-      body: pending.body,
-    );
+    var value = pending.confirmation;
+    if (value == null) {
+      final reply = await api.fetchApi(
+        '/api/source-preferences/mutations',
+        method: 'POST',
+        headers: {..._headers, 'Content-Type': 'application/json'},
+        body: pending.body,
+      );
+      _ensureOpen();
+      _budget(reply);
+      value = wire.decodeProtoJson(
+        wire.SourcePreferencesMutationResponse(),
+        jsonDecode(reply.body),
+        maxBytes: 128 * 1024,
+      );
+      _version(value.schemaVersion);
+      if (!value.hasCatalog() || value.catalog != pending.request.catalog) {
+        throw const FormatException('Source settings ACK repository mismatch');
+      }
+      validateBusinessRevision(value.accountRevision);
+      wire.validatePreferenceSyncRules(value.syncRules);
+      if (value.mutationId != pending.request.mutationId &&
+          (!value.hasError() || value.mutationId.isNotEmpty)) {
+        throw const FormatException(
+          'Source settings mutation identity mismatch',
+        );
+      }
+      if (value.hasError()) {
+        final failure = BusinessStateException(value.error);
+        if (!value.error.retryable) pending.rejection = failure;
+        throw failure;
+      }
+      _success(reply);
+      if (!value.hasPreferences()) {
+        throw const FormatException(
+          'Source settings ACK has no confirmed values',
+        );
+      }
+      validateSourcePreferences(value.preferences, pending.request.packageName);
+      if (value.preferences.sourceId != pending.request.sourceId ||
+          value.preferences.revision != pending.request.expectedRevision + 1 ||
+          !samePreferenceEntries(
+            value.preferences.entries,
+            pending.request.entries,
+          )) {
+        throw const FormatException(
+          'Source settings ACK differs from submitted values',
+        );
+      }
+      pending.confirmation = value..freeze();
+    }
+    if (value.accountRevision > _accountRevision) {
+      _accountRevision = value.accountRevision;
+    }
+    onAcknowledged?.call();
     _ensureOpen();
-    _budget(reply);
-    final value = wire.decodeProtoJson(
-      wire.SourcePreferencesMutationResponse(),
-      jsonDecode(reply.body),
-      maxBytes: 128 * 1024,
-    );
-    _version(value.schemaVersion);
-    if (!value.hasCatalog() || value.catalog != pending.request.catalog) {
-      throw const FormatException('Source settings ACK repository mismatch');
-    }
-    validateBusinessRevision(value.accountRevision);
-    wire.validatePreferenceSyncRules(value.syncRules);
-    if (value.mutationId != pending.request.mutationId &&
-        (!value.hasError() || value.mutationId.isNotEmpty)) {
-      throw const FormatException('Source settings mutation identity mismatch');
-    }
-    if (value.hasError()) {
-      final failure = BusinessStateException(value.error);
-      if (!value.error.retryable) pending.rejection = failure;
-      throw failure;
-    }
-    _success(reply);
-    if (!value.hasPreferences()) {
-      throw const FormatException(
-        'Source settings ACK has no confirmed values',
-      );
-    }
-    validateSourcePreferences(value.preferences, pending.request.packageName);
-    if (value.preferences.sourceId != pending.request.sourceId ||
-        value.preferences.revision != pending.request.expectedRevision + 1 ||
-        !samePreferenceEntries(
-          value.preferences.entries,
-          pending.request.entries,
-        )) {
-      throw const FormatException(
-        'Source settings ACK differs from submitted values',
-      );
-    }
     final current = await _readSourcePreferences(
       pending.request.packageName,
       catalog: pending.request.catalog,

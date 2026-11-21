@@ -6,14 +6,17 @@ import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/library_repository.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -23,6 +26,7 @@ const _first = '10000000-0000-4000-8000-000000000001';
 const _second = '10000000-0000-4000-8000-000000000002';
 const _conflict = '分类或漫画已在其他设备修改，请重新读取后重开编辑。';
 const _expired = '身份或服务已变化，请关闭后重新打开。';
+const _blockedDraft = '原草稿不会自动提交。请重新读取并关闭，再按最新内容重新编辑。';
 
 void main() {
   late TestBusinessServer server;
@@ -55,10 +59,21 @@ void main() {
     await platform.dispose();
   });
 
-  Future<void> show(WidgetTester tester, {CatalogController? service}) async {
+  Future<void> show(
+    WidgetTester tester, {
+    CatalogController? service,
+    Brightness brightness = Brightness.light,
+    double textScale = 1,
+  }) async {
     final current = service ?? controller;
     await tester.pumpApp(
       CupertinoApp(
+        theme: readerAppTheme(brightness),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: CupertinoPageScaffold(
           child: LibraryPage(
             controller: current,
@@ -78,12 +93,42 @@ void main() {
   }
 
   Future<void> tap(WidgetTester tester, Finder finder) async {
+    if (finder.evaluate().isEmpty) {
+      await tester.tap(iconLabel('书架选项'));
+      await tester.pumpAndSettle();
+    }
     await tester.ensureVisible(finder);
     await tester.runAsync(() async {
       await tester.tap(finder);
       await Future<void>.delayed(Duration.zero);
     });
     await tester.pumpAndSettle();
+  }
+
+  Future<void> tapDuringRead(WidgetTester tester, Finder finder) async {
+    await tester.ensureVisible(finder);
+    await tester.runAsync(() async {
+      await tester.tap(finder);
+      await Future<void>.delayed(Duration.zero);
+    });
+    // The pending read keeps a spinner active; settle the button and route
+    // transitions without waiting for every animation to become idle.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+  }
+
+  Finder categoryTitle(String name) => find.descendant(
+    of: find.byKey(const ValueKey('category-manager')),
+    matching: find.text(name),
+  );
+
+  Future<void> categoryAction(
+    WidgetTester tester,
+    String name,
+    String action,
+  ) async {
+    await tap(tester, iconLabel('分类选项 $name'));
+    await tap(tester, find.widgetWithText(CupertinoMenuItem, action));
   }
 
   final categoryFilter = find.byKey(const ValueKey('library-category-filter'));
@@ -140,6 +185,356 @@ void main() {
     (request) => request.method == 'POST' && request.uri.path == path,
   );
 
+  for (final brightness in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'category groups, menu and destructive confirmation adapt to $brightness at $textScale',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final name = '长' * 70 + '想读';
+          await create(tester, name: name);
+          await create(tester, id: _second, name: '科幻');
+          await show(tester, brightness: brightness, textScale: textScale);
+          await tap(tester, find.text('管理分类'));
+          final manager = find.byKey(const ValueKey('category-manager'));
+          expect(
+            find.descendant(
+              of: manager,
+              matching: find.byType(CupertinoFormSection),
+            ),
+            findsOneWidget,
+          );
+          final rename = find.byKey(
+            const ValueKey(('category-rename', _first)),
+          );
+          final options = iconLabel('分类选项 $name');
+          expect(rename, findsOneWidget);
+          expect(options, findsOneWidget);
+          try {
+            expect(
+              tester.getSemantics(find.text('新建分类')).label,
+              '新建分类',
+              reason: 'the create action must not absorb section captions or other categories',
+            );
+          } finally {
+            semantics.dispose();
+          }
+          expect(iconLabel('上移分类 $name'), findsNothing);
+          expect(tester.takeException(), isNull);
+          server.requests.clear();
+          await tap(tester, options);
+          final up = find.widgetWithText(CupertinoMenuItem, '上移分类');
+          final down = find.widgetWithText(CupertinoMenuItem, '下移分类');
+          final remove = find.widgetWithText(CupertinoMenuItem, '删除分类');
+          expect(tester.widget<CupertinoMenuItem>(up).onPressed, isNull);
+          expect(tester.widget<CupertinoMenuItem>(down).onPressed, isNotNull);
+          expect(
+            tester.widget<CupertinoMenuItem>(remove).isDestructiveAction,
+            isTrue,
+          );
+          await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+          await tester.pumpAndSettle();
+          expect(remove, findsNothing);
+          expect(posts('/api/categories/mutations'), isEmpty);
+          await tap(tester, options);
+          await tap(tester, remove);
+          final delete = find.widgetWithText(CupertinoButton, '删除');
+          expect(
+            tester.widget<CupertinoButton>(delete).foregroundColor,
+            AppColors.error.resolveFrom(tester.element(delete)),
+          );
+          await tap(tester, find.text('取消'));
+          await tap(tester, rename);
+          final field = find.byType(CupertinoTextField).last;
+          await tester.enterText(field, '新的分类草稿');
+          tester.view.physicalSize = const Size(390, 844);
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<CupertinoTextField>(field).controller!.text,
+            '新的分类草稿',
+          );
+          expect(find.text('保存').hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await tap(tester, find.text('取消'));
+          expect(posts('/api/categories/mutations'), isEmpty);
+          expect(server.catalog().categories.first.name, name);
+          for (final reorder in [false, true]) {
+            final received = Completer<void>();
+            final release = Completer<void>();
+            final readReceived = Completer<void>();
+            final readRelease = Completer<void>();
+            var acknowledged = false;
+            late Finder action;
+            if (reorder) {
+              await tap(tester, iconLabel('分类选项 已确认名称'));
+              action = find.widgetWithText(CupertinoMenuItem, '下移分类');
+            } else {
+              await tap(tester, rename);
+              await tester.enterText(
+                find.byType(CupertinoTextField).last,
+                '已确认名称',
+              );
+              action = find.text('保存').hitTestable();
+            }
+            platform.afterBusinessReply = (request, reply) async {
+              if (request.method == 'POST' &&
+                  request.uri.path == '/api/categories/mutations') {
+                received.complete();
+                await release.future;
+                acknowledged = true;
+              } else if (acknowledged &&
+                  request.method == 'GET' &&
+                  request.uri.path == '/api/categories') {
+                platform.afterBusinessReply = null;
+                readReceived.complete();
+                await readRelease.future;
+              }
+              return reply;
+            };
+            try {
+              await tester.tap(action);
+              await tester.pump();
+              await tester.runAsync(
+                () => received.future.timeout(const Duration(seconds: 5)),
+              );
+              await tester.pump(const Duration(milliseconds: 400));
+              final editor = reorder
+                  ? manager
+                  : find.byKey(const ValueKey('category-command'));
+              final waiting = find.descendant(
+                of: editor,
+                matching: find.text('正在等待服务端确认分类修改。'),
+              );
+              await tester.ensureVisible(
+                find.descendant(
+                  of: editor,
+                  matching: find.byType(CupertinoActivityIndicator),
+                ),
+              );
+              await tester.pump();
+              expect(waiting, findsOneWidget);
+              if (reorder) {
+                expect(
+                  find.descendant(
+                    of: editor,
+                    matching: find.text('将“已确认名称”移至第 2 位。'),
+                  ),
+                  findsOneWidget,
+                );
+              }
+              expect(
+                find.descendant(
+                  of: editor,
+                  matching: find.text('原修改暂存在当前会话，关闭窗口不会撤回请求。请继续处理这次修改。'),
+                ),
+                findsNothing,
+              );
+              final saving = find.descendant(
+                of: editor,
+                matching: find.widgetWithText(CupertinoButton, '保存中'),
+              );
+              expect(saving, findsOneWidget);
+              expect(tester.widget<CupertinoButton>(saving).onPressed, isNull);
+              final dismissal = find.descendant(
+                of: editor,
+                matching: find.widgetWithText(CupertinoButton, '稍后'),
+              );
+              expect(dismissal, findsOneWidget);
+              expect(
+                tester.widget<CupertinoButton>(dismissal).onPressed,
+                isNull,
+              );
+              await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+              await tester.pump(const Duration(milliseconds: 400));
+              expect(editor, findsOneWidget);
+              expect(
+                posts('/api/categories/mutations'),
+                hasLength(reorder ? 2 : 1),
+              );
+              expect(
+                server.catalog().categories.first.name,
+                reorder ? '科幻' : '已确认名称',
+              );
+              expect(tester.takeException(), isNull);
+              await tester.runAsync(() async {
+                release.complete();
+                await readReceived.future.timeout(const Duration(seconds: 5));
+              });
+              await tester.pump(const Duration(milliseconds: 400));
+              expect(
+                find.descendant(
+                  of: editor,
+                  matching: find.text('正在读取已确认修改后的书架。'),
+                ),
+                findsOneWidget,
+              );
+              expect(waiting, findsNothing);
+              final reading = find.descendant(
+                of: editor,
+                matching: find.widgetWithText(CupertinoButton, '读取中'),
+              );
+              expect(reading, findsOneWidget);
+              expect(tester.widget<CupertinoButton>(reading).onPressed, isNull);
+              expect(
+                tester.widget<CupertinoButton>(dismissal).onPressed,
+                isNotNull,
+              );
+              final pendingReads = server.requests
+                  .where(
+                    (request) =>
+                        request.method == 'GET' &&
+                        request.uri.path == '/api/categories',
+                  )
+                  .length;
+              await tapDuringRead(tester, dismissal);
+              expect(
+                find.byKey(const ValueKey('category-command')),
+                findsNothing,
+              );
+              if (!reorder) {
+                expect(manager, findsOneWidget);
+                expect(
+                  find.descendant(
+                    of: manager,
+                    matching: find.text('重命名分类：“已确认名称”。'),
+                  ),
+                  findsOneWidget,
+                );
+                await tapDuringRead(
+                  tester,
+                  find.descendant(
+                    of: manager,
+                    matching: find.widgetWithText(CupertinoButton, '稍后'),
+                  ),
+                );
+              }
+              expect(manager, findsNothing);
+              final continueRead = find.text('继续读取最新书架');
+              expect(continueRead, findsOneWidget);
+              await tapDuringRead(tester, continueRead);
+              expect(manager, findsOneWidget);
+              expect(
+                find.descendant(
+                  of: manager,
+                  matching: find.text('正在读取已确认修改后的书架。'),
+                ),
+                findsOneWidget,
+              );
+              expect(
+                posts('/api/categories/mutations'),
+                hasLength(reorder ? 2 : 1),
+              );
+              expect(
+                server.requests.where(
+                  (request) =>
+                      request.method == 'GET' &&
+                      request.uri.path == '/api/categories',
+                ),
+                hasLength(pendingReads),
+                reason: 'reopening keeps the original in-flight read',
+              );
+            } finally {
+              await tester.runAsync(() async {
+                if (!release.isCompleted) release.complete();
+                if (!readRelease.isCompleted) readRelease.complete();
+                await Future<void>.delayed(Duration.zero);
+              });
+              await tester.pumpAndSettle();
+            }
+            expect(
+              posts('/api/categories/mutations'),
+              hasLength(reorder ? 2 : 1),
+            );
+            expect(
+              find.byKey(const ValueKey('category-command')),
+              findsNothing,
+            );
+            expect(
+              manager,
+              findsOneWidget,
+              reason: 'a late read must update the reopened manager without closing its route',
+            );
+            expect(tester.takeException(), isNull);
+          }
+          final confirmedCatalog = server.catalog();
+          final confirmedAccount = server.accountRevision;
+          final confirmedPosts = posts('/api/categories/mutations').length;
+          server.beforeRequest = (request) {
+            if (request.method != 'POST' ||
+                request.uri.path != '/api/categories/mutations') {
+              return null;
+            }
+            server.beforeRequest = null;
+            final mutation = wire.decodeProtoJson(
+              wire.CategoryMutation(),
+              jsonDecode(request.body!),
+            );
+            return ApiReply(
+              status: 400,
+              headers: const {'content-type': 'application/json'},
+              body: jsonEncode(
+                wire.encodeProtoJson(
+                  wire.CategoryMutationResponse(
+                    schemaVersion: 1,
+                    mutationId: mutation.mutationId,
+                    accountRevision: confirmedAccount,
+                    categoryCatalog: confirmedCatalog,
+                    error: wire.BusinessStateError(
+                      code: wire
+                          .BusinessStateErrorCode
+                          .BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+                      message: 'Injected category rejection',
+                      retryable: false,
+                    ),
+                  ),
+                ),
+              ),
+              redirected: false,
+            );
+          };
+          await tap(tester, categoryTitle('已确认名称'));
+          await nameAndSave(tester, '被拒绝的草稿');
+          final command = find.byKey(const ValueKey('category-command'));
+          expect(
+            find.descendant(of: command, matching: find.text(_blockedDraft)),
+            findsOneWidget,
+          );
+          expect(find.text('原修改暂存在当前会话，关闭窗口不会撤回请求。请继续处理这次修改。'), findsNothing);
+          expect(server.catalog(), confirmedCatalog);
+          expect(server.accountRevision, confirmedAccount);
+          await tap(
+            tester,
+            find.descendant(
+              of: command,
+              matching: find.widgetWithText(CupertinoButton, '稍后'),
+            ),
+          );
+          expect(
+            find.descendant(of: manager, matching: find.text(_blockedDraft)),
+            findsOneWidget,
+          );
+          await tap(tester, find.text('重新读取并关闭'));
+          expect(manager, findsNothing);
+          await tap(tester, find.text('管理分类'));
+          expect(categoryTitle('已确认名称'), findsOneWidget);
+          expect(categoryTitle('被拒绝的草稿'), findsNothing);
+          expect(
+            posts('/api/categories/mutations'),
+            hasLength(confirmedPosts + 1),
+          );
+          expect(server.catalog(), confirmedCatalog);
+          expect(server.accountRevision, confirmedAccount);
+          expect(tester.takeException(), isNull);
+          await hide(tester);
+        },
+      );
+    }
+  }
+
   testWidgets(
     'an empty shelf can create, rename, reorder and delete server categories',
     (tester) async {
@@ -156,20 +551,20 @@ void main() {
         '想读',
         '科幻',
       ]);
-      await tap(tester, iconLabel('上移分类 科幻'));
+      await categoryAction(tester, '科幻', '上移分类');
       expect(server.catalog().categories.map((value) => value.name), [
         '科幻',
         '想读',
       ]);
-      await tap(tester, iconLabel('下移分类 科幻'));
+      await categoryAction(tester, '科幻', '下移分类');
       expect(server.catalog().categories.map((value) => value.name), [
         '想读',
         '科幻',
       ]);
-      await tap(tester, iconLabel('重命名分类 想读'));
+      await tap(tester, categoryTitle('想读'));
       await nameAndSave(tester, '待读');
       expect(server.catalog().categories.first.name, '待读');
-      await tap(tester, iconLabel('删除分类 科幻'));
+      await categoryAction(tester, '科幻', '删除分类');
       await tap(tester, find.text('删除'));
       expect(server.catalog().categories.map((value) => value.name), ['待读']);
       await tap(tester, find.text('完成'));
@@ -188,9 +583,10 @@ void main() {
       final alpha = await favorite(tester, 'Alpha');
       await favorite(tester, 'Beta');
       await show(tester);
-      await tap(tester, iconLabel('设置分类：Alpha'));
-      await tap(tester, checkboxLabel('想读'));
-      await tap(tester, checkboxLabel('科幻'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
+      await tap(tester, find.text('想读').last);
+      await tap(tester, find.text('科幻').last);
       await tap(tester, find.text('保存'));
       expect(server.manga(alpha.mangaKey)!.categoryIds, [_first, _second]);
       await filter(tester, '想读');
@@ -202,7 +598,8 @@ void main() {
       await filter(tester, '全部');
       expect(find.text('Alpha'), findsOneWidget);
       expect(find.text('Beta'), findsOneWidget);
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('想读'));
       await tap(tester, checkboxLabel('科幻'));
       await tap(tester, find.text('保存'));
@@ -222,7 +619,7 @@ void main() {
       await create(tester);
       await show(tester);
       await tap(tester, find.text('管理分类'));
-      await tap(tester, iconLabel('重命名分类 想读'));
+      await tap(tester, categoryTitle('想读'));
       await tester.enterText(find.byType(CupertinoTextField).last, '本端草稿');
       await tester.runAsync(
         () => remote.renameCategory(
@@ -235,6 +632,8 @@ void main() {
       await tester.pumpAndSettle();
       await tap(tester, find.text('保存'));
       expect(find.text(_conflict), findsWidgets);
+      expect(find.text(_blockedDraft), findsWidgets);
+      expect(find.text('原修改暂存在当前会话，关闭窗口不会撤回请求。请继续处理这次修改。'), findsNothing);
       expect(server.catalog().categories.single.name, '另一设备');
       final attempted = wire.decodeProtoJson(
         wire.CategoryMutation(),
@@ -244,8 +643,72 @@ void main() {
       expect(attempted.renameCategory.name, '本端草稿');
       final postCount = posts('/api/categories/mutations').length;
       // A conflict cannot become an implicit retry against the new revision.
-      expect(find.text('重试保存'), findsNothing);
+      expect(find.text('重试'), findsNothing);
       expect(posts('/api/categories/mutations').length, postCount);
+      await tester.runAsync(
+        () => remote.renameCategory(
+          categoryId: _first,
+          name: '读取之后',
+          expectedRevision: 2,
+        ),
+      );
+      final finalPosts = posts('/api/categories/mutations').length;
+      final received = Completer<void>();
+      final release = Completer<void>();
+      platform.afterBusinessReply = (request, reply) async {
+        if (request.method == 'GET' && request.uri.path == '/api/library') {
+          platform.afterBusinessReply = null;
+          received.complete();
+          await release.future;
+        }
+        return reply;
+      };
+      final manager = find.byKey(const ValueKey('category-manager'));
+      final command = find.byKey(const ValueKey('category-command'));
+      try {
+        await tapDuringRead(tester, find.text('重读'));
+        await tester.runAsync(
+          () => received.future.timeout(const Duration(seconds: 5)),
+        );
+        expect(find.text('正在重新读取服务端分类。'), findsWidgets);
+        await tapDuringRead(
+          tester,
+          find.descendant(
+            of: command,
+            matching: find.widgetWithText(CupertinoButton, '稍后'),
+          ),
+        );
+        await tapDuringRead(
+          tester,
+          find.descendant(
+            of: manager,
+            matching: find.widgetWithText(CupertinoButton, '稍后'),
+          ),
+        );
+        expect(manager, findsNothing);
+        await tapDuringRead(tester, find.text('处理未确认修改'));
+        expect(manager, findsOneWidget);
+        expect(find.text('重命名分类：“本端草稿”。'), findsOneWidget);
+        expect(posts('/api/categories/mutations').length, finalPosts);
+      } finally {
+        await tester.runAsync(() async {
+          release.complete();
+          await Future<void>.delayed(Duration.zero);
+        });
+        await tester.pumpAndSettle();
+      }
+      expect(manager, findsOneWidget);
+      expect(categoryTitle('读取之后'), findsOneWidget);
+      expect(categoryTitle('另一设备'), findsNothing);
+      expect(
+        tester
+            .widget<CupertinoButton>(
+              find.widgetWithText(CupertinoButton, '新建分类'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      expect(posts('/api/categories/mutations').length, finalPosts);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },
@@ -258,7 +721,8 @@ void main() {
       await create(tester, id: _second, name: '科幻');
       final alpha = await favorite(tester, 'Alpha');
       await show(tester);
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('科幻'));
       await tester.runAsync(
         () => remote.setCategories(
@@ -276,7 +740,7 @@ void main() {
       expect(server.manga(alpha.mangaKey)!.categoryIds, [_first]);
       // The data layer can reject the stale manga CAS before sending a request.
       expect(posts('/api/state/mutations').length, postCount);
-      expect(find.text('重试保存'), findsNothing);
+      expect(find.text('重试'), findsNothing);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },
@@ -315,7 +779,7 @@ void main() {
         false,
       );
       expect(hasCategory(tester, '想读'), false);
-      await tap(tester, find.text('稍后处理').last);
+      await tap(tester, find.text('稍后').last);
       expect(
         tester
             .widget<CupertinoButton>(
@@ -324,7 +788,7 @@ void main() {
             .onPressed,
         isNull,
       );
-      await tap(tester, find.text('稍后处理'));
+      await tap(tester, find.text('稍后'));
       expect(find.text('处理未确认修改'), findsOneWidget);
       await tap(tester, find.text('处理未确认修改'));
       await tap(tester, find.text('继续未确认修改'));
@@ -335,7 +799,7 @@ void main() {
             .enabled,
         false,
       );
-      await tap(tester, find.text('重试保存'));
+      await tap(tester, find.text('重试'));
       expect(posts('/api/categories/mutations').map((value) => value.body), [
         initial,
         initial,
@@ -348,13 +812,79 @@ void main() {
     },
   );
 
+  for (final failingRead in ['catalog', 'library', 'published shelf']) {
+    testWidgets(
+      'confirmed category read-back $failingRead failure reopens and retries reads without another POST',
+      (tester) async {
+        await show(tester);
+        await tap(tester, find.text('管理分类'));
+        await tap(tester, find.text('新建分类'));
+        var acknowledged = false;
+        var failReads = true;
+        var libraryReads = 0;
+        platform.afterBusinessReply = (request, reply) {
+          if (request.method == 'POST' &&
+              request.uri.path == '/api/categories/mutations') {
+            acknowledged = true;
+          } else if (acknowledged && request.method == 'GET') {
+            final libraryRead = request.uri.path == '/api/library';
+            if (libraryRead) {
+              libraryReads++;
+            }
+            final selected = failingRead == 'catalog'
+                ? request.uri.path == '/api/categories'
+                : libraryRead &&
+                      (failingRead == 'library' || libraryReads >= 2);
+            if (failReads && selected) {
+              return const ApiReply(
+                status: 503,
+                headers: {'content-type': 'text/plain'},
+                body: 'Confirmed category read unavailable',
+                redirected: false,
+              );
+            }
+          }
+          return reply;
+        };
+        await nameAndSave(tester, '想读');
+        expect(acknowledged, isTrue);
+        expect(server.catalog().categories.single.name, '想读');
+        expect(server.appliedMutations, 1);
+        expect(posts('/api/categories/mutations'), hasLength(1));
+        expect(find.text('修改已确认，但未能读取最新书架。请重试读取。'), findsWidgets);
+        expect(find.textContaining('尚未确认保存'), findsNothing);
+        final retryLabel = find.byWidgetPredicate(
+          (widget) => widget is Text && widget.semanticsLabel == '重试读取',
+        );
+        expect(retryLabel, findsOneWidget);
+        await tap(tester, find.text('稍后').last);
+        expect(find.text('继续读取已确认修改'), findsOneWidget);
+        expect(posts('/api/categories/mutations'), hasLength(1));
+        await tap(tester, find.text('稍后'));
+        expect(find.text('继续读取最新书架'), findsOneWidget);
+        expect(find.text('处理未确认修改'), findsNothing);
+        await tap(tester, find.text('继续读取最新书架'));
+        await tap(tester, find.text('继续读取已确认修改'));
+        expect(retryLabel, findsOneWidget);
+        failReads = false;
+        await tap(tester, retryLabel);
+        expect(posts('/api/categories/mutations'), hasLength(1));
+        expect(server.appliedMutations, 1);
+        expect(hasCategory(tester, '想读'), isTrue);
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
+  }
+
   testWidgets(
     'a failed association remains unsaved until an exact explicit retry succeeds',
     (tester) async {
       await create(tester);
       final alpha = await favorite(tester, 'Alpha');
       await show(tester);
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('想读'));
       server.failWrites = true;
       await tap(tester, find.text('保存'));
@@ -367,7 +897,7 @@ void main() {
       final first = posts('/api/state/mutations').last.body;
       final postCount = posts('/api/state/mutations').length;
       server.failWrites = false;
-      await tap(tester, find.text('重试保存'));
+      await tap(tester, find.text('重试'));
       expect(posts('/api/state/mutations').length, postCount + 1);
       expect(posts('/api/state/mutations').last.body, first);
       expect(server.manga(alpha.mangaKey)!.categoryIds, [_first]);
@@ -375,6 +905,82 @@ void main() {
       await hide(tester);
     },
   );
+
+  for (final brightness in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'an acknowledged association read failure reopens in $brightness at $textScale as a read-only retry',
+        (tester) async {
+          await create(tester);
+          final alpha = await favorite(tester, 'Alpha');
+          await show(tester, brightness: brightness, textScale: textScale);
+          await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+          await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
+          await tap(tester, checkboxLabel('想读'));
+          server.loseNextResponse = true;
+          await tap(tester, find.text('保存'));
+          expect(find.textContaining('尚未确认保存'), findsWidgets);
+          final original = posts('/api/state/mutations').last.body;
+          var failRead = true;
+          final received = Completer<void>();
+          final release = Completer<void>();
+          addTearDown(() {
+            if (!release.isCompleted) release.complete();
+          });
+          platform.afterBusinessReply = (request, reply) async {
+            if (failRead &&
+                request.method == 'GET' &&
+                request.uri.path == '/api/state/manga/${alpha.mangaKey}') {
+              if (!received.isCompleted) received.complete();
+              await release.future;
+              return const ApiReply(
+                status: 503,
+                headers: {'content-type': 'text/plain'},
+                body: 'Confirmed association read unavailable',
+                redirected: false,
+              );
+            }
+            return reply;
+          };
+          await tapDuringRead(tester, find.text('重试'));
+          await tester.runAsync(() => received.future);
+          expect(find.text('正在读取已确认修改后的书架。'), findsOneWidget);
+          expect(find.text('正在等待服务端确认分类修改。'), findsNothing);
+          expect(
+            tester
+                .widget<CupertinoButton>(
+                  find.widgetWithText(CupertinoButton, '稍后'),
+                )
+                .onPressed,
+            isNotNull,
+          );
+          release.complete();
+          await tester.pumpAndSettle();
+          final postCount = posts('/api/state/mutations').length;
+          final applied = server.appliedMutations;
+          expect(posts('/api/state/mutations').last.body, original);
+          expect(server.manga(alpha.mangaKey)!.categoryIds, [_first]);
+          expect(find.text('修改已确认，但未能读取最新书架。请重试读取。'), findsWidgets);
+          expect(find.textContaining('尚未确认保存'), findsNothing);
+          final retryRead = find.byWidgetPredicate(
+            (widget) => widget is Text && widget.semanticsLabel == '重试读取',
+          );
+          expect(retryRead, findsOneWidget);
+          await tap(tester, find.text('稍后').last);
+          expect(find.text('继续读取最新书架'), findsOneWidget);
+          await tap(tester, find.text('继续读取最新书架'));
+          expect(retryRead, findsOneWidget);
+          expect(posts('/api/state/mutations'), hasLength(postCount));
+          failRead = false;
+          await tap(tester, retryRead);
+          expect(posts('/api/state/mutations'), hasLength(postCount));
+          expect(server.appliedMutations, applied);
+          expect(tester.takeException(), isNull);
+          await hide(tester);
+        },
+      );
+    }
+  }
 
   testWidgets(
     'a service identity switch disables a category draft instead of writing it to the new account',
@@ -403,6 +1009,61 @@ void main() {
   );
 
   testWidgets(
+    'category management fades at its resting position and closes without animation',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(reduceMotion: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await create(tester);
+      await show(tester);
+      final before = server.catalog().revision;
+      await tap(tester, iconLabel('书架选项'));
+      final manage = find.widgetWithText(CupertinoMenuItem, '管理分类');
+      await tester.ensureVisible(manage);
+      await tester.runAsync(() async {
+        await tester.tap(manage);
+        await Future<void>.delayed(Duration.zero);
+      });
+      await tester.pump();
+      await tester.pump();
+      final sheet = find.byType(EditSheet, skipOffstage: false);
+      final initialRect = tester.getRect(sheet);
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(tester.getRect(sheet), initialRect);
+      expect(
+        find.ancestor(
+          of: sheet,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is FadeTransition &&
+                widget.opacity.value > 0 &&
+                widget.opacity.value < 1,
+          ),
+        ),
+        findsWidgets,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(sheet), initialRect);
+      expect(categoryTitle('想读'), findsOneWidget);
+
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      await tester.pump();
+      await tester.tap(find.text('完成'));
+      await tester.pump();
+      expect(find.byType(EditSheet, skipOffstage: false), findsNothing);
+      expect(server.catalog().revision, before);
+      await hide(tester);
+    },
+  );
+
+  testWidgets(
     'category management remains usable on a narrow display with long names',
     (tester) async {
       tester.view.devicePixelRatio = 1;
@@ -416,10 +1077,10 @@ void main() {
       await show(tester);
       expect(tester.takeException(), isNull);
       await tap(tester, find.text('管理分类'));
-      expect(iconLabel('重命名分类 $name'), findsOneWidget);
-      expect(iconLabel('删除分类 $name'), findsOneWidget);
+      expect(categoryTitle(name), findsOneWidget);
+      expect(iconLabel('分类选项 $name'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tap(tester, iconLabel('重命名分类 $name'));
+      await tap(tester, categoryTitle(name));
       tester.view.viewInsets = const FakeViewPadding(bottom: 320);
       addTearDown(tester.view.resetViewInsets);
       await tester.pumpAndSettle();
@@ -431,7 +1092,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(server.catalog().categories.first.name, '长篇·待读');
       await tap(tester, find.text('完成'));
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       expect(checkboxLabel('长篇·待读'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await hide(tester);
@@ -445,7 +1107,8 @@ void main() {
       await create(tester, id: _second, name: '科幻');
       final alpha = await favorite(tester, 'Alpha');
       await show(tester);
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('想读'));
       await tester.runAsync(
         () => remote.renameCategory(
@@ -466,10 +1129,11 @@ void main() {
       expect(rejected.expectedRevision, alpha.revision);
       expect(rejected.setCategories.expectedCatalogRevision, 2);
       final attempts = posts('/api/state/mutations').length;
-      expect(find.text('重试保存'), findsNothing);
-      await tap(tester, find.text('重新读取并关闭'));
+      expect(find.text('重试'), findsNothing);
+      await tap(tester, find.text('重读'));
       expect(posts('/api/state/mutations').length, attempts);
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       expect(checkboxLabel('新名字'), findsOneWidget);
       await tap(tester, checkboxLabel('想读'));
       await tap(tester, find.text('保存'));
@@ -488,10 +1152,19 @@ void main() {
   testWidgets('reconnecting the same identity never revives the old draft', (
     tester,
   ) async {
+    final save = find.widgetWithText(CupertinoButton, '保存');
+    final create = find.widgetWithText(CupertinoButton, '新建分类');
+    Tristate enabled(Finder action) => tester
+        .getSemantics(action)
+        .getSemanticsData()
+        .flagsCollection
+        .isEnabled;
     await show(tester);
     await tap(tester, find.text('管理分类'));
+    expect(enabled(create), Tristate.isTrue);
     await tap(tester, find.text('新建分类'));
     await tester.enterText(find.byType(CupertinoTextField).last, '旧会话草稿');
+    expect(enabled(save), Tristate.isTrue);
     await tester.runAsync(controller.connect);
     await tester.pumpAndSettle();
     expect(find.text(_expired), findsWidgets);
@@ -501,16 +1174,19 @@ void main() {
           .enabled,
       false,
     );
-    expect(
-      tester
-          .widget<CupertinoButton>(find.widgetWithText(CupertinoButton, '保存'))
-          .onPressed,
-      isNull,
-    );
+    expect(tester.widget<CupertinoButton>(save).enabled, isFalse);
+    expect(enabled(save), Tristate.isFalse);
     expect(posts('/api/categories/mutations'), isEmpty);
     await tap(tester, find.text('取消'));
+    expect(enabled(create), Tristate.isFalse);
+    final createLabel = find.text('新建分类');
+    expect(
+      tester.widget<Text>(createLabel).style?.color,
+      CupertinoColors.tertiaryLabel.resolveFrom(tester.element(createLabel)),
+    );
     await tap(tester, find.text('完成'));
     await tap(tester, find.text('管理分类'));
+    expect(enabled(create), Tristate.isTrue);
     await tap(tester, find.text('新建分类'));
     await nameAndSave(tester, '新会话修改');
     expect(server.catalog().categories.map((category) => category.name), [
@@ -672,7 +1348,7 @@ void main() {
       await tapBusy(
         find.descendant(
           of: find.byKey(const ValueKey('category-command')),
-          matching: find.text('稍后处理'),
+          matching: find.text('稍后'),
         ),
       );
       // Sheets retain a departing route for their delegated transition. Count
@@ -687,13 +1363,13 @@ void main() {
         tester,
         find.descendant(
           of: find.byKey(const ValueKey('category-manager')),
-          matching: find.text('稍后处理'),
+          matching: find.text('稍后'),
         ),
       );
       expect(activeSheets, findsNothing);
       await tapBusy(find.text('处理未确认修改'));
       expect(activeSheets, findsOneWidget);
-      expect(find.text('管理分类'), findsWidgets);
+      expect(iconLabel('书架选项'), findsOneWidget);
       expect(find.text(_expired), findsNothing);
       expect(
         tester
@@ -705,7 +1381,7 @@ void main() {
       );
       await acknowledge();
       expect(find.byType(EditSheet), findsOneWidget);
-      expect(iconLabel('重命名分类 迟到确认'), findsOneWidget);
+      expect(categoryTitle('迟到确认'), findsOneWidget);
       expect(
         tester
             .widget<CupertinoButton>(
@@ -719,7 +1395,8 @@ void main() {
 
       final alpha = await favorite(tester, 'Alpha');
       await tester.pumpAndSettle();
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('迟到确认'));
       received = Completer<void>();
       release = Completer<void>();
@@ -729,7 +1406,7 @@ void main() {
       await tester.runAsync(controller.connect);
       await tester.pump(const Duration(milliseconds: 32));
       expect(find.text(_expired), findsWidgets);
-      await tap(tester, find.text('稍后处理'));
+      await tap(tester, find.text('稍后'));
       expect(find.byType(EditSheet), findsNothing);
       await tapBusy(find.text('处理未确认修改'));
       expect(find.text('设置分类'), findsOneWidget);
@@ -786,13 +1463,14 @@ void main() {
       );
       final original = posts('/api/state/mutations').last.body;
       final sent = posts('/api/state/mutations').length;
-      await tap(tester, iconLabel('设置分类：Alpha'));
+      await tap(tester, iconLabel('更多操作：Alpha · zh · 测试漫画源'));
+      await tap(tester, iconLabel('设置分类：Alpha · zh · 测试漫画源'));
       await tap(tester, checkboxLabel('想读'));
       await tap(tester, find.text('保存'));
       expect(find.textContaining('先处理原操作'), findsOneWidget);
-      expect(find.text('重新读取并关闭'), findsOneWidget);
+      expect(find.text('重读'), findsOneWidget);
       expect(posts('/api/state/mutations'), hasLength(sent));
-      await tap(tester, find.text('重新读取并关闭'));
+      await tap(tester, find.text('重读'));
       expect(find.byType(EditSheet), findsNothing);
       expect(find.text('处理未确认修改'), findsNothing);
       expect(find.text('书架还是空的'), findsOneWidget);
@@ -826,7 +1504,7 @@ void main() {
       await filter(tester, '想读');
       expect(find.text('Beta'), findsNothing);
       await tap(tester, find.text('管理分类'));
-      await tap(tester, iconLabel('删除分类 想读'));
+      await categoryAction(tester, '想读', '删除分类');
       await tap(tester, find.text('删除'));
       await tap(tester, find.text('完成'));
       expect(hasCategory(tester, '想读'), false);

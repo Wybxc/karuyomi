@@ -18,7 +18,7 @@ node apps/api/test/source-metadata-probe.ts \
   PATH_TO_ARKNIGHTS/manifest.json PATH_TO_ARKNIGHTS/artifacts
 ```
 
-在输出的根页面使用正常的浏览、扩展与 Source 选择、漫画详情和 Reader 控件；独立元数据门位于 `/probe`。不注入应用内部状态，不直接请求原图 URL。原始请求摘要留在验证树 ignored `.local/p0c/reader-online.json`，不保存 Cookie、JWT 或图片正文。
+在输出的根页面使用正常的浏览、扩展与 Source 选择、漫画详情和 Reader 控件；独立元数据门位于 `/probe`。不注入应用内部状态，不直接请求原图 URL。本轮未保存 Cookie、JWT 或图片正文。
 
 ## 实际通过
 

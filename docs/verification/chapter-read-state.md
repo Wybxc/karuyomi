@@ -95,6 +95,4 @@ flutter test test/browse/chapter_read_navigation_test.dart
 - `pnpm flutter:check`：reader_core 21、source_runtime 42、客户端 337 项，三个项目静态分析无问题。
 - `pnpm build`：正式 Web/Native runtime 资源、Flutter Web 与 Worker/Static Assets 构建成功；此项仅为工程构建；独立 iOS/Android 实测见上节。
 
-详细临时日志留在忽略的 `.local/chapter-read-*.log`，不提交机器输出。
-
 Web 独立文档与 iOS ↔ Android 模拟器的顺序闭环已通过。Web ↔ Native 范围同步、Reader 与详情同时写、真实部分提交与丢响应恢复、实际生命周期、生产 Access 和真机仍待验收。

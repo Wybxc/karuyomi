@@ -1,13 +1,16 @@
 import '../test_support/cupertino.dart';
 
-import 'package:karuyomi/widgets/app_page_route.dart';
+import 'package:karuyomi/widgets/app_routes.dart';
 import 'package:karuyomi/widgets/choice_field.dart';
 
 import 'test_app.dart';
 
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind, SemanticsAction, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/semantics.dart' show SemanticsData;
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/diagnostics/reader_baseline.dart';
@@ -38,6 +41,82 @@ Future<void> _browseDetails(WidgetTester tester) async {
 }
 
 void main() {
+  for (final key in [
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+  ]) {
+    testWidgets('app buttons activate with Web ${key.keyLabel}', (
+      tester,
+    ) async {
+      await tester.pumpApp(const KaruyomiApp());
+      await tester.pumpAndSettle();
+      final shortcuts = tester
+          .widget<CupertinoApp>(find.byType(CupertinoApp))
+          .shortcuts;
+      var first = 0;
+      var second = 0;
+      const input = ValueKey('shortcut-input');
+      const secondButton = ValueKey('shortcut-second');
+      await tester.pumpApp(
+        CupertinoApp(
+          shortcuts: {
+            ...WidgetsApp.defaultShortcuts,
+            const SingleActivator(LogicalKeyboardKey.enter):
+                const ButtonActivateIntent(),
+            const SingleActivator(LogicalKeyboardKey.numpadEnter):
+                const ButtonActivateIntent(),
+            ...?shortcuts,
+          },
+          home: CupertinoPageScaffold(
+            child: Column(
+              children: [
+                CupertinoButton(
+                  autofocus: true,
+                  onPressed: () => first++,
+                  child: const Text('第一个操作'),
+                ),
+                const CupertinoTextField(key: input),
+                const CupertinoButton(onPressed: null, child: Text('不可用操作')),
+                CupertinoButton(
+                  key: secondButton,
+                  onPressed: () => second++,
+                  child: const Text('第二个操作'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+      expect(first, 1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.enterText(find.byKey(input), '草稿');
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+      expect(
+        first,
+        1,
+        reason: 'text input does not activate an unrelated button',
+      );
+      expect(second, 0);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(
+        FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<CupertinoButton>()
+            ?.key,
+        secondButton,
+      );
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+      expect(second, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final disableAnimations in [false, true]) {
     testWidgets(
       'reduced motion keeps pages stationary (disabled: $disableAnimations)',
@@ -57,16 +136,16 @@ void main() {
         expect(MediaQuery.disableAnimationsOf(context), disableAnimations);
         const pageKey = ValueKey('motion-test-page');
         final navigator = Navigator.of(context);
-        unawaited(
-          navigator.push<void>(
-            AppPageRoute<void>(
-              builder: (_) => const SizedBox.expand(key: pageKey),
-            ),
-          ),
+        final route = AppPageRoute<void>(
+          builder: (_) => const SizedBox.expand(key: pageKey),
         );
+        unawaited(navigator.push<void>(route));
         await tester.pump();
+        if (disableAnimations) {
+          expect(route.animation!.status, AnimationStatus.completed);
+        }
         await tester.pump(const Duration(milliseconds: 60));
-        final page = find.byKey(pageKey);
+        final page = find.byKey(pageKey, skipOffstage: false);
         expect(tester.getTopLeft(page), Offset.zero);
         final fades = tester.widgetList<FadeTransition>(
           find.ancestor(of: page, matching: find.byType(FadeTransition)),
@@ -83,37 +162,513 @@ void main() {
         }
         await tester.pumpAndSettle();
         expect(tester.getTopLeft(page), Offset.zero);
-        navigator.pop();
+        if (disableAnimations) {
+          navigator.pop();
+          await tester.pump();
+          expect(page, findsNothing);
+        } else {
+          final bounds = tester.getRect(page);
+          final gesture = await tester.startGesture(
+            Offset(bounds.left + 1, bounds.center.dy),
+          );
+          try {
+            await gesture.moveBy(const Offset(30, 0));
+            await tester.pump();
+            await gesture.moveBy(Offset(bounds.width * 0.6, 0));
+            await tester.pump();
+            expect(route.popGestureInProgress, isTrue);
+            expect(tester.getTopLeft(page), Offset.zero);
+            expect(route.animation!.value, lessThan(1));
+          } finally {
+            await gesture.up();
+          }
+        }
         await tester.pumpAndSettle();
+        expect(page, findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
   }
 
-  for (final size in [const Size(360, 800), const Size(1280, 900)]) {
-    testWidgets('empty shell navigation at ${size.width}px', (tester) async {
-      tester.view.physicalSize = size;
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets('a page pop uses the latest disabled-animation preference', (
+    tester,
+  ) async {
+    await tester.pumpApp(const KaruyomiApp());
+    await tester.pumpAndSettle();
+    final navigator = Navigator.of(tester.element(find.byType(AppShell)));
+    const pageKey = ValueKey('motion-preference-page');
+    unawaited(
+      navigator.push<void>(
+        AppPageRoute<void>(builder: (_) => const SizedBox.expand(key: pageKey)),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.pumpApp(const KaruyomiApp());
-      await tester.pumpAndSettle();
-      expect(find.text('书架还是空的'), findsOneWidget);
-      expect(
-        find.byType(ReaderBaselineHost),
-        readerBaselineEnabled ? findsOneWidget : findsNothing,
-      );
-      expect(find.byKey(const ValueKey('app-navigation')), findsOneWidget);
-      await tester.tap(find.text('去浏览'));
-      await tester.pumpAndSettle();
-      expect(find.text('连接漫画服务'), findsOneWidget);
-      await tester.tap(find.text('设置').last);
-      await tester.pumpAndSettle();
-      expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
-      expect(find.byType(ChoiceField<wire.AppTheme>), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await tester.pump();
+    navigator.pop();
+    await tester.pump();
+    expect(find.byKey(pageKey, skipOffstage: false), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final brightness in Brightness.values) {
+    for (final size in [
+      const Size(360, 800),
+      const Size(800, 360),
+      const Size(768, 1024),
+      const Size(1024, 768),
+      const Size(1280, 900),
+    ]) {
+      testWidgets('empty shell navigation at $size in $brightness', (
+        tester,
+      ) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpApp(const KaruyomiApp());
+        await tester.pumpAndSettle();
+        expect(find.text('书架还是空的'), findsOneWidget);
+        expect(
+          find.byType(ReaderBaselineHost),
+          readerBaselineEnabled ? findsOneWidget : findsNothing,
+        );
+        final navigation = find.byKey(const ValueKey('app-navigation'));
+        expect(navigation, findsOneWidget);
+        expect(find.byType(CupertinoTabBar), findsOneWidget);
+        expect(tester.getTopLeft(find.byType(CupertinoNavigationBar)).dx, 0);
+        for (var i = 0; i < 3; i++) {
+          final destination = find.byKey(ValueKey(('app-destination', i)));
+          expect(
+            tester
+                .getSemantics(destination)
+                .getSemanticsData()
+                .flagsCollection
+                .isSelected,
+            i == 0 ? Tristate.isTrue : Tristate.isFalse,
+          );
+        }
+        await tester.tap(find.text('去浏览'));
+        await tester.pumpAndSettle();
+        expect(find.text('连接漫画服务'), findsOneWidget);
+        await tester.tap(find.text('设置').last);
+        await tester.pumpAndSettle();
+        expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
+        expect(find.byType(ChoiceField<wire.AppTheme>), findsNothing);
+
+        tester.view.physicalSize = size.shortestSide >= 600
+            ? const Size(800, 360)
+            : const Size(768, 1024);
+        await tester.pumpAndSettle();
+        expect(navigation, findsOneWidget);
+        expect(find.byType(CupertinoTabBar), findsOneWidget);
+        expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets(
+      'Cupertino tabs fit their icons and scaled labels in $brightness',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        tester.view.devicePixelRatio = 1;
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 20);
+        tester.view.viewPadding = tester.view.padding;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetPadding);
+        addTearDown(tester.view.resetViewPadding);
+        await tester.pumpApp(const KaruyomiApp());
+        await tester.pumpAndSettle();
+
+        final navigation = find.byKey(const ValueKey('app-navigation'));
+        const labels = ['书架', '浏览', '设置'];
+        for (final viewport in [
+          const Size(360, 480),
+          const Size(800, 360),
+          const Size(768, 1024),
+        ]) {
+          tester.view.physicalSize = viewport;
+          tester.platformDispatcher.textScaleFactorTestValue = 1;
+          await tester.pumpAndSettle();
+          final defaultHeight = tester.getSize(navigation).height;
+          final selection = tester
+              .widget<CupertinoTabBar>(navigation)
+              .currentIndex;
+          for (final scale in [2.0, 3.0]) {
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            await tester.pumpAndSettle();
+            final bar = tester.widget<CupertinoTabBar>(navigation);
+            final barBounds = tester.getRect(navigation);
+            expect(bar.currentIndex, selection);
+            expect(barBounds.height, greaterThan(defaultHeight));
+            for (var index = 0; index < labels.length; index++) {
+              final icon = find.byKey(ValueKey(('app-destination', index)));
+              final label = find.descendant(
+                of: navigation,
+                matching: find.text(labels[index]),
+              );
+              final iconBounds = tester.getRect(icon);
+              final labelBounds = tester.getRect(label);
+              expect(iconBounds.height, bar.iconSize);
+              expect(iconBounds.bottom, lessThanOrEqualTo(labelBounds.top));
+              expect(labelBounds.bottom, lessThanOrEqualTo(barBounds.bottom));
+              expect(label.hitTestable(), findsOneWidget);
+            }
+          }
+          final next = (selection + 1) % labels.length;
+          await tester.tap(
+            find.descendant(of: navigation, matching: find.text(labels[next])),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.widget<CupertinoTabBar>(navigation).currentIndex, next);
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
+
+    testWidgets(
+      'Cupertino navigation switches all destinations with the keyboard in $brightness',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        tester.view.physicalSize = const Size(360, 480);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpApp(const KaruyomiApp());
+        await tester.pumpAndSettle();
+
+        final bar = find.byKey(const ValueKey('app-navigation'));
+        Finder destination(int index) =>
+            find.byKey(ValueKey(('app-destination', index)));
+        SemanticsData tabSemantics(int index) =>
+            tester.getSemantics(destination(index)).getSemanticsData();
+        bool isFocused(int index) =>
+            tabSemantics(index).flagsCollection.isFocused == Tristate.isTrue;
+        void expectSelected(int current) {
+          expect(tester.widget<CupertinoTabBar>(bar).currentIndex, current);
+          expect(
+            tabSemantics(current).flagsCollection.isSelected,
+            Tristate.isTrue,
+          );
+        }
+
+        Future<void> key(LogicalKeyboardKey key) async {
+          await tester.sendKeyEvent(key);
+          await tester.pumpAndSettle();
+        }
+
+        for (var step = 0; step < 8 && !isFocused(1); step++) {
+          await key(LogicalKeyboardKey.tab);
+        }
+        expect(isFocused(1), isTrue);
+        expect(tabSemantics(1).label, contains('浏览'));
+        expect(tabSemantics(1).hasAction(SemanticsAction.tap), isTrue);
+        expectSelected(0);
+        await key(LogicalKeyboardKey.enter);
+        expect(find.text('连接漫画服务'), findsOneWidget);
+        expectSelected(1);
+        expect(isFocused(1), isTrue);
+
+        await key(LogicalKeyboardKey.tab);
+        expect(isFocused(2), isTrue);
+        tester.view.physicalSize = const Size(800, 360);
+        await tester.pumpAndSettle();
+        expect(isFocused(2), isTrue);
+        await key(LogicalKeyboardKey.space);
+        expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
+        expectSelected(2);
+        expect(isFocused(2), isTrue);
+
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        try {
+          await key(LogicalKeyboardKey.tab);
+          expect(isFocused(1), isTrue);
+          await key(LogicalKeyboardKey.tab);
+          expect(isFocused(0), isTrue);
+        } finally {
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        }
+        await key(LogicalKeyboardKey.numpadEnter);
+        expect(find.text('书架还是空的'), findsOneWidget);
+        expectSelected(0);
+        expect(isFocused(0), isTrue);
+
+        await tester.tapAt(
+          tester.getCenter(destination(2)),
+          kind: PointerDeviceKind.mouse,
+        );
+        await tester.pumpAndSettle();
+        expectSelected(2);
+        expect(isFocused(2), isTrue);
+        await key(LogicalKeyboardKey.space);
+        expectSelected(2);
+        await tester.tap(destination(1));
+        await tester.pumpAndSettle();
+        expectSelected(1);
+        expect([
+          isFocused(0),
+          isFocused(1),
+          isFocused(2),
+        ], everyElement(isFalse));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'Cupertino navigation keeps focus and drafts across $brightness changes',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        tester.view.physicalSize = const Size(768, 1024);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpApp(const KaruyomiApp());
+        await tester.pumpAndSettle();
+        final settings = find.byKey(const ValueKey(('app-destination', 2)));
+        await tester.tap(settings);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .getSemantics(settings)
+              .getSemanticsData()
+              .flagsCollection
+              .isSelected,
+          Tristate.isTrue,
+        );
+        final origin = find.byKey(const ValueKey('service-origin'));
+        await tester.ensureVisible(origin);
+        await tester.enterText(origin, 'https://draft.example');
+        expect(
+          PrimaryScrollController.of(tester.element(find.byType(AppShell)))
+              .positions,
+          hasLength(1),
+          reason: 'keyboard scrolling has one content target',
+        );
+        final field = tester.element(origin);
+        final editing = tester.widget<EditableText>(
+          find.descendant(of: origin, matching: find.byType(EditableText)),
+        );
+        expect(editing.focusNode.hasFocus, true);
+        final selection = editing.controller.selection;
+        for (final size in [const Size(800, 360), const Size(768, 1024)]) {
+          tester.platformDispatcher.platformBrightnessTestValue =
+              brightness == Brightness.light
+              ? Brightness.dark
+              : Brightness.light;
+          tester.view.physicalSize = size;
+          await tester.pumpAndSettle();
+          expect(tester.element(origin), same(field));
+          expect(editing.controller.text, 'https://draft.example');
+          expect(editing.controller.selection, selection);
+          expect(editing.focusNode.hasFocus, true);
+          expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
+  }
+
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'settings panes retain the focused connection draft in $brightness at large text',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        tester.view.physicalSize = const Size(768, 1024);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final platform = TestPlatform(seedDefaultInstallation: false);
+        await tester.pumpApp(KaruyomiApp(platform: platform));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey(('app-destination', 2))));
+        await tester.pumpAndSettle();
+        final connection = find.byKey(
+          const ValueKey('settings-section-connection'),
+        );
+        await tester.ensureVisible(connection);
+        await tester.tap(connection);
+        await tester.pumpAndSettle();
+        final origin = find.byKey(const ValueKey('service-origin'));
+        await tester.ensureVisible(origin);
+        await tester.enterText(origin, 'https://draft.example');
+        final field = tester.element(origin);
+        final editing = tester.widget<EditableText>(
+          find.descendant(of: origin, matching: find.byType(EditableText)),
+        );
+        final selection = editing.controller.selection;
+        for (final size in [const Size(800, 360), const Size(768, 1024)]) {
+          tester.view.physicalSize = size;
+          await tester.pumpAndSettle();
+          expect(tester.element(origin), same(field));
+          expect(editing.controller.text, 'https://draft.example');
+          expect(editing.controller.selection, selection);
+          expect(editing.focusNode.hasFocus, true);
+          expect(tester.takeException(), isNull);
+        }
+        expect(platform.businessServer.appliedMutations, 0);
+      },
+    );
+
+    testWidgets(
+      'tablet settings exposes both panes to accessibility in $brightness',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        tester.view.physicalSize = const Size(768, 1024);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final semantics = tester.ensureSemantics();
+        try {
+          final platform = TestPlatform(seedDefaultInstallation: false);
+          await tester.pumpApp(KaruyomiApp(platform: platform));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey(('app-destination', 2))));
+          await tester.pumpAndSettle();
+
+          void expectDirectory() {
+            for (final label in ['外观与主题', '阅读显示', '翻页与快捷键', '服务连接', '关于']) {
+              expect(
+                find.semantics.byPredicate(
+                  (node) =>
+                      node.label.startsWith(label) &&
+                      node.getSemanticsData().hasAction(SemanticsAction.tap),
+                ),
+                findsOne,
+                reason:
+                    'the visible directory $label must remain reachable from the semantics root',
+              );
+            }
+          }
+
+          expectDirectory();
+          await tester.tap(
+            find.byKey(const ValueKey('settings-section-connection')),
+          );
+          await tester.pumpAndSettle();
+          expectDirectory();
+          expect(find.semantics.byLabel('连接服务'), findsOne);
+          tester.view.physicalSize = const Size(360, 800);
+          await tester.pumpAndSettle();
+          expect(find.semantics.byLabel('连接服务'), findsOne);
+          expect(find.semantics.byLabel(RegExp('^外观与主题')), findsNothing);
+          tester.view.physicalSize = const Size(768, 1024);
+          await tester.pumpAndSettle();
+          expectDirectory();
+          expect(find.semantics.byLabel('连接服务'), findsOne);
+          expect(platform.businessServer.appliedMutations, 0);
+          expect(tester.takeException(), isNull);
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+
+    testWidgets(
+      'service origin leaves no autofill clients after $brightness navigation',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        tester.view.physicalSize = const Size(768, 1024);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final platform = TestPlatform(seedDefaultInstallation: false);
+        await tester.pumpApp(KaruyomiApp(platform: platform));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey(('app-destination', 2))));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('settings-section-connection')),
+        );
+        await tester.pumpAndSettle();
+        final origin = find.byKey(const ValueKey('service-origin'));
+        await tester.enterText(origin, 'https://draft.example');
+        expect(tester.testTextInput.hasAnyClients, true);
+        expect(tester.testTextInput.setClientArgs!['autofill'], isNull);
+        await tester.tap(
+          find.byKey(const ValueKey('settings-section-appearance')),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.testTextInput.hasAnyClients, false);
+        await tester.tap(
+          find.byKey(const ValueKey('settings-section-connection')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<CupertinoTextField>(origin).controller!.text,
+          'https://draft.example',
+        );
+        await tester.enterText(origin, 'https://second.example');
+        expect(tester.testTextInput.setClientArgs!['autofill'], isNull);
+        await tester.tap(find.byKey(const ValueKey(('app-destination', 0))));
+        await tester.pumpAndSettle();
+        expect(tester.testTextInput.hasAnyClients, false);
+        expect(platform.businessServer.appliedMutations, 0);
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+
+    testWidgets(
+      'search does not retain autofill clients after $brightness navigation',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        final platform = TestPlatform(seedDefaultInstallation: false);
+        await tester.pumpApp(KaruyomiApp(platform: platform));
+        await tester.pumpAndSettle();
+        final navigation = find.byKey(const ValueKey('app-navigation'));
+        await tester.tap(
+          find.descendant(of: navigation, matching: find.text('浏览')),
+        );
+        await tester.pumpAndSettle();
+        final search = find.byKey(const ValueKey('source-directory-search'));
+        await tester.enterText(search, '草稿');
+        expect(tester.testTextInput.hasAnyClients, true);
+        expect(tester.testTextInput.setClientArgs, isNotNull);
+        expect(
+          tester.testTextInput.setClientArgs!['autofill'],
+          isNull,
+          reason: 'search must not create a dormant browser autofill form',
+        );
+        await tester.tap(
+          find.descendant(of: navigation, matching: find.text('设置')),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.testTextInput.hasAnyClients, false);
+        await tester.tap(
+          find.descendant(of: navigation, matching: find.text('浏览')),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(search, '另一个查询');
+        expect(tester.testTextInput.setClientArgs!['autofill'], isNull);
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
   }
 
   testWidgets(

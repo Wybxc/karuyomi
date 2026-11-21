@@ -29,6 +29,4 @@ flutter test test/browse/chapter_list_navigation_test.dart --concurrency=1
 
 新增控制使窄视口内部分章节处于屏幕外，旧导航测试因此补上真实滚动。沿用原 800×600 视口、收藏/精确进度/身份/重试及迟到资源清理断言；未放大测试视口或静默忽略未命中点击。懒列表使用官方 `scrollUntilVisible`，现有 ListView 子项结构保留，没有把整份章节目录放入一个 Column。
 
-临时输出留在忽略的 `.local/chapter-browsing-*.log`。
-
 这四项是正式产品组件导航与受控 supplier 证据，尚不是实际 Source、独立浏览器、Web/Native 组合、生产 Access 或真机验收。章节浏览不新增跨端业务记录；范围已读/标未读、书架批量操作和其余 P1 功能继续保留待办。

@@ -23,6 +23,12 @@ final class MigrationSourceChoice {
   String get key => '${build.packageName}:${source.id}';
 }
 
+typedef _TargetRead = ({
+  MigrationSourceChoice choice,
+  int? page,
+  Future<void> Function() retry,
+});
+
 /// The wizard belongs to one account client, independently of the Source slot
 /// it switches while searching. Every continuation also checks the route.
 final class MigrationController extends ChangeNotifier {
@@ -63,6 +69,7 @@ final class MigrationController extends ChangeNotifier {
   bool copyBookmarks = true;
   bool completed = false;
   bool _sourceConfirmed = false;
+  bool get inputsReady => _sourceConfirmed;
   bool get sourceDecided => sourceSequence != null || categoriesOnly;
   bool get canChange =>
       available && !busy && pending == null && !completed && _sourceConfirmed;
@@ -96,6 +103,26 @@ final class MigrationController extends ChangeNotifier {
   ChapterSequence? targetSequence;
   String? error;
   String? notice;
+  String operationLabel = '读取迁移输入';
+  _TargetRead? _targetRead;
+  bool get hasTargetReadFeedback => _targetRead != null;
+  bool get hasTargetPaginationFeedback => (_targetRead?.page ?? 0) > 1;
+  String? get targetReadContext {
+    final target = _targetRead;
+    final page = target?.page;
+    if (target == null || page == null) return null;
+    final source = target.choice.source;
+    return '${source.name} · ${source.lang} · 第 $page 页';
+  }
+
+  String? get targetRetryLabel {
+    if (_targetRead == null || error == null) return null;
+    return switch (_targetRead!.page) {
+      null => '重试打开目标源',
+      final page => '重试读取第 $page 页',
+    };
+  }
+
   bool _busy = false;
   final _cancelled = Completer<void>();
   bool _disposed = false;
@@ -123,8 +150,8 @@ final class MigrationController extends ChangeNotifier {
   }
 
   Future<void> refreshSources() async {
-    if (!available || busy) return;
-    await _run((epoch) async {
+    if (!available || busy || completed) return;
+    await _run('读取迁移输入', (epoch) async {
       await catalog.refreshInstallations();
       if (!_current(epoch)) return;
       await catalog.refreshCatalog(
@@ -161,7 +188,7 @@ final class MigrationController extends ChangeNotifier {
 
   Future<void> readOriginalChapters() async {
     if (!canChange || selectedSource != null) return;
-    await _run((epoch) async {
+    await _run('读取原作品章节', (epoch) async {
       final ref = await catalog.openSelectedSource(
         packageName: seed.metadata.packageName,
         sourceId: seed.metadata.sourceId,
@@ -192,27 +219,62 @@ final class MigrationController extends ChangeNotifier {
 
   Future<void> chooseSource(MigrationSourceChoice choice) async {
     if (!canChange || !sourceDecided) return;
-    await _run((epoch) async {
-      final ref = await catalog.openMigrationSource(
-        build: choice.build,
-        sourceId: choice.source.id,
-        shouldContinue: () => _current(epoch),
-      );
-      if (!_current(epoch)) return;
-      if (ref == null) throw FormatException(catalog.error ?? '目标漫画源未能打开。');
-      selectedSource = choice;
-      _targetReference = ref;
-      results = const [];
-      _listingQuery = null;
-      _listingPage = 0;
-      hasNextPage = false;
-      targetMetadata = null;
-      targetSequence = null;
-      preview = null;
-      matches = const [];
-      mappedTargets.clear();
-      selectedChapters.clear();
-    });
+    await _run(
+      '打开目标漫画源“${choice.source.name}”（${choice.source.lang}）',
+      (epoch) async {
+        final ref = await _openTarget(choice, epoch);
+        if (ref == null) return;
+        selectedSource = choice;
+        _targetReference = ref;
+        results = const [];
+        _listingQuery = null;
+        _listingPage = 0;
+        hasNextPage = false;
+        targetMetadata = null;
+        targetSequence = null;
+        preview = null;
+        matches = const [];
+        mappedTargets.clear();
+        selectedChapters.clear();
+      },
+      targetRead: (
+        choice: choice,
+        page: null,
+        retry: () => chooseSource(choice),
+      ),
+    );
+  }
+
+  Future<CatalogSourceRef?> _openTarget(
+    MigrationSourceChoice target,
+    int epoch,
+  ) async {
+    final ref = await catalog.openMigrationSource(
+      build: target.build,
+      sourceId: target.source.id,
+      shouldContinue: () => _current(epoch),
+    );
+    if (!_current(epoch)) return null;
+    if (ref == null) throw FormatException(catalog.error ?? '目标漫画源未能打开。');
+    return ref;
+  }
+
+  Future<CatalogSourceRef?> _ensureTarget(
+    MigrationSourceChoice target,
+    int epoch,
+  ) async {
+    final ref = _targetReference;
+    if (ref != null && catalog.isCurrentSource(ref)) return ref;
+    // Opening a different build may retire this session before it succeeds.
+    // Keep the confirmed selection and open it again on the next explicit read.
+    final reopened = await _openTarget(target, epoch);
+    if (reopened != null) _targetReference = reopened;
+    return reopened;
+  }
+
+  Future<void> retryTargetRead() async {
+    if (!canChange || error == null) return;
+    await _targetRead?.retry();
   }
 
   Future<void> search(String value) => _listTargets(value.trim());
@@ -221,42 +283,60 @@ final class MigrationController extends ChangeNotifier {
 
   Future<void> loadMore() async {
     if (_listingPage == 0 || !hasNextPage) return;
-    await _listTargets(_listingQuery, more: true);
+    await _listTargets(_listingQuery, page: _listingPage + 1);
   }
 
-  Future<void> _listTargets(String? search, {bool more = false}) async {
-    final ref = _targetReference;
-    if (!canChange || ref == null) return;
-    await _run((epoch) async {
-      final next = more ? _listingPage + 1 : 1;
-      final found = await catalog.listMigrationTargets(
-        source: ref,
-        search: search,
-        page: next,
-        shouldContinue: () => _current(epoch),
-      );
-      if (!_current(epoch)) return;
-      if (found == null) throw FormatException(catalog.error ?? '目标列表未能读取。');
-      _listingQuery = search;
-      _listingPage = next;
-      hasNextPage = found.hasNextPage;
-      results = List.unmodifiable(
-        more ? [...results, ...found.mangas] : found.mangas,
-      );
-    });
+  Future<void> _listTargets(String? search, {int page = 1}) async {
+    final selected = selectedSource;
+    if (!canChange || selected == null) return;
+    final more = page > 1;
+    final operation = search == null
+        ? more
+              ? '加载更多目标源热门作品'
+              : '浏览目标源热门作品'
+        : more
+        ? '加载更多“$search”的搜索结果'
+        : '搜索目标作品“$search”';
+    await _run(
+      operation,
+      (epoch) async {
+        final ref = await _ensureTarget(selected, epoch);
+        if (ref == null || !_current(epoch)) return;
+        final found = await catalog.listMigrationTargets(
+          source: ref,
+          search: search,
+          page: page,
+          shouldContinue: () => _current(epoch),
+        );
+        if (!_current(epoch)) return;
+        if (found == null) throw FormatException(catalog.error ?? '目标列表未能读取。');
+        _listingQuery = search;
+        _listingPage = page;
+        hasNextPage = found.hasNextPage;
+        results = List.unmodifiable(
+          more ? [...results, ...found.mangas] : found.mangas,
+        );
+      },
+      targetRead: (
+        choice: selected,
+        page: page,
+        retry: () => _listTargets(search, page: page),
+      ),
+    );
   }
 
   Future<void> chooseManga(MangaEntry manga) async {
-    final ref = _targetReference;
     final selected = selectedSource;
-    if (!canChange || ref == null || selected == null) return;
-    await _run((epoch) async {
+    if (!canChange || selected == null) return;
+    await _run('读取目标作品“${manga.title}”与迁移预览', (epoch) async {
       preview = null;
       targetMetadata = null;
       targetSequence = null;
       matches = const [];
       mappedTargets.clear();
       selectedChapters.clear();
+      final ref = await _ensureTarget(selected, epoch);
+      if (ref == null || !_current(epoch)) return;
       final details = await catalog.details(
         manga,
         shouldContinue: () => _current(epoch) && catalog.isCurrentSource(ref),
@@ -287,6 +367,7 @@ final class MigrationController extends ChangeNotifier {
     categoriesOnly = true;
     sourceSequence = null;
     error = null;
+    _targetRead = null;
     notice = '仅迁移收藏和所选分类；章节未映射，已读、书签及页面位置不复制。';
     notifyListeners();
   }
@@ -391,7 +472,7 @@ final class MigrationController extends ChangeNotifier {
 
   Future<void> refreshPreview() async {
     if (!available || busy || completed) return;
-    await _run((epoch) async {
+    await _run('重新读取迁移预览', (epoch) async {
       await _loadPreview(epoch);
     });
   }
@@ -422,7 +503,7 @@ final class MigrationController extends ChangeNotifier {
                 !value.targetBookmarks.contains(mappedTargets[sourceChapter]),
           ),
     ];
-    await _run((epoch) async {
+    await _run('等待服务端确认', (epoch) async {
       final result = await repository.commit(
         value,
         chapters: chapters,
@@ -433,33 +514,42 @@ final class MigrationController extends ChangeNotifier {
       completed = true;
       notice =
           '迁移已由服务端确认：新增已读 ${result.migration.copiedReadChapters} 章、书签 ${result.migration.copiedBookmarks} 个。原作品及目标原有数据保留。';
-    });
+    }, submitting: true);
   }
 
   Future<void> retry() async {
-    if (!available || busy || pending?.retryable != true) return;
-    await _run((epoch) async {
+    final original = pending;
+    if (!available || busy || original == null || !original.retryable) return;
+    await _run('等待服务端确认', (epoch) async {
       final result = await repository.retry(
         sourceKey,
         shouldContinue: () => _current(epoch),
       );
       if (!_current(epoch)) return;
+      targetMetadata = original.request.migrateFrom.targetMetadata;
       completed = true;
       notice =
           '原迁移操作已由服务端确认：新增已读 ${result.migration.copiedReadChapters} 章、书签 ${result.migration.copiedBookmarks} 个。';
-    });
+    }, submitting: true);
   }
 
   Future<void> discardRejected() async {
     if (!available || busy || pending?.retryable != false) return;
-    await _run((epoch) async {
+    await _run('重新读取迁移预览', (epoch) async {
       repository.discardRejected(sourceKey);
       await _loadPreview(epoch);
     });
   }
 
-  Future<void> _run(Future<void> Function(int epoch) action) async {
+  Future<void> _run(
+    String label,
+    Future<void> Function(int epoch) action, {
+    bool submitting = false,
+    _TargetRead? targetRead,
+  }) async {
     _busy = true;
+    operationLabel = label;
+    _targetRead = targetRead;
     final epoch = ++_epoch;
     error = null;
     notice = null;
@@ -474,12 +564,17 @@ final class MigrationController extends ChangeNotifier {
             ? failure.message
             : failure is BusinessStateException && failure.conflict
             ? '迁移预览已在其他设备改变，请重新读取后确认。'
+            : pending != null && !submitting
+            ? '本次读取未完成，请重新读取。原迁移操作保持不变。'
+            : pending?.retryable == false
+            ? '原迁移已被服务端拒绝，请重新读取后再修改。'
             : pending != null
-            ? '迁移尚未确认。请明确重试原操作；已确认冲突须先重新读取。'
+            ? '迁移尚未确认。请明确重试原操作。'
             : '操作未完成，请重试；尚未提交迁移。';
       }
     } finally {
       if (!_disposed) {
+        if (error == null || !_current(epoch)) _targetRead = null;
         _busy = false;
         notifyListeners();
       }

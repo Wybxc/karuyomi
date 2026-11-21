@@ -38,3 +38,38 @@ Wrangler 只让 `/api`、`/api/*` 和 `/runtime/host.html` 优先经过 Worker�
 `ACCEPTANCE_FIXTURE=progress-cas-race` 使用独立 D1 和当前英文 xkcd 的 `SINGLE`、`/3319/`。先用正式客户端把两个 Reader 准备到同一已保存且未完成的第 2 页、相同清单与写入基线。一个点「读完本章」，另一个点「重新阅读本章」。普通翻页不会占用名额；只有同基线、不同 UUID 的这两个意图能占满两个槽。第一条最多等待 15 秒；两条正式请求进入 Worker 后，最多再等待 5 秒以确认两边都已通过前置校验并到达 D1 原子批次。夹具原样提交业务批次，缺少任一请求则不会提交本轮批次。
 
 正常停服输出 `ACCEPTANCE_PROGRESS_RACE_AUDIT`。要求两个 Worker 处理时段重叠，两条都到达原子批次；一个 HTTP 200 有持久回执，另一个 HTTP 409 为 revision 冲突且无回执；两条返回同一权威状态，独立只读确认账户和作品 revision 只各增加 1。双 Reader 的保持画面、冲突提示和明确重开另由正式 UI 验收；Workers 回归只验证 API 和 D1。
+
+`ACCEPTANCE_FIXTURE=editor-ui pnpm acceptance:serve` 为设置、封面、迁移、分类、章节标记与连接状态提供隔离故障控制。仅通过进程 stdin 输入 `editor <mode> [manga|global|cover|migration|categories|classification|chapter-read|connection|preferences|extension-manifest]`，没有 HTTP 控制入口；`manga`、`global` 对应阅读设置，`cover` 对应作品快照、JSON 清除封面及私有图片读取，`migration` 对应作品快照和迁移命令，`categories` 对应分类目录读取与命令，`classification` 对应作品快照与分类关联命令，两种分类范围均包含首段书架读回；`connection` 仅对应 bootstrap GET。默认查询规则见下文的 preferences 范围。图片预置通过正式 multipart API，上传路径本身不注入故障，也不把图片字节存入审计。
+
+模式为 `pass`、`hold-read`、`delay-read`、`fail-read`、`fail-image`、`hold-confirm`、`delay-confirm`、`confirm-read-failure`、`confirm-next-loss`、`lose-confirm`、`reject-save`、`login-required`和`access-denied`。`hold-confirm` 先等待真实 D1 提交，再暂停回执交付；`lose-confirm` 仅在成功提交后返回502。人工挂起最多30秒，以新的控制命令推进 generation 释放；取消会退出等待，未释放超时不记成功。`delay-read` 自动等待5秒，`delay-confirm` 在真实提交后自动等待2秒再交付原回执；`confirm-read-failure` 正常交付同样延迟的成功回执，同时把该 generation 的后续读取设为503。`confirm-next-loss` 同样正常交付首个成功命令的延迟回执，再把该 generation 切为`lose-confirm`，使后续成功提交只丢确认；用`editor pass <scope>`后才能明确重试原命令。自动等待也检查取消，显式改模式优先于预定故障；产品超时不变。`fail-image` 仅对私有图片字节返回503，作品记录保持真实。用 `audit` 查看最多256条请求正文/状态审计，`stop` 正常停服并输出 `ACCEPTANCE_EDITOR_UI_AUDIT`。有界JSON状态命令均进入审计；进度、收藏等其它命令始终原样执行，不受编辑器故障模式影响。此入口替代先前仅设置的夹具，生产入口与配置不包含测试控制。
+
+`editor <mode> preferences` 对应默认仓库的 Source 偏好。读取要求整包路径和标准的 `catalogUrl`、`repoId` 参数，写入使用正式 Source 偏好命令与 D1 事务。以 `delay-read` 验收打开表单，以 `lose-confirm` 验收未确认原请求，以 `confirm-read-failure` 验收已确认后的只读恢复。
+
+`editor <mode> chapter-read` 只对应 `setChapterRead`。给三章批量设置 `confirm-next-loss` 后，第一项的真实确认正常交付，第二项真实保存后丢确认，第三项仍未发送。设为 `pass` 后重试第二项，再明确继续第三项。需要验收失效时，可以用 `hold-confirm` 暂扣首项回执，再切 `login-required` 释放首笔并使下一章在进入业务处理前收到 401。用独立章节进度读回和审计核对每个 UUID、版本、结果及未发送范围。
+
+`editor delay-read extension-manifest` 延迟同源的标准构建清单 GET 五秒。打开扩展安装或本机准备时，可在等待界面取消，再用 `editor pass extension-manifest` 复验正常完成。清单仍由官方 Static Assets 提供，索引、压缩产物与运行时资源照常交付。取消观测以真实请求的终态和临时账户快照为准。
+
+`ACCEPTANCE_FIXTURE=migration-chapters pnpm acceptance:serve` 在隔离验收入口为固定的英语、中文 xkcd 上游章节列表各提供 257 条可唯一匹配的记录。正式扩展解析响应，Worker 仍经过正常鉴权、二进制桥和 D1。先收藏英语作品，再按 `/1/` 至 `/257/` 通过正式书签 API 保存标记。切到中文源的迁移预览后，检查超限时禁用确认，取消一条映射后可进入二次确认。返回检查且不提交；通过前后读回核对作品和全部书签。夹具只替换两个章节列表的响应，结果仅用于验收选择上限。
+
+测试运行时确认的等待、丢失与精确重试时，先按正式 Web 构建装配客户端和扩展快照，再运行以下命令。
+
+```sh
+pnpm --filter @karuyomi/api exec vite build --config vite.acceptance.config.ts --mode runtime-acceptance
+ACCEPTANCE_FIXTURE=runtime-control pnpm acceptance:serve
+```
+
+使用验收地址的 `?acceptance-runtime=stop`、`close` 或 `cache`。验收脚本调用原 CI runtime host 和扩展。`stop` 暂扣第一笔搜索的结果，最长 25 秒；结束等待时按原 requestId 和 generation 向真实 host 发送停止，在 6.5 秒后模拟停止确认丢失，并丢弃第一次已成功重置的确认。`close` 从同样的有活动搜索点击返回，另丢弃一次关闭中尝试的重置确认。确认失败后，界面应提供原停止或原关闭的重试。`cache` 在真实清除成功后保留同一摘要的确认 7 秒。通过浏览器控制台的 `ACCEPTANCE_RUNTIME_CONTROL` 和前后权威 API 读回核对结果。脚本及路由仅由显式验收构建和本机启动选项启用。
+
+`?acceptance-runtime=filters` 在正式 Source 枚举筛选说明或执行带筛选条件的搜索时，最多将相同请求的结果暂扣八秒。打开长筛选表单，滚到底后点重置，再明确应用，核对进度、禁用语义与实际恢复。新文档还可加上 `filter-outcome=read-error` 或 `reset-error`，分别把第一次或第二次筛选说明结果替换为 `SOURCE_ERROR`，再用界面重试。加上 `filter-outcome=retire` 会在第二次读取完成后通过正式 host 重建运行时，并向原请求返回 `RUNTIME_LOST`。核对旧草稿退出、重连、重新打开筛选，按审计中的 requestId、generation、snapshotId 以及前后账户读回确认隔离。
+
+`?acceptance-runtime=migration` 要求提供精确的 `migration-reject-build`（构建 ID）和 `migration-listing-source`（读取列表的 Source ID）。先选择可用的目标并读取，切换到指定构建时，首次打开向客户端返回 `SOURCE_ERROR`。核对原目标及候选保留、可继续读取原目标、显式重试打开原失败构建。指定 Source 的热门和搜索在首次取得真实的第二页非空结果时分别丢弃该响应，其余响应照常交付。搜索的该次响应先暂扣 3.5 秒，供实拍稳定等待。修改输入框但不提交，再重试失败的分页，与 `ACCEPTANCE_RUNTIME_CONTROL` 中的 sourceId、query、page 和 generation 核对。用隔离账户的前后读回确认向导零业务写入。
+
+`?acceptance-runtime=details-refresh&details-refresh-stage=chapters` 用于英文 xkcd 的 `SINGLE`。先从热门列表打开作品，首次资料和章节均由原宿主交付。点详情刷新时，夹具等待真实章节结果并暂扣 2.4 秒，再返回一次 `SOURCE_ERROR`。另开文档用 `details-refresh-stage=details` 复验资料阶段。两轮均核对等待、失败和重试时的旧资料、原清单及同一阅读入口，按 `ACCEPTANCE_RUNTIME_CONTROL` 核对源、作品、代次和阅读阶段。在进入阅读器前用独立账户读回检查刷新产生的写入。
+
+`?acceptance-runtime=reader-boundary` 暂扣英文 xkcd 3319 的首份真实非空页列表 18 秒，随后原样交付。选择单页、从右到左及反向来源顺序，从详情打开 3320。待第 1 页加载且服务端确认进度后，按 T 隐藏工具，再按 Page Up 转向 3319。采集稳定等待并在交付前点「返回本章」。用 `ACCEPTANCE_RUNTIME_CONTROL` 区分暂扣和交付，用独立 API 读回核对进度。再次显示过渡，确认进入后核对目标的真实图片和保存位置。
+
+`?acceptance-runtime=preference-groups` 将真实 Komiic 的两个设置放进受控的启用、禁用和空分组。先在普通文档保存可用镜像，再在夹具文档打开漫画源设置。验证子组仍显示、镜像继承禁用、可编辑的章节选项能完成实际保存。夹具保留 snapshotId 与 generation，将客户端提交的嵌套路径还原到同一真实设置的原始路径，再交付原监听器结果。核对 `ACCEPTANCE_RUNTIME_CONTROL` 的两条路径、确认值和同一隔离账户的读回。
+
+`?acceptance-runtime=retire-search` 用正式跨源搜索选择 Komiic 并查找「航海王」。先在普通文档用漫画源设置选通 `.cc`。夹具取得真实搜索结果后交付 `ACCESS_REQUIRED`，在同一执行槽将真实关闭确认暂扣八秒并模拟丢失，再丢弃两次真实重置确认。失效页应保留关闭状态和精确重试，隐藏旧查询与结果。显式重试第三次重置确认后才返回原浏览入口。用请求 ID、generation 和 slot 核对审计；重新连接后手动发起同一查询应从新代次取得真实结果。
+
+`?acceptance-runtime=search-choices` 在正式跨源搜索选择英文 xkcd 与 MangaDex，提交 `one piece` 后迅速重开搜索范围及语言选择。原宿主返回两源首份搜索结果后，夹具暂扣 xkcd 9 秒再交付一次 `SOURCE_ERROR`，MangaDex 暂扣 10.5 秒后原样交付。两条 `ACCEPTANCE_RUNTIME_CONTROL` 交付事件应出现在语言页打开期间。选择「全部语言」并返回，核对两个已选源、分组结果和返回焦点。可按页面坐标滚动筛选 `MangaDex` 后的长名单，回到顶部检查筛选文字和语言行位置，再直接打开语言。翻页和后续重试走原宿主。

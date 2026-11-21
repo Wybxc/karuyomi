@@ -1,4 +1,4 @@
-import 'package:karuyomi/widgets/app_page_route.dart';
+import 'package:karuyomi/widgets/app_routes.dart';
 
 import 'dart:async';
 import 'dart:convert';

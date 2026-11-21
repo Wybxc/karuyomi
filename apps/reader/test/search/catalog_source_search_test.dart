@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
+import 'package:karuyomi/features/search/cross_source_search_controller.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
 
@@ -621,6 +622,62 @@ void main() {
   });
 
   test(
+    'an unconfirmed stop can recover its original slot in the same search page',
+    () async {
+      final controller = CrossSourceSearchController(service: search);
+      final entered = Completer<void>();
+      final late = Completer<wire.SourceResult>();
+      slots.invoke = (_) {
+        entered.complete();
+        return late.future;
+      };
+      var resetAttempts = 0;
+      slots.beforeReset = () async {
+        ++resetAttempts;
+        throw const RuntimeException(
+          RuntimeErrorCode.runtimeLost,
+          'Reset ACK lost',
+        );
+      };
+      try {
+        await controller.loadTargets();
+        controller.select(target('11'), true);
+        await controller.start('query');
+        await entered.future.timeout(const Duration(seconds: 2));
+        final group = controller.groups.single;
+
+        await controller.cancel(group);
+        await Future<void>.delayed(Duration.zero);
+        expect(group.status, SourceSearchStatus.cancellationFailed);
+        expect(controller.canCancel(group), true);
+        expect(controller.canStart, false);
+        expect(resetAttempts, 1);
+        await controller.start('replacement');
+        expect(controller.query, 'query');
+        expect(slots.calls, hasLength(1));
+
+        slots.beforeReset = () async {
+          ++resetAttempts;
+        };
+        await controller.cancel(group);
+        expect(group.status, SourceSearchStatus.cancelled);
+        expect(controller.canStart, true);
+        expect(slots.live, isEmpty);
+        expect(resetAttempts, 2);
+        expect(slots.calls, hasLength(1));
+        late.complete(_page('late after stop'));
+        await Future<void>.delayed(Duration.zero);
+        expect(group.mangas, isEmpty);
+      } finally {
+        slots.beforeReset = null;
+        if (!late.isCompleted) late.complete(_page('late after stop'));
+        await controller.close();
+        controller.dispose();
+      }
+    },
+  );
+
+  test(
     'a confirmed exact-origin replacement cancels the old search result',
     () async {
       final entered = Completer<void>();
@@ -746,4 +803,38 @@ void main() {
       expect(catalog.isCurrentSource(details.source), true);
     },
   );
+
+  for (final failOpening in [true, false]) {
+    test(
+      'opening an exact result reports the catalog error at ${failOpening ? 'Source open' : 'details read'}',
+      () async {
+        final selected = target('11');
+        final page = await search.search(selected, 'query').result;
+        const failure = RuntimeException(
+          RuntimeErrorCode.runtimeLost,
+          'One Source operation failed',
+        );
+        if (failOpening) {
+          slots.beforeOpen = (_) async => throw failure;
+        } else {
+          slots.invoke = (call) async {
+            if (call.hasDetails()) throw failure;
+            return slots._defaultResult(call);
+          };
+        }
+        await expectLater(
+          search.openResult(selected, page.mangas.single),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'displayed reason',
+              predicate(
+                (message) => message == catalog.error && catalog.error != null,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:source_runtime/source_runtime.dart';
 
 import '../browse/catalog_controller.dart';
 
@@ -28,6 +29,7 @@ final class SourceSearchGroup {
   bool hasNextPage = false;
   SourceSearchStatus status = SourceSearchStatus.queued;
   String? error;
+  String? errorDetails;
   String? limitReason;
   SourceSearchTask? _task;
   int _request = 0;
@@ -46,7 +48,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
     bool Function()? isCurrent,
   }) : isCurrent = isCurrent ?? (() => true) {
     service.addListener(_serviceChanged);
-    if (!service.available) _retired = true;
+    _retired = service.retired;
   }
 
   final CatalogSourceSearch service;
@@ -61,22 +63,40 @@ final class CrossSourceSearchController extends ChangeNotifier {
   String? cleanupError;
   bool loadingTargets = false;
   bool transitioning = false;
-  bool opening = false;
+  ({String title, String sourceName})? _openingTarget;
   bool _retired = false;
   bool _disposed = false;
   bool _closed = false;
   int _epoch = 0;
 
-  bool get available =>
-      !_disposed && !_retired && !_closed && service.available;
+  bool get _ownsSearch =>
+      !_disposed && !_retired && !_closed && !service.retired;
+  bool get retired => !_ownsSearch;
+  bool get available => _ownsSearch && service.available;
+  SourceSearchRetirement? get retirement => service.retirement;
   String? get unavailableReason =>
       available ? null : service.unavailableReason ?? '身份或服务已改变，请关闭后重新开始搜索。';
+  String? get cleanupNotice =>
+      cleanupError ??
+      (_ownsSearch && !service.available && !_stopPending
+          ? service.unavailableReason
+          : null);
+  bool get _stopPending => groups.any(
+    (group) =>
+        group.status == SourceSearchStatus.cancelling ||
+        group.status == SourceSearchStatus.cancellationFailed,
+  );
   bool get hasActive => groups.any((group) => group.active);
+  bool get opening => _openingTarget != null;
+  ({String title, String sourceName})? get openingTarget =>
+      available ? _openingTarget : null;
   int get resultCount =>
       groups.fold(0, (count, group) => count + group.mangas.length);
   bool get canChange =>
       available && !loadingTargets && !transitioning && !opening;
-  bool get canSelect => canChange && !hasActive && cleanupError == null;
+  bool get canSearch => canChange && cleanupError == null && !_stopPending;
+  bool get canStart => canSearch && targets.isNotEmpty;
+  bool get canSelect => canSearch && !hasActive;
   List<String> get languages =>
       targets.map((target) => target.source.lang).toSet().toList()..sort();
   List<SourceSearchTarget> get visibleTargets => List.unmodifiable(
@@ -85,13 +105,23 @@ final class CrossSourceSearchController extends ChangeNotifier {
     ),
   );
 
-  bool _current(int epoch) => available && isCurrent() && epoch == _epoch;
+  // Accepted searches can finish while the language picker covers the page.
+  bool _ownsEpoch(int epoch) => _ownsSearch && epoch == _epoch;
+  bool _current(int epoch) => _ownsEpoch(epoch) && isCurrent();
 
   void _serviceChanged() {
     if (_disposed) return;
-    if (!service.available) {
+    if (service.retired && !_retired) {
       _retired = true;
       ++_epoch;
+    }
+    if (retirement != null) {
+      targets = const [];
+      groups = const [];
+      _selected.clear();
+      query = '';
+      language = null;
+      error = null;
     }
     notifyListeners();
   }
@@ -143,7 +173,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
   }
 
   Future<void> start(String value) async {
-    if (!canChange || !isCurrent()) return;
+    if (!canStart || !isCurrent()) return;
     final text = value.trim();
     if (text.isEmpty || text.length > crossSourceQueryLimit) {
       error = '请输入1至500字的搜索词。';
@@ -176,13 +206,14 @@ final class CrossSourceSearchController extends ChangeNotifier {
     final request = ++group._request;
     group.status = SourceSearchStatus.queued;
     group.error = null;
+    group.errorDetails = null;
     try {
       final task = service.search(
         group.target,
         group.query,
         page: group.page + 1,
         onStarted: () {
-          if (!_current(epoch) || request != group._request) return;
+          if (!_ownsEpoch(epoch) || request != group._request) return;
           group.status = SourceSearchStatus.loading;
           notifyListeners();
         },
@@ -190,9 +221,10 @@ final class CrossSourceSearchController extends ChangeNotifier {
       group._task = task;
       unawaited(_receive(group, task, epoch, request));
     } catch (failure) {
-      if (!_current(epoch) || request != group._request) return;
+      if (!_ownsEpoch(epoch) || request != group._request) return;
       group.status = SourceSearchStatus.error;
       group.error = _message(failure);
+      group.errorDetails = failure.toString();
     }
   }
 
@@ -204,7 +236,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
   ) async {
     try {
       final found = await task.result;
-      if (!_current(epoch) || request != group._request) return;
+      if (!_ownsEpoch(epoch) || request != group._request) return;
       group._task = null;
       if (group.mangas.length + found.mangas.length >
               crossSourcePerSourceLimit ||
@@ -224,18 +256,18 @@ final class CrossSourceSearchController extends ChangeNotifier {
         group.limitReason = '已达每源200项或总计1000项的上限；请缩小范围后重新搜索以查看更多。';
       }
     } catch (failure) {
-      if (!_current(epoch) || request != group._request) return;
+      if (!_ownsEpoch(epoch) || request != group._request) return;
       group._task = null;
       group.status = SourceSearchStatus.error;
       group.error = _message(failure);
+      group.errorDetails = failure.toString();
     } finally {
       if (!_disposed) notifyListeners();
     }
   }
 
   bool canContinue(SourceSearchGroup group) =>
-      canChange &&
-      cleanupError == null &&
+      canSearch &&
       !group.active &&
       group.limitReason == null &&
       (group.status == SourceSearchStatus.error ||
@@ -248,19 +280,27 @@ final class CrossSourceSearchController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool canCancel(SourceSearchGroup group) =>
+      _ownsSearch &&
+      !transitioning &&
+      !opening &&
+      cleanupError == null &&
+      group._task != null &&
+      (group.status == SourceSearchStatus.cancellationFailed ||
+          service.available &&
+              {
+                SourceSearchStatus.queued,
+                SourceSearchStatus.loading,
+              }.contains(group.status));
+
   Future<void> cancel(SourceSearchGroup group) async {
-    final task = group._task;
-    if (!available ||
-        transitioning ||
-        task == null ||
-        !groups.contains(group) ||
-        group.status == SourceSearchStatus.cancelling) {
-      return;
-    }
+    if (!canCancel(group) || !groups.contains(group)) return;
+    final task = group._task!;
     final request = ++group._request;
     final epoch = _epoch;
     group.status = SourceSearchStatus.cancelling;
     group.error = null;
+    group.errorDetails = null;
     notifyListeners();
     try {
       await task.cancel();
@@ -271,29 +311,57 @@ final class CrossSourceSearchController extends ChangeNotifier {
       if (_disposed || epoch != _epoch || request != group._request) return;
       group.status = SourceSearchStatus.cancellationFailed;
       group.error = '停止尚未确认：${_message(failure)}';
+      group.errorDetails = failure.toString();
     } finally {
       if (!_disposed) notifyListeners();
     }
   }
 
-  Future<bool> stop() async {
-    if (_disposed || transitioning) return false;
+  void _beginCleanup() {
     transitioning = true;
     ++_epoch;
     error = null;
+    cleanupError = null;
+    for (final group in groups.where((group) => group.active)) {
+      group.status = SourceSearchStatus.cancelling;
+      group.error = null;
+      group.errorDetails = null;
+    }
     notifyListeners();
+  }
+
+  void _cleanupFailed(Object failure) {
+    cleanupError =
+        failure is RuntimeException &&
+            failure.code == RuntimeErrorCode.runtimeLost
+        ? '运行时未确认资源释放。'
+        : _message(failure);
+    for (final group in groups) {
+      if (group.status == SourceSearchStatus.cancelling) {
+        group.status = SourceSearchStatus.cancellationFailed;
+      }
+    }
+  }
+
+  Future<bool> stop() async {
+    if (_disposed || transitioning) return false;
+    _beginCleanup();
     try {
       await service.stop();
       if (_disposed) return false;
       for (final group in groups) {
         ++group._request;
         group._task = null;
-        if (group.active) group.status = SourceSearchStatus.cancelled;
+        if (group.active) {
+          group.status = SourceSearchStatus.cancelled;
+          group.error = null;
+          group.errorDetails = null;
+        }
       }
       cleanupError = null;
       return true;
     } catch (failure) {
-      if (!_disposed) cleanupError = '搜索资源尚未释放：${_message(failure)}';
+      if (!_disposed) _cleanupFailed(failure);
       return false;
     } finally {
       if (!_disposed) {
@@ -307,18 +375,17 @@ final class CrossSourceSearchController extends ChangeNotifier {
     ({MangaEntry manga, List<ChapterEntry> chapters, CatalogSourceRef source})?
   >
   open(SourceSearchGroup group, MangaEntry manga) async {
-    if (!canChange ||
+    if (!canSearch ||
         !groups.contains(group) ||
         !group.mangas.contains(manga) ||
         !isCurrent()) {
       return null;
     }
-    if (!await stop() || !available || !isCurrent()) return null;
-    opening = true;
-    error = null;
+    _openingTarget = (title: manga.title, sourceName: group.target.source.name);
+    final stopped = stop();
     final epoch = _epoch;
-    notifyListeners();
     try {
+      if (!await stopped || !_current(epoch)) return null;
       final details = await service.openResult(
         group.target,
         manga,
@@ -332,7 +399,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       return null;
     } finally {
       if (!_disposed) {
-        opening = false;
+        _openingTarget = null;
         notifyListeners();
       }
     }
@@ -341,9 +408,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
   Future<bool> close() async {
     if (_closed) return true;
     if (_disposed || transitioning) return false;
-    transitioning = true;
-    ++_epoch;
-    notifyListeners();
+    _beginCleanup();
     try {
       await service.close();
       if (_disposed) return false;
@@ -355,7 +420,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       }
       return true;
     } catch (failure) {
-      if (!_disposed) cleanupError = '搜索资源尚未释放：${_message(failure)}';
+      if (!_disposed) _cleanupFailed(failure);
       return false;
     } finally {
       if (!_disposed) {
@@ -365,8 +430,24 @@ final class CrossSourceSearchController extends ChangeNotifier {
     }
   }
 
-  static String _message(Object error) =>
-      error is FormatException ? error.message.toString() : error.toString();
+  static String _message(Object error) => switch (error) {
+    FormatException() => error.message.toString(),
+    RuntimeException() => switch (error.code) {
+      RuntimeErrorCode.accessRequired => '访问验证已失效，请重新登录。',
+      RuntimeErrorCode.accessDenied => '当前身份没有访问权限。',
+      RuntimeErrorCode.timeout => '漫画源响应超时，请重试。',
+      RuntimeErrorCode.runtimeLost => '漫画源连接已失效，请重试。',
+      RuntimeErrorCode.unsupportedCapability => '漫画源暂不支持这个操作。',
+      RuntimeErrorCode.integrityError => '扩展文件校验失败，请重新加载。',
+      RuntimeErrorCode.extensionAssetUnavailable => '无法从仓库读取扩展材料，请重试。',
+      RuntimeErrorCode.sourceError => '漫画源请求失败，请重试。',
+      RuntimeErrorCode.storageBusy => '漫画源正在其他标签页或窗口运行，请关闭后重试。',
+      RuntimeErrorCode.protocolError => '漫画源返回的数据无法读取，请重新加载。',
+      RuntimeErrorCode.limitExceeded => '漫画源返回内容超出限额，请缩小搜索范围。',
+      RuntimeErrorCode.cancelled => '请求已取消，可重新搜索。',
+    },
+    _ => error.toString(),
+  };
 
   Future<void> _disposeService() async {
     try {

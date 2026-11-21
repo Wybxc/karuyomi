@@ -1,6 +1,7 @@
-import 'package:karuyomi/widgets/app_page_route.dart';
+import 'package:karuyomi/widgets/app_routes.dart';
 
 import '../test_app.dart';
+import '../../test_support/cupertino.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -8,6 +9,7 @@ import 'dart:convert';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
+import 'package:karuyomi/features/browse/manga_cover_tile.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
@@ -43,15 +45,17 @@ void main() {
   Future<void> favorite({
     wire.Manga? manga,
     String sourceName = '测试漫画源',
+    String mangaSourceId = sourceId,
+    String sourceLang = 'zh',
     DateTime? addedAt,
   }) async {
     if (addedAt != null) serverNow = addedAt;
     final repository = controller.library!;
     await repository.setFavorite(
       packageName: 'eu.kanade.source.test',
-      sourceId: sourceId,
+      sourceId: mangaSourceId,
       sourceName: sourceName,
-      sourceLang: 'zh',
+      sourceLang: sourceLang,
       manga: manga ?? testManga,
       favorite: true,
     );
@@ -78,6 +82,126 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final brightness in Brightness.values) {
+    for (final textScale in [1.0, 2.0]) {
+      testWidgets(
+        'same-title shelf entries expose language and Source in $brightness at ${textScale}x',
+        (tester) async {
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          tester.platformDispatcher.textScaleFactorTestValue = textScale;
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(
+            tester.platformDispatcher.clearPlatformBrightnessTestValue,
+          );
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final semantics = tester.ensureSemantics();
+          try {
+            const title = '同名作品 · A long title spanning several lines';
+            const name = '很长的漫画源名称，含多种语言版本';
+            for (final (id, language) in [('11', 'en'), ('12', 'zh')]) {
+              await favorite(
+                manga: wire.Manga(url: '/same', title: title),
+                sourceName: name,
+                mangaSourceId: id,
+                sourceLang: language,
+              );
+            }
+            final writesBefore = platform.businessServer.requests
+                .where((request) => request.method == 'POST')
+                .length;
+            await show(tester);
+            for (final language in ['en', 'zh']) {
+              final caption = find.text('$language · $name');
+              expect(caption, findsOneWidget);
+              final button = find
+                  .ancestor(of: caption, matching: find.byType(CupertinoButton))
+                  .first;
+              expect(
+                tester.getSemantics(button).getSemanticsData().label,
+                '$title\n$language · $name',
+              );
+              expect(
+                tester.getRect(button).contains(tester.getCenter(caption)),
+                isTrue,
+              );
+              expect(
+                iconLabel('更多操作：$title · $language · $name'),
+                findsOneWidget,
+              );
+            }
+            await tester.tap(iconLabel('更多操作：$title · en · $name'));
+            await tester.pumpAndSettle();
+            expect(find.text('迁移到其他漫画源'), findsOneWidget);
+            await tester.tap(iconLabel('设置分类：$title · en · $name'));
+            await tester.pumpAndSettle();
+            final editor = find.byKey(const ValueKey('category-command'));
+            expect(
+              find.descendant(of: editor, matching: find.text(title)),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(of: editor, matching: find.text('en · $name')),
+              findsOneWidget,
+              reason: 'The open editor must distinguish the same-title Source',
+            );
+            await tester.tap(find.text('取消'));
+            await tester.pumpAndSettle();
+            expect(editor, findsNothing);
+            expect(find.text('en · $name'), findsOneWidget);
+            await tester.tap(iconLabel('选择漫画'));
+            await tester.pumpAndSettle();
+            Finder selection(String language) => find.byWidgetPredicate(
+              (widget) =>
+                  widget is CupertinoCheckbox &&
+                  widget.semanticLabel == '选择漫画：$title · $language · $name',
+            );
+            for (final language in ['en', 'zh']) {
+              final checkbox = selection(language);
+              expect(checkbox, findsOneWidget);
+              expect(
+                tester.getSemantics(checkbox).getSemanticsData().label,
+                '选择漫画：$title · $language · $name',
+              );
+              expect(tester.widget<CupertinoCheckbox>(checkbox).value, isFalse);
+            }
+            await tester.tap(selection('en'));
+            await tester.pumpAndSettle();
+            expect(
+              tester.widget<CupertinoCheckbox>(selection('en')).value,
+              isTrue,
+            );
+            expect(
+              tester.widget<CupertinoCheckbox>(selection('zh')).value,
+              isFalse,
+            );
+            expect(find.text('已选 1 部 · 当前隐藏 0 部'), findsOneWidget);
+            await tester.tap(selection('en'));
+            await tester.pumpAndSettle();
+            expect(
+              tester.widget<CupertinoCheckbox>(selection('en')).value,
+              isFalse,
+            );
+            expect(find.text('已选 0 部 · 当前隐藏 0 部'), findsOneWidget);
+            expect(
+              platform.businessServer.requests
+                  .where((request) => request.method == 'POST')
+                  .length,
+              writesBefore,
+            );
+            expect(platform.invocations, isEmpty);
+            expect(tester.takeException(), isNull);
+            await hide(tester);
+          } finally {
+            semantics.dispose();
+          }
+        },
+      );
+    }
+  }
+
   testWidgets('shelf search and sorting only use stored metadata', (
     tester,
   ) async {
@@ -93,16 +217,20 @@ void main() {
     await show(tester);
 
     expect(
-      tester.getTopLeft(find.text('Zulu')).dy,
-      lessThan(tester.getTopLeft(find.text('Alpha')).dy),
+      tester
+          .widgetList<MangaCoverTile>(find.byType(MangaCoverTile))
+          .map((tile) => tile.title),
+      ['Zulu', 'Alpha'],
     );
-    await tester.tap(find.text('最近收藏'));
+    await tester.tap(iconLabel('书架排序'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('标题').last);
     await tester.pumpAndSettle();
     expect(
-      tester.getTopLeft(find.text('Alpha')).dy,
-      lessThan(tester.getTopLeft(find.text('Zulu')).dy),
+      tester
+          .widgetList<MangaCoverTile>(find.byType(MangaCoverTile))
+          .map((tile) => tile.title),
+      ['Alpha', 'Zulu'],
     );
 
     await tester.enterText(find.byType(CupertinoTextField), '新作者');
@@ -310,6 +438,8 @@ void main() {
           redirected: false,
         );
       };
+      await tester.tap(iconLabel('书架选项'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('刷新服务端书架'));
       await tester.pumpAndSettle();
       expect(find.text(testManga.title), findsOneWidget);
@@ -317,6 +447,8 @@ void main() {
       expect(find.text('书架还是空的'), findsNothing);
       expect(controller.status, ServiceStatus.ready);
       platform.businessServer.beforeRequest = null;
+      await tester.tap(iconLabel('书架选项'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('刷新服务端书架'));
       await tester.pumpAndSettle();
       expect(find.text(testManga.title), findsOneWidget);
@@ -330,6 +462,8 @@ void main() {
     'the shelf offers an explicit server refresh without local persistence',
     (tester) async {
       await show(tester);
+      await tester.tap(iconLabel('书架选项'));
+      await tester.pumpAndSettle();
       expect(find.text('刷新服务端书架'), findsOneWidget);
       expect(find.text('书架仅保存在此设备。'), findsNothing);
       expect(tester.takeException(), isNull);

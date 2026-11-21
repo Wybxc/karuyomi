@@ -58,6 +58,72 @@ void main() {
   List<TestBusinessRequest> writes() =>
       server.requests.where((request) => request.method == 'POST').toList();
 
+  test('recreating a settings editor retains the known rejection instead of calling it unknown', () async {
+    await controller.refresh();
+    expect(await controller.saveGlobal(_global(), 1), false);
+    expect(state().failure, SettingsFailure.conflict);
+    fixture.invalidate();
+    controller = fixture.editor();
+    expect(state().failure, SettingsFailure.conflict);
+    expect(state().error, contains('其他设备'));
+    expect(state().canRetry, false);
+    expect(await controller.refresh(), true);
+    expect(state().pending, isNull);
+    expect(writes(), hasLength(1));
+  });
+
+  test(
+    'acknowledged settings move to reading before authoritative reply arrives',
+    () async {
+      await controller.refresh();
+      final entered = Completer<void>();
+      final proceed = Completer<void>();
+      addTearDown(() {
+        if (!proceed.isCompleted) proceed.complete();
+      });
+      fixture.platform.afterBusinessReply = (request, reply) async {
+        if (request.method == 'GET' && request.uri.path == '/api/settings') {
+          entered.complete();
+          await proceed.future;
+        }
+        return reply;
+      };
+      final saving = controller.saveGlobal(_global(), 0);
+      await entered.future.timeout(const Duration(seconds: 5));
+      expect(state().activity, SettingsActivity.reading);
+      expect(state().canEdit, false);
+      proceed.complete();
+      expect(await saving, true);
+      expect(writes(), hasLength(1));
+    },
+  );
+
+  test('acknowledged settings read failure stays confirmed and retries only the read', () async {
+    await controller.refresh();
+    var failReads = true;
+    fixture.platform.afterBusinessReply = (request, reply) {
+      if (failReads &&
+          request.method == 'GET' &&
+          request.uri.path == '/api/settings') {
+        throw StateError('Current settings read failed');
+      }
+      return reply;
+    };
+    expect(await controller.saveGlobal(_global(), 0), false);
+    expect(state().error, contains('已确认'));
+    expect(state().error, isNot(contains('尚未确认')));
+    expect(state().pending, isNotNull);
+    expect(state().canEdit, false);
+    expect(await controller.retry(), false);
+    expect(writes(), hasLength(1));
+    failReads = false;
+    expect(await controller.retry(), true);
+    expect(writes(), hasLength(1));
+    expect(server.appliedMutations, 1);
+    expect(state().pending, isNull);
+    expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_DARK);
+  });
+
   test('only ACKs confirm settings and an uncertain command requires exact explicit retry', () async {
     expect(await controller.refresh(), true);
     holdNextWrite = true;

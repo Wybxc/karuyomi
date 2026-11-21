@@ -28,6 +28,8 @@ import {
   shouldObserveProgressD1Error,
   withProgressD1Error,
 } from './acceptance-progress-d1-error.ts';
+import { withEditorUi } from './acceptance-editor-ui.ts';
+import { fetchMigrationChapters } from './acceptance-migration-chapters.ts';
 
 export { RuntimeSession } from '../src/runtime-session.js';
 
@@ -40,6 +42,9 @@ export interface AcceptanceBindings extends Bindings {
   ACCEPTANCE_PROGRESS_CAS_RACE?: '1';
   ACCEPTANCE_PROGRESS_D1_ERROR?: '1';
   ACCEPTANCE_BRIDGE_ERROR_URL?: string;
+  ACCEPTANCE_EDITOR_UI?: '1';
+  ACCEPTANCE_MIGRATION_CHAPTERS?: '1';
+  ACCEPTANCE_RUNTIME_CONTROL?: '1';
 }
 
 export default {
@@ -49,6 +54,20 @@ export default {
     context: ExecutionContext,
   ) {
     const url = new URL(request.url);
+    if (
+      env.ACCEPTANCE_RUNTIME_CONTROL === '1' &&
+      request.method === 'GET' &&
+      url.pathname === '/runtime/host.js' &&
+      url.searchParams.get('acceptance-original') !== '1'
+    ) {
+      return env.ASSETS.fetch(new URL('/runtime/acceptance-control.js', url));
+    }
+    if (url.pathname.startsWith('/extensions/builds/')) {
+      const dispatch = () => env.ASSETS.fetch(request);
+      return env.ACCEPTANCE_EDITOR_UI === '1'
+        ? withEditorUi(request, env.DB, env.APP_ORIGIN, requestJson, dispatch)
+        : dispatch();
+    }
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       const fixture = env.ACCEPTANCE_ACK_LOSS;
       const original =
@@ -113,16 +132,34 @@ export default {
         ? { ...env, DB: progressRaceDatabase(env.DB, progressContender) }
         : env;
       const dispatch = () =>
-        verifiedWorker.fetch(forwarded, workerEnv, context);
-      const response = progressD1Error
-        ? await withProgressD1Error(
-            progressD1Error,
-            env.DB,
-            env.ACCEPTANCE_SUBJECT,
-            { requestJson, readMangaState },
-            dispatch,
-          )
-        : await dispatch();
+        verifiedWorker.fetch(
+          forwarded,
+          workerEnv,
+          context,
+          env.ACCEPTANCE_MIGRATION_CHAPTERS === '1'
+            ? fetchMigrationChapters
+            : undefined,
+        );
+      const run = () =>
+        progressD1Error
+          ? withProgressD1Error(
+              progressD1Error,
+              env.DB,
+              env.ACCEPTANCE_SUBJECT,
+              { requestJson, readMangaState },
+              dispatch,
+            )
+          : dispatch();
+      const response =
+        env.ACCEPTANCE_EDITOR_UI === '1'
+          ? await withEditorUi(
+              forwarded,
+              env.DB,
+              env.APP_ORIGIN,
+              requestJson,
+              run,
+            )
+          : await run();
       const responseAtMs = Date.now();
       if (settingsContender) {
         await observeSettingsRace(

@@ -64,6 +64,8 @@ Komiic 的 Select 描述首轮已能呈现，但其默认 `komiic.com` 在当前
 
 ## 复验与交付限制
 
+2026-11-19，正式 `7461850` Web 使用既有 Komiic AOT 的真实镜像验证筛选等待、取消、失败重试和换代后的读取。遮住重置反馈和缺少禁用语义的旧版缺口已修复。两个主题均在取消或失败恢复后核对原列表一致，前后账户权威读回一致。[正式双主题记录](mihon-cupertino-fidelity.md#漫画源筛选过程与恢复的正式-web-双主题验收)
+
 ```sh
 pnpm exec vitest run packages/contracts/test/filters.test.ts packages/runtime-host/test/teavm-entry.test.ts packages/runtime-host/test/manager.test.ts
 pnpm teavm:check
@@ -75,5 +77,3 @@ flutter test test/sources/source_filters_controller_test.dart test/sources/sourc
 新能力要求 `hostAbi=karuyomi-source-host-v5`，protocolVersion / bridgeVersion 仍为 2；旧 v4 AOT 不兼容，必须以固定提交重新规划和构建，不把旧三包的浏览/图片结果当成筛选通过。Komiic 仅在空关键词搜索中应用其 Select/Group；原 Header 保留。CuuTruyen 动态标签可能先返回重置提示，须按原后台链路完成后再显式重置确认。
 
 修复后的两包 v5 AOT 与上述 CuuTruyen Web 分项已通过，尚未部署。其它 Source/筛选类型、Native、独立客户端、生产 Access 和目标设备须另外记录。编译/完整性仍只能记 compiled_unverified/runtimeReady=false；首次全量 baseline 与增量 CI 状态不因新增筛选而提升。
-
-临时完整日志留在忽略的 `.local/typed-filters-*.log` 和 `/private/tmp/karuyomi-source-filters-*.log`，不将机器输出提交入库。

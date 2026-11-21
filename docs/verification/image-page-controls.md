@@ -46,7 +46,7 @@ xcodebuild -workspace Runner.xcworkspace -scheme Runner \
 
 首次 XCTest 因该工作区缺少本地 `Pods/Manifest.lock` 而在 CocoaPods 同步检查失败，未进入测试。`pod install --deployment` 按现有锁文件恢复生成目录、锁文件无变化后，iPhone 17 Pro / iOS 26.4 Simulator 的正式测试全部通过；Xcode 使用的测试克隆随后已自动关闭。首次全工程检查也因并行补写的 Dart 测试尚未格式化而失败，后续以完整格式化后的重跑结果为准。
 
-原始日志保留于 ignored `.local/tile-control-*.log`，不把完整机器日志入库。完整构建只证明 Web/Native 材料装配、Flutter Web 与 API dry-run，不等于 Native 材料已经实际执行。
+完整构建只证明 Web/Native 材料装配、Flutter Web 与 API dry-run，不等于 Native 材料已经实际执行。
 
 ## 剩余产品门
 

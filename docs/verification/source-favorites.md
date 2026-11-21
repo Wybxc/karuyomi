@@ -46,12 +46,16 @@ flutter test test/browse/source_favorites_controller_test.dart test/sources/
 
 控制器、容量、完整检查与构建临时日志位于 `/private/tmp/karuyomi-source-favorites-*.log`，原始输出不入库。
 
+## 正式 Web 界面与账户恢复分项
+
+2026-11-18，`1bc3c70`完整CI/Web/Wasm及[源目录正式双主题](mihon-cupertino-fidelity.md#源收藏与存储隔离的正式-web-双主题验收)通过。内置浏览器、临时D1及独立只读API核对同一会话的收藏/取消、丢确认、刷新/页面重开、完整原值及原文重试；两次精确重试零重复，主题切换和确认清除后的重开正常。16组六路完整快照与73条终态审计核对其它业务保持。该分项没有打开Source，也未覆盖独立客户端、新文档恢复或生产Access；实际Source、并发与平台门继续如下。
+
 ## 独立运行门
 
-以下均未由本轮组件结果替代：
+以下运行门仍未由组件或上节Web同会话分项替代：
 
-- Codex 内置浏览器和 Web/iOS/Android 独立客户端，同一身份收藏、取消、只读刷新及重启后恢复；实际同时写与响应丢失后的恢复。
+- Web/iOS/Android 独立客户端及新文档/重启后恢复；实际同时写与其它响应丢失恢复。上节Web同会话界面分项不能代替这些运行门。
 - 实际 Static Assets 索引更新后按稳定 package/source 身份打开当前构建；缺包、缺 Source、Access 失效、打开期间切页或换身份的真实行为。
 - 生产 Access、实际 Native 会话和目标设备。当前没有因这些工程测试执行生产部署或完成 AOT baseline。
 
-其余扩展管理、全目录语言筛选、typed preferences 与源迁移保持 [P3](../plan/p3-extensions-and-migration.md) 的未实现状态。完整 P0/P1/P2/P3 均不能按本页局部结果判为完成。
+扩展管理、全目录语言筛选、typed preferences 与源迁移的当前状态以 [P3](../plan/p3-extensions-and-migration.md) 为准。完整 P0/P1/P2/P3 均不能按本页局部结果判为完成。

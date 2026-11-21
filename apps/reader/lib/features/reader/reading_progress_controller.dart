@@ -49,6 +49,9 @@ final class ReadingProgressController extends ChangeNotifier {
   Future<void>? _flushing;
   bool Function()? _canWrite;
   bool _awaitingAccessRetry = false;
+  // Resolving another editor must not authorize automatic sends of a draft
+  // whose recovery message requires an explicit retry, even after route reuse.
+  bool _awaitingOperationRetry = false;
   bool _retryingAccess = false;
   bool _accessRetryAuthorized = false;
   bool _closed = false;
@@ -74,6 +77,7 @@ final class ReadingProgressController extends ChangeNotifier {
 
   bool _maySend(bool explicitRetry) =>
       _writeIdentityCurrent &&
+      (!_awaitingOperationRetry || explicitRetry) &&
       (!_awaitingAccessRetry || (explicitRetry && _accessRetryAuthorized));
 
   /// Keep the original draft and cancel automatic sends, including after a
@@ -115,9 +119,14 @@ final class ReadingProgressController extends ChangeNotifier {
       if (reopening) {
         _pending.remove(manifest.chapterKey);
         _pendingResets.remove(manifest.chapterKey);
-        if (!unsaved) _awaitingAccessRetry = false;
+        if (!unsaved) {
+          _awaitingAccessRetry = false;
+          _awaitingOperationRetry = false;
+        }
       }
-      error = _awaitingAccessRetry && unsaved ? _progressUnconfirmed : null;
+      if (!_awaitingOperationRetry || !unsaved) {
+        error = _awaitingAccessRetry && unsaved ? _progressUnconfirmed : null;
+      }
       _conflicted.remove(manifest.chapterKey);
     } catch (_) {
       if (_closed || view != _viewSequence) return null;
@@ -255,7 +264,8 @@ final class ReadingProgressController extends ChangeNotifier {
     required bool reversedOrder,
     bool complete = false,
   }) {
-    if (!_maySend(false) ||
+    if (!_writeIdentityCurrent ||
+        _awaitingAccessRetry ||
         _conflicted.contains(manifest.chapterKey) ||
         _resetting.contains(manifest.chapterKey) ||
         _pendingResets.containsKey(manifest.chapterKey) ||
@@ -288,16 +298,22 @@ final class ReadingProgressController extends ChangeNotifier {
       after,
       reversedOrder,
     );
-    _delay?.cancel();
-    _delay = Timer(debounce, () => unawaited(flush()));
-    _deadline ??= Timer(maxWait, () => unawaited(flush()));
+    if (!_awaitingOperationRetry) {
+      _delay?.cancel();
+      _delay = Timer(debounce, () => unawaited(flush()));
+      _deadline ??= Timer(maxWait, () => unawaited(flush()));
+    }
     if (!wasUnsaved || before.completed != after.completed) _notify();
   }
 
   Future<bool> flush() => _flush();
 
   Future<bool> retry() async {
-    if (!_awaitingAccessRetry) return flush();
+    if (!_awaitingAccessRetry) {
+      final saved = await _flush(explicitRetry: true);
+      if (saved) _awaitingOperationRetry = false;
+      return saved;
+    }
     if (!_writeIdentityCurrent || _retryingAccess || !unsaved) {
       return !unsaved && _conflicted.isEmpty;
     }
@@ -314,7 +330,10 @@ final class ReadingProgressController extends ChangeNotifier {
       }
       _accessRetryAuthorized = true;
       final saved = await _flush(explicitRetry: true);
-      if (saved) _awaitingAccessRetry = false;
+      if (saved) {
+        _awaitingAccessRetry = false;
+        _awaitingOperationRetry = false;
+      }
       return saved;
     } finally {
       _accessRetryAuthorized = false;
@@ -374,6 +393,13 @@ final class ReadingProgressController extends ChangeNotifier {
           }
           if (_conflicted.isEmpty) error = null;
         }
+      } on BusinessPendingMutationException catch (failure) {
+        if (_closed) return;
+        _awaitingOperationRetry = true;
+        _cancelTimers();
+        error = '${failure.message} 处理原操作后再显式重试；草稿仅保留在当前会话。';
+        _notify();
+        return;
       } on BusinessStateException catch (failure) {
         if (_closed) return;
         if (failure.conflict) {
@@ -418,6 +444,13 @@ final class ReadingProgressController extends ChangeNotifier {
         _currentChapter = entry.key;
         storageMode = ProgressStorageMode.serverConfirmed;
         error = null;
+      } on BusinessPendingMutationException catch (failure) {
+        if (_closed) return;
+        _awaitingOperationRetry = true;
+        _cancelTimers();
+        error = '${failure.message} 处理原操作后再显式重试；草稿仅保留在当前会话。';
+        _notify();
+        return;
       } on BusinessStateException catch (failure) {
         if (_closed) return;
         if (failure.conflict) {

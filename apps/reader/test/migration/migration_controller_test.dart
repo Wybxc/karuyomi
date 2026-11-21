@@ -2,8 +2,10 @@ import '../test_app.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/bookmark_repository.dart';
 import 'package:karuyomi/data/progress_repository.dart';
@@ -13,6 +15,8 @@ import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/features/migration/migration_controller.dart';
 import 'package:karuyomi/features/migration/migration_page.dart';
 import 'package:karuyomi/features/reader/chapter_sequence.dart';
+import 'package:karuyomi/runtime/api_fetch.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
 
@@ -46,7 +50,7 @@ void main() {
     );
     platform.inventory = wire.encodeProtoJson(index);
     platform.sourceInventory = [
-      wire.SourceInfo(id: sourceId, name: '原源', lang: 'zh'),
+      wire.SourceInfo(id: sourceId, name: '原源', lang: 'en'),
       wire.SourceInfo(id: _targetId, name: '目标源', lang: 'zh'),
     ];
     platform.invokeHandler = (call) async => switch (call.whichRequest()) {
@@ -77,7 +81,7 @@ void main() {
       packageName: _package,
       sourceId: sourceId,
       sourceName: '原源',
-      sourceLang: 'zh',
+      sourceLang: 'en',
       manga: testManga,
       favorite: true,
     );
@@ -108,7 +112,7 @@ void main() {
         packageName: _package,
         sourceId: sourceId,
         sourceName: '原源',
-        sourceLang: 'zh',
+        sourceLang: 'en',
         manga: testManga,
       ),
       sequence: sequence,
@@ -130,6 +134,19 @@ void main() {
       .where((request) => request.method == 'POST')
       .map((request) => request.body!)
       .toList();
+  void failOriginalRead() {
+    platform.businessServer.beforeRequest = (request) =>
+        request.method == 'GET' &&
+            request.uri.path == '/api/state/manga/${sequence.mangaKey}'
+        ? const ApiReply(
+            status: 503,
+            redirected: false,
+            headers: {'content-type': 'text/plain'},
+            body: 'Injected read failure',
+          )
+        : null;
+  }
+
   Future<void> targetPreview() async {
     await controller.refreshSources();
     await controller.chooseSource(controller.sources.single);
@@ -142,8 +159,40 @@ void main() {
     await controller.refreshSources();
     expect(controller.sources.single.source.id, _targetId);
     await controller.chooseSource(controller.sources.single);
-    await controller.search('原作品');
-    await controller.loadMore();
+    final normal = platform.invokeHandler!;
+    var entered = Completer<void>();
+    var release = Completer<void>();
+    platform.invokeHandler = (call) async {
+      if (call.hasSearch()) {
+        entered.complete();
+        await release.future;
+      }
+      return normal(call);
+    };
+    final search = controller.search('原作品');
+    try {
+      await entered.future.timeout(const Duration(seconds: 5));
+      expect(controller.busy, isTrue);
+      expect(controller.canChange, isFalse);
+      expect(controller.operationLabel, '搜索目标作品“原作品”');
+      expect(posts(), hasLength(before));
+    } finally {
+      release.complete();
+      await search;
+    }
+    final retained = controller.results;
+    entered = Completer<void>();
+    release = Completer<void>();
+    final more = controller.loadMore();
+    try {
+      await entered.future.timeout(const Duration(seconds: 5));
+      expect(controller.operationLabel, '加载更多“原作品”的搜索结果');
+      expect(controller.results, orderedEquals(retained));
+      expect(posts(), hasLength(before));
+    } finally {
+      release.complete();
+      await more;
+    }
     final searches = platform.invocations
         .where((call) => call.hasSearch())
         .toList();
@@ -174,6 +223,45 @@ void main() {
     expect(copied.epoch, 1);
     expect(copied.hasCurrent(), false);
     expect(copied.hasFurthest(), false);
+    final notice = controller.notice;
+    final requests = platform.businessServer.requests.length;
+    await controller.refreshSources();
+    expect(controller.notice, notice);
+    expect(platform.businessServer.requests, hasLength(requests));
+  });
+
+  test('a failed target open preserves the listing and can reopen the selected source for its next page', () async {
+    await controller.refreshSources();
+    final target = controller.sources.single;
+    await controller.chooseSource(target);
+    await controller.search('原查询');
+    final oldResults = controller.results;
+    final writes = posts().length;
+    platform.businessServer.beforeRequest = (request) =>
+        request.method == 'GET' &&
+            request.uri.path == '/api/source-preferences/packages/$_package'
+        ? const ApiReply(
+            status: 503,
+            redirected: false,
+            headers: {'content-type': 'text/plain'},
+            body: 'Injected read failure',
+          )
+        : null;
+    await controller.chooseSource(target);
+    expect(controller.error, isNotNull);
+    expect(controller.selectedSource, same(target));
+    expect(controller.results, same(oldResults));
+    expect(catalog.session, isNull);
+    platform.businessServer.beforeRequest = null;
+
+    await controller.loadMore();
+    expect(controller.error, isNull);
+    expect(controller.results, hasLength(2));
+    final searches = platform.invocations.where((call) => call.hasSearch());
+    expect(searches.map((call) => call.search.page), [1, 2]);
+    expect(searches.every((call) => call.search.query == '原查询'), isTrue);
+    expect(searches.every((call) => call.sourceId == _targetId), isTrue);
+    expect(posts(), hasLength(writes));
   });
 
   test('lost ACK survives closing the wizard and only explicit retry resends its original body', () async {
@@ -195,10 +283,92 @@ void main() {
     await controller.refreshPreview();
     expect(posts(), hasLength(count));
     expect(controller.canChange, false);
+    failOriginalRead();
+    await controller.refreshSources();
+    platform.businessServer.beforeRequest = null;
+    expect(controller.operationLabel, '读取迁移输入');
+    expect(controller.error, '本次读取未完成，请重新读取。原迁移操作保持不变。');
+    expect(controller.pending?.retryable, true);
+    expect(
+      wire.encodeProtoJson(controller.pending!.request),
+      jsonDecode(original),
+    );
+    expect(controller.canChange, false);
+    expect(posts(), hasLength(count));
     await controller.retry();
     expect(controller.completed, true, reason: controller.error);
     expect(posts().last, original);
     expect(posts(), hasLength(count + 1));
+  });
+
+  test('a rejected migration requires a read before a new command and never suggests retrying the rejected operation', () async {
+    await targetPreview();
+    final before = posts().length;
+    final applied = platform.businessServer.appliedMutations;
+    final originalState = platform.businessServer.manga(sequence.mangaKey);
+    final targetKey = controller.preview!.targetKey;
+    platform.businessServer.beforeRequest = (request) {
+      if (request.method != 'POST' ||
+          request.uri.path != '/api/state/mutations') {
+        return null;
+      }
+      final command = wire.decodeProtoJson(
+        wire.StateMutation(),
+        jsonDecode(request.body!),
+      );
+      return ApiReply(
+        status: 400,
+        redirected: false,
+        headers: const {'content-type': 'application/json'},
+        body: jsonEncode(
+          wire.encodeProtoJson(
+            wire.StateMutationResponse(
+              schemaVersion: 1,
+              mutationId: command.mutationId,
+              error: wire.BusinessStateError(
+                code: wire
+                    .BusinessStateErrorCode
+                    .BUSINESS_STATE_ERROR_CODE_INVALID_INPUT,
+                message: 'Injected pre-dispatch rejection',
+                retryable: false,
+              ),
+            ),
+          ),
+        ),
+      );
+    };
+    await controller.confirm();
+    platform.businessServer.beforeRequest = null;
+    expect(controller.completed, false);
+    expect(controller.pending?.retryable, false);
+    expect(controller.error, contains('重新读取'));
+    expect(controller.error, isNot(contains('重试')));
+    expect(controller.canChange, false);
+    final original = controller.pending!.request;
+    await controller.retry();
+    await controller.confirm();
+    await controller.refreshSources();
+    expect(controller.pending!.request, original);
+    expect(posts(), hasLength(before + 1));
+    expect(platform.businessServer.appliedMutations, applied);
+    expect(platform.businessServer.manga(sequence.mangaKey), originalState);
+    expect(platform.businessServer.manga(targetKey), isNull);
+    failOriginalRead();
+    await controller.refreshSources();
+    platform.businessServer.beforeRequest = null;
+    expect(controller.operationLabel, '读取迁移输入');
+    expect(controller.error, '本次读取未完成，请重新读取。原迁移操作保持不变。');
+    expect(controller.pending!.request, original);
+    expect(controller.pending?.retryable, false);
+    expect(controller.canChange, false);
+    expect(posts(), hasLength(before + 1));
+    expect(platform.businessServer.appliedMutations, applied);
+    await controller.discardRejected();
+    expect(controller.pending, isNull);
+    expect(controller.preview, isNotNull);
+    expect(controller.canChange, true);
+    expect(posts(), hasLength(before + 1));
+    expect(platform.businessServer.appliedMutations, applied);
   });
 
   test(
@@ -569,7 +739,14 @@ void main() {
           final opened = platform.openedBuilds.length;
           // Run the real entry handler, then invalidate before the pushed
           // route's lazy builder receives its first frame.
-          (menu.menuChildren.single as CupertinoMenuItem).onPressed!();
+          menu.menuChildren
+              .whereType<CupertinoMenuItem>()
+              .singleWhere(
+                (item) =>
+                    item.child is Text &&
+                    (item.child as Text).data == '迁移到其他漫画源',
+              )
+              .onPressed!();
           expect(find.byType(MigrationPage), findsNothing);
           catalog.subject = replaceIdentity ? 'other-subject' : null;
           catalog.status = replaceIdentity
@@ -594,13 +771,22 @@ void main() {
             expect(catalog.library!.client, same(clickedClient));
             await catalog.refreshInstallations();
             await tester.pumpAndSettle();
+            expect(find.text('迁移已停用'), findsOneWidget);
             expect(
-              tester
-                  .widget<CupertinoButton>(
-                    find.byKey(const ValueKey('migration-refresh-sources')),
-                  )
-                  .onPressed,
-              isNull,
+              find.byKey(const ValueKey('migration-refresh-sources')),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const ValueKey('migration-source')),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const ValueKey('migration-confirm')),
+              findsNothing,
+            );
+            expect(
+              find.byKey(const ValueKey('migration-retry-original')),
+              findsNothing,
             );
             expect(posts(), hasLength(before));
             expect(platform.invocations, hasLength(calls));
@@ -613,30 +799,606 @@ void main() {
     }
   }
 
+  for (final brightness in Brightness.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'migration Cupertino states $brightness ${scale}x keep reads, drafts and original confirmation distinct',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(360, 800));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(
+            tester.platformDispatcher.clearPlatformBrightnessTestValue,
+          );
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final source = platform.invokeHandler!;
+          platform.invokeHandler = (call) async {
+            final result = await source(call);
+            if (call.hasSearch()) {
+              result.mangaPage.mangas.add(
+                wire.Manga(url: '/other-candidate', title: '图源返回的另一部候选作品'),
+              );
+            }
+            return result;
+          };
+          final readPath = '/api/state/manga/${sequence.mangaKey}';
+          final readGate = Completer<void>();
+          var failRead = true;
+          platform.beforeApiFetch = (path) async {
+            if (Uri.parse(path).path == readPath) {
+              await readGate.future;
+            }
+          };
+          platform.afterBusinessReply = (request, reply) async {
+            if (failRead &&
+                request.method == 'GET' &&
+                request.uri.path == readPath) {
+              failRead = false;
+              return ApiReply(
+                status: 503,
+                redirected: false,
+                headers: reply.headers,
+                body: reply.body,
+              );
+            }
+            return reply;
+          };
+          addTearDown(() {
+            if (!readGate.isCompleted) readGate.complete();
+          });
+          Widget page({bool fromShelf = false}) => CupertinoApp(
+            home: MigrationPage(
+              catalog: catalog,
+              client: catalog.library!.client,
+              seed: fromShelf ? MigrationSeed(metadata: seed.metadata) : seed,
+            ),
+          );
+          Finder control(String key) => find.byKey(ValueKey(key));
+          Future<void> reveal(
+            Finder finder, {
+            double delta = 300,
+            bool settle = true,
+          }) async {
+            await tester.scrollUntilVisible(
+              finder,
+              delta,
+              scrollable: find.byType(Scrollable).first,
+            );
+            if (settle) {
+              await tester.pumpAndSettle();
+            } else {
+              await tester.pump();
+              await tester.pump(const Duration(milliseconds: 400));
+            }
+          }
+
+          Future<void> tap(String key, {bool settle = true}) async {
+            await reveal(control(key));
+            await tester.tap(control(key));
+            if (settle) {
+              await tester.pumpAndSettle();
+            } else {
+              await tester.pump();
+              await tester.pump(const Duration(milliseconds: 400));
+            }
+          }
+
+          Future<void> errorColor() async {
+            final error = control('migration-error');
+            await reveal(error, delta: -300);
+            expect(error, findsOneWidget);
+            expect(
+              tester.renderObject<RenderParagraph>(error).text.style?.color,
+              AppColors.error.resolveFrom(tester.element(error)),
+            );
+          }
+
+          final writes = posts().length;
+          final applied = platform.businessServer.appliedMutations;
+          await tester.pumpApp(page());
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(find.text('没有其他已安装且启用的可用漫画源。请先在扩展管理中准备目标。'), findsNothing);
+          expect(find.text('正在读取迁移输入'), findsOneWidget);
+          expect(find.text('尚未读取迁移输入'), findsNothing);
+          expect(posts(), hasLength(writes));
+          readGate.complete();
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)),
+          );
+          await tester.pumpAndSettle();
+          platform.beforeApiFetch = null;
+          await errorColor();
+          expect(find.byType(CupertinoActivityIndicator), findsNothing);
+          expect(find.text('没有其他已安装且启用的可用漫画源。请先在扩展管理中准备目标。'), findsNothing);
+          await tap('migration-refresh-sources');
+          expect(control('migration-error'), findsNothing);
+          expect(find.byType(CupertinoFormSection), findsWidgets);
+          await tap('migration-source');
+          await tester.tap(find.text('目标源 · zh · eu.kanade.source.test').last);
+          await tester.pumpAndSettle();
+          await reveal(control('migration-search'));
+          await tester.tap(control('migration-search'));
+          await tester.enterText(control('migration-search'), '目标作品');
+          await tap('migration-search-submit');
+          final firstResult = find.byKey(
+            const ValueKey(('migration-result', 0)),
+          );
+          final secondResult = find.byKey(
+            const ValueKey(('migration-result', 1)),
+          );
+          await reveal(firstResult);
+          final firstCard = tester.getRect(firstResult);
+          final secondCard = tester.getRect(secondResult);
+          expect(firstCard.width, closeTo(162, 0.1));
+          expect(firstCard.height, closeTo(243, 0.1));
+          expect(secondCard.top, firstCard.top);
+          expect(secondCard.left - firstCard.right, closeTo(12, 0.1));
+          expect(find.text('/target'), findsNothing);
+          expect(find.text('/other-candidate'), findsNothing);
+          failRead = true;
+          await tester.tapAt(
+            tester.getRect(firstResult).centerRight - const Offset(8, 0),
+          );
+          await tester.pumpAndSettle();
+          await errorColor();
+          expect(control('migration-confirm'), findsNothing);
+          expect(posts(), hasLength(writes));
+          await tap('migration-refresh-preview');
+          expect(control('migration-error'), findsNothing);
+          final retained = find.text('目标将加入书架，原作品保留；目标已有分类、章节状态、书签、封面与阅读位置保留。');
+          await reveal(retained);
+          final semantics = tester.ensureSemantics();
+          try {
+            await tester.pump();
+            expect(
+              tester.getSemantics(retained).label,
+              '目标将加入书架，原作品保留；目标已有分类、章节状态、书签、封面与阅读位置保留。',
+              reason: 'Preview guidance must be readable separately from chapter mappings',
+            );
+            expect(
+              tester
+                  .getSemantics(
+                    find.text('原作品：${seed.metadata.manga.title} · 原源 · en'),
+                  )
+                  .label,
+              '原作品：${seed.metadata.manga.title} · 原源 · en',
+            );
+            expect(
+              tester.getSemantics(control('migration-target-preview')).label,
+              '目标：目标作品 · 目标源 · zh',
+            );
+          } finally {
+            semantics.dispose();
+          }
+          expect(
+            tester.renderObject<RenderParagraph>(retained).text.style?.color,
+            AppColors.secondaryLabel.resolveFrom(tester.element(retained)),
+          );
+          expect(posts(), hasLength(writes));
+          final chooseChapter = find.byKey(
+            ValueKey(('migration-map-choose', sequence.entries.first.key)),
+          );
+          await reveal(chooseChapter);
+          final mainScroll = tester.state<ScrollableState>(
+            find.byType(Scrollable).first,
+          );
+          final beforeChoice = mainScroll.position.pixels;
+          await tester.tap(chooseChapter);
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byType(CupertinoTextField).last,
+            '没有这个章节',
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('没有匹配的选项'), findsOneWidget);
+          await tester.tap(find.byType(CupertinoNavigationBarBackButton).last);
+          await tester.pumpAndSettle();
+          expect(
+            mainScroll.position.pixels,
+            closeTo(beforeChoice, 1),
+            reason:
+                'Cancelling a chapter choice must keep the mapping position',
+          );
+          expect(
+            Focus.of(
+              tester.element(
+                find.descendant(
+                  of: chooseChapter,
+                  matching: find.text('选择目标章节'),
+                ),
+              ),
+            ).hasPrimaryFocus,
+            isTrue,
+            reason: 'Chapter choice must return keyboard focus to its trigger',
+          );
+          expect(tester.testTextInput.isVisible, isFalse);
+          await tap('migration-confirm');
+          final beforeConfirm = mainScroll.position.pixels;
+          await tester.tap(find.text('返回检查'));
+          await tester.pumpAndSettle();
+          expect(
+            mainScroll.position.pixels,
+            closeTo(beforeConfirm, 1),
+            reason: 'Cancelling confirmation must keep the review position',
+          );
+          expect(
+            Focus.of(tester.element(find.text('检查并确认迁移'))).hasPrimaryFocus,
+            isTrue,
+            reason: 'Confirmation must return keyboard focus to its trigger',
+          );
+          expect(tester.testTextInput.isVisible, isFalse);
+          expect(posts(), hasLength(writes));
+          final saveGate = Completer<void>();
+          addTearDown(() {
+            if (!saveGate.isCompleted) saveGate.complete();
+          });
+          platform.beforeApiFetch = (path) async {
+            if (Uri.parse(path).path == '/api/state/mutations') {
+              await saveGate.future;
+            }
+          };
+          platform.businessServer.loseNextResponse = true;
+          await tap('migration-confirm');
+          expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+          expect(
+            find.textContaining(
+              '原作品“${seed.metadata.manga.title}”（原源 · en）保留。',
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.textContaining('将目标“目标作品”（目标源 · zh）加入书架。'),
+            findsOneWidget,
+          );
+          expect(find.textContaining('选中 1 条章节映射'), findsOneWidget);
+          expect(posts(), hasLength(writes));
+          await tap('migration-confirm-send', settle: false);
+          await reveal(find.text('正在等待服务端确认'), delta: -300, settle: false);
+          expect(find.text('正在等待服务端确认'), findsOneWidget);
+          expect(find.textContaining('迁移已由服务端确认'), findsNothing);
+          expect(control('migration-search'), findsNothing);
+          expect(
+            tester
+                .widget<CupertinoButton>(control('migration-retry-original'))
+                .onPressed,
+            isNull,
+          );
+          saveGate.complete();
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)),
+          );
+          await tester.pumpAndSettle();
+          platform.beforeApiFetch = null;
+          await errorColor();
+          final original = posts().last;
+          final command = wire.decodeProtoJson(
+            wire.StateMutation(),
+            jsonDecode(original),
+          );
+          expect(posts(), hasLength(writes + 1));
+          expect(platform.businessServer.appliedMutations, applied + 1);
+          expect(find.textContaining(command.mutationId), findsNothing);
+          expect(find.textContaining(command.mangaKey), findsNothing);
+          await tap('migration-original-details');
+          expect(find.textContaining(command.mutationId), findsOneWidget);
+          expect(posts(), hasLength(writes + 1));
+          await tester.tap(find.text('关闭'));
+          await tester.pumpAndSettle();
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+          final reopenGate = Completer<void>();
+          addTearDown(() {
+            if (!reopenGate.isCompleted) reopenGate.complete();
+          });
+          platform.beforeApiFetch = (path) async {
+            if (Uri.parse(path).path == readPath) {
+              await reopenGate.future;
+            }
+          };
+          await tester.pumpApp(page(fromShelf: true));
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(find.text('正在读取迁移输入'), findsOneWidget);
+          await reveal(find.text('原迁移尚未确认'), settle: false);
+          expect(find.text('原操作的复制范围已固定，原作品保留。'), findsOneWidget);
+          expect(find.text('先读取原源章节，或明确选择仅迁移收藏和分类。'), findsNothing);
+          expect(find.text('等待服务端确认'), findsNothing);
+          expect(posts(), hasLength(writes + 1));
+          reopenGate.complete();
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 100)),
+          );
+          await tester.pumpAndSettle();
+          platform.beforeApiFetch = null;
+          expect(find.text('目标作品 · 目标源 · zh'), findsOneWidget);
+          expect(find.textContaining(command.mutationId), findsNothing);
+          expect(posts(), hasLength(writes + 1));
+          failRead = true;
+          await tap('migration-refresh-sources');
+          await errorColor();
+          expect(find.text('本次读取未完成，请重新读取。原迁移操作保持不变。'), findsOneWidget);
+          expect(find.text('原迁移尚未确认'), findsOneWidget);
+          expect(control('migration-search'), findsNothing);
+          expect(posts(), hasLength(writes + 1));
+          expect(platform.businessServer.appliedMutations, applied + 1);
+          await tap('migration-retry-original');
+          expect(find.textContaining('原迁移操作已由服务端确认'), findsOneWidget);
+          expect(find.text('原作品已保留；迁移结果见下方服务端确认。'), findsOneWidget);
+          expect(find.text('先读取原源章节，或明确选择仅迁移收藏和分类。'), findsNothing);
+          expect(find.text('目标作品 · 目标源 · zh'), findsOneWidget);
+          expect(posts(), hasLength(writes + 2));
+          expect(posts().last, original);
+          expect(platform.businessServer.appliedMutations, applied + 1);
+          expect(tester.takeException(), isNull);
+          await tester.pumpApp(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+  }
+
+  for (final readFails in [false, true]) {
+    testWidgets(
+      'long candidate lists reveal the selected preview (read fails: $readFails)',
+      (tester) async {
+        final invoke = platform.invokeHandler!;
+        platform.invokeHandler = (call) async => call.hasSearch()
+            ? wire.SourceResult(
+                mangaPage: wire.MangaPage(
+                  mangas: [
+                    for (var index = 0; index < 100; index++)
+                      wire.Manga(url: '/candidate-$index', title: '候选 $index'),
+                  ],
+                ),
+              )
+            : invoke(call);
+        await tester.binding.setSurfaceSize(const Size(360, 640));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpApp(
+          CupertinoApp(
+            home: MigrationPage(
+              catalog: catalog,
+              client: catalog.library!.client,
+              seed: seed,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final writes = posts().length;
+        await tester.tap(find.byKey(const ValueKey('migration-source')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('目标源 · zh · eu.kanade.source.test').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('migration-search-submit')));
+        await tester.pumpAndSettle();
+        final first = find.byKey(const ValueKey(('migration-result', 0)));
+        await tester.ensureVisible(first);
+        await tester.pumpAndSettle();
+        expect(first.hitTestable(), findsOneWidget);
+        if (readFails) failOriginalRead();
+        await tester.tap(first);
+        await tester.pumpAndSettle();
+
+        final heading = find.text(readFails ? '迁移预览尚未取得' : '迁移预览');
+        expect(heading.hitTestable(), findsOneWidget);
+        expect(Focus.of(tester.element(heading)).hasPrimaryFocus, isTrue);
+        expect(
+          find.textContaining('候选 0 · 目标源 · zh').hitTestable(),
+          findsOneWidget,
+        );
+        expect(posts(), hasLength(writes));
+        expect(tester.takeException(), isNull);
+        await tester.pumpApp(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
+  testWidgets(
+    'retiring a scrolled migration starts with the full warning visible',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpApp(
+        CupertinoApp(
+          home: MigrationPage(
+            catalog: catalog,
+            client: catalog.library!.client,
+            seed: seed,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final writes = posts().length;
+      final scrollable = find.byType(Scrollable).first;
+      Future<void> tap(Finder finder) async {
+        await tester.scrollUntilVisible(finder, 220, scrollable: scrollable);
+        await Scrollable.ensureVisible(tester.element(finder), alignment: .5);
+        await tester.pumpAndSettle();
+        expect(finder.hitTestable(), findsOneWidget);
+        await tester.tap(finder);
+        await tester.pumpAndSettle();
+      }
+
+      await tap(find.byKey(const ValueKey('migration-source')));
+      await tester.tap(find.text('目标源 · zh · eu.kanade.source.test').last);
+      await tester.pumpAndSettle();
+      await tap(find.byKey(const ValueKey('migration-search-submit')));
+      await tap(find.byKey(const ValueKey(('migration-result', 0))));
+      final reload = find.byKey(const ValueKey('migration-refresh-preview'));
+      await tester.scrollUntilVisible(reload, 220, scrollable: scrollable);
+      final previous = tester.state<ScrollableState>(scrollable);
+      expect(previous.position.pixels, greaterThan(0));
+
+      platform.loginHtml = true;
+      await tester.runAsync(catalog.connect);
+      expect(catalog.accessPaused, isTrue);
+      await tester.pump();
+      final warning = find.byKey(const ValueKey('migration-error'));
+      expect(warning, findsOneWidget);
+      expect(find.text('迁移已停用'), findsOneWidget);
+      final navigationBottom = tester
+          .getBottomLeft(find.byType(CupertinoNavigationBar))
+          .dy;
+      expect(tester.getTopLeft(warning).dy, greaterThan(navigationBottom));
+      expect(tester.state<ScrollableState>(scrollable).position.pixels, 0);
+      expect(posts(), hasLength(writes));
+      expect(tester.takeException(), isNull);
+      await tester.pumpApp(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'failed pagination keeps the original query and exposes an exact retry at the bottom of a long listing',
+    (tester) async {
+      var failed = false;
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      platform.invokeHandler = (call) async {
+        if (call.search.page == 2 && !failed) {
+          entered.complete();
+          await release.future;
+          failed = true;
+          throw const RuntimeException(
+            RuntimeErrorCode.sourceError,
+            'next page temporarily unavailable',
+          );
+        }
+        return wire.SourceResult(
+          mangaPage: wire.MangaPage(
+            mangas: call.search.page == 1
+                ? [
+                    for (var index = 0; index < 18; index++)
+                      wire.Manga(url: '/first-$index', title: '候选 $index'),
+                  ]
+                : [wire.Manga(url: '/second', title: '第二页作品')],
+            hasNextPage: call.search.page == 1,
+          ),
+        );
+      };
+      await tester.binding.setSurfaceSize(const Size(360, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpApp(
+        CupertinoApp(
+          home: MigrationPage(
+            catalog: catalog,
+            client: catalog.library!.client,
+            seed: seed,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final before = posts().length;
+      await tester.tap(find.byKey(const ValueKey('migration-source')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('目标源 · zh · eu.kanade.source.test').last);
+      await tester.pumpAndSettle();
+      final search = find.byKey(const ValueKey('migration-search'));
+      await tester.enterText(search, '原查询');
+      await tester.tap(find.byKey(const ValueKey('migration-search-submit')));
+      await tester.pumpAndSettle();
+      await tester.enterText(search, '新草稿');
+      tester.testTextInput.hide();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final more = find.byKey(const ValueKey('migration-search-more'));
+      final scrollable = find
+          .descendant(
+            of: find.byType(CustomScrollView),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(more, 280, scrollable: scrollable);
+      await tester.ensureVisible(more);
+      await tester.pumpAndSettle();
+      expect(more.hitTestable(), findsOneWidget);
+      final lastCover = find.byKey(const ValueKey(('migration-result', 17)));
+      Tristate lastCoverEnabled() => tester
+          .getSemantics(lastCover)
+          .getSemanticsData()
+          .flagsCollection
+          .isEnabled;
+      final coverBefore = tester.getRect(lastCover);
+      await tester.tap(more);
+      final semantics = tester.ensureSemantics();
+      try {
+        await tester.pump();
+        await tester.runAsync(
+          () => entered.future.timeout(const Duration(seconds: 5)),
+        );
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('正在加载更多“原查询”的搜索结果'), findsOneWidget);
+        expect(tester.getRect(lastCover), coverBefore);
+        expect(lastCoverEnabled(), Tristate.isFalse);
+        release.complete();
+        await tester.pumpAndSettle();
+        expect(lastCoverEnabled(), Tristate.isTrue);
+      } finally {
+        semantics.dispose();
+        if (!release.isCompleted) {
+          release.complete();
+          await tester.pumpAndSettle();
+        }
+      }
+      expect(failed, isTrue);
+      expect(tester.getRect(lastCover), coverBefore);
+      final error = find.byKey(const ValueKey('migration-error'));
+      expect(error.hitTestable(), findsOneWidget);
+      expect(find.text('加载更多“原查询”的搜索结果'), findsOneWidget);
+      expect(find.text('目标源 · zh · 第 2 页'), findsOneWidget);
+      expect(find.text('候选 17'), findsOneWidget);
+      final retry = find.text('重试读取第 2 页');
+      expect(retry.hitTestable(), findsOneWidget);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(retry, 250, scrollable: scrollable);
+      await tester.pumpAndSettle();
+      expect(retry.hitTestable(), findsOneWidget);
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      final calls = platform.invocations.where((call) => call.hasSearch());
+      expect(calls.map((call) => call.search.page), [1, 2, 2]);
+      expect(calls.every((call) => call.search.query == '原查询'), isTrue);
+      await tester.scrollUntilVisible(
+        find.text('第二页作品'),
+        250,
+        scrollable: scrollable,
+      );
+      expect(retry, findsNothing);
+      expect(posts(), hasLength(before));
+      await tester.pumpApp(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
   testWidgets(
     'wizard browses a target without search results and filters marks before confirmation',
     (tester) async {
       final normal = platform.invokeHandler!;
+      var entered = Completer<void>();
+      var release = Completer<void>();
       platform.invokeHandler = (call) async {
         if (call.hasSearch()) {
           return wire.SourceResult(mangaPage: wire.MangaPage());
         }
         if (call.hasPopular()) {
+          entered.complete();
+          await release.future;
           return wire.SourceResult(
             mangaPage: wire.MangaPage(
-              mangas: [
-                if (call.popular.page == 1)
-                  _target
-                else
-                  wire.Manga(url: '/another', title: '第二页作品'),
-              ],
+              mangas: call.popular.page == 1
+                  ? []
+                  : [_target, wire.Manga(url: '/another', title: '第二页作品')],
               hasNextPage: call.popular.page == 1,
             ),
           );
         }
         return normal(call);
       };
-      await tester.binding.setSurfaceSize(const Size(700, 1000));
+      await tester.binding.setSurfaceSize(const Size(360, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpApp(
         CupertinoApp(
@@ -658,13 +1420,70 @@ void main() {
       expect(find.text('没有搜索结果，可尝试浏览目标源热门作品。'), findsOneWidget);
       expect(platform.invocations.where((call) => call.hasPopular()), isEmpty);
       await tester.tap(find.byKey(const ValueKey('migration-popular')));
+      try {
+        await tester.pump();
+        await tester.runAsync(
+          () => entered.future.timeout(const Duration(seconds: 5)),
+        );
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.ensureVisible(find.byType(CupertinoActivityIndicator));
+        await tester.pump();
+        expect(find.text('正在浏览目标源热门作品'), findsOneWidget);
+        final semantics = tester.ensureSemantics();
+        try {
+          await tester.pump();
+          for (final id in [
+            'migration-refresh-sources',
+            'migration-search-submit',
+            'migration-popular',
+          ]) {
+            final button = find.byKey(ValueKey(id));
+            expect(
+              tester
+                  .getSemantics(button)
+                  .getSemanticsData()
+                  .flagsCollection
+                  .isEnabled,
+              Tristate.isFalse,
+            );
+          }
+        } finally {
+          semantics.dispose();
+        }
+        expect(posts(), hasLength(before));
+      } finally {
+        release.complete();
+        await tester.pumpAndSettle();
+      }
+      final emptyPopular = find.text('目标源的热门列表没有作品。');
+      expect(emptyPopular, findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('migration-search')),
+        '尚未提交的新查询',
+      );
       await tester.pumpAndSettle();
-      expect(find.text('目标作品'), findsOneWidget);
+      entered = Completer<void>();
+      release = Completer<void>();
       final more = find.byKey(const ValueKey('migration-search-more'));
       await tester.ensureVisible(more);
       await tester.tap(more);
-      await tester.pumpAndSettle();
+      try {
+        await tester.pump();
+        await tester.runAsync(
+          () => entered.future.timeout(const Duration(seconds: 5)),
+        );
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.ensureVisible(find.byType(CupertinoActivityIndicator));
+        await tester.pump();
+        expect(find.text('正在加载更多目标源热门作品'), findsOneWidget);
+        expect(emptyPopular, findsOneWidget);
+        expect(posts(), hasLength(before));
+      } finally {
+        release.complete();
+        await tester.pumpAndSettle();
+      }
       expect(find.text('第二页作品'), findsOneWidget);
+      expect(emptyPopular, findsNothing);
       final popular = platform.invocations.where((call) => call.hasPopular());
       expect(popular.map((call) => call.popular.page), [1, 2]);
       expect(popular.every((call) => call.sourceId == _targetId), true);
@@ -685,6 +1504,7 @@ void main() {
       await tester.scrollUntilVisible(unmarked, 300, scrollable: scroller);
       expect(unmarked, findsOneWidget);
       await tester.ensureVisible(filter);
+      await tester.pumpAndSettle();
       await tester.tap(filter);
       await tester.pumpAndSettle();
       expect(unmarked, findsNothing);

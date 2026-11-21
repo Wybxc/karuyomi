@@ -28,7 +28,7 @@
 - `0010` 完成后再重载客户端，书架仍能直接恢复 `Elevators` 第 2 页。随后从详情打开此前未读的 `3322: Dragonfly`，确认首图显示且第 1 页已保存，验证清理后的 Source 请求和进度写入。
 - 首次安装 xkcd 后回到浏览页，视觉目录已将它置顶，辅助功能树仍保留旧行；重开客户端后可通过辅助功能进入。复现与修复见下文。
 
-可复验输入、迁移/流量读回、匿名检查命令和续读截图留在本机忽略目录 `.local/first-release-0.1.0.7lGF2d/production/`；其中 `confirmed-state.json` 为确认后的生产检查点。
+其中 首发切流后已确认当时的生产检查点。
 
 ## 首装后的目录顺序
 
@@ -38,7 +38,7 @@
 
 2026-11-11 00:13:41（UTC+8），发布分支 [`2f5a8ec`](https://github.com/Wybxc/karuyomi/commit/2f5a8eca655638d8f3e88fdeee6b93dd257088f2) 的[通用 CI](https://github.com/Wybxc/karuyomi/actions/runs/42850970404)通过后，Worker `537cd188-b50c-43db-8852-69087681796e` 接管全部生产流量。Web 版本仍为 `0.1.0+1`，Worker 脚本、绑定、扩展索引与状态、运行时材料保持原样；D1 账本仍连续至 `0010`。37 条匿名路径复验通过，线上 `main.dart.js` 与本次候选字节一致。
 
-真实 Access 测试账号在新标签页读回书架；生产目录的首个辅助功能条目为已安装的 xkcd。旧阅读标签持有漫画源时，新标签显示占用提示；刷新旧会话的服务端进度后确认已保存，关闭旧标签并连接即可恢复《3322: Dragonfly》第 1 页。在新版翻到第 2 页并获服务端确认，关闭后从另一个新标签页直接续读，实际显示第 2 页文字图。生产复验沿用现有安装；空账号首装回归使用上面的隔离环境。切流与匿名检查留在本机忽略目录 `.local/first-run-catalog.HIprOz/production/`。
+真实 Access 测试账号在新标签页读回书架；生产目录的首个辅助功能条目为已安装的 xkcd。旧阅读标签持有漫画源时，新标签显示占用提示；刷新旧会话的服务端进度后确认已保存，关闭旧标签并连接即可恢复《3322: Dragonfly》第 1 页。在新版翻到第 2 页并获服务端确认，关闭后从另一个新标签页直接续读，实际显示第 2 页文字图。生产复验沿用现有安装；空账号首装回归使用上面的隔离环境。
 
 ## 生产代表源整章与续读
 
@@ -49,13 +49,13 @@
 | Arknights Comics en | 《Prelude Suite: The Lone Walker》`DREAM`：第 1–51 页逐页确认，末页显式标记读完                | 正常进入 `HEARTBEAT`，确认第 3 页；新标签从书架首次显示第 3 页实图  |
 | CuuTruyen vi        | 《Spy x Family (FULL HD)》`Chương 142`：第 1–23 页逐页确认，末页显式标记读完，核对原扩展处理图 | 正常进入 `Chương 141`，确认第 3 页；新标签从书架首次显示第 3 页实图 |
 
-两次续读均先关闭旧阅读标签，未经过作品详情。最后的新标签读回 xkcd 与这两部作品。逐页确认记录、完成状态和实图保存在本机忽略目录 `.local/first-run-catalog.HIprOz/production/representative/`。这是 xkcd 之外的生产 Web 证据；没有更改扩展快照，不将其它包标为已验收，也不代替 Native 生产 Access、同账号三端读写或签名真机验收。
+两次续读均先关闭旧阅读标签，未经过作品详情。最后的新标签读回 xkcd 与这两部作品。这是 xkcd 之外的生产 Web 证据；没有更改扩展快照，不将其它包标为已验收，也不代替 Native 生产 Access、同账号三端读写或签名真机验收。
 
 ## 原生交接
 
-六材料完整候选已产出 Android arm64 release APK 和 iPhoneOS arm64 App；两包未签名。已将归档的客户端产品源码、平台文件、Dart 依赖锁及三份内置运行时文件与首发输入逐字节比对，包内材料身份与生产一致。成品在本机忽略目录 `.local/prototype-full-six-material.tLNTHI/artifacts/`。同一首发源码和扩展候选还通过了 [MANGA Plus Creators iOS 模拟器完整章、跨章与新进程续读](aot-current-pilot.md#完整目录的代表源复验)。这些结果是构建或隔离模拟器证据。
+六材料完整候选已产出 Android arm64 release APK 和 iPhoneOS arm64 App；两包未签名。已将归档的客户端产品源码、平台文件、Dart 依赖锁及三份内置运行时文件与首发输入逐字节比对，包内材料身份与生产一致。同一首发源码和扩展候选还通过了 [MANGA Plus Creators iOS 模拟器完整章、跨章与新进程续读](aot-current-pilot.md#完整目录的代表源复验)。这些结果是构建或隔离模拟器证据。
 
-目录修复后，以六材料发布分支 [`2f5a8eca655638d8f3e88fdeee6b93dd257088f2`](https://github.com/Wybxc/karuyomi/commit/2f5a8eca655638d8f3e88fdeee6b93dd257088f2) 重建 Android arm64 release APK 和 iPhoneOS arm64 App，均未签名。包名、生产地址、架构和包内六份材料均核对通过，Dart 锁文件未变。新版成品与核对记录在本机忽略目录 `.local/first-run-catalog.HIprOz/` 的 `artifacts/` 与 `native-*-verified.json`。未执行真机安装或生产 Native 登录。
+目录修复后，以六材料发布分支 [`2f5a8eca655638d8f3e88fdeee6b93dd257088f2`](https://github.com/Wybxc/karuyomi/commit/2f5a8eca655638d8f3e88fdeee6b93dd257088f2) 重建 Android arm64 release APK 和 iPhoneOS arm64 App，均未签名。包名、生产地址、架构和包内六份材料均核对通过，Dart 锁文件未变。未执行真机安装或生产 Native 登录。
 
 续办时用修复后的六材料源码构建，默认 `APP_ORIGIN=https://karuyomi.wybxc.cc`。Android 按[发行签名配置](native-main-entry.md#android-发行签名配置)使用正式密钥；iOS 使用对应 `dev.karuyomi.karuyomi` 的 Apple Team、签名身份和 provisioning。真机分别通过生产 Access 登录同一测试账号，先跑 Web → iOS → Android → Web 的非默认页保存/续读，再按 [P0](../plan/p0-runtime-and-reading.md#验收)和 [P2](../plan/p2-sync.md#验收)补齐代表源、真实设备操作和一致性门。
 
@@ -68,7 +68,7 @@
 | Android | Pixel 7 / API 36 arm64 模拟器安装首发 release APK 的临时 v2 签名副本；唯一证书为 `CN=Karuyomi Local Emulator Only`。签名前后 Dart AOT 和三份内置运行时文件逐字节一致；设备上的 APK 摘要等于本机副本。正式 Activity 冷启动后经可见「登录」按钮打开生产表单，并在带窗口模式重新确认。该密钥只用于本机模拟器，不是发行身份。 |
 | iOS     | iPhone 17 Pro / iOS 26.4 模拟器运行正式入口的 debug 构建，包名为 `dev.karuyomi.karuyomi`。内置 `host.js`、`worker.js`、`manifest.json` 与首发 iPhoneOS 成品逐字节一致，Dart kernel 包含生产地址。独立 XCTest 点击正式登录按钮，以 Access 独有标题和提交按钮确认表单，1 项通过；真实截图也核对通过。                       |
 
-iOS 早期两轮测试误选了同一 App 的后台运行时 WebView，断言未找到表单；当时的截图和层级记录实际包含 Access。修正外部测试的定位后通过，产品未改动。运行产物、签名/安装摘要、三轮 XCTest 结果及截图保存在本机忽略目录 `.local/native-production-preflight.itpO4s/`。这版 Xcode 的模拟器窗口由 [Device Hub](https://developer.apple.com/documentation/xcode/managing-your-simulated-and-physical-devices-in-device-hub) 提供，已打开本次专用设备供用户登录。测试未注入身份、复制浏览器 Cookie 或修改生产 TLS 信任。
+iOS 早期两轮测试误选了同一 App 的后台运行时 WebView，断言未找到表单；当时的截图和层级记录实际包含 Access。修正外部测试的定位后通过，产品未改动。这版 Xcode 的模拟器窗口由 [Device Hub](https://developer.apple.com/documentation/xcode/managing-your-simulated-and-physical-devices-in-device-hub) 提供，已打开本次专用设备供用户登录。测试未注入身份、复制浏览器 Cookie 或修改生产 TLS 信任。
 
 用户已明确目前没有可用的正式签名或真机；两端仍需用户在 App 内登录同一 Access 测试账号。模拟器的表单预检不代替正式签名、真机安装、生产登录回跳、实际阅读和同账号三端确认。
 

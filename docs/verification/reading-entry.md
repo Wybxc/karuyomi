@@ -28,9 +28,9 @@ flutter test test/library/ test/browse/details_recovery_test.dart test/browse/ch
 
 ## 集中工程检查
 
-`pnpm flutter:check` 完整通过：reader_core 22、source_runtime 42、客户端 389 项，三个项目严格分析无问题，124 份自有 Dart 文件格式一致。首次集中分析发现 SnackBar 在异步开章失败后缺少直接的 `context.mounted` 检查，已修正并重新完整检查；没有禁用 lint 或放宽类型/生命周期检查。日志位于忽略的 `.local/reading-entry-flutter.log` 与 `.local/reading-entry-flutter-final.log`。
+`pnpm flutter:check` 完整通过：reader_core 22、source_runtime 42、客户端 389 项，三个项目严格分析无问题，124 份自有 Dart 文件格式一致。首次集中分析发现 SnackBar 在异步开章失败后缺少直接的 `context.mounted` 检查，已修正并重新完整检查；没有禁用 lint 或放宽类型/生命周期检查。
 
-`pnpm build` 完整通过，包含 Web/Native runtime 材料、Flutter Web release 及 Worker/Static Assets。提交前执行全库 `pnpm format`、完整 `pnpm format:check` 和正常 prek；临时构建/格式输出保留在忽略的 `.local/reading-entry-*.log`。本轮未修改原生插件或构建设置，也未重新构建/运行 Native App，不把共用 Dart 检查和 Web 构建等同于原生验收。
+`pnpm build` 完整通过，包含 Web/Native runtime 材料、Flutter Web release 及 Worker/Static Assets。提交前执行全库 `pnpm format`、完整 `pnpm format:check` 和正常 prek；本轮未修改原生插件或构建设置，也未重新构建/运行 Native App，不把共用 Dart 检查和 Web 构建等同于原生验收。
 
 ## 无差异打开与跨端 CAS
 
@@ -38,7 +38,7 @@ flutter test test/library/ test/browse/details_recovery_test.dart test/browse/ch
 
 `library_navigation_test.dart` 14 项通过，包含重复打开零写后另一业务客户端持原 revision 成功标书签、Source 名称/语言/opaque memo 变化、旧书架项不覆盖远端新资料、失 ACK 原命令在无差异打开后保留并精确重试，以及真正变更保存失败后仍可阅读。新增跨端 CAS 回归对照旧实现先失败（两次打开多提交两次），修复后通过。既有书架资料失响应组件夹具改为明确变化的 Source 快照，继续验证真实写入的恢复路径。
 
-完整 `pnpm flutter:check` 通过：三个项目严格分析无问题，reader_core 22、source_runtime 86、客户端 597 项，173 份 Dart 文件格式一致；新 Native 书签驱动也通过严格分析。全库格式和完整 Web/Native 材料、Flutter Web、API 构建通过。日志保留于忽略的 `.local/bookmarks-*.log`，旧实现对照与集中回归位于 `.local/metadata-noop-*.log`。
+完整 `pnpm flutter:check` 通过：三个项目严格分析无问题，reader_core 22、source_runtime 86、客户端 597 项，173 份 Dart 文件格式一致；新 Native 书签驱动也通过严格分析。全库格式和完整 Web/Native 材料、Flutter Web、API 构建通过。
 
 真实 Web 书签准备发现新文档 Source 重开/调用失败，尚未取得实际平台上无差异打开零 revision 的证据；不能以受控回归代替该运行门。实际观察、D1 核对及 HTTPS 信任限制见[书签记录](bookmarks.md)。
 
@@ -50,7 +50,7 @@ flutter test test/library/ test/browse/details_recovery_test.dart test/browse/ch
 2. 同一浏览器 profile 的文档 B 已能读到书架；当 A 仍持同源 Source 运行锁时，B 明确提示需要关闭其它标签后重连。关闭 A 并重连后，B 点书架「继续阅读」直接进入该章第 2 页，显示文字图与已保存状态。重开前后的独立 API 响应逐字节一致（含 revision、位置、页清单和视口锚）。
 3. B 回看第 1 页，独立读取确认账户/作品 revision 恰好各加一（`6/5`），当前位置为第 1 页、最远仍为第 2 页。关闭 B 后新建文档 C，点书架续读直接显示第 1 页原漫画、最远第 2 页及已保存状态；重开前后独立响应再次逐字节一致。
 
-结果覆盖同 profile 的独立文档顺序交接和已有进度的无差异打开；共享 Source 锁和浏览器缓存，未验同开、冷缓存或独立设备。原始读回、截图与服务日志保留在忽略的 `.local/reading-entry-current-*`。
+结果覆盖同 profile 的独立文档顺序交接和已有进度的无差异打开；共享 Source 锁和浏览器缓存，未验同开、冷缓存或独立设备。
 
 ## 详情开章故障验收入口
 
@@ -66,7 +66,7 @@ ACCEPTANCE_FIXTURE=bridge-once-error \
 
 2026-11-08，Codex 内置浏览器使用同一正式 Web 构建、固定 `c04d436` 的 xkcd v6 1.6.1、独立 D1 和签名测试身份 `acceptance-owner`。正式安装后从英文 xkcd 的详情搜索 3319，首次点击保持详情与筛选条件，页面显示开章失败，并提供「重试打开『3319: Elevators』」；底部也显示错误提示。独立业务 API 的失败前后响应逐字节一致（账户/作品 revision `1/0`，无进度）。
 
-点击详情内的重试按钮后，正式 Reader 显示第 1 页漫画和第 2 页插件生成的文字图。独立读取确认第 1 页已保存（`3/2`）；翻到第 2 页后当前位置和最远均为第 2 页（`4/3`），未收藏或标记读完。停服审计恰好两条同一代次的目标请求，实际桥响应与上游均为 200，第一次注入、第二次透传。原始响应和截图保留在忽略的 `.local/reading-entry-detail-fault-*`。实际点击详情内重试时底部提示还在；提示移除后的入口保持由组件测试覆盖。
+点击详情内的重试按钮后，正式 Reader 显示第 1 页漫画和第 2 页插件生成的文字图。独立读取确认第 1 页已保存（`3/2`）；翻到第 2 页后当前位置和最远均为第 2 页（`4/3`），未收藏或标记读完。停服审计恰好两条同一代次的目标请求，实际桥响应与上游均为 200，第一次注入、第二次透传。实际点击详情内重试时底部提示还在；提示移除后的入口保持由组件测试覆盖。
 
 ## iOS 与 Android 模拟器书架续读
 
@@ -82,7 +82,7 @@ ACCEPTANCE_FIXTURE=bridge-once-error \
 
 新进程打开正式书架详情时，隔离验收 Worker 只对该作品无章节参数的状态 GET 注入 503，正式业务写入和 Source 请求不改。详情显示读取失败和「重新读取阅读位置」，真实章节列表仍在。解除注入后点击该按钮，同一详情和 Source 会话恢复「继续阅读」。点击到验证完成的窗口有两个成功的目标 GET、零新增 Source 中继请求和零业务 mutation；六份独立 HTTP 响应与打开前逐字节一致，主机再次确认原页位未改变。本分项未在恢复后点击续读进入 Reader。
 
-准备、保存和最终故障阶段各 1/1。首次故障驱动未滚回顶部找到恢复后的按钮；第二次确认按钮恢复、状态相同，但请求计数断言错误地只允许一个 GET。最终驱动确认原 Source 会话及实际只读恢复，保留两轮失败记录。复验脚本、定向分析、各阶段日志和 `evidence/verified.json` 位于本机忽略目录 `.local/native-resume-read-fault-2c012db.IMfcHp/`；服务及专用模拟器已关闭。
+准备、保存和最终故障阶段各 1/1。首次故障驱动未滚回顶部找到恢复后的按钮；第二次确认按钮恢复、状态相同，但请求计数断言错误地只允许一个 GET。最终驱动确认原 Source 会话及实际只读恢复，保留两轮失败记录。服务及专用模拟器已关闭。
 
 ## 剩余运行门
 

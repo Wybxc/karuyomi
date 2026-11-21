@@ -10,16 +10,19 @@ import '../browse/catalog_controller.dart';
 
 part 'settings_controller.g.dart';
 
-enum SettingsFailure { conflict, rejected, unknown }
+enum SettingsFailure { conflict, rejected, unknown, confirmedRead }
+
+enum SettingsActivity { reading, saving }
 
 final class const SettingsState({
   final SettingsSnapshot? snapshot,
   final SettingsDraft? pending,
   final bool available = false,
-  final bool busy = false,
+  final SettingsActivity? activity,
   final String? error,
   final SettingsFailure? failure,
 }) {
+  bool get busy => activity != null;
   bool get canEdit => available && !busy && snapshot != null && pending == null;
   bool get canRefresh => available && !busy;
   bool get canRetry => available && !busy && pending?.retryable == true;
@@ -41,6 +44,8 @@ class SettingsController extends _$SettingsController {
     final account = ref.watch(confirmedAccountProvider(catalog));
     final generation = _generation = Object();
     final initial = mangaKey == null ? catalog.installationSettings : null;
+    final pending = _pending();
+    final failure = _rejection(pending);
     _wantedGlobalRevision = initial?.globalRevision ?? -1;
     if (repository == null || !identical(account?.settings, repository)) {
       return SettingsState(pending: _pending());
@@ -60,7 +65,7 @@ class SettingsController extends _$SettingsController {
       }
       state = _next(
         snapshot: value,
-        busy: state.busy,
+        activity: state.activity,
         error: state.error,
         failure: state.failure,
       );
@@ -75,6 +80,8 @@ class SettingsController extends _$SettingsController {
       snapshot: initial,
       pending: _pending(),
       available: true,
+      failure: failure,
+      error: failure == null ? null : _failureMessage(failure),
     );
   }
 
@@ -92,16 +99,33 @@ class SettingsController extends _$SettingsController {
       ? repository?.pendingGlobal()
       : repository?.pendingManga(mangaKey!);
 
+  SettingsFailure? _rejection(SettingsDraft? pending) =>
+      pending?.retryable == false
+      ? pending?.rejectionCode ==
+                wire
+                    .BusinessStateErrorCode
+                    .BUSINESS_STATE_ERROR_CODE_REVISION_CONFLICT
+            ? SettingsFailure.conflict
+            : SettingsFailure.rejected
+      : null;
+
+  String _failureMessage(SettingsFailure failure) => switch (failure) {
+    SettingsFailure.conflict => '设置已在其他设备修改，请重新读取后确认。',
+    SettingsFailure.rejected => '设置修改已被服务端拒绝，请重新读取后确认。',
+    SettingsFailure.unknown => '设置修改尚未确认，请明确重试原操作。',
+    SettingsFailure.confirmedRead => '原设置已确认，读取最新状态未完成，请重试读取。',
+  };
+
   SettingsState _next({
     SettingsSnapshot? snapshot,
-    bool busy = false,
+    SettingsActivity? activity,
     String? error,
     SettingsFailure? failure,
   }) => SettingsState(
     snapshot: snapshot ?? state.snapshot,
     pending: _pending(),
     available: _current(_generation),
-    busy: busy,
+    activity: activity,
     error: error,
     failure: failure,
   );
@@ -118,7 +142,7 @@ class SettingsController extends _$SettingsController {
 
   Future<bool> refresh() async {
     if (!_current(_generation) || !state.canRefresh) return false;
-    state = _next(busy: true);
+    state = _next(activity: SettingsActivity.reading);
     final generation = _generation;
     try {
       final snapshot = mangaKey == null
@@ -128,7 +152,21 @@ class SettingsController extends _$SettingsController {
       state = _next(snapshot: snapshot);
       return true;
     } catch (_) {
-      if (_current(generation)) state = _next(error: '未能读取服务端设置；当前阅读仍可继续。');
+      if (_current(generation)) {
+        final pending = _pending();
+        final failure =
+            pending?.acknowledged == true && pending?.retryable == true
+            ? SettingsFailure.confirmedRead
+            : _rejection(pending);
+        state = _next(
+          failure: failure,
+          error: failure == null
+              ? '未能读取服务端设置；当前阅读仍可继续。'
+              : failure == SettingsFailure.confirmedRead
+              ? _failureMessage(failure)
+              : '未能读取最新设置。${_failureMessage(failure)}',
+        );
+      }
       return false;
     } finally {
       if (_current(generation)) _refreshInheritance();
@@ -137,17 +175,22 @@ class SettingsController extends _$SettingsController {
 
   Future<bool> saveGlobal(wire.GlobalSettingsValues values, int revision) =>
       _save(
-        () => repository!.setGlobal(values: values, basedOnRevision: revision),
+        (onAcknowledged) => repository!.setGlobal(
+          values: values,
+          basedOnRevision: revision,
+          onAcknowledged: onAcknowledged,
+        ),
       );
 
   Future<bool> saveOverrides(
     wire.ReaderSettingsOverride values,
     int revision,
   ) => _save(
-    () => repository!.setManga(
+    (onAcknowledged) => repository!.setManga(
       mangaKey: mangaKey!,
       overrides: values,
       basedOnRevision: revision,
+      onAcknowledged: onAcknowledged,
     ),
   );
 
@@ -156,22 +199,24 @@ class SettingsController extends _$SettingsController {
     final pending = state.pending;
     if (!state.canRetry || pending == null) return false;
     return _save(
-      () => mangaKey == null
+      (onAcknowledged) => mangaKey == null
           ? repository!.setGlobal(
               values: pending.global!,
               basedOnRevision: pending.basedOnRevision,
+              onAcknowledged: onAcknowledged,
             )
           : repository!.setManga(
               mangaKey: mangaKey!,
               overrides: pending.overrides!,
               basedOnRevision: pending.basedOnRevision,
+              onAcknowledged: onAcknowledged,
             ),
       retrying: true,
     );
   }
 
   Future<bool> _save(
-    Future<SettingsSnapshot> Function() send, {
+    Future<SettingsSnapshot> Function(void Function() onAcknowledged) send, {
     bool retrying = false,
   }) async {
     if (!_current(_generation) ||
@@ -179,28 +224,34 @@ class SettingsController extends _$SettingsController {
       return false;
     }
     final generation = _generation;
-    state = _next(busy: true);
+    state = _next(
+      activity: retrying && state.pending?.acknowledged == true
+          ? SettingsActivity.reading
+          : SettingsActivity.saving,
+    );
     try {
-      final snapshot = await send();
+      final snapshot = await send(() {
+        if (_current(generation)) {
+          state = _next(activity: SettingsActivity.reading);
+        }
+      });
       if (!_current(generation)) return false;
       state = _next(snapshot: snapshot);
       return true;
     } catch (error) {
       if (_current(generation)) {
-        final failure = switch (error) {
-          BusinessStateException(conflict: true) => SettingsFailure.conflict,
-          BusinessStateException(:final error) when !error.retryable =>
-            SettingsFailure.rejected,
-          _ => SettingsFailure.unknown,
-        };
-        state = _next(
-          failure: failure,
-          error: switch (failure) {
-            SettingsFailure.conflict => '设置已在其他设备修改，请重新读取后确认。',
-            SettingsFailure.rejected => '设置修改已被服务端拒绝，请重新读取后确认。',
-            SettingsFailure.unknown => '设置修改尚未确认，请明确重试原操作。',
-          },
-        );
+        final pending = _pending();
+        final failure =
+            pending?.acknowledged == true && pending?.retryable == true
+            ? SettingsFailure.confirmedRead
+            : switch (error) {
+                BusinessStateException(conflict: true) =>
+                  SettingsFailure.conflict,
+                BusinessStateException(:final error) when !error.retryable =>
+                  SettingsFailure.rejected,
+                _ => SettingsFailure.unknown,
+              };
+        state = _next(failure: failure, error: _failureMessage(failure));
       }
       return false;
     } finally {

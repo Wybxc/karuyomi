@@ -30,11 +30,11 @@ Codex 内置浏览器 Chromium 156 在正式 `verify-build.ts --serve` 通过真
 | 第 26 页 | 719,916 B，PNG | 1200 × 1691 |
 | 第 51 页 | 718,931 B，PNG | 1200 × 1691 |
 
-三张图片均通过显示解码、重复释放和 Blob URL 撤销；Page 会话关闭 ACK 通过。原始报告留在该工作树忽略的 `.local/protocol-v3/`，没有将请求流水或临时 JSON 复制入库。
+三张图片均通过显示解码、重复释放和 Blob URL 撤销；Page 会话关闭 ACK 通过。
 
 ## Flutter Web 产品边界
 
-同一冻结提交使用 Flutter 3.47.5 / Dart 3.13.4 构建 Web release，通过 Source harness 的 `SOURCE_PROBE_READER_DIR` 入口在上述内置浏览器实际操作。正式 Dart 应用经“浏览→扩展→Source→漫画详情→DREAM”进入 ReaderScreen，显示真实首图；双页翻到第 2/3 页、切换单页、缩放/重置、切换竖向连续、继续前进至第 3 页、打开/关闭图片放大层均通过。模式与放大层切换保留逻辑页；退出阅读器回到真实章节列表。原始网络摘要留在忽略的 `.local/protocol-v3/flutter-source.json`，未抓取 Cookie 或凭据。
+同一冻结提交使用 Flutter 3.47.5 / Dart 3.13.4 构建 Web release，通过 Source harness 的 `SOURCE_PROBE_READER_DIR` 入口在上述内置浏览器实际操作。正式 Dart 应用经“浏览→扩展→Source→漫画详情→DREAM”进入 ReaderScreen，显示真实首图；双页翻到第 2/3 页、切换单页、缩放/重置、切换竖向连续、继续前进至第 3 页、打开/关闭图片放大层均通过。模式与放大层切换保留逻辑页；退出阅读器回到真实章节列表。当次只记录网络摘要，未抓取 Cookie 或凭据。
 
 ## 复验与限制
 

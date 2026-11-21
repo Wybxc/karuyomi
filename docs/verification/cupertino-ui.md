@@ -26,7 +26,7 @@ pnpm format:check
 pnpm check:dependencies
 ```
 
-本机只做编辑、生成、分析与单并发测试；完整 Web 编译交给 CI，没有执行 AOT、模拟器或真机验证。原始输出留在 ignored `.local/cupertino-migration/`。
+本机只做编辑、生成、分析与单并发测试；完整 Web 编译交给 CI，没有执行 AOT、模拟器或真机验证。
 
 ## 代码量
 
@@ -57,7 +57,7 @@ Codex 内置浏览器已完成扩展安装的等待/账户确认/本机就绪、
 - 独立新文档从书架续读到第 2 页，同时读回白色背景与章节书签。旧文档仍占有 Source 时，新文档先显示明确占用提示；关闭旧文档并连接后恢复正常，没有并行抢占。
 - 360px 的底部三入口、中文分类创建及漫画归类、全局主题深色→浅色→跟随系统的确认保存。主题草稿不提前改变应用主题，保存后才生效。
 
-通过独立 HTTP 客户端读取相同 harness 的正式 API，并携带身份绑定头 `X-App-Subject: acceptance-owner`；不提取浏览器 token，不改写 API 或 D1 结果。`/api/library`、`/api/categories`、`/api/settings`、作品设置、进度和书签分别核对收藏、分类关联、白色覆盖、第 2 页及书签为真。最终账户 revision 为 15，全局 revision 为 6 / `APP_THEME_SYSTEM`，作品设置 revision 为 1；分类及主题操作后当前/最远页仍为 `pageIndexHint=1`。日志和完整响应保留于 ignored `.local/cupertino-migration/`，不作为受维护源码提交。
+通过独立 HTTP 客户端读取相同 harness 的正式 API，并携带身份绑定头 `X-App-Subject: acceptance-owner`；不提取浏览器 token，不改写 API 或 D1 结果。`/api/library`、`/api/categories`、`/api/settings`、作品设置、进度和书签分别核对收藏、分类关联、白色覆盖、第 2 页及书签为真。最终账户 revision 为 15，全局 revision 为 6 / `APP_THEME_SYSTEM`，作品设置 revision 为 1；分类及主题操作后当前/最远页仍为 `pageIndexHint=1`。
 
 该轮浏览器没有 error/warn 日志，临时视口已恢复，专用验收服务已关闭。测试仍是桌面 Web 视口与 Flutter 组件模拟；没有执行原生设备、物理触屏或真实软键盘验收。
 
@@ -76,7 +76,7 @@ Codex 内置浏览器使用既有生产 Access 测试账号会话，明确重新
 
 通过 Wrangler 正式只读查询独立核对生产 D1，身份由正式 `/api/bootstrap` 与现有测试账号确认，不提取浏览器 token。上线前 xkcd revision 为 25；两次翻页确认后为 27，最终验收结束为 28，当前/最远位置均为 `pageIndexHint=1`、同一 Dragonfly manifest，当前横向视口锚点为 `viewportX=0.13669143356643354`。全局设置保持 revision 10、`APP_THEME_SYSTEM` 与黑色背景；作品设置 revision 1 为白色，恢复继承后 revision 2、背景覆盖为空，最终独立读回一致。
 
-生产两份文档的浏览器 warn/error 日志均为空，临时视口已恢复，最终显式退出并释放阅读会话。release/verification、D1 查询结果和成功截图保存在 ignored `.local/cupertino-migration/`；详细临时输出不提交。后续仅提交本次证据与状态文档，产品源码及协议不再变化。
+生产两份文档的浏览器 warn/error 日志均为空，临时视口已恢复，最终显式退出并释放阅读会话。详细临时输出不提交。后续仅提交本次证据与状态文档，产品源码及协议不再变化。
 
 本轮 Web 交付通过；没有测量新的包体或性能收益。原生共享代码和 integration_test 的迁移不能代替 iOS/Android 实际运行证据；原生现场、物理触屏、真实软键盘、安全区及系统手势仍待验，按用户要求继续停止，不阻塞本次 Web 上线。
 
@@ -106,4 +106,4 @@ WHERE scope_key = ''
 
 独立 Wrangler 只读核对生产 D1：翻页前漫画 revision 为 30，确认后为 **31**，当前和最远位置均为 `pageIndexHint=1`，页键后缀为 `:1`，manifest 为 `01223f77d9c8d1aaebdfde75cc19184ca84847451b619dbc9295c4a875ef3874`。全局主题两次保存后 revision 从 13 增至 **15**，最终为 `APP_THEME_DARK`。独立新文档续读前后的漫画、全部该漫画章节进度和该账号设置查询结果逐字节一致；漫画与设置 revision 均未增加，续读未附带业务写入。查询没有提取浏览器凭据或修改服务端数据。
 
-两份验收文档的浏览器 warn/error 日志均为空。临时视口已恢复，验收标签已关闭，用户原有标签保留。CI 日志、release/verification、D1 对照与截图保存在 ignored `.local/liquid-glass-evaluation/` 的 `cupertino-restore-*`、`cupertino-restored-*` 和 `production-*-cupertino*` 文件中。未继续玻璃性能采集，不把恢复决定或资源移除描述为已经测得能耗改善；原生现场验证仍停止。
+两份验收文档的浏览器 warn/error 日志均为空。临时视口已恢复，验收标签已关闭，用户原有标签保留。未继续玻璃性能采集，不把恢复决定或资源移除描述为已经测得能耗改善；原生现场验证仍停止。

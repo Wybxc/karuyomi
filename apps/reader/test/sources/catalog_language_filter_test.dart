@@ -6,6 +6,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
@@ -150,11 +151,16 @@ void main() {
         find.byKey(const ValueKey('source-language-filter'));
     Finder clearFilter() => find.byKey(const ValueKey('source-language-clear'));
 
-    Future<void> show(WidgetTester tester) async {
-      await tester.binding.setSurfaceSize(const Size(480, 800));
+    Future<void> show(
+      WidgetTester tester, {
+      Size size = const Size(480, 800),
+      Brightness? appearance,
+    }) async {
+      await tester.binding.setSurfaceSize(size);
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpApp(
         CupertinoApp(
+          theme: appearance == null ? null : readerAppTheme(appearance),
           home: CupertinoPageScaffold(
             child: CatalogPage(
               controller: catalog,
@@ -327,42 +333,65 @@ void main() {
       },
     );
 
-    testWidgets(
-      'no account installations leads to extension installation and refreshes the Source tab',
-      (tester) async {
-        platform.seedInstalledBuilds(const []);
-        await catalog.connect();
-        await show(tester);
-        expect(find.text('尚无漫画源'), findsOneWidget);
-        await tester.tap(find.text('前往扩展'));
-        await tester.pumpAndSettle();
-        final target = _builds().first;
-        await tester.enterText(
-          find.byKey(const ValueKey('extensions-search')),
-          '中文目录源',
-        );
-        await tester.pumpAndSettle();
-        final install = find.byKey(
-          ValueKey((
-            'extension-install',
-            catalog.catalogUrl,
+    for (final appearance in Brightness.values) {
+      testWidgets(
+        'an empty Source directory centers feedback and leads to extension installation in $appearance',
+        (tester) async {
+          platform.seedInstalledBuilds(const []);
+          await catalog.connect();
+          await show(
+            tester,
+            size: const Size(360, 800),
+            appearance: appearance,
+          );
+          final empty = find.text('尚无漫画源');
+          final viewport = find.byKey(
+            const PageStorageKey('source-directory-scroll'),
+          );
+          expect(empty, findsOneWidget);
+          expect(
+            tester.getCenter(empty).dy,
+            greaterThan(tester.getRect(viewport).center.dy),
+          );
+          tester.platformDispatcher.textScaleFactorTestValue = 2;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await tester.binding.setSurfaceSize(const Size(360, 480));
+          await tester.pumpAndSettle();
+          final manage = find.widgetWithText(CupertinoButton, '前往扩展');
+          await reveal(tester, manage);
+          expect(manage.hitTestable(), findsOneWidget);
+          await tester.tap(manage);
+          tester.platformDispatcher.clearTextScaleFactorTestValue();
+          await tester.binding.setSurfaceSize(const Size(360, 800));
+          await tester.pumpAndSettle();
+          final target = _builds().first;
+          await tester.enterText(
+            find.byKey(const ValueKey('extensions-search')),
+            '中文目录源',
+          );
+          await tester.pumpAndSettle();
+          final install = find.byKey(
+            ValueKey((
+              'extension-install',
+              catalog.catalogUrl,
+              target.packageName,
+            )),
+          );
+          await tester.ensureVisible(install);
+          await tester.tap(install);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('漫画源').first);
+          await tester.pumpAndSettle();
+          expect(find.text('中文目录源'), findsOneWidget);
+          expect(
+            catalog.installedExtensions.single.packageName,
             target.packageName,
-          )),
-        );
-        await tester.ensureVisible(install);
-        await tester.tap(install);
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('漫画源').first);
-        await tester.pumpAndSettle();
-        expect(find.text('中文目录源'), findsOneWidget);
-        expect(
-          catalog.installedExtensions.single.packageName,
-          target.packageName,
-        );
-        expect(platform.openedBuilds, isEmpty);
-        expect(tester.takeException(), isNull);
-        await hide(tester);
-      },
-    );
+          );
+          expect(platform.openedBuilds, isEmpty);
+          expect(tester.takeException(), isNull);
+          await hide(tester);
+        },
+      );
+    }
   });
 }

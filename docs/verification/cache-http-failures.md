@@ -24,7 +24,7 @@ TeaVM 从当前维护模板生成忽略的临时工程，使用正式 `prepareSo
 
 ## 本轮输入
 
-最终报告留在忽略的 `.local/cache-failure-http/browser-rst-v3-final-passed.json`；同轮 JVM 报告在 `jvm-report.json`。摘要对应实际服务字节，格式或构建输入变化后重新生成。
+同轮 JVM 报告在 `jvm-report.json`。摘要对应实际服务字节，格式或构建输入变化后重新生成。
 
 | 输入                             | SHA-256                                                            |
 | -------------------------------- | ------------------------------------------------------------------ |
@@ -46,6 +46,6 @@ node apps/api/test/cache-http-probe.ts --jvm-only
 
 历史复用入口当时维护 fixture、oracle、受控 origin 和 API 编排，不提交生成的 Maven 工程、下载 JAR、缓存或产物。它只编译当前官方桥，不保留选择旧桥的分支；历史输入应在固定 Git checkout 复验。两份 Java 入口分别是 `CacheFailureOracle.java` 和 `fixtures/cache-failure/CacheFailureProbe.java`，浏览器 driver 为 `packages/runtime-host/test/cache-failure-java-browser-worker.ts`。严格检查为 `pnpm typecheck:tools`、`pnpm exec tsc -p packages/runtime-host/test/tsconfig.bridge-browser.json` 与 `pnpm check:dependencies`。
 
-每次运行在准备/编译前写入新的失败初态。最终报告位于忽略的 `.local/cache-failure-http/browser-report.json`，含实际脚本、共享 Java、Java bundle、Worker 和桥摘要；原 JVM 报告在同目录 `jvm-report.json`。成功退出 0。未打开浏览器的实际 `--timeout-ms 1000` 门退出 1，写入 deadline exceeded，并经异步 finally 清理；SIGTERM 的真实门在 stdout URL ready 后发送一次信号，写入明确 interrupted、本轮 identity，然后按锁定 Miniflare 自身 exit-hook 退出 143。该信号路径不声称执行了 runner 的异步 finally，也不承诺编译中立即停止 Maven；独立 TCP 检查确认 harness、workerd API、origin 三个端口均 ECONNREFUSED。
+每次运行在准备/编译前写入新的失败初态。成功退出 0。未打开浏览器的实际 `--timeout-ms 1000` 门退出 1，写入 deadline exceeded，并经异步 finally 清理；SIGTERM 的真实门在 stdout URL ready 后发送一次信号，写入明确 interrupted、本轮 identity，然后按锁定 Miniflare 自身 exit-hook 退出 143。该信号路径不声称执行了 runner 的异步 finally，也不承诺编译中立即停止 Maven；独立 TCP 检查确认 harness、workerd API、origin 三个端口均 ECONNREFUSED。
 
 启动错误与 gentle 断连失败、`browser-timeout-failed.json`、`browser-sigterm-before-fix.json`、`browser-sigterm-failed.json` 及最终成功报告保留在该忽略目录。SIGTERM 门与最终成功门的 runner 摘要相同；超时报告保留其实际运行身份。曾有测试编译分支将 Uint8Array 错解码为空桥，已删除该分支；正式 Worker 在启动 Java 前验证三项 Cache 函数安装。报告失败不能被旧成功文件覆盖，编译成功也不能替代实际运行门。

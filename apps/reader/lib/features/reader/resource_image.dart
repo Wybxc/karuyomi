@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/widgets.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:image/image.dart' as img;
 
 import '../../diagnostics/reader_baseline.dart';
@@ -31,22 +31,24 @@ class ReaderImageFailed extends Notification {
   final Object error;
 }
 
-/// Only UI image widgets inspect borders. Transport and Source stay opaque.
-class ReaderImageCropScope extends InheritedWidget {
-  const ReaderImageCropScope({
+/// Supplies the reader's image appearance to the resource image builder.
+class ReaderImageAppearance extends InheritedWidget {
+  const ReaderImageAppearance({
     super.key,
-    required this.enabled,
+    required this.cropBorders,
+    required this.dimPercent,
     required super.child,
   });
-  final bool enabled;
-  static bool enabledOf(BuildContext context) =>
-      context
-          .dependOnInheritedWidgetOfExactType<ReaderImageCropScope>()
-          ?.enabled ??
-      false;
+  final bool cropBorders;
+  final int dimPercent;
+
+  static ReaderImageAppearance? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ReaderImageAppearance>();
+
   @override
-  bool updateShouldNotify(ReaderImageCropScope oldWidget) =>
-      enabled != oldWidget.enabled;
+  bool updateShouldNotify(ReaderImageAppearance oldWidget) =>
+      cropBorders != oldWidget.cropBorders ||
+      dimPercent != oldWidget.dimPercent;
 }
 
 class ReaderImageCrop extends Notification {
@@ -76,12 +78,16 @@ Widget buildResourceImage(
   BuildContext context,
   ImageResource resource,
   BoxFit fit,
-) => ResourceImage(
-  key: ValueKey(resource.id),
-  resource: resource,
-  fit: fit,
-  cropBorders: ReaderImageCropScope.enabledOf(context),
-);
+) {
+  final appearance = ReaderImageAppearance.maybeOf(context);
+  return ResourceImage(
+    key: ValueKey(resource.id),
+    resource: resource,
+    fit: fit,
+    cropBorders: appearance?.cropBorders ?? false,
+    dimPercent: appearance?.dimPercent ?? 0,
+  );
+}
 
 /// Observes the same cached provider/completer used by Image. The extra listener
 /// owns only an ImageInfo handle; it never creates a codec or decodes bytes.
@@ -91,6 +97,7 @@ class const ResourceImage({
   required final BoxFit fit,
   final ImageProvider<Object>? imageProvider,
   final bool cropBorders = false,
+  final int dimPercent = 0,
 }) extends StatefulWidget {
   @override
   State<ResourceImage> createState() => _ResourceImageState();
@@ -472,13 +479,36 @@ class _ResourceImageState extends State<ResourceImage> {
     _publishCrop();
   }
 
+  ui.Color? get _imageTint {
+    if (widget.dimPercent == 0) return null;
+    final intensity = 1 - widget.dimPercent / 100;
+    return ui.Color.from(
+      alpha: 1,
+      red: intensity,
+      green: intensity,
+      blue: intensity,
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Image(
     image: _provider,
     fit: widget.fit,
+    color: _imageTint,
+    colorBlendMode: ui.BlendMode.modulate,
     gaplessPlayback: false,
     excludeFromSemantics: true,
     frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+      if (frame == null && _error == null) {
+        return Center(
+          child: Semantics(
+            label: '正在加载图片',
+            child: CupertinoActivityIndicator(
+              color: DefaultTextStyle.of(context).style.color,
+            ),
+          ),
+        );
+      }
       if (frame != null && _error == null) {
         final baseline = _baseline;
         if (baseline != null && baseline.recording) {

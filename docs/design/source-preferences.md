@@ -10,6 +10,8 @@
 
 `getPreferences` 返回有界 `PreferenceSnapshot`，包含当前 `snapshotId`、递归 nodes，以及实际 SharedPreferences 的两个完整分区 `syncValues` / `sessionValues`。描述支持开关、文本、单选、多选、分组、动作和明确不支持的项；保留标题、summary、enabled、visible、默认值及同步范围。
 
+设置页以 Cupertino 分区呈现原树，保留分组、子组与空分组的标题。组的禁用状态传到子控件，选择行的标签、当前值和辅助功能状态一起反映可用性。显示分区和筛选可见项目均保留叶节点在原描述中的索引路径。
+
 `editPreference(snapshotId,path,change|click)` 一次只修改一个原控件或执行一次原点击 listener，返回 `accepted`、`clickHandled` 和更新后的快照。路径绑定原 Source 实例、Source ID 和 generation；旧快照、非法路径、类型错误、不可用项与非法选项在回调之前拒绝。单选和多选使用真实 entryValues，不能用标签或选项索引代替。当前值暂时不在动态选项中时明确显示不可用值，不自动改变存储；空选项可描述，但禁止编辑。
 
 存储使用 typed `PreferenceValue`，区分 boolean、text、sint32、sint64、float 和唯一字符串集合。缺键是默认/未存储状态，false、0、空字符串与空集合都是存在的值。sint64 采用 ProtoJSON 十进制字符串，Java 分别通过 `putInt` / `putLong` 保存，不能把两者都转换成 Number；Dart 在生成 codec 解码之前额外拒绝会被 fixnum 环绕的越界长整数。float 必须有限。没有通用的“重置单项”操作；原 Source 提供的 action 仍可调用。
@@ -39,7 +41,7 @@ setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主�
 
 编辑基线必须是该 Source 构造时注入的 revision/entries。打开设置页先 GET；若与构造基线不同，先重开 Source 再取描述，不能把旧 runtime 的值套到新 revision 上。编辑后只上传 snapshot.syncValues；sessionValues 在当前部署/身份会话内按 catalog URL、repoId、package 和 Source 隔离保留，供确认后重开注入。
 
-业务响应丢失时保留冻结的 UUID、body 和 CAS，显式重试只重发这份业务请求，不重跑插件回调。收到旧幂等 ACK 后再次 GET 整包再重开，不能用旧 ACK 回退 runtime 基线。只读刷新不重放 pending；冲突、显式放弃或未知运行结果都读取当前 D1 后重开。关闭表单、切换 Source/包/身份/部署及迟到结果不能复活旧草稿；切换身份/部署清空客户端秘密值；同包换仓不能注入原仓秘密、D1 值或可变存储。额外仓库边界见[设计](additional-repositories.md)。
+业务响应丢失时保留冻结的 UUID、body 和 CAS。显式重试重发这份业务请求，插件回调仍只执行原编辑一次。校验 ACK 的身份、版本和提交值后，在原会话保存确认，随后的失败恢复只 GET 整包。读回校验确认版本并采用当前 D1 数据，再重开运行容器。未确认和已确认的恢复均可查看本次提交的同步值。冲突、显式放弃或未知运行结果可读取 D1 当前状态后重开。关闭表单、切换 Source/包/身份/部署及迟到结果不能复活旧草稿。切换身份/部署清空客户端秘密值。同包换仓的 Session、D1 值和可变存储按仓库隔离。额外仓库边界见[设计](additional-repositories.md)。
 
 ## 统一限额
 

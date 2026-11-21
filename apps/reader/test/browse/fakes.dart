@@ -114,6 +114,8 @@ final class TestPlatform extends PlatformRuntime {
   final preparations = <wire.PrepareBuildRequest>[];
   final buildClosures = <wire.CloseBuildRequest>[];
   Future<void> Function(wire.PrepareBuildRequest)? beforePrepare;
+  Future<void> Function(String preparationId)? beforeCancelPreparation;
+  Future<wire.RuntimeError?> Function(String sha256)? beforeForgetArtifact;
   wire.RuntimeError? preparationFailure;
   final _cancelledPreparations = <String>{};
   String? _liveBuild;
@@ -269,7 +271,9 @@ final class TestPlatform extends PlatformRuntime {
           );
         }
       case wire.ControlRequest_Command.cancelPreparation:
-        _cancelledPreparations.add(request.cancelPreparation.preparationId);
+        final id = request.cancelPreparation.preparationId;
+        _cancelledPreparations.add(id);
+        await beforeCancelPreparation?.call(id);
         response.completed = wire.Completed(completed: true);
       case wire.ControlRequest_Command.extensionCache:
         response.extensionCache = wire.ExtensionCacheState(
@@ -284,8 +288,14 @@ final class TestPlatform extends PlatformRuntime {
           maxArtifacts: 128,
         );
       case wire.ControlRequest_Command.forgetExtensionArtifact:
-        cachedArtifacts.remove(request.forgetExtensionArtifact.sha256);
-        response.completed = wire.Completed(completed: true);
+        final sha256 = request.forgetExtensionArtifact.sha256;
+        final failure = await beforeForgetArtifact?.call(sha256);
+        if (failure != null) {
+          response.error = failure;
+        } else {
+          cachedArtifacts.remove(sha256);
+          response.completed = wire.Completed(completed: true);
+        }
       case wire.ControlRequest_Command.closeBuild:
         buildClosures.add(request.closeBuild.deepCopy()..freeze());
         if (_liveBuild == request.closeBuild.buildId &&

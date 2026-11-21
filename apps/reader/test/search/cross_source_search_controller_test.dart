@@ -132,6 +132,11 @@ void main() {
       expect(group.status, SourceSearchStatus.cancellationFailed);
       expect(group.error, contains('ACK丢失'));
       expect(task.completion.isCompleted, false);
+      final stops = service.stops;
+      await controller.start('新查询');
+      expect(service.stops, stops);
+      expect(service.tasks, [task]);
+      expect(controller.query, '作品');
       await controller.cancel(group);
       expect(group.status, SourceSearchStatus.cancelled);
       controller.next(group);
@@ -160,7 +165,29 @@ void main() {
       await cancelling;
       expect(group.status, SourceSearchStatus.cancelled);
       expect(group.error, isNull);
+      expect(group.errorDetails, isNull);
       expect(controller.cleanupError, isNull);
+    },
+  );
+
+  test(
+    'confirmed global stop clears the previous cancellation failure',
+    () async {
+      await controller.loadTargets();
+      controller.select(controller.targets.first, true);
+      await controller.start('作品');
+      var attempts = 0;
+      service.tasks.single.beforeCancel = () async {
+        if (++attempts == 1) throw const FormatException('停止确认丢失');
+      };
+      final group = controller.groups.single;
+      await controller.cancel(group);
+      expect(group.errorDetails, contains('停止确认丢失'));
+      expect(await controller.stop(), true);
+      expect(group.status, SourceSearchStatus.cancelled);
+      expect(group.error, isNull);
+      expect(group.errorDetails, isNull);
+      expect(controller.canContinue(group), true);
     },
   );
 
