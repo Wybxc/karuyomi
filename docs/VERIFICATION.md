@@ -20,7 +20,11 @@
 
 2026-11-22，Read Berserk Manga 在冻结并发构建中因 Gradle 打包共享主题缓存时读取文件模式失败。用 `macbook-pro-4` 上独立的 `f64676e` checkout 串行复验同一 Keiyoushi 提交，Gradle、TeaVM 和正式完整性检查通过。1.6.1 产物包含 1 个 Source 与 `hostAcquireCover`，canonical SHA-256 为 `161714228319a84bb9d32249751dd604bc69a82b881dbb219bb513a76bf419d5`，保持 `compiled_unverified`，已登记到完整候选。同期其他扩展有上游 KSP `@Source` 继承校验错误，原诊断按包保留。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
 
-2026-11-22，`303bc67` 补齐冻结批次缺少的 Java PBKDF2 接口。`pnpm teavm:check` 通过，实际生成的 JavaScript 与 JDK 对照通过 8 项断言。在 `macbook-pro-4` 固定同一 Keiyoushi 提交补编 Coolmic 1.6.3、Manga Drama 1.6.6、Mgread.io 1.6.7，三包正式 AOT、完整性和 `hostAcquireCover` 检查通过，各保留 1 个 Source。共享运行材料与冻结批次逐字节相同。三包保持 `compiled_unverified`，生产发布与在线出图待验。[宿主实现](../runtime/teavm/README.md)
+2026-11-22，`303bc67` 补齐冻结批次缺少的 Java PBKDF2 接口。`pnpm teavm:check` 通过，实际生成的 JavaScript 与 JDK 对照通过 8 项断言。在 `macbook-pro-4` 固定同一 Keiyoushi 提交补编 Coolmic 1.6.3、Manga Drama 1.6.6、Mgread.io 1.6.7，三包正式 AOT、完整性和 `hostAcquireCover` 检查通过，各保留 1 个 Source。共享运行材料与冻结批次逐字节相同。三包与此前八个补编结果通过候选装配前检查，等待全量终态。三包保持 `compiled_unverified`，生产发布与在线出图待验。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，在 `macbook-pro-4` 用 LunarAnime 的隔离构建副本复现 TeaVM 字符串拼接参数越界。`5281227` 的固定编译器补丁经 JDK 与生成 JavaScript 对照通过，`pnpm teavm:check` 通过。随后同机用原扩展正式重编，越过原异常，AOT 仍因 `KeyFactory`、`KeyPairGenerator`、`KeyPair` 和 `ECPoint` 缺失而失败。[编译器补丁](../runtime/teavm/README.md)
+
+2026-11-22，在 `macbook-pro-4` 的独立 `5281227` checkout 串行复验冻结批次上游 KSP 失败的 Read One Piece Manga Online。使用同一 Keiyoushi 提交，Gradle、TeaVM、完整性和 `hostAcquireCover` 检查均通过。1.6.1 产物包含 1 个 Source，canonical SHA-256 为 `49995bc1842d7c7464f9553f25de7d374492fcfc1e30f4e56e0bd8e5c125292e`。该包保持 `compiled_unverified`，同主题同类失败按包排队复验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
 
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 

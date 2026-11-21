@@ -1121,13 +1121,18 @@ async function baselineFixture(t: TestContext) {
     retainedDirectory,
     replacedDirectory,
     supplementDirectory,
+    pinnedPlan,
     options: {
       frozenPlan,
       frozenResults: f.results,
       frozenRuntime: materialIdentity,
-      supplementPlan,
-      supplementResults,
-      supplementPackages: [selected.packageName],
+      supplements: [
+        {
+          plan: supplementPlan,
+          results: supplementResults,
+          packages: [selected.packageName],
+        },
+      ],
       parentState: parent,
       assetsDirectory: f.snapshot,
     },
@@ -1228,21 +1233,94 @@ test('supplemented baseline aborts on a mismatched live index or damaged artifac
 
 test('baseline plans reject duplicate replacements and a changed upstream source closure', async (t) => {
   const { options, selected } = await baselineFixture(t);
+  const [supplement] = options.supplements;
+  assert.ok(supplement);
   assert.throws(
     () =>
-      makeBaselinePlan(options.frozenPlan, options.supplementPlan, [
-        selected.packageName,
-        selected.packageName,
+      makeBaselinePlan(options.frozenPlan, [
+        {
+          plan: supplement.plan,
+          packages: [selected.packageName, selected.packageName],
+        },
       ]),
     /duplicate|unique/i,
   );
-  const changed = structuredClone(options.supplementPlan);
+  const changed = structuredClone(supplement.plan);
   changed.entries[1]!.sourceFingerprint = '8'.repeat(64);
   changed.selected[1]!.sourceFingerprint = '8'.repeat(64);
   assert.throws(
-    () => makeBaselinePlan(options.frozenPlan, changed, [selected.packageName]),
+    () =>
+      makeBaselinePlan(options.frozenPlan, [
+        { plan: changed, packages: [selected.packageName] },
+      ]),
     /source|upstream/i,
   );
+});
+
+test('a baseline reuses verified packages from independent supplements with shared materials', async (t) => {
+  const { f, options, failed, selected, pinnedPlan, retained } =
+    await baselineFixture(t);
+  const thirdPlan = pinnedPlan(
+    options.frozenPlan.entries.map((entry, index) => ({
+      ...entry,
+      hostFingerprint: '0'.repeat(64),
+      inputFingerprint: String(index + 4).repeat(64),
+      buildId: entry.buildId + '-third',
+    })),
+    'c'.repeat(40),
+  );
+  const recovered = thirdPlan.entries.find(
+    (entry) => entry.packageName === failed.packageName,
+  );
+  assert.ok(recovered);
+  const results = path.join(f.root, 'independent-results');
+  mkdirSync(results);
+  f.output(recovered, false, '/* independently recovered */', results);
+  const checkout = path.join(f.root, 'independent-checkout');
+  const third = {
+    plan: thirdPlan,
+    results,
+    checkout,
+    packages: [failed.packageName],
+  };
+  const combined = { ...options, supplements: [...options.supplements, third] };
+  assert.throws(
+    () =>
+      makeBaselinePlan(options.frozenPlan, [
+        ...options.supplements,
+        { ...third, packages: [selected.packageName] },
+      ]),
+    /unique supplement packages/,
+  );
+
+  const mismatched = new ExtensionPipeline({
+    root: f.root,
+    materials: async (input) =>
+      input === checkout
+        ? { ...materialIdentity, hostAbi: 'different-runtime' }
+        : materialIdentity,
+    fetchBytes: async (_origin, relative) => {
+      const body = f.remoteOverrides.get(relative);
+      assert.ok(body);
+      return body;
+    },
+  });
+  await assert.rejects(
+    mismatched.prepareBaseline(combined),
+    /runtime materials/i,
+  );
+  assert.equal(existsSync(f.snapshot), false);
+
+  const next = await f.pipeline.prepareBaseline(combined);
+  assert.equal(next.bootstrap.complete, true);
+  assert.equal(next.summary?.pending, 0);
+  assert.deepEqual(next.active, {
+    [retained.packageName]: retained.inputFingerprint,
+    [selected.packageName]: selected.inputFingerprint,
+    [failed.packageName]: recovered.inputFingerprint,
+  });
+  assert.equal(next.attempts[failed.inputFingerprint], undefined);
+  assert.equal((await f.index()).builds.length, 3);
 });
 
 test('initial baseline refuses to drop a deployed package still in the catalog', async (t) => {

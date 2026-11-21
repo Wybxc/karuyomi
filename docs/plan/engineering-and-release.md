@@ -46,7 +46,9 @@ BookWalker 与 J-Novel 的 Java 摘要兼容补编已通过正式完整性和封
 
 Read Berserk Manga 从已归档的 Gradle 共享目录缓存失败恢复，同一上游提交在独立 checkout 串行构建通过，已登记到完整候选。收尾时复核同类日志并按包串行复验一次，上游 KSP 继承校验失败保留诊断。[补编证据](../VERIFICATION.md)
 
-Coolmic、Manga Drama、Mgread.io 在独立 checkout 补齐 PBKDF2 后通过正式 AOT、产物完整性和封面入口检查。收尾合入前继续核验此前的成功补编、生产父快照和共享材料。冻结队列中同一共享主题的 KSP 继承校验失败待隔离串行复验。[补编证据](../VERIFICATION.md)
+Coolmic、Manga Drama、Mgread.io 在独立 checkout 补齐 PBKDF2 后通过正式 AOT、产物完整性和封面入口检查。三包与此前八个补编结果已通过生产父快照、共享材料及候选装配前检查。[补编证据](../VERIFICATION.md)
+
+Read One Piece Manga Online 的 KSP 继承校验失败已在同一上游提交的独立 checkout 串行恢复，同主题的同类失败按包复验。LunarAnime 的字符串拼接编译器问题已修复，扩展仍缺椭圆曲线密钥接口。候选组装入口支持直接复用多个经过检查的独立补编批次。[补编证据](../VERIFICATION.md) · [组装命令](../EXTENSIONS.md#首次全量候选的定向补编)
 
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。

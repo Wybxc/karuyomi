@@ -110,18 +110,33 @@ node tools/extensions/pipeline.ts commit-snapshot \
 
 冻结全量期间如有少量包需要用新版 AOT 重编，先确认新旧 checkout 的上游源码和共享运行材料相同。等冻结批次退出并留下所有包的终态；在独立目录保留其原计划和逐包结果。新版固定 checkout 以同一份已核对的生产父状态运行 `plan --limit 10000`，按新计划中的精确 `inputFingerprint` 对指定包运行 `build --key`，每个包使用独立输出目录。两份 checkout 先各自执行 `pnpm --filter @karuyomi/runtime-host build:materials`。
 
-执行本地候选组装。`--supplement-checkout` 指向补编计划固定的 checkout，省略时使用当前 checkout；`--supplement-package` 为完整包名，每包重复一次：
+本地候选可以同时纳入多个独立补编批次。`--supplements` 指向 JSON 数组，每项记录原计划、实际结果目录、固定 checkout 和要合入的完整包名。相对路径以该 JSON 文件所在目录为基准。每个包只能由一个补编批次提供。
+
+```json
+[
+  {
+    "plan": "supplement-a/plan.json",
+    "results": "supplement-a/builds",
+    "checkout": "supplement-a/checkout",
+    "packages": ["eu.kanade.tachiyomi.extension.all.komga"]
+  },
+  {
+    "plan": "supplement-b/plan.json",
+    "results": "supplement-b/builds",
+    "checkout": "supplement-b/checkout",
+    "packages": ["eu.kanade.tachiyomi.extension.en.theblank"]
+  }
+]
+```
 
 ```sh
 node tools/extensions/pipeline.ts prepare-baseline \
   --state "$parent_state" --plan "$frozen_plan" \
   --results "$frozen_results" --build-checkout "$frozen_checkout" \
-  --supplement-plan "$new_plan" --supplement-results "$new_results" \
-  --supplement-checkout "$new_checkout" \
-  --supplement-package "$package_name" --assets-dir "$candidate"
+  --supplements "$supplements_file" --assets-dir "$candidate"
 ```
 
-入口核对线上 state/index 仍为同一真实父快照，验证完整冻结计划、补编的包身份及实际结果。只用补编成功产物替换指定包；保留其余冻结终态及各自输入指纹。缺检查点、材料不符或传输损坏会中止，不把它们记为编译失败。仍在上游目录且现网可用的包必须留在候选索引。组装只生成本地候选；仍需正式构建、验收和 `check-base` 后才可部署。增量 CI 继续以真实已部署且完成的 baseline 为前提。
+入口核对线上 state/index 仍为同一真实父快照，逐批检查完整源码目录、共享运行材料、固定 checkout 和实际产物。组装只替换指定包，保留每个产物的构建输入身份及其余冻结终态。缺检查点、材料不符或传输损坏会中止，并保留已有候选。仍在上游目录且现网可用的包必须留在候选索引。组装只生成本地候选，仍须完成正式构建、验收和 `check-base` 才可部署。增量 CI 继续以真实已部署且完成的 baseline 为前提。
 
 ### 部署确认
 
