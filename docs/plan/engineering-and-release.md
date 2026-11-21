@@ -50,6 +50,8 @@ Coolmic、Manga Drama、Mgread.io 在独立 checkout 补齐 PBKDF2 后通过正�
 
 Read One Piece Manga Online 的 KSP 继承校验失败已在同一上游提交的独立 checkout 串行恢复，同主题的同类失败按包复验。LunarAnime 的字符串拼接编译器问题已修复，扩展仍缺椭圆曲线密钥接口。候选组装入口支持直接复用多个经过检查的独立补编批次。[补编证据](../VERIFICATION.md) · [组装命令](../EXTENSIONS.md#首次全量候选的定向补编)
 
+The Blank、TCB Scans、Webnex 已通过正式 AOT、产物完整性及封面入口检查。两个固定 checkout 的 15 个成功补编已通过多批候选预检，同主题的后续串行结果将在该批结束后加入。[补编证据](../VERIFICATION.md)
+
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
 - [x] 先行发布原索引 191 个升级包，逐包读回生产资源并确认新的生产检查点。完整冻结队列继续构建后续目录。[生产证据](../VERIFICATION.md)
