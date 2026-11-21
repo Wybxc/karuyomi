@@ -283,77 +283,132 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     );
   }
 
-  Widget _resultStrip(SourceSearchGroup group) {
-    const cardWidth = 96.0;
-    const inset = 4.0;
-    const coverAspectRatio = 2 / 3;
-    const titleLines = 3;
-    final titleStyle = CupertinoTheme.of(context).textTheme.actionTextStyle
-        .copyWith(
-          fontSize: 12,
-          height: 1.5,
-          color: AppColors.label.resolveFrom(context),
+  Widget _resultStrip(SourceSearchGroup group) => HookBuilder(
+    builder: (context) {
+      const cardWidth = 96.0;
+      const inset = 4.0;
+      const coverAspectRatio = 2 / 3;
+      const coverWidth = cardWidth - 2 * inset;
+      const coverHeight = coverWidth / coverAspectRatio;
+      const titleWidth = coverWidth - 2 * inset;
+      const minimumTitleLines = 2;
+      const maximumTitleLines = 3;
+      final mangas = group.mangas;
+      final titleStyle = CupertinoTheme.of(context).textTheme.actionTextStyle
+          .copyWith(
+            fontSize: 12,
+            height: 1.5,
+            color: AppColors.label.resolveFrom(context),
+          );
+      final textDirection = Directionality.of(context);
+      final textScaler = MediaQuery.textScalerOf(context);
+      final locale = Localizations.maybeLocaleOf(context);
+      final titleHeight = useMemoized(() {
+        final caption = TextPainter(
+          text: TextSpan(style: titleStyle),
+          textDirection: textDirection,
+          textScaler: textScaler,
+          locale: locale,
+          maxLines: minimumTitleLines,
         );
-    final caption = TextPainter(
-      text: TextSpan(style: titleStyle),
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-      locale: Localizations.maybeLocaleOf(context),
-    );
-    final titleHeight = titleLines * caption.preferredLineHeight;
-    caption.dispose();
-    const coverHeight = (cardWidth - 2 * inset) / coverAspectRatio;
+        try {
+          final needsThirdLine = mangas.any((manga) {
+            caption.text = TextSpan(text: manga.title, style: titleStyle);
+            caption.layout(maxWidth: titleWidth);
+            return caption.didExceedMaxLines;
+          });
+          final lines = needsThirdLine ? maximumTitleLines : minimumTitleLines;
+          return lines * caption.preferredLineHeight;
+        } finally {
+          caption.dispose();
+        }
+      }, [mangas, titleStyle, textDirection, textScaler, locale]);
 
-    return SizedBox(
-      height: coverHeight + 3 * inset + titleHeight,
-      child: ListView.separated(
-        key: ValueKey(('cross-search-results', group.target.key)),
-        scrollDirection: Axis.horizontal,
-        itemCount: group.mangas.length,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        separatorBuilder: (_, _) => const SizedBox(width: 4),
-        itemBuilder: (context, index) => SizedBox(
-          width: cardWidth,
-          child: Semantics(
-            enabled: controller.canSearch,
-            child: CupertinoButton(
-              key: ValueKey(('cross-search-result', group.target.key, index)),
-              padding: const EdgeInsets.all(inset),
-              alignment: Alignment.topLeft,
-              onPressed: controller.canSearch
-                  ? () => unawaited(_open(group, group.mangas[index]))
-                  : null,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AspectRatio(
-                    aspectRatio: coverAspectRatio,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: AppColors.groupedSurface.resolveFrom(context),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Icon(
-                        CupertinoIcons.book,
-                        color: AppColors.secondaryLabel.resolveFrom(context),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: inset),
-                  Flexible(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: inset),
-                      child: Text(
-                        group.mangas[index].title,
-                        maxLines: titleLines,
-                        overflow: TextOverflow.ellipsis,
-                        style: titleStyle,
+      return SizedBox(
+        height: coverHeight + 3 * inset + titleHeight,
+        child: ListView.separated(
+          key: ValueKey(('cross-search-results', group.target.key)),
+          scrollDirection: Axis.horizontal,
+          itemCount: mangas.length,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          separatorBuilder: (_, _) => const SizedBox(width: 4),
+          itemBuilder: (context, index) => SizedBox(
+            width: cardWidth,
+            child: Semantics(
+              enabled: controller.canSearch,
+              child: CupertinoButton(
+                key: ValueKey(('cross-search-result', group.target.key, index)),
+                padding: const EdgeInsets.all(inset),
+                alignment: Alignment.topLeft,
+                onPressed: controller.canSearch
+                    ? () => unawaited(_open(group, mangas[index]))
+                    : null,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: coverAspectRatio,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppColors.groupedSurface.resolveFrom(context),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Icon(
+                          CupertinoIcons.book,
+                          color: AppColors.secondaryLabel.resolveFrom(context),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: inset),
+                    Flexible(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: inset),
+                        child: Text(
+                          mangas[index].title,
+                          maxLines: maximumTitleLines,
+                          overflow: TextOverflow.ellipsis,
+                          style: titleStyle,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+          ),
+        ),
+      );
+    },
+  );
+
+  Widget _sourcePageAction(
+    SourceSearchGroup group, {
+    required bool loading,
+    required bool retry,
+  }) {
+    final enabled = controller.canContinue(group);
+    return Semantics(
+      label: retry ? '重试此源' : '此源下一页',
+      enabled: enabled,
+      child: CupertinoButton(
+        key: ValueKey(('cross-search-more', group.target.key)),
+        sizeStyle: CupertinoButtonSize.small,
+        minimumSize: const Size.square(kMinInteractiveDimensionCupertino),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        onPressed: enabled ? () => controller.next(group) : null,
+        child: ExcludeSemantics(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Opacity(
+                opacity: loading || retry ? 0 : 1,
+                child: const Text('下一页'),
+              ),
+              if (loading)
+                const CupertinoActivityIndicator()
+              else if (retry)
+                const Text('重试'),
+            ],
           ),
         ),
       ),
@@ -370,16 +425,27 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
       SourceSearchStatus.cancelled => '已停止',
       SourceSearchStatus.cancellationFailed => '停止尚未确认',
     };
+    final statusLabel = group.hasNextPage
+        ? switch (group.status) {
+            SourceSearchStatus.queued => '等待中',
+            SourceSearchStatus.loading => '搜索中',
+            SourceSearchStatus.error => '未完成',
+            SourceSearchStatus.cancelling => '停止中',
+            SourceSearchStatus.cancellationFailed => '未确认',
+            _ => status,
+          }
+        : status;
+    final language = sourceLanguage(group.target.source.lang);
     final count = group.mangas.length;
     final loading =
         !controller.transitioning &&
         (group.status == SourceSearchStatus.loading ||
             group.status == SourceSearchStatus.cancelling);
-    final hasAction =
-        group.active ||
-        group.hasNextPage ||
+    final retry =
         group.status == SourceSearchStatus.error ||
         group.status == SourceSearchStatus.cancelled;
+    final retryBelowResults = retry && !group.hasNextPage;
+    final hasAction = group.active || retryBelowResults;
     final canCancel = controller.canCancel(group);
     return Semantics(
       container: true,
@@ -388,41 +454,52 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        group.target.source.name,
-                        style: CupertinoTheme.of(context).textTheme.textStyle
-                            .copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${sourceLanguage(group.target.source.lang)}'
-                        ' · $status · $count 项',
-                        key: ValueKey((
-                          'cross-search-status',
-                          group.target.key,
-                        )),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.secondaryLabel.resolveFrom(context),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: kMinInteractiveDimensionCupertino,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          group.target.source.name,
+                          style: CupertinoTheme.of(context).textTheme.textStyle
+                              .copyWith(fontWeight: FontWeight.w600),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          '$language · $statusLabel · $count 项',
+                          semanticsLabel: '$language · $status · $count 项',
+                          key: ValueKey((
+                            'cross-search-status',
+                            group.target.key,
+                          )),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.secondaryLabel.resolveFrom(
+                              context,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                if (loading) ...[
-                  const SizedBox(width: 12),
-                  const CupertinoActivityIndicator(),
+                  if (group.hasNextPage) ...[
+                    const SizedBox(width: 8),
+                    _sourcePageAction(group, loading: loading, retry: retry),
+                  ] else if (loading) ...[
+                    const SizedBox(width: 12),
+                    const CupertinoActivityIndicator(),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
+          if (group.mangas.isNotEmpty) _resultStrip(group),
           if (group.error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -472,7 +549,6 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Text(group.limitReason!),
             ),
-          if (group.mangas.isNotEmpty) _resultStrip(group),
           if (group.status == SourceSearchStatus.complete &&
               group.mangas.isEmpty)
             Padding(
@@ -520,21 +596,14 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                         child: const Text('重试停止'),
                       ),
                     ),
-                  if (group.hasNextPage ||
-                      group.status == SourceSearchStatus.error ||
-                      group.status == SourceSearchStatus.cancelled)
+                  if (retryBelowResults)
                     MergeSemantics(
                       child: CupertinoButton(
                         key: ValueKey(('cross-search-more', group.target.key)),
                         onPressed: controller.canContinue(group)
                             ? () => controller.next(group)
                             : null,
-                        child: Text(
-                          group.status == SourceSearchStatus.error ||
-                                  group.status == SourceSearchStatus.cancelled
-                              ? '重试此源'
-                              : '此源下一页',
-                        ),
+                        child: const Text('重试此源'),
                       ),
                     ),
                 ],

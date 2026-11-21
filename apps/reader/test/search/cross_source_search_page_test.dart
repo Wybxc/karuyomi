@@ -325,7 +325,10 @@ void main() {
         expect(heading.data, '“测试作品” · 2 / 2 源完成 · 1 项');
         expect(find.text('仍属于原查询的作品'), findsOneWidget);
         expect(find.text('此源临时失败'), findsOneWidget);
-        expect(find.text('此源下一页'), findsOneWidget);
+        final more = find.byKey(
+          ValueKey(('cross-search-more', service.targets.first.key)),
+        );
+        expect(tester.getSemantics(more).label, '此源下一页');
         expect(find.text('重试此源'), findsOneWidget);
         expect(service.tasks, hasLength(2));
         expect(tester.takeException(), isNull);
@@ -703,6 +706,94 @@ void main() {
       await tester.pumpApp(const SizedBox());
       await tester.pump();
     });
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'paging stays with the source and keeps its covers anchored in $brightness at $scale',
+        (tester) async {
+          tester.view.physicalSize = const Size(360, 800);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final service = FakeSourceSearch();
+          await openPage(
+            tester,
+            service,
+            brightness: brightness,
+            textScaler: TextScaler.linear(scale),
+          );
+          final secondSource = find.byKey(
+            ValueKey(('cross-search-source', service.targets.last.key)),
+          );
+          await tester.ensureVisible(secondSource);
+          await tester.pumpAndSettle();
+          await tester.tap(secondSource);
+          await tester.pumpAndSettle();
+          await chooseAndSearch(tester, service);
+          const firstTitle = '第一卷';
+          const longTitle = '这个漫画的完整标题足够长，需要显示第三行和末尾的省略符号';
+          service.tasks.first.complete([searchManga(firstTitle)], more: true);
+          service.tasks.last.complete([searchManga(longTitle)]);
+          await tester.pumpAndSettle();
+
+          final first = service.targets.first.key;
+          final firstCard = find.byKey(
+            ValueKey(('cross-search-result', first, 0)),
+          );
+          final longCard = find.byKey(
+            ValueKey(('cross-search-result', service.targets.last.key, 0)),
+          );
+          final firstCover = find.descendant(
+            of: firstCard,
+            matching: find.byType(AspectRatio),
+          );
+          final action = find.byKey(ValueKey(('cross-search-more', first)));
+          final art = tester.getRect(firstCover);
+          final originalCardHeight = tester.getSize(firstCard).height;
+          final pagingButton = tester.getRect(action);
+          expect(action.hitTestable(), findsOneWidget);
+          expect(pagingButton.bottom, lessThanOrEqualTo(art.top));
+          expect(tester.getSemantics(action).label, '此源下一页');
+          expect(
+            tester.getSize(longCard).height,
+            greaterThan(originalCardHeight),
+          );
+
+          await tester.tap(action);
+          await tester.pump();
+          expect(service.tasks.last.target.key, first);
+          expect(service.tasks.last.page, 2);
+          expect(service.tasks.last.query, '测试作品');
+          expect(tester.getRect(action), pagingButton);
+          expect(tester.getRect(firstCover), art);
+          expect(tester.widget<CupertinoButton>(action).enabled, isFalse);
+          final status = find.byKey(ValueKey(('cross-search-status', first)));
+          expect(tester.getSemantics(status).label, contains('正在搜索'));
+          final cancel = find.byKey(ValueKey(('cross-search-cancel', first)));
+          expect(cancel.hitTestable(), findsOneWidget);
+
+          service.tasks.last.fail('下一页暂时失败');
+          await tester.pumpAndSettle();
+          final error = find.byKey(ValueKey(('cross-search-error', first)));
+          expect(tester.getRect(firstCover), art);
+          expect(tester.getTopLeft(error).dy, greaterThan(art.bottom));
+          expect(tester.getSemantics(action).label, '重试此源');
+          expect(action.hitTestable(), findsOneWidget);
+          await tester.tap(action);
+          await tester.pump();
+          expect(service.tasks.last.target.key, first);
+          expect(service.tasks.last.page, 2);
+          expect(service.tasks.last.query, '测试作品');
+          service.tasks.last.complete([searchManga('第二卷')]);
+          await tester.pumpAndSettle();
+          expect(tester.getRect(firstCover), art);
+          expect(find.text(firstTitle), findsOneWidget);
+          expect(find.text('第二卷'), findsOneWidget);
+          expect(action, findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
 
     for (final (label, scaler) in [
       ('1x', TextScaler.noScaling),
