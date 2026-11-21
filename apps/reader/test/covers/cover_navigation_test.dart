@@ -688,19 +688,13 @@ void main() {
       await _tap(tester, find.byKey(const ValueKey('cover-save')));
       await _tap(tester, find.text('关闭'));
       expect(server.manga(key)!.hasCustomCover(), false);
-      expect(
-        tester.widget<CustomCover>(find.byType(CustomCover)).cover,
-        isNull,
-      );
+      expect(find.byType(CustomCover), findsNothing);
       await tester.runAsync(() async {
         await tester.binding.handlePopRoute();
         await Future<void>.delayed(Duration.zero);
       });
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<CustomCover>(find.byType(CustomCover)).cover,
-        isNull,
-      );
+      expect(find.byType(CustomCover), findsNothing);
       await _finish(tester, controller);
     },
   );

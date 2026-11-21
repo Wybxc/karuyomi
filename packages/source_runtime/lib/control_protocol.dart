@@ -19,6 +19,7 @@ const sourceMemoLimit = 64 * 1024;
 const controlJsonDepthLimit = 64;
 const imageByteLimit = 64 * 1024 * 1024;
 const imageResourceLimit = 6;
+const coverByteLimit = 8 * 1024 * 1024;
 
 /// Checks transport budgets, without duplicating the generated field schema.
 void _checkJsonNesting(Object? value) {

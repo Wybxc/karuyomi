@@ -15,6 +15,7 @@ import {
   closePageSessionSchema,
   imageResourceSchema,
   type AcquireImage,
+  COVER_BODY_LIMIT,
   type CancelImage,
   type ReleaseImage,
   type ClosePageSession,
@@ -445,7 +446,9 @@ export class SourceRuntimeManager {
         ? {
             ...result,
             capabilities: result.capabilities.filter(
-              (capability) => capability !== 'processed-image-resources',
+              (capability) =>
+                capability !== 'processed-image-resources' &&
+                capability !== 'cover-image-resources',
             ),
           }
         : result;
@@ -595,7 +598,10 @@ export class SourceRuntimeManager {
 
   private pump(): void {
     if (this.active || !this.session || !this.worker) return;
-    const task = this.queue.shift();
+    const foreground = this.queue.findIndex(
+      (task) => task.kind !== 'image' || task.input.thumbnailUrl === undefined,
+    );
+    const task = this.queue.splice(Math.max(0, foreground), 1)[0];
     if (!task) return;
     this.active = task;
     if (task.kind === 'source' && task.call.request.case === 'editPreference') {
@@ -868,10 +874,24 @@ export class SourceRuntimeManager {
         'unsupported_capability',
         'The loaded build does not provide image resources',
       );
-    if (this.closedPageSessions.has(request.pageSessionId))
+    if (
+      request.thumbnailUrl !== undefined &&
+      !session.capabilities.includes('cover-image-resources')
+    )
+      throw new RuntimeFailure(
+        'unsupported_capability',
+        'The loaded build does not provide cover resources',
+      );
+    if (
+      request.thumbnailUrl === undefined &&
+      this.closedPageSessions.has(request.pageSessionId)
+    )
       throw new RuntimeFailure('runtime_lost', 'Page session was closed');
     this.reserveRequest(request.requestId);
-    const collector = this.images.create(request.generation);
+    const collector = this.images.create(
+      request.generation,
+      request.thumbnailUrl === undefined ? undefined : COVER_BODY_LIMIT,
+    );
     const channel = new MessageChannel();
     collector.attach(channel.port1);
     let settle!: () => void;

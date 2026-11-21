@@ -12,6 +12,7 @@ import { validatePageList } from './runtime-control.ts';
 
 export const IMAGE_CHUNK_LIMIT = 64 * 1024;
 export const IMAGE_BODY_LIMIT = 64 * 1024 * 1024;
+export const COVER_BODY_LIMIT = 8 * 1024 * 1024;
 export const IMAGE_RESOURCE_LIMIT = 6;
 
 export type AcquireImage = PlainMessage<pb.AcquireImage>;
@@ -29,13 +30,26 @@ export type Completed = PlainMessage<pb.Completed>;
 
 export const acquireImageSchema = codec<AcquireImage>((input) => {
   const value = plainMessage(pb.AcquireImageSchema, input);
-  [
-    value.requestId,
-    value.pageSessionId,
-    value.pageKey,
-    value.generation,
-  ].forEach(validId);
+  [value.requestId, value.generation].forEach(validId);
   validSourceId(value.sourceId);
+  if (value.thumbnailUrl !== undefined) {
+    requireCondition(
+      value.pageSessionId === '' &&
+        value.pageKey === '' &&
+        value.thumbnailUrl.length <= 4096,
+      'Invalid Source thumbnail request',
+    );
+    const url = new URL(value.thumbnailUrl);
+    requireCondition(
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+        url.hostname.length > 0 &&
+        url.username === '' &&
+        url.password === '',
+      'Invalid Source thumbnail request',
+    );
+  } else {
+    [value.pageSessionId, value.pageKey].forEach(validId);
+  }
   if (value.timeoutMs !== undefined)
     requireCondition(
       value.timeoutMs > 0 && value.timeoutMs <= 300_000,

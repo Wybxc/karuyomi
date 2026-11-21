@@ -8,6 +8,7 @@ import kotlin.ResultKt;
 import kotlin.coroutines.Continuation;
 import kotlin.coroutines.intrinsics.IntrinsicsKt;
 import kotlinx.coroutines.Dispatchers;
+import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import okio.Buffer;
@@ -15,6 +16,8 @@ import okio.BufferedSource;
 
 /** Calls the original Source image API and exports only its processed response body. */
 public final class SourceImages {
+  private static final long MAX_COVER_BYTES = 8L * 1024 * 1024;
+
   public interface Sink {
     String open() throws IOException;
 
@@ -45,6 +48,22 @@ public final class SourceImages {
               }
             },
             Dispatchers.getDefault());
+    return export(response, sink, HttpBodySource.MAX_RESPONSE);
+  }
+
+  public static String acquireCover(HttpSource source, String thumbnailUrl, Sink sink)
+      throws IOException {
+    Request request = new Request.Builder().url(thumbnailUrl).headers(source.getHeaders()).build();
+    Response response = source.getClient().newCall(request).execute();
+    if (!response.isSuccessful()) {
+      try (response) {
+        throw new IOException("Source cover request returned HTTP " + response.code());
+      }
+    }
+    return export(response, sink, MAX_COVER_BYTES);
+  }
+
+  private static String export(Response response, Sink sink, long limit) throws IOException {
     if (response == null) throw new IOException("Source returned no image response");
     String handle = null;
     try {
@@ -52,11 +71,11 @@ public final class SourceImages {
         ResponseBody body = response.body();
         if (body == null) throw new IOException("Source returned no image body");
         long length = body.contentLength();
-        if (length < -1 || length > HttpBodySource.MAX_RESPONSE)
-          throw new IOException("Processed image exceeds 64 MiB or has an invalid length");
+        if (length < -1 || length > limit)
+          throw new IOException("Processed image exceeds its byte budget or has an invalid length");
         handle = sink.open();
         if (handle == null || handle.isEmpty()) throw new IOException("Missing image sink handle");
-        pump(body.source(), length, sink, handle);
+        pump(body.source(), length, limit, sink, handle);
       }
       // The HTTP body is closed before a resource can become visible to its owner.
       String resource = sink.close(handle);
@@ -85,7 +104,7 @@ public final class SourceImages {
     return source.getImage(page, continuation);
   }
 
-  static void pump(BufferedSource source, long length, Sink sink, String handle)
+  static void pump(BufferedSource source, long length, long limit, Sink sink, String handle)
       throws IOException {
     Buffer chunk = new Buffer();
     long total = 0;
@@ -94,7 +113,7 @@ public final class SourceImages {
       if (count == -1) break;
       if (count < 1 || count > HttpBodySource.MAX_CHUNK)
         throw new IOException("Invalid processed image chunk");
-      if (count > HttpBodySource.MAX_RESPONSE - total || length >= 0 && count > length - total)
+      if (count > limit - total || length >= 0 && count > length - total)
         throw new IOException("Processed image exceeds its length limit");
       total += count;
       sink.write(handle, chunk.readByteArray(count));

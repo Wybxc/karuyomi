@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data' show BytesBuilder;
 
 import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
+import 'package:file_selector/file_selector.dart' show XFile;
 import 'package:pool/pool.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
@@ -23,6 +25,7 @@ import '../../data/library_repository.dart';
 import '../reader/reading_progress_controller.dart';
 
 part 'catalog_search.dart';
+part 'catalog_covers.dart';
 
 enum ServiceStatus {
   disconnected,
@@ -138,6 +141,7 @@ final class MangaEntry {
   final wire.Manga snapshot;
   String get title => snapshot.title;
   String get url => snapshot.url;
+  Uri? get thumbnail => sourceThumbnail(snapshot.thumbnailUrl);
   String? get description =>
       snapshot.hasDescription() ? snapshot.description : null;
   String? get author => snapshot.hasAuthor() ? snapshot.author : null;
@@ -226,6 +230,8 @@ final class CatalogController extends ChangeNotifier {
   }
 
   final SourceRuntime runtime;
+  Pool? _coverPool;
+  final _activeCovers = <String>{};
   final SourceRuntime? _searchRuntimeOverride;
   _CatalogSourceSearch? _searchOwner;
   final _searchScopes = <_CatalogSourceSearch>{};
@@ -2164,6 +2170,7 @@ final class CatalogController extends ChangeNotifier {
 
   @override
   void dispose() {
+    unawaited(_coverPool?.close());
     for (final scope in _searchScopes.toList()) {
       scope.dispose();
     }

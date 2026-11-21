@@ -18,6 +18,7 @@ import '../sources/source_filters.dart';
 import '../sources/source_preferences.dart';
 import 'catalog_controller.dart';
 import 'manga_details_page.dart';
+import 'source_manga_cover.dart';
 import 'manga_cover_tile.dart';
 
 enum _ListingWork { initial, query, refresh, more }
@@ -836,6 +837,13 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                                           title: manga.title,
                                           entry: saved[manga.url],
                                           covers: _covers,
+                                          sourceCover: SourceMangaCover(
+                                            catalog: catalog,
+                                            source: _sourceCurrent
+                                                ? _reference
+                                                : null,
+                                            thumbnail: manga.thumbnail,
+                                          ),
                                           badge: saved[manga.url] == null
                                               ? null
                                               : Icon(

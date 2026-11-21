@@ -301,15 +301,27 @@ public final class ImageTest {
           public void cancel(String handle) {}
         };
     fails(
-        () -> SourceImages.pump(new Buffer().write(new byte[] {1}), 2, discard, "unused"),
+        () ->
+            SourceImages.pump(
+                new Buffer().write(new byte[] {1}),
+                2,
+                HttpBodySource.MAX_RESPONSE,
+                discard,
+                "unused"),
         IOException.class,
         "length mismatch");
     fails(
-        () -> SourceImages.pump(new Buffer().write(new byte[] {1, 2}), 1, discard, "unused"),
+        () ->
+            SourceImages.pump(
+                new Buffer().write(new byte[] {1, 2}),
+                1,
+                HttpBodySource.MAX_RESPONSE,
+                discard,
+                "unused"),
         IOException.class,
         "length limit");
     fails(
-        () -> SourceImages.pump(new Buffer(), -1, discard, "unused"),
+        () -> SourceImages.pump(new Buffer(), -1, HttpBodySource.MAX_RESPONSE, discard, "unused"),
         IOException.class,
         "empty image");
     BufferedSource excessive =
@@ -333,7 +345,7 @@ public final class ImageTest {
             });
     try (excessive) {
       fails(
-          () -> SourceImages.pump(excessive, -1, discard, "unused"),
+          () -> SourceImages.pump(excessive, -1, HttpBodySource.MAX_RESPONSE, discard, "unused"),
           IOException.class,
           "length limit");
     }
@@ -352,7 +364,8 @@ public final class ImageTest {
     for (int index = 0; index < encrypted.length; index++) encrypted[index] ^= (byte) 0xa5;
     AtomicInteger requests = new AtomicInteger(),
         cookies = new AtomicInteger(),
-        originalHeaders = new AtomicInteger();
+        originalHeaders = new AtomicInteger(),
+        coverHeaders = new AtomicInteger();
     server.createContext(
         "/image",
         exchange -> {
@@ -363,6 +376,9 @@ public final class ImageTest {
               && "original-instance"
                   .equals(exchange.getRequestHeaders().getFirst("X-Original-Page")))
             originalHeaders.incrementAndGet();
+          if ("source-fixture".equals(exchange.getRequestHeaders().getFirst("Referer"))
+              && exchange.getRequestHeaders().getFirst("X-Original-Page") == null)
+            coverHeaders.incrementAndGet();
           exchange.getResponseHeaders().set("Content-Type", "application/octet-stream");
           exchange.getResponseHeaders().set("Cache-Control", "public, max-age=3600");
           exchange.getResponseHeaders().set("Set-Cookie", "session=source-cookie; Path=/");
@@ -393,6 +409,13 @@ public final class ImageTest {
       check(source.resolutions == 1 && source.imageRequests == 2);
       check(requests.get() == 2 && cookies.get() == 1 && originalHeaders.get() == 2);
       check(source.client.cache() == cache && cache.requestCount() == 0);
+      Sink cover = new Sink(source);
+      String coverDescriptor = SourceImages.acquireCover(source, source.endpoint, cover);
+      check(coverDescriptor.contains("\"byteLength\":131079"));
+      check(Arrays.equals(cover.output.readByteArray(), expected));
+      check(cover.opens == 1 && cover.closes == 1 && cover.cancels == 0);
+      check(requests.get() == 3 && cookies.get() == 2 && coverHeaders.get() == 1);
+      check(source.imageRequests == 2 && source.resolutions == 1);
       source.failRead = true;
       Sink readFailure = new Sink(source);
       fails(
@@ -438,7 +461,7 @@ public final class ImageTest {
           "Source-image JVM fixture passed: "
               + assertions
               + " assertions; original Page, suspend URL, cacheless/progress, processed binary"
-              + " body, limits and cleanup. No real Source/decoder/device gate.");
+              + " body, thumbnail headers/cookies/interceptors, limits and cleanup.");
     } finally {
       server.stop(0);
       cache.close();

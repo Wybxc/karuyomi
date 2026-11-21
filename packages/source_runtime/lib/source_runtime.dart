@@ -48,6 +48,7 @@ final class const ImageAcquireRequest({
   required final String pageKey,
   required final String generation,
   final Duration timeout = const Duration(seconds: 30),
+  final Uri? thumbnailUrl,
 });
 
 final class const ImageCancelRequest({

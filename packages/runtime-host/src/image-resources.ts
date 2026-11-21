@@ -45,13 +45,20 @@ export class ImageResourceStore {
     return { resources: this.images.size, bytes: this.bytes };
   }
 
-  create(generation: string): ImageCollector {
+  create(
+    generation: string,
+    maxImageBytes = this.limits.maxImageBytes,
+  ): ImageCollector {
     if (this.images.size >= this.limits.maxResources)
       throw new RuntimeFailure(
         'limit_exceeded',
         'Image resource window is full',
       );
-    const collector = new ImageCollector(this, generation);
+    const collector = new ImageCollector(
+      this,
+      generation,
+      Math.min(maxImageBytes, this.limits.maxImageBytes),
+    );
     this.images.set(collector.resourceId, collector);
     return collector;
   }
@@ -110,6 +117,7 @@ export class ImageCollector {
   constructor(
     private readonly store: ImageResourceStore,
     readonly generation: string,
+    private readonly maxImageBytes: number,
   ) {
     this.result = new Promise((resolve, reject) => {
       this.resolve = resolve;
@@ -166,7 +174,7 @@ export class ImageCollector {
             'protocol_error',
             'Image chunk exceeds the frame budget',
           );
-        if (size + this.byteLength > this.store.limits.maxImageBytes)
+        if (size + this.byteLength > this.maxImageBytes)
           throw new RuntimeFailure(
             'limit_exceeded',
             'Image exceeds its encoded byte budget',

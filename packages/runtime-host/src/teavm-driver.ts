@@ -34,6 +34,7 @@ import {
 } from './runtime-diagnostics.js';
 
 export interface RuntimeDriver {
+  readonly supportsCoverImages?: boolean;
   open(
     manifest: BuildManifest,
     userAgent: string,
@@ -51,6 +52,7 @@ export interface RuntimeDriver {
     port: MessagePort,
     resourceId: string,
     context: HttpCallContext,
+    thumbnailUrl?: string,
   ): Promise<ProcessedImage>;
   closePageSession?(
     pageSessionId: string,
@@ -83,6 +85,13 @@ export interface TeaVMGlobals {
     sourceId: string,
     pageSessionId: string,
     pageKey: string,
+    requestId: string,
+    generation: string,
+    operationToken: string,
+  ) => void;
+  hostAcquireCover?: (
+    sourceId: string,
+    thumbnailUrl: string,
     requestId: string,
     generation: string,
     operationToken: string,
@@ -136,6 +145,10 @@ export interface TeaVMGlobals {
 
 /** Executes hash-checked release9-derived classic scripts from the selected catalog. */
 export class TeaVMDriver implements RuntimeDriver {
+  get supportsCoverImages(): boolean {
+    return typeof this.scope.hostAcquireCover === 'function';
+  }
+
   private waiter:
     { resolve(value: unknown): void; reject(error: unknown): void } | undefined;
   private bridgeFailure: RuntimeFailure | undefined;
@@ -507,6 +520,7 @@ export class TeaVMDriver implements RuntimeDriver {
     port: MessagePort,
     resourceId: string,
     context: HttpCallContext,
+    thumbnailUrl?: string,
   ): Promise<ProcessedImage> {
     return processedImageSchema.parse(
       await this.acquireImageResult(
@@ -516,6 +530,7 @@ export class TeaVMDriver implements RuntimeDriver {
         port,
         resourceId,
         context,
+        thumbnailUrl,
       ),
     );
   }
@@ -527,11 +542,18 @@ export class TeaVMDriver implements RuntimeDriver {
     port: MessagePort,
     resourceId: string,
     context: HttpCallContext,
+    thumbnailUrl?: string,
   ): Promise<unknown> {
     if (this.waiter)
       throw new RuntimeFailure(
         'protocol_error',
         'Concurrent TeaVM entry is not allowed',
+      );
+    const cover = this.scope.hostAcquireCover;
+    if (thumbnailUrl !== undefined && cover === undefined)
+      throw new RuntimeFailure(
+        'unsupported_capability',
+        'This build does not export Source cover acquisition',
       );
     const sink = new ImageSink(port, resourceId, (error) => {
       this.imageFailure ??= error;
@@ -541,8 +563,16 @@ export class TeaVMDriver implements RuntimeDriver {
     this.imageSink = sink;
     this.imageFailure = undefined;
     try {
-      const raw = await this.call(
-        (owner, token) =>
+      const raw = await this.call((owner, token) => {
+        if (thumbnailUrl !== undefined && cover) {
+          cover(
+            sourceId,
+            thumbnailUrl,
+            owner.requestId,
+            owner.generation,
+            token,
+          );
+        } else {
           this.scope.hostAcquireImage!(
             sourceId,
             pageSessionId,
@@ -550,9 +580,9 @@ export class TeaVMDriver implements RuntimeDriver {
             owner.requestId,
             owner.generation,
             token,
-          ),
-        context,
-      );
+          );
+        }
+      }, context);
       return raw;
     } finally {
       sink.dispose();

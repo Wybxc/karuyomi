@@ -38,7 +38,8 @@ wire.Manga get testManga => wire.Manga(
   genres: ['冒险'],
 );
 
-final class TestPlatform extends PlatformRuntime {
+final class TestPlatform extends PlatformRuntime
+    implements ManagedImageTransport {
   TestPlatform({
     Uri? origin,
     this.bootstrapSubject = 'owner-subject',
@@ -61,6 +62,12 @@ final class TestPlatform extends PlatformRuntime {
   final publicDocuments = <String, Object?>{};
   final publicReads = <Uri>[];
   CoverTransport? covers;
+  FutureOr<wire.ImageResource> Function(wire.AcquireImage request)?
+  acquireImageHandler;
+  final _imageLocations = <(String, String, Uri)>{};
+  @override
+  bool ownsImageLocation(String resourceId, String generation, Uri location) =>
+      _imageLocations.contains((resourceId, generation, location));
   @override
   CoverTransport? get coverTransport => covers;
   String bootstrapSubject;
@@ -244,7 +251,10 @@ final class TestPlatform extends PlatformRuntime {
                   supportsLatest: true,
                 ),
               ],
-          capabilities: ['source-rpc'],
+          capabilities: [
+            'source-rpc',
+            if (acquireImageHandler != null) 'cover-image-resources',
+          ],
         );
       case wire.ControlRequest_Command.prepareBuild:
         final prepare = request.prepareBuild.deepCopy()..freeze();
@@ -352,10 +362,21 @@ final class TestPlatform extends PlatformRuntime {
           'acquireImage',
           wire.encodeProtoJson(request.acquireImage),
         ));
-        response.error = wire.RuntimeError(
-          code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_UNSUPPORTED_CAPABILITY,
-          message: 'Test platform has no native image file channel',
-        );
+        if (acquireImageHandler case final acquire?) {
+          final image = await acquire(request.acquireImage);
+          _imageLocations.add((
+            image.resourceId,
+            image.generation,
+            Uri.parse(image.url),
+          ));
+          response.image = image;
+        } else {
+          response.error = wire.RuntimeError(
+            code:
+                wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_UNSUPPORTED_CAPABILITY,
+            message: 'Test platform has no native image file channel',
+          );
+        }
       case wire.ControlRequest_Command.cancelImage:
         imageControls.add((
           'cancelImage',
@@ -367,6 +388,11 @@ final class TestPlatform extends PlatformRuntime {
           'releaseImage',
           wire.encodeProtoJson(request.releaseImage),
         ));
+        _imageLocations.removeWhere(
+          (image) =>
+              image.$1 == request.releaseImage.resourceId &&
+              image.$2 == request.releaseImage.generation,
+        );
         response.released = wire.Released(released: true);
       case wire.ControlRequest_Command.closePageSession:
         await closePageSessionHandler?.call(

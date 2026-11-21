@@ -741,11 +741,21 @@ final class TransportSourceRuntime implements SourceRuntime {
         'Image request belongs to an expired Source',
       );
     }
-    if ([
-          request.requestId,
-          request.pageSessionId,
-          request.pageKey,
-        ].any((value) => value.isEmpty || value.length > 200) ||
+    final thumbnail = request.thumbnailUrl;
+    final validImageTarget = thumbnail == null
+        ? [
+            request.pageSessionId,
+            request.pageKey,
+          ].every((value) => value.isNotEmpty && value.length <= 200)
+        : request.pageSessionId.isEmpty &&
+              request.pageKey.isEmpty &&
+              thumbnail.toString().length <= 4096 &&
+              (thumbnail.scheme == 'http' || thumbnail.scheme == 'https') &&
+              thumbnail.host.isNotEmpty &&
+              thumbnail.userInfo.isEmpty;
+    if (!validImageTarget ||
+        request.requestId.isEmpty ||
+        request.requestId.length > 200 ||
         request.timeout <= Duration.zero ||
         request.timeout > const Duration(minutes: 5)) {
       throw const RuntimeException(
@@ -805,6 +815,7 @@ final class TransportSourceRuntime implements SourceRuntime {
             pageKey: request.pageKey,
             generation: request.generation,
             timeoutMs: request.timeout.inMilliseconds,
+            thumbnailUrl: request.thumbnailUrl?.toString(),
           ),
         ),
         wire.ControlResponse_Result.image,
@@ -853,7 +864,10 @@ final class TransportSourceRuntime implements SourceRuntime {
         if (location == null ||
             (location.scheme != 'blob' && !managedFile) ||
             response.byteLength <= 0 ||
-            response.byteLength > wire.imageByteLimit) {
+            response.byteLength >
+                (request.thumbnailUrl == null
+                    ? wire.imageByteLimit
+                    : wire.coverByteLimit)) {
           throw const RuntimeException(
             RuntimeErrorCode.protocolError,
             'Invalid managed image resource',

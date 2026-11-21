@@ -132,6 +132,45 @@ test('the installed image ABI sends typed bytes and survives HTTP operation clea
   store.release(resource.resourceId, resource.generation);
 });
 
+test('a Source thumbnail uses the cover entry and publishes managed opaque bytes', async () => {
+  const page = vi.fn();
+  const calls: string[][] = [];
+  const { driver, build } = await setup((scope) => {
+    scope.hostAcquireImage = page;
+    scope.hostAcquireCover = (...args) => {
+      calls.push(args);
+      void (async () => {
+        const handle = scope.teaImageOpen!();
+        await scope.teaImageWrite!(handle, pngHeader());
+        scope.teaDone!(await scope.teaImageClose!(handle));
+      })().catch((error) => scope.teaFail!(String(error)));
+    };
+  });
+  await driver.open(build, 'test', new AbortController().signal, catalog);
+  expect(driver.supportsCoverImages).toBe(true);
+  const { image, channel, store } = collector();
+  const thumbnail = 'https://source.example/cover.jpg';
+  const result = await driver.acquireImage(
+    build.sourceIds[0]!,
+    '',
+    '',
+    channel.port2,
+    image.resourceId,
+    { requestId: 'cover', generation: 'generation' },
+    thumbnail,
+  );
+  const resource = await image.publish(result);
+  expect(calls).toEqual([
+    [build.sourceIds[0], thumbnail, 'cover', 'generation', expect.any(String)],
+  ]);
+  expect(page).not.toHaveBeenCalled();
+  expect(
+    new Uint8Array(await (await fetch(resource.url)).arrayBuffer()),
+  ).toEqual(pngHeader());
+  store.release(resource.resourceId, resource.generation);
+  expect(store.snapshot.resources).toBe(0);
+});
+
 test('image cancellation closes a pending HTTP body but waits for swallowed Java failure to unwind', async () => {
   const reading = deferred<void>();
   const caught = deferred<void>();

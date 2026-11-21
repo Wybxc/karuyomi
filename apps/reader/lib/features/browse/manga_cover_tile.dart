@@ -14,6 +14,7 @@ class const MangaCoverTile({
   final String? subtitle,
   final LibraryEntry? entry,
   final CoverRepository? covers,
+  final Widget? sourceCover,
   final VoidCallback? onLongPress,
   final bool? selected,
   final Widget? badge,
@@ -41,7 +42,8 @@ class const MangaCoverTile({
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      if (covers case final repository?)
+                      if (covers case final repository?
+                          when entry?.customCover != null)
                         CustomCover(
                           repository: repository,
                           cover: entry?.customCover,
@@ -50,6 +52,8 @@ class const MangaCoverTile({
                             height: constraints.maxHeight,
                           ),
                         )
+                      else if (sourceCover case final cover?)
+                        cover
                       else
                         ColoredBox(
                           color: AppColors.groupedSurface.resolveFrom(context),

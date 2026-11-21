@@ -1740,9 +1740,19 @@ const AcquireImage$json = {
       '10': 'timeoutMs',
       '17': true
     },
+    {
+      '1': 'thumbnail_url',
+      '3': 7,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'thumbnailUrl',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_timeout_ms'},
+    {'1': '_thumbnail_url'},
   ],
 };
 
@@ -1751,8 +1761,9 @@ final $typed_data.Uint8List acquireImageDescriptor = $convert.base64Decode(
     'CgxBY3F1aXJlSW1hZ2USHQoKcmVxdWVzdF9pZBgBIAEoCVIJcmVxdWVzdElkEhsKCXNvdXJjZV'
     '9pZBgCIAEoCVIIc291cmNlSWQSJgoPcGFnZV9zZXNzaW9uX2lkGAMgASgJUg1wYWdlU2Vzc2lv'
     'bklkEhkKCHBhZ2Vfa2V5GAQgASgJUgdwYWdlS2V5Eh4KCmdlbmVyYXRpb24YBSABKAlSCmdlbm'
-    'VyYXRpb24SIgoKdGltZW91dF9tcxgGIAEoDUgAUgl0aW1lb3V0TXOIAQFCDQoLX3RpbWVvdXRf'
-    'bXM=');
+    'VyYXRpb24SIgoKdGltZW91dF9tcxgGIAEoDUgAUgl0aW1lb3V0TXOIAQESKAoNdGh1bWJuYWls'
+    'X3VybBgHIAEoCUgBUgx0aHVtYm5haWxVcmyIAQFCDQoLX3RpbWVvdXRfbXNCEAoOX3RodW1ibm'
+    'FpbF91cmw=');
 
 @$core.Deprecated('Use cancelImageDescriptor instead')
 const CancelImage$json = {

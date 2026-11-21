@@ -381,6 +381,8 @@ message AcquireImage {
   string page_key = 4;
   string generation = 5;
   optional uint32 timeout_ms = 6;
+  // A Source thumbnail URL replaces page_session_id and page_key.
+  optional string thumbnail_url = 7;
 }
 message CancelImage {
   string request_id = 1;

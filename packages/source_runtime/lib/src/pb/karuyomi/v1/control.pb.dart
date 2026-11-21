@@ -4871,6 +4871,7 @@ class AcquireImage extends $pb.GeneratedMessage {
     $core.String? pageKey,
     $core.String? generation,
     $core.int? timeoutMs,
+    $core.String? thumbnailUrl,
   }) {
     final result = AcquireImage._();
     if (requestId != null) result.requestId = requestId;
@@ -4879,6 +4880,7 @@ class AcquireImage extends $pb.GeneratedMessage {
     if (pageKey != null) result.pageKey = pageKey;
     if (generation != null) result.generation = generation;
     if (timeoutMs != null) result.timeoutMs = timeoutMs;
+    if (thumbnailUrl != null) result.thumbnailUrl = thumbnailUrl;
     return result;
   }
 
@@ -4901,6 +4903,7 @@ class AcquireImage extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'pageKey')
     ..aOS(5, _omitFieldNames ? '' : 'generation')
     ..aI(6, _omitFieldNames ? '' : 'timeoutMs', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(7, _omitFieldNames ? '' : 'thumbnailUrl')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4978,6 +4981,16 @@ class AcquireImage extends $pb.GeneratedMessage {
   $core.bool hasTimeoutMs() => $_has(5);
   @$pb.TagNumber(6)
   void clearTimeoutMs() => $_clearField(6);
+
+  /// A Source thumbnail URL replaces page_session_id and page_key.
+  @$pb.TagNumber(7)
+  $core.String get thumbnailUrl => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set thumbnailUrl($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasThumbnailUrl() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearThumbnailUrl() => $_clearField(7);
 }
 
 class CancelImage extends $pb.GeneratedMessage {

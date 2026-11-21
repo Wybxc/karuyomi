@@ -23,6 +23,7 @@ import '../covers/custom_cover_editor.dart';
 import '../../data/business_state_client.dart';
 import '../../diagnostics/reader_baseline.dart';
 import 'catalog_controller.dart';
+import 'source_manga_cover.dart';
 import '../bookmarks/chapter_bookmarks_controller.dart';
 import '../bookmarks/bookmark_status.dart';
 import '../reader/chapter_reader_route.dart';
@@ -542,15 +543,28 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
   Widget _mangaInformation(wire.MangaState? state) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      if (_covers case final covers?)
-        ClipRRect(
+      SizedBox(
+        width: 100,
+        height: 150,
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(4),
-          child: CustomCover(
-            repository: covers,
-            cover: state?.hasCustomCover() == true ? state!.customCover : null,
-            constraints: const BoxConstraints.tightFor(width: 100, height: 150),
-          ),
+          child: switch (_covers) {
+            final covers? when state?.hasCustomCover() == true => CustomCover(
+              repository: covers,
+              cover: state!.customCover,
+              constraints: const BoxConstraints.tightFor(
+                width: 100,
+                height: 150,
+              ),
+            ),
+            _ => SourceMangaCover(
+              catalog: controller,
+              source: widget.source,
+              thumbnail: manga.thumbnail,
+            ),
+          },
         ),
+      ),
       const SizedBox(width: 16),
       Expanded(
         child: Column(

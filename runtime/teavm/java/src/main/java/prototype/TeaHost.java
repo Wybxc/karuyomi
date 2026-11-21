@@ -325,6 +325,36 @@ public class TeaHost {
         });
   }
 
+  private static final SourceImages.Sink SOURCE_IMAGE_SINK =
+      new SourceImages.Sink() {
+        public String open() throws java.io.IOException {
+          return Bridge.imageOpen();
+        }
+
+        public void write(String handle, byte[] bytes) throws java.io.IOException {
+          Bridge.imageWrite(handle, bytes);
+        }
+
+        public String close(String handle) throws java.io.IOException {
+          return Bridge.imageClose(handle);
+        }
+
+        public void cancel(String handle) throws java.io.IOException {
+          Bridge.imageCancel(handle);
+        }
+      };
+
+  private static eu.kanade.tachiyomi.source.online.HttpSource imageSource(String sourceId) {
+    Source selected =
+        sources.stream()
+            .filter(s -> Long.toString(s.getId()).equals(sourceId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Unknown Source " + sourceId));
+    if (!(selected instanceof eu.kanade.tachiyomi.source.online.HttpSource))
+      throw new UnsupportedOperationException("Image acquisition requires an HttpSource");
+    return (eu.kanade.tachiyomi.source.online.HttpSource) selected;
+  }
+
   @JSExport
   public static void hostAcquireImage(
       String sourceId,
@@ -338,39 +368,23 @@ public class TeaHost {
         generation,
         token,
         () -> {
-          Source selected =
-              sources.stream()
-                  .filter(s -> Long.toString(s.getId()).equals(sourceId))
-                  .findFirst()
-                  .orElseThrow(() -> new IllegalArgumentException("Unknown Source " + sourceId));
-          if (!(selected instanceof eu.kanade.tachiyomi.source.online.HttpSource))
-            throw new UnsupportedOperationException("Image acquisition requires an HttpSource");
+          eu.kanade.tachiyomi.source.online.HttpSource selected = imageSource(sourceId);
           try (PageSessions.Lease lease =
               pageSessions.acquire(selected, sourceId, pageSessionId, pageKey)) {
-            String resource =
-                SourceImages.acquire(
-                    (eu.kanade.tachiyomi.source.online.HttpSource) selected,
-                    lease.page(),
-                    new SourceImages.Sink() {
-                      public String open() throws java.io.IOException {
-                        return Bridge.imageOpen();
-                      }
-
-                      public void write(String handle, byte[] bytes) throws java.io.IOException {
-                        Bridge.imageWrite(handle, bytes);
-                      }
-
-                      public String close(String handle) throws java.io.IOException {
-                        return Bridge.imageClose(handle);
-                      }
-
-                      public void cancel(String handle) throws java.io.IOException {
-                        Bridge.imageCancel(handle);
-                      }
-                    });
-            return resource;
+            return SourceImages.acquire(selected, lease.page(), SOURCE_IMAGE_SINK);
           }
         },
+        () -> {});
+  }
+
+  @JSExport
+  public static void hostAcquireCover(
+      String sourceId, String thumbnailUrl, String requestId, String generation, String token) {
+    startOperation(
+        requestId,
+        generation,
+        token,
+        () -> SourceImages.acquireCover(imageSource(sourceId), thumbnailUrl, SOURCE_IMAGE_SINK),
         () -> {});
   }
 

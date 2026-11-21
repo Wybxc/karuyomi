@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，普通封面接入单源浏览和作品详情。71 项 Flutter 定向回归和本机全量 1,025 项 Flutter 测试通过，覆盖受管文件交付、Flutter 解码、释放与自定义封面清除后的回退。34 项运行宿主及 10 项跨语言协议测试通过。`pnpm teavm:check` 在 JVM 受控 HTTP 服务验证 Source 请求携带 Referer 与已有 Cookie，拦截器修改的字节到达图片接收器。真实扩展的新版 AOT 与在线封面待验。[实施计划](plan/device-settings-adaptive-covers.md)
+
 2026-11-21，Cupertino 自适应布局通过 112 项 Flutter 定向回归。组件在手机、短横屏、平板及桌面尺寸验证主导航位置、大字号、焦点和设置连接草稿。书架和 Source 详情从 1280×900 缩至 390×800 后保留同一页面，恢复宽屏重新并排，切换尺寸和返回时业务写入数保持一致。实际浏览器与原生窗口待验。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，本机阅读设置通过 134 项 Flutter 定向回归、68 项 Workerd 与合同测试和 10 项跨语言协议测试。应用测试使用内存偏好和模拟服务，验证按部署与作品继承、0% 覆盖、重开恢复及同一阅读页应用本机值。只修改背景和输入时账户设置请求数保持不变。隔离 D1 验证清除旧设备字段后保留账户版本及原单漫画回执。浏览器配置和原生存储现场待验。[实施计划](plan/device-settings-adaptive-covers.md)

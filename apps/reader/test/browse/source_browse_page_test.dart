@@ -3,11 +3,13 @@ import 'package:karuyomi/widgets/app_routes.dart';
 import '../test_app.dart';
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
@@ -81,6 +83,45 @@ void main() {
     await tester.tap(target);
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'Source listing decodes a managed cover and releases the host resource',
+    (tester) async {
+      final temp = Directory.systemTemp.createTempSync('karuyomi.');
+      addTearDown(() => temp.deleteSync(recursive: true));
+      final bytes = img.encodePng(img.Image(width: 2, height: 3));
+      final file = File('${temp.path}/cover.png')..writeAsBytesSync(bytes);
+      final requests = <wire.AcquireImage>[];
+      platform.acquireImageHandler = (request) {
+        requests.add(request.deepCopy());
+        return wire.ImageResource(
+          resourceId: 'source-cover-1',
+          generation: request.generation,
+          byteLength: bytes.length,
+          url: file.uri.toString(),
+        );
+      };
+      await show(tester);
+      bool released() =>
+          platform.imageControls.any((event) => event.$1 == 'releaseImage');
+      for (var turn = 0; turn < 100 && !released(); turn++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 5)),
+        );
+        await tester.pump();
+      }
+      expect(released(), true);
+      await tester.pumpAndSettle();
+      expect(requests, hasLength(1));
+      expect(requests.single.thumbnailUrl, testManga.thumbnailUrl);
+      expect(requests.single.pageSessionId, isEmpty);
+      expect(requests.single.sourceId, sourceId);
+      expect(find.byKey(const ValueKey('source-cover-image')), findsOneWidget);
+      expect(platform.businessServer.appliedMutations, 0);
+      expect(tester.takeException(), isNull);
+      await hide(tester);
+    },
+  );
 
   for (final brightness in Brightness.values) {
     testWidgets(

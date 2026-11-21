@@ -484,6 +484,21 @@ export const goldenFixtures: GoldenFixture[] = [
       },
     },
   },
+  {
+    name: 'source-cover-request',
+    type: 'ControlRequest',
+    value: {
+      requestId,
+      slotId: 'RUNTIME_SLOT_FOREGROUND',
+      acquireImage: {
+        requestId,
+        generation,
+        sourceId,
+        thumbnailUrl: 'https://source.example/covers/first.png?size=large',
+        timeoutMs: 10000,
+      },
+    },
+  },
 
   {
     name: 'preferences-open-bootstrap',

@@ -120,6 +120,9 @@ export class WorkerRuntime {
                 ...(this.driver.acquireImage && this.driver.closePageSession
                   ? ['processed-image-resources']
                   : []),
+                ...(this.driver.supportsCoverImages
+                  ? ['cover-image-resources']
+                  : []),
               ],
             }),
           });
@@ -187,6 +190,7 @@ export class WorkerRuntime {
             ports[0],
             acquiring.resourceId,
             context,
+            request.thumbnailUrl,
           );
           this.reply(command, {
             case: 'image',
