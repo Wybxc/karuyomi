@@ -167,6 +167,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     '-d',
     classes,
     path.join(compat, 'java/io/SequenceInputStream.java'),
+    path.join(compat, 'java/net/UnknownHostException.java'),
     ...securitySources,
   ]);
   await execute(
@@ -206,6 +207,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     !oracle.stdout.includes('EC_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('RSA_OAEP_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('SEQUENCE_STREAM_SCENARIOS_PASS ') ||
+    !oracle.stdout.includes('UNKNOWN_HOST_SCENARIO_PASS') ||
     !oracle.stdout.includes('Graphics transform oracle: ') ||
     generated.stdout !== oracle.stdout
   )

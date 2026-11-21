@@ -5,6 +5,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
@@ -55,7 +56,24 @@ public final class ClassLibraryScenarios {
     EcScenarios.run();
     RsaScenarios.run();
     SequenceStreamScenarios.run();
+    unknownHost();
     GraphicsTransformTest.main(args);
+  }
+
+  private static void unknownHost() throws IOException {
+    String name = "synthetic.fixture.invalid";
+    try {
+      throwUnknownHost(name);
+      throw new AssertionError("Expected a checked DNS error");
+    } catch (UnknownHostException failure) {
+      check(name.equals(failure.getMessage()), "DNS error preserves the message");
+    }
+    check(new UnknownHostException().getMessage() == null, "empty DNS error message");
+    System.out.println("UNKNOWN_HOST_SCENARIO_PASS");
+  }
+
+  private static void throwUnknownHost(String message) throws IOException {
+    throw new UnknownHostException(message);
   }
 
   private static String concat(String title, int count, boolean enabled) {

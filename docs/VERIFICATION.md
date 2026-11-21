@@ -48,9 +48,15 @@
 
 2026-11-22，在 `macbook-pro-4` 固定 `ddbcbb8`，Falco Scan 1.6.1 的正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `363d849a4a1d7c40cfc01c238a6113826de4d83f34043323cec153de648bffc1`，共享材料逐字节一致，候选预检纳入第 35 个补编结果，保持 `compiled_unverified`。正式出图和使用真实源站图片的阅读待验。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
 
-2026-11-22，在 `macbook-pro-4` 的同一 `ddbcbb8` checkout 提前试编 U-Next、OneReader 和 MoeTruyen，三包使用相同上游源码闭包及共享材料。U-Next 1.6.4 通过正式构建、产物完整性和 `hostAcquireCover`，canonical SHA-256 为 `f7b0597516d7fbb035f2a4df681d7bc2464bbefdbdce185e62d1fd21599bf05f`，候选预检等待该包的冻结原回执。OneReader 的密钥接口已通过编译解析，缺少 Java `SequenceInputStream`。MoeTruyen 仍依赖未实现的 Android 对话框、视图及密码接口。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+2026-11-22，在 `macbook-pro-4` 的同一 `ddbcbb8` checkout 提前试编 U-Next、OneReader 和 MoeTruyen，三包使用相同上游源码闭包及共享材料。U-Next 1.6.4 通过正式构建、产物完整性和 `hostAcquireCover`，canonical SHA-256 为 `f7b0597516d7fbb035f2a4df681d7bc2464bbefdbdce185e62d1fd21599bf05f`，候选预检等待该包的冻结原回执。OneReader 的密钥接口已通过编译解析，缺少 Java `SequenceInputStream`。MoeTruyen 仍依赖未实现的 Android 对话框和视图接口，以及双参数 `Cipher.init`。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
 
 2026-11-22，顺序流兼容层在 JDK 与生成的 TeaVM JavaScript 各通过 15 项断言，覆盖延迟读取、空分段、无符号字节、EOF、提前关闭及后续关闭错误的传播。完整 `pnpm teavm:check` 通过，OneReader 正式补编待复验。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，在 `macbook-pro-4` 固定 `289f182` 补编 OneReader 1.6.4，正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `c2fe7b4a807128569377e50f5faab570d61303ea89c1c9a8619c56c8c9c35879`，共享材料逐字节一致。保留提前构建回执，等待冻结原回执及在线验收。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，Dragon Ball Multiverse 和 ManhuaRM 的冻结构建均缺少 `StaticLayout.Builder`。Android API 35 原生图形参考以合成段落复现三组不同断行结果。80 px 下，简单与高质量断行的第 5 行分别止于 UTF‑16 偏移 40 和 39，关闭与开启完整连字符的第 2 行分别止于 12 和 14。85 px 下，高质量与平衡断行的第 9 行分别止于 69 和 71。扩展所需的断行与连字符仍待宿主实现。[Android 参考测试](../tools/teavm/fixtures/text-layout/AndroidTextTest.java) · [Android Builder](https://developer.android.com/reference/android/text/StaticLayout.Builder)
+
+2026-11-22，SoftKomik 冻结构建缺少 Java `UnknownHostException`。JDK 与生成的 TeaVM JavaScript 对照通过该异常的继承、捕获和消息保留，完整 `pnpm teavm:check` 通过。当前 HTTP 中继以通用网络错误表示请求失败，扩展在线遇到 DNS 错误时的分支仍待验证。[HTTP 传输边界](HTTP-BRIDGE.md)
 
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 

@@ -4,10 +4,16 @@ import static org.junit.Assert.*;
 
 import android.graphics.Bitmap;
 import android.graphics.Paint;
+import android.graphics.Typeface;
+import android.graphics.text.LineBreaker;
 import android.os.Build;
+import android.text.Layout;
+import android.text.StaticLayout;
 import android.text.TextPaint;
 import com.google.gson.JsonObject;
 import java.net.URL;
+import java.util.Arrays;
+import java.util.Locale;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -41,6 +47,50 @@ public final class AndroidTextTest {
   @Test
   public void nativeAndroidBitmapMatrixAndColorFilter() {
     CanvasRotationScenarios.runBitmapMatrixAndColorFilter();
+  }
+
+  @Test
+  public void nativeAndroidParagraphBreakStrategiesAndHyphenation() {
+    String text =
+        "We can read internationalization documentation while selecting worthwhile recommendations.";
+    TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    paint.setTextSize(18);
+    paint.setTypeface(Typeface.DEFAULT);
+    paint.setTextLocale(Locale.US);
+    int none = Layout.HYPHENATION_FREQUENCY_NONE;
+    int full = Layout.HYPHENATION_FREQUENCY_FULL;
+    int high = LineBreaker.BREAK_STRATEGY_HIGH_QUALITY;
+    int[] simple80 = lineEnds(text, paint, 80, LineBreaker.BREAK_STRATEGY_SIMPLE, none);
+    int[] high80 = lineEnds(text, paint, 80, high, none);
+    int[] full80 = lineEnds(text, paint, 80, high, full);
+    assertFalse("high-quality changes some line breaks", Arrays.equals(simple80, high80));
+    assertFalse("automatic hyphenation changes some line breaks", Arrays.equals(high80, full80));
+
+    int[] high85 = lineEnds(text, paint, 85, high, none);
+    int[] balanced85 = lineEnds(text, paint, 85, LineBreaker.BREAK_STRATEGY_BALANCED, none);
+    assertFalse("balanced breaking uses different offsets", Arrays.equals(high85, balanced85));
+    System.out.println(
+        "Android NATIVE paragraph options: SIMPLE "
+            + Arrays.toString(simple80)
+            + ", HIGH_QUALITY "
+            + Arrays.toString(high80)
+            + ", FULL "
+            + Arrays.toString(full80)
+            + ", BALANCED "
+            + Arrays.toString(balanced85));
+  }
+
+  private static int[] lineEnds(
+      String text, TextPaint paint, int width, int strategy, int hyphenation) {
+    StaticLayout layout =
+        StaticLayout.Builder.obtain(text, 0, text.length(), paint, width)
+            .setBreakStrategy(strategy)
+            .setHyphenationFrequency(hyphenation)
+            .build();
+    int[] ends = new int[layout.getLineCount()];
+    for (int i = 0; i < ends.length; i++) ends[i] = layout.getLineEnd(i);
+    assertEquals("final offset includes all UTF-16 units", text.length(), ends[ends.length - 1]);
+    return ends;
   }
 
   @Test
