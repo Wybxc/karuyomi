@@ -737,11 +737,28 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         expect(service.tasks, hasLength(3));
         expect(tester.takeException(), isNull);
+        final query = find.byKey(const ValueKey('cross-search-query'));
+        final submit = find.byKey(const ValueKey('cross-search-submit'));
+        final stop = find.byKey(const ValueKey('cross-search-stop'));
+        final sourceName = find.text(service.targets.first.source.name);
+        final queryRect = tester.getRect(query);
+        final sourceTop = tester.getTopLeft(sourceName).dy;
+        expect(tester.getCenter(submit).dy, queryRect.center.dy);
+        expect(tester.getSemantics(submit).label, '搜索所选漫画源');
+        expect(
+          find.ancestor(
+            of: stop,
+            matching: find.byType(CupertinoNavigationBar),
+          ),
+          findsOneWidget,
+        );
         const title = '这是一个很长的漫画作品名称，显示在封面下方';
         service.tasks[0].complete([searchManga(title)], more: true);
         service.tasks[1].complete([]);
         service.tasks[2].fail('这个漫画源暂时不可用');
         await tester.pumpAndSettle();
+        expect(tester.getRect(query), queryRect);
+        expect(tester.getTopLeft(sourceName).dy, sourceTop);
         final result = find.byKey(
           ValueKey(('cross-search-result', service.targets[0].key, 0)),
         );
@@ -753,10 +770,8 @@ void main() {
         );
         expect(tester.getSize(result).width, 96);
         expect(tester.getSize(cover), const Size(88, 132));
-        expect(
-          tester.getTopLeft(find.text(title)).dy,
-          greaterThan(tester.getBottomLeft(cover).dy),
-        );
+        final titlePosition = tester.getTopLeft(find.text(title));
+        expect(titlePosition, tester.getBottomLeft(cover) + const Offset(4, 4));
         final context = tester.element(result);
         expect(
           tester.widget<Text>(find.text(title)).style!.color,
