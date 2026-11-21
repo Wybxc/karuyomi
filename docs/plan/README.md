@@ -77,6 +77,8 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 阅读器双主题正式 Web 已核对工具显隐、单页重试、画布内章节缺页与就绪。稳定等待补齐浅深主图，80% 调暗时可读并能返回原页，两色明确切章后均在新文档续读。深色短横屏已通过缺页重试。两色页码滑杆通过缩高后的自动焦点恢复及主动换焦。[双主题稳定等待](../verification/mihon-cupertino-fidelity.md#双主题正式-web-的稳定章间等待) · [滑杆焦点实测](../verification/mihon-cupertino-fidelity.md#缩高时页码滑杆的键盘焦点)
 
+源内浏览的两色正式 Web 已核对 MangaDex 的最新等待、实际作品及热门分页重试。[源内浏览分页实测](../verification/mihon-cupertino-fidelity.md#源内浏览的最新等待与分页重试)
+
 封面编辑采用居中的完整比例预览。两色受控本地 Web 已核对短横屏选图和取消后自动显示新图四边与草稿说明。关闭并重开保留已确认封面；清除确认后可在新文档读回。实际系统选图与替换上传故障仍待。[草稿落点与确认](../verification/mihon-cupertino-fidelity.md#替换封面后自动显示草稿)
 
 作品详情支持原位下拉刷新、失败重试及清除无结果的章节筛选。两色正常 Web 验证了章节区按钮刷新，隔离 Web 用鼠标拖动在两色验到下拉失败与重试。组件回归覆盖模拟触控、禁用语义、晚到结果和空清单重读，真机触屏验收仍待。[详情刷新故障](../verification/mihon-cupertino-fidelity.md#详情刷新故障的双主题正式-web) · [下拉手势对照](../verification/mihon-cupertino-fidelity.md#下拉刷新的双主题手势对照)

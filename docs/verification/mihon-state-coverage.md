@@ -319,6 +319,8 @@ stateDiagram-v2
 
 2026-11-21，`f30a345` 更新 12.02、12.06 的双主题正式 Web 画面，并补 12.04 打开、取消及提交的转换证据。英文 xkcd 两色均在确认清除后才返回热门。360×480 双倍字号与模拟软键盘及失败重试有组件证据。最新、追加、真实系统键盘与原生继续复验，跨版本主图计数保持 172/173。[紧凑网格与短屏搜索](mihon-cupertino-fidelity.md#源内浏览紧凑网格与短屏搜索)
 
+`efd402a` 更新 12.01、12.03、12.08、12.09 的双主题正式 Web 证据。英文 MangaDex 两色取得最新作品，热门列表在短屏追加失败后可直接重试。目测和辅助矩形确认原末排在等待、失败和恢复后均保留原位置，等待时报告禁用。最新失败与双倍字号有组件证据，真实系统偏好、其他列表分页和原生待验。[源内浏览分页实测](mihon-cupertino-fidelity.md#源内浏览的最新等待与分页重试)
+
 依据：`presentation/browse/BrowseSourceScreen.kt` 的 refresh/append Loading/Error/Empty、`ui/browse/source/browse/SourceFilterDialog.kt` 的 typed Filter、`ui/browse/extension/details/SourcePreferencesScreen.kt`、`presentation/browse/GlobalSearchScreen.kt` 的 Loading/Success/Error。
 
 ```mermaid
