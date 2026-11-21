@@ -625,7 +625,7 @@ public final class BrowserCall implements Call {
       }
 
       public okhttp3.Dns getDns() {
-        throw new UnsupportedOperationException("Chain.getDns");
+        return client.dns();
       }
 
       public okhttp3.Interceptor.Chain withDns(okhttp3.Dns a0) {
@@ -649,7 +649,7 @@ public final class BrowserCall implements Call {
       }
 
       public okhttp3.Authenticator getAuthenticator() {
-        throw new UnsupportedOperationException("Chain.getAuthenticator");
+        return client.authenticator();
       }
 
       public okhttp3.Interceptor.Chain withAuthenticator(okhttp3.Authenticator a0) {
@@ -742,39 +742,62 @@ public final class BrowserCall implements Call {
   private Response follow(Interceptor.Chain chain) throws IOException {
     Request next = chain.request();
     Response prior = null;
-    for (int redirects = 0; ; redirects++) {
+    for (int followUps = 0; ; followUps++) {
       Response response = chain.proceed(next);
       if (prior != null) response = response.newBuilder().priorResponse(prior).build();
-      String location = response.header("Location");
-      int code = response.code();
-      if (!client.followRedirects()
-          || location == null
-          || !Arrays.asList(301, 302, 303, 307, 308).contains(code)) return response;
-      if (redirects >= 10) {
-        response.close();
-        throw new IOException("Too many redirects");
+      boolean deliver = false;
+      try {
+        Request proposed = followUp(chain, next, response);
+        if (proposed == null) {
+          deliver = true;
+          return response;
+        }
+        if (followUps >= 10)
+          throw new IOException(
+              response.code() == 401 ? "Too many authentication follow-ups" : "Too many redirects");
+        prior = okhttp3.internal.UnreadableResponseBodyKt.stripBody(response);
+        next = proposed;
+      } finally {
+        if (!deliver) response.close();
       }
-      HttpUrl target = next.url().resolve(location);
-      if (target == null) {
-        response.close();
-        throw new IOException("Bad redirect");
-      }
-      Request.Builder builder = next.newBuilder().url(target);
-      if (!target.host().equals(next.url().host())
-          || target.port() != next.url().port()
-          || !target.scheme().equals(next.url().scheme()))
-        builder.removeHeader("Authorization").removeHeader("Cookie");
-      if (code == 303 && !next.method().equals("HEAD")
-          || ((code == 301 || code == 302) && next.method().equals("POST")))
-        builder
-            .get()
-            .removeHeader("Content-Type")
-            .removeHeader("Content-Length")
-            .removeHeader("Transfer-Encoding");
-      prior = okhttp3.internal.UnreadableResponseBodyKt.stripBody(response);
-      response.close();
-      next = builder.build();
     }
+  }
+
+  private Request followUp(Interceptor.Chain chain, Request request, Response response)
+      throws IOException {
+    int code = response.code();
+    if (code == 401 && sameOrigin(chain.request().url(), request.url())) {
+      Request authenticated = chain.getAuthenticator().authenticate(null, response);
+      if (authenticated == null) return null;
+      if (!sameOrigin(request.url(), authenticated.url()))
+        throw new IOException("Authenticator changed request origin");
+      RequestBody body = authenticated.body();
+      return body != null && body.isOneShot() ? null : authenticated;
+    }
+
+    String location = response.header("Location");
+    if (!client.followRedirects()
+        || location == null
+        || !Arrays.asList(301, 302, 303, 307, 308).contains(code)) return null;
+    HttpUrl target = request.url().resolve(location);
+    if (target == null) throw new IOException("Bad redirect");
+    Request.Builder builder = request.newBuilder().url(target);
+    if (!sameOrigin(target, request.url()))
+      builder.removeHeader("Authorization").removeHeader("Cookie");
+    if (code == 303 && !request.method().equals("HEAD")
+        || ((code == 301 || code == 302) && request.method().equals("POST")))
+      builder
+          .get()
+          .removeHeader("Content-Type")
+          .removeHeader("Content-Length")
+          .removeHeader("Transfer-Encoding");
+    return builder.build();
+  }
+
+  private static boolean sameOrigin(HttpUrl left, HttpUrl right) {
+    return left.host().equals(right.host())
+        && left.port() == right.port()
+        && left.scheme().equals(right.scheme());
   }
 
   private Response bridgeRequest(Interceptor.Chain chain) throws IOException {

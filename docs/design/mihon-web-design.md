@@ -392,6 +392,8 @@ Wrangler 关键配置草案（并非完整部署文件，静态资源目录由 F
 
 网络中继使用 Cloudflare Access 认证后的应用会话和 Workers 公网 fetch，所有扩展采用相同转发路径。重定向由 Source 自己处理，每跳重新经同一中继；应用 Cookie、Authorization 和 Access 头不复制到上游，只转发 Source 自己为站点构造的请求凭证。
 
+Source 选择 `Dns.SYSTEM` 时使用 Workers 公网 fetch 的系统解析，自定义 DNS 配置返回明确的宿主错误。Source 配置的 `Authenticator` 可以处理原请求同源的 401，补发请求仍限定在该 origin，并与重定向共用次数上限。补发前释放旧响应正文，只重用可重放的请求体。[OkHttp 5.5.0 参考实现](https://github.com/square/okhttp/blob/parent-5.5.0/okhttp/src/commonJvmAndroid/kotlin/okhttp3/internal/http/RetryAndFollowUpInterceptor.kt)
+
 Cookie 与偏好按扩展包/Source 登录配置分组，正确处理 Domain/Path/Expires/Secure，避免串账号；这些分组不构成对可信扩展的权限隔离。浏览器到同源网络桥按部署会话鉴权；Worker 到漫画站的出站请求只使用扩展请求描述构建，不复制入站应用 Cookie、Authorization 或 Access 头。敏感 cookie/token 仅保留在当前客户端，不增加云端凭证同步模块。
 
 业务数据、登录返回和错误响应使用 `Cache-Control: private, no-store`；API 不进入 Service Worker Cache Storage 或公共 CDN 缓存。公开 AOT 与共享材料不使用 Access 私有缓存重验证：AOT 按 Static Assets index/catalog 定位最新 build 并校验下载字节，由客户端或 Service Worker 管理更新缓存，共享材料使用内容寻址静态缓存。公开缓存与个人运行文件/HTTP Cache 分开所有权；缓存命中、版本变化和解压上限仍须实测。
