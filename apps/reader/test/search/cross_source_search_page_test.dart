@@ -92,6 +92,49 @@ void main() {
     await tester.pump();
   }
 
+  testWidgets('scrolling the Source range keeps the edited filter', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 480);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final service = FakeSourceSearch(
+      targets: [for (var i = 1; i <= 66; i++) searchTarget(i)],
+    );
+    await openPage(tester, service);
+    final scope = find.byKey(const ValueKey('cross-search-scope-toggle'));
+    final filter = find.byKey(const ValueKey('cross-search-source-filter'));
+    final editor = find.descendant(
+      of: filter,
+      matching: find.byType(EditableText),
+    );
+    await tester.enterText(filter, '漫画源');
+    await tester.pumpAndSettle();
+    final focus = tester.widget<EditableText>(editor).focusNode;
+    expect(focus.hasPrimaryFocus, isTrue);
+
+    await tester.dragFrom(const Offset(170, 400), const Offset(0, -240));
+    await tester.pumpAndSettle();
+    expect(focus.hasFocus, isFalse);
+    await tester.dragFrom(const Offset(170, 270), const Offset(0, 380));
+    await tester.pumpAndSettle();
+    expect(tester.widget<EditableText>(editor).controller.text, '漫画源');
+
+    await tester.tap(filter);
+    await tester.pumpAndSettle();
+    expect(focus.hasPrimaryFocus, isTrue);
+    await tester.tap(scope);
+    await tester.pumpAndSettle();
+    expect(focus.hasFocus, isFalse);
+    await tester.tap(scope);
+    await tester.pumpAndSettle();
+    expect(tester.widget<EditableText>(editor).controller.text, '漫画源');
+    expect(service.tasks, isEmpty);
+    await tester.pumpApp(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
   for (final brightness in Brightness.values) {
     testWidgets(
       'no available Source opens extension management in $brightness',

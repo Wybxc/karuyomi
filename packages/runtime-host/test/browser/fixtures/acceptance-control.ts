@@ -18,6 +18,7 @@ import { filterAcceptanceControl } from './acceptance-filters.js';
 import { migrationAcceptanceControl } from './acceptance-migration.js';
 import { preferenceGroupAcceptanceControl } from './acceptance-preference-groups.js';
 import { readerBoundaryAcceptanceControl } from './acceptance-reader-boundary.js';
+import { searchChoicesAcceptanceControl } from './acceptance-search-choices.js';
 import { searchRetirementAcceptanceControl } from './acceptance-search-retirement.js';
 
 interface BrowserRuntime {
@@ -94,6 +95,13 @@ if (profile === 'retire-search') {
   browser.karuyomiRuntime = {
     ...host,
     control: searchRetirementAcceptanceControl((input) => host.control(input)),
+  };
+}
+
+if (profile === 'search-choices') {
+  browser.karuyomiRuntime = {
+    ...host,
+    control: searchChoicesAcceptanceControl((input) => host.control(input)),
   };
 }
 

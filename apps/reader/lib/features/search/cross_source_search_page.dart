@@ -29,6 +29,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
   late final CrossSourceSearchController controller;
   late TextEditingController _query;
   late TextEditingController _sourceFilter;
+  late FocusNode _sourceFilterFocus;
   late ScrollController _resultsScroll;
   late ExpansibleController _scope;
   int _sourcePage = 0;
@@ -190,6 +191,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                 autofillHints: null,
                 key: const ValueKey('cross-search-source-filter'),
                 controller: _sourceFilter,
+                focusNode: _sourceFilterFocus,
                 onChanged: (_) => setState(() => _sourcePage = 0),
                 placeholder: '查找漫画源名称或扩展包',
               ),
@@ -696,7 +698,18 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
             ),
           ),
         if (retired == null) _searchControls(),
-        Expanded(child: retired ?? results),
+        Expanded(
+          child:
+              retired ??
+              NotificationListener<ScrollStartNotification>(
+                onNotification: (notification) {
+                  // Finish editing before the filter leaves the scroll viewport.
+                  if (notification.depth == 0) _sourceFilterFocus.unfocus();
+                  return false;
+                },
+                child: results,
+              ),
+        ),
       ],
     ),
   );
@@ -781,6 +794,7 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
   Widget build(BuildContext context) {
     _query = useTextEditingController();
     _sourceFilter = useTextEditingController();
+    _sourceFilterFocus = useFocusNode();
     _resultsScroll = useScrollController(keepScrollOffset: false);
     _scope = useMemoized(ExpansibleController.new);
     useEffect(() {
@@ -913,9 +927,14 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                             child: CupertinoButton(
                               key: const ValueKey('cross-search-scope-toggle'),
                               padding: EdgeInsets.zero,
-                              onPressed: () => _scope.isExpanded
-                                  ? _scope.collapse()
-                                  : _scope.expand(),
+                              onPressed: () {
+                                if (_scope.isExpanded) {
+                                  _sourceFilterFocus.unfocus();
+                                  _scope.collapse();
+                                } else {
+                                  _scope.expand();
+                                }
+                              },
                               child: CupertinoListTile(
                                 title: Builder(
                                   builder: (context) => DefaultTextStyle(

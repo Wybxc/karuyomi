@@ -71,3 +71,5 @@ ACCEPTANCE_FIXTURE=runtime-control pnpm acceptance:serve
 `?acceptance-runtime=preference-groups` 将真实 Komiic 的两个设置放进受控的启用、禁用和空分组。先在普通文档保存可用镜像，再在夹具文档打开漫画源设置。验证子组仍显示、镜像继承禁用、可编辑的章节选项能完成实际保存。夹具保留 snapshotId 与 generation，将客户端提交的嵌套路径还原到同一真实设置的原始路径，再交付原监听器结果。核对 `ACCEPTANCE_RUNTIME_CONTROL` 的两条路径、确认值和同一隔离账户的读回。
 
 `?acceptance-runtime=retire-search` 用正式跨源搜索选择 Komiic 并查找「航海王」。先在普通文档用漫画源设置选通 `.cc`。夹具取得真实搜索结果后交付 `ACCESS_REQUIRED`，在同一执行槽将真实关闭确认暂扣八秒并模拟丢失，再丢弃两次真实重置确认。失效页应保留关闭状态和精确重试，隐藏旧查询与结果。显式重试第三次重置确认后才返回原浏览入口。用请求 ID、generation 和 slot 核对审计；重新连接后手动发起同一查询应从新代次取得真实结果。
+
+`?acceptance-runtime=search-choices` 在正式跨源搜索选择英文 xkcd 与 MangaDex，提交 `one piece` 后迅速重开搜索范围及语言选择。原宿主返回两源首份搜索结果后，夹具暂扣 xkcd 9 秒再交付一次 `SOURCE_ERROR`，MangaDex 暂扣 10.5 秒后原样交付。两条 `ACCEPTANCE_RUNTIME_CONTROL` 交付事件应出现在语言页打开期间。选择「全部语言」并返回，核对两个已选源、分组结果和返回焦点。可按页面坐标滚动筛选 `MangaDex` 后的长名单，回到顶部检查筛选文字和语言行位置，再直接打开语言。翻页和后续重试走原宿主。
