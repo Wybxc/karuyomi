@@ -27,7 +27,6 @@ wire.FavoriteSource _source(String packageName) => wire.FavoriteSource(
 wire.GlobalSettingsValues _values({
   Iterable<wire.FavoriteSource> favorites = const [],
 }) => wire.GlobalSettingsValues(
-  theme: wire.AppTheme.APP_THEME_DARK,
   reader: wire.ReaderSettings(
     mode: wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
     pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
@@ -126,14 +125,13 @@ void main() {
     );
     final current = await repository.loadGlobal();
     expect(current.global.favoriteSources, [b]);
-    expect(current.global.theme, original.theme);
     expect(current.global.reader, original.reader);
     expect(current.globalRevision, 2);
     final otherClient = _client(server.forSubject('other'), subject: 'other');
     addTearDown(otherClient.dispose);
     final other = await SettingsRepository(otherClient).loadGlobal();
     expect(other.global.favoriteSources, isEmpty);
-    expect(other.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
+    expect(other.global.reader.fit, wire.ReaderFit.READER_FIT_CONTAIN);
     expect(other.globalRevision, 0);
     expect(server.appliedMutations, 2);
   });
@@ -198,9 +196,7 @@ void main() {
     final remoteClient = _client(server);
     addTearDown(remoteClient.dispose);
     final remote = SettingsRepository(remoteClient);
-    final remotelyChanged = initial.global.deepCopy()
-      ..theme = wire.AppTheme.APP_THEME_LIGHT
-      ..favoriteSources.clear();
+    final remotelyChanged = initial.global.deepCopy()..favoriteSources.clear();
     remotelyChanged.reader.mode = wire.ReaderMode.READER_MODE_CONTINUOUS;
     await remote.setGlobal(values: remotelyChanged, basedOnRevision: 1);
     final stale = initial.global.deepCopy()
@@ -328,7 +324,7 @@ void main() {
   });
 
   testWidgets(
-    'editing the global theme preserves source favorites and reader preferences',
+    'editing a reading preference preserves source favorites and other reader fields',
     (tester) async {
       await attachFixture();
       tester.view.physicalSize = const Size(480, 800);
@@ -357,16 +353,15 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      final appearance = find.byKey(
-        const ValueKey('settings-section-appearance'),
-      );
-      await tap(appearance);
-      await tap(find.byType(ChoiceField<wire.AppTheme>));
-      await tap(find.text('浅色').last);
+      final reading = find.byKey(const ValueKey('settings-section-reading'));
+      await tap(reading);
+      await tap(find.byType(ChoiceField<wire.ReaderFit>));
+      await tap(find.text('适高').last);
       await tap(find.text('保存全局设置'));
       final current = await tester.runAsync(repository.loadGlobal);
-      expect(current!.global.theme, wire.AppTheme.APP_THEME_LIGHT);
-      expect(current.global.reader, original.reader);
+      final expectedReader = original.reader.deepCopy()
+        ..fit = wire.ReaderFit.READER_FIT_HEIGHT;
+      expect(current!.global.reader, expectedReader);
       expect(current.global.favoriteSources, original.favoriteSources);
       final sent = wire.decodeProtoJson(
         wire.SettingsMutation(),

@@ -67,7 +67,7 @@ void main() {
       final oldRepository = fixture.catalog.settings!;
       final old = fixture.editor();
       final values = fixture.state().snapshot!.global.deepCopy()
-        ..theme = wire.AppTheme.APP_THEME_DARK;
+        ..reader.fit = wire.ReaderFit.READER_FIT_WIDTH;
       fixture.platform.bootstrapSubject = 'other-owner';
       await fixture.catalog.connect();
       await fixture.container.pump();
@@ -90,8 +90,8 @@ void main() {
       final current = fixture.editor();
       expect(identical(old, current), false);
       expect(
-        fixture.state().snapshot!.global.theme,
-        wire.AppTheme.APP_THEME_SYSTEM,
+        fixture.state().snapshot!.global.reader.fit,
+        wire.ReaderFit.READER_FIT_CONTAIN,
       );
       expect(
         fixture.platform.businessServer.requests.where(

@@ -72,7 +72,7 @@ flutter test integration_test/settings_sync_test.dart --no-pub \
   --reporter expanded
 ```
 
-依次运行 A `verify` → B `write`（`dark-rtl-double-width-crop`）→ A 新进程 `verify` → A 新进程 `write`（`light-webtoon-auto-height-no-crop`）→ B 新进程 `verify`。每阶段重新取得当前完整快照作为前置；保存成功后不要盲目重跑旧写阶段。正式表单修改主题、阅读模式、页组、适配和裁白，其它字段与列表保留。驱动验证草稿不提前应用主题、服务端确认后清除 pending，并输出完整 `SETTINGS_SYNC_RESULT`。
+依次运行 A `verify` → B `write`（`rtl-double-width-crop`）→ A 新进程 `verify` → A 新进程 `write`（`webtoon-auto-height-no-crop`）→ B 新进程 `verify`。每阶段重新取得当前完整快照作为前置；保存成功后不要盲目重跑旧写阶段。正式表单修改阅读模式、页组、适配和裁白，其它字段与列表保留。驱动验证草稿不提前应用主题、服务端确认后清除 pending，并输出完整 `SETTINGS_SYNC_RESULT`。
 
 这组顺序操作证明实际执行平台间的全局设置读写与新进程恢复；单作品覆盖见[独立驱动](#单作品阅读设置同步)，同时写竞争、丢响应、自动前台、Web↔Native、生产 Access 和真机分别验收。全局默认 false/0 与 optional 漫画覆盖的 presence 语义不同，驱动按生成 getter 核对非 optional 值。实际结果与剩余门见[设置记录](../../../docs/verification/reader-settings.md)。完成后关闭 harness，移除本轮 reverse、测试安装与专用设备，结束测试进程。
 
@@ -82,7 +82,7 @@ flutter test integration_test/settings_sync_test.dart --no-pub \
 
 为每端分别启动新的官方 HTTPS harness，设置 `ACCEPTANCE_FIXTURE=settings-ack-loss`。从另一个主机进程以正常 TLS 和本节的业务头读取 `/api/settings` 与 `/api/library`，要求空书架、系统主题、账户和全局设置 revision `0/0`。阶段 JSON 使用服务的 `APP_ORIGIN`、`SETTINGS_SUBJECT=acceptance-owner`、完整 `SETTINGS_EXPECT_JSON` 和 `SETTINGS_PHASE=ack-loss`，不传 `SETTINGS_PRESET`。Android 继续使用精确主机 debug CA 配置、`SETTINGS_TEST_CA_BASE64` 与实际端口的 `adb reverse`。
 
-用上方命令运行正式设置驱动。它只将主题改为深色，验证首次丢确认保留原草稿；在同一进程以独立 HTTPS 连接核对已提交的深色 `1/1`；用正式「重新读取设置」应用主题但保留原待确认操作，再点「重试原设置操作」才清除提示，版本仍为 `1/1`。另一个主机进程重取设置与书架，仅允许主题和 revision 改变。按 Enter 停服，核对 `ACCEPTANCE_SETTINGS_ACK_AUDIT` 恰好两条、`sequence=1/2`、`drop_ack=1/0`、预期 revision 均为 0、确认 revision 均为 `1/1`，同一 mutation UUID 及正文、确认和持久回执的 SHA-256 全同。已提交的写阶段须用新 D1 才能重跑。实际结果与边界见 [Native 丢确认记录](../../../docs/verification/native-settings-ack.md)。
+用上方命令运行正式设置驱动。它只将图像适配改为适宽，验证首次丢确认保留原草稿；在同一进程以独立 HTTPS 连接核对已提交的适宽 `1/1`；用正式「重新读取设置」读回适配值但保留原待确认操作，再点「重试原设置操作」才清除提示，版本仍为 `1/1`。另一个主机进程重取设置与书架，仅允许图像适配和 revision 改变。按 Enter 停服，核对 `ACCEPTANCE_SETTINGS_ACK_AUDIT` 恰好两条、`sequence=1/2`、`drop_ack=1/0`、预期 revision 均为 0、确认 revision 均为 `1/1`，同一 mutation UUID 及正文、确认和持久回执的 SHA-256 全同。已提交的写阶段须用新 D1 才能重跑。实际结果与边界见 [Native 丢确认记录](../../../docs/verification/native-settings-ack.md)。
 
 ## 章节书签同步
 

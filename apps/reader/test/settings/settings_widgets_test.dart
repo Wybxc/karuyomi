@@ -29,14 +29,13 @@ const _target = MangaEditContext(
   sourceLang: 'zh',
 );
 wire.GlobalSettingsValues _global({
-  wire.AppTheme theme = wire.AppTheme.APP_THEME_DARK,
+  wire.ReaderFit fit = wire.ReaderFit.READER_FIT_WIDTH,
   wire.ReaderPageLayout layout = wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
 }) => wire.GlobalSettingsValues(
-  theme: theme,
   reader: wire.ReaderSettings(
     mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
     pageLayout: layout,
-    fit: wire.ReaderFit.READER_FIT_CONTAIN,
+    fit: fit,
     background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
     tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
     keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
@@ -69,7 +68,7 @@ void main() {
     Brightness? appearance,
     bool reduceMotion = false,
     bool disableAnimations = false,
-    bool openAppearance = true,
+    bool openReading = true,
     bool settle = true,
     double textScale = 1,
     Size size = const Size(480, 1000),
@@ -104,8 +103,8 @@ void main() {
     } else {
       await tester.pump();
     }
-    if (!manga && openAppearance) {
-      await openSettingsSection(tester, 'appearance');
+    if (!manga && openReading) {
+      await openSettingsSection(tester, 'reading');
     }
   }
 
@@ -421,7 +420,7 @@ void main() {
           controller,
           reduceMotion: true,
           disableAnimations: disabled,
-          openAppearance: false,
+          openReading: false,
         );
         await tester.tap(
           find.byKey(const ValueKey('settings-section-reading')),
@@ -474,7 +473,7 @@ void main() {
           tester,
           controller,
           appearance: appearance,
-          openAppearance: false,
+          openReading: false,
           size: const Size(360, 800),
         );
         await openSettingsSection(tester, 'about');
@@ -513,9 +512,9 @@ void main() {
           tester,
           controller,
           appearance: appearance,
-          openAppearance: false,
+          openReading: false,
         );
-        const key = ValueKey(('settings-navigation', 'appearance'));
+        const key = ValueKey(('settings-navigation', 'reading'));
         Key? focusedButton() => FocusManager.instance.primaryFocus?.context
             ?.findAncestorWidgetOfExactType<CupertinoButton>()
             ?.key;
@@ -530,7 +529,7 @@ void main() {
         expect(focusedButton(), key);
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
         await tester.pumpAndSettle();
-        expect(find.byKey(const ValueKey('global-theme')), findsOneWidget);
+        expect(find.byKey(const ValueKey('global-fit')), findsOneWidget);
         expect(writes(), isEmpty);
         expect(tester.takeException(), isNull);
         await hide(tester);
@@ -551,17 +550,16 @@ void main() {
           appearance: appearance,
           reduceMotion: true,
         );
-        await select<wire.AppTheme>(tester, '深色');
-        await openSettingsSection(tester, 'reading');
-        expect(find.byKey(const ValueKey('global-theme')), findsNothing);
+        await select<wire.ReaderFit>(tester, '适宽');
+        await openSettingsSection(tester, 'appearance');
+        expect(find.byKey(const ValueKey('global-fit')), findsNothing);
         tester.view.physicalSize = const Size(768, 1024);
         await tester.pumpAndSettle();
         expect(
           find.byKey(const ValueKey('settings-directory')),
           findsOneWidget,
         );
-        expect(find.byKey(const ValueKey('global-mode')), findsOneWidget);
-        await openSettingsSection(tester, 'appearance');
+        expect(find.byKey(const ValueKey('global-mode')), findsNothing);
         final row = find.byKey(const ValueKey('settings-section-appearance'));
         expect(
           tester.widget<CupertinoListTile>(row).backgroundColor,
@@ -574,32 +572,33 @@ void main() {
           DefaultTextStyle.of(subtitle).style.color,
           CupertinoColors.secondaryLabel.resolveFrom(subtitle),
         );
+        await openSettingsSection(tester, 'reading');
         tester.view.physicalSize = const Size(360, 800);
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('settings-directory')), findsNothing);
         expect(
           tester
-              .widget<ChoiceField<wire.AppTheme>>(
-                find.byKey(const ValueKey('global-theme')),
+              .widget<ChoiceField<wire.ReaderFit>>(
+                find.byKey(const ValueKey('global-fit')),
               )
               .value,
-          wire.AppTheme.APP_THEME_DARK,
+          wire.ReaderFit.READER_FIT_WIDTH,
         );
         await tap(tester, find.byType(CupertinoNavigationBarBackButton));
-        expect(find.byKey(const ValueKey('global-theme')), findsNothing);
+        expect(find.byKey(const ValueKey('global-fit')), findsNothing);
         expect(find.text('修改尚未保存。'), findsOneWidget);
-        await openSettingsSection(tester, 'appearance');
+        await openSettingsSection(tester, 'reading');
         expect(
           tester
-              .widget<ChoiceField<wire.AppTheme>>(
-                find.byKey(const ValueKey('global-theme')),
+              .widget<ChoiceField<wire.ReaderFit>>(
+                find.byKey(const ValueKey('global-fit')),
               )
               .value,
-          wire.AppTheme.APP_THEME_DARK,
+          wire.ReaderFit.READER_FIT_WIDTH,
         );
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
-        expect(find.byKey(const ValueKey('global-theme')), findsNothing);
+        expect(find.byKey(const ValueKey('global-fit')), findsNothing);
         expect(find.text('修改尚未保存。'), findsOneWidget);
         expect(writes(), isEmpty);
         expect(tester.takeException(), isNull);
@@ -616,11 +615,11 @@ void main() {
     await show(tester, controller);
     expect(
       tester
-          .widget<ChoiceField<wire.AppTheme>>(
-            find.byKey(const ValueKey('global-theme')),
+          .widget<ChoiceField<wire.ReaderFit>>(
+            find.byKey(const ValueKey('global-fit')),
           )
           .value,
-      wire.AppTheme.APP_THEME_SYSTEM,
+      wire.ReaderFit.READER_FIT_CONTAIN,
     );
     await tester.runAsync(
       () => repository.setGlobal(values: _global(), basedOnRevision: 0),
@@ -628,11 +627,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester
-          .widget<ChoiceField<wire.AppTheme>>(
-            find.byKey(const ValueKey('global-theme')),
+          .widget<ChoiceField<wire.ReaderFit>>(
+            find.byKey(const ValueKey('global-fit')),
           )
           .value,
-      wire.AppTheme.APP_THEME_DARK,
+      wire.ReaderFit.READER_FIT_WIDTH,
     );
     expect(state().snapshot!.globalRevision, 1);
     expect(tester.takeException(), isNull);
@@ -645,7 +644,7 @@ void main() {
       final controller = editor();
       await tester.runAsync(controller.refresh);
       await show(tester, controller);
-      await select<wire.AppTheme>(tester, '深色');
+      await select<wire.ReaderFit>(tester, '适宽');
       final remoteClient = BusinessStateClient(
         api: server,
         identity: client.identity,
@@ -653,7 +652,7 @@ void main() {
       addTearDown(remoteClient.dispose);
       await tester.runAsync(() async {
         await SettingsRepository(remoteClient).setGlobal(
-          values: _global(theme: wire.AppTheme.APP_THEME_LIGHT),
+          values: _global(fit: wire.ReaderFit.READER_FIT_HEIGHT),
           basedOnRevision: 0,
         );
         await repository.loadGlobal();
@@ -662,11 +661,11 @@ void main() {
       expect(state().snapshot!.globalRevision, 1);
       expect(
         tester
-            .widget<ChoiceField<wire.AppTheme>>(
-              find.byKey(const ValueKey('global-theme')),
+            .widget<ChoiceField<wire.ReaderFit>>(
+              find.byKey(const ValueKey('global-fit')),
             )
             .value,
-        wire.AppTheme.APP_THEME_DARK,
+        wire.ReaderFit.READER_FIT_WIDTH,
       );
       await tap(tester, find.text('保存全局设置'));
       expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
@@ -682,11 +681,11 @@ void main() {
       expect(state().pending, isNull);
       expect(
         tester
-            .widget<ChoiceField<wire.AppTheme>>(
-              find.byKey(const ValueKey('global-theme')),
+            .widget<ChoiceField<wire.ReaderFit>>(
+              find.byKey(const ValueKey('global-fit')),
             )
             .value,
-        wire.AppTheme.APP_THEME_LIGHT,
+        wire.ReaderFit.READER_FIT_HEIGHT,
       );
       await tap(tester, find.text('保存全局设置'));
       expect(
@@ -804,7 +803,7 @@ void main() {
         if (manga) {
           await select<wire.ReaderPageLayout>(tester, '自动');
         } else {
-          await select<wire.AppTheme>(tester, '深色');
+          await select<wire.ReaderFit>(tester, '适宽');
         }
         server.loseNextResponse = true;
         await tap(tester, find.text(manga ? '保存' : '保存全局设置'));
@@ -829,11 +828,11 @@ void main() {
         } else {
           expect(
             tester
-                .widget<ChoiceField<wire.AppTheme>>(
-                  find.byType(ChoiceField<wire.AppTheme>),
+                .widget<ChoiceField<wire.ReaderFit>>(
+                  find.byType(ChoiceField<wire.ReaderFit>),
                 )
                 .value,
-            wire.AppTheme.APP_THEME_DARK,
+            wire.ReaderFit.READER_FIT_WIDTH,
           );
         }
         if (manga) {
@@ -848,8 +847,8 @@ void main() {
         } else {
           expect(
             tester
-                .widget<ChoiceField<wire.AppTheme>>(
-                  find.byType(ChoiceField<wire.AppTheme>),
+                .widget<ChoiceField<wire.ReaderFit>>(
+                  find.byType(ChoiceField<wire.ReaderFit>),
                 )
                 .onChanged,
             isNull,

@@ -27,10 +27,12 @@ import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  final preferences = SharedPreferencesAsync();
   runApp(
     ProviderScope(
       child: KaruyomiApp(
-        connectionPreferences: kIsWeb ? null : SharedPreferencesAsync(),
+        connectionPreferences: kIsWeb ? null : preferences,
+        appearancePreferences: preferences,
       ),
     ),
   );
@@ -41,19 +43,67 @@ class const KaruyomiApp({
   final PlatformRuntime? platform,
   final PlatformRuntime Function(Uri? origin)? platformFactory,
   final SharedPreferencesAsync? connectionPreferences,
+  final SharedPreferencesAsync? appearancePreferences,
 }) extends StatefulWidget {
   @override
   State<KaruyomiApp> createState() => _KaruyomiAppState();
 }
 
 class _KaruyomiAppState extends State<KaruyomiApp> {
-  Brightness? _brightness;
+  static const _appearanceKey = 'device_appearance';
+  AppAppearance _appearance = AppAppearance.system;
+  AppAppearance? _failedAppearance;
+  bool _restoringAppearance = false;
+  bool _savingAppearance = false;
   late final VoidCallback _stopPreservingSliderFocus;
 
   @override
   void initState() {
     super.initState();
     _stopPreservingSliderFocus = preserveReaderSliderFocus();
+    if (widget.appearancePreferences case final preferences?) {
+      _restoringAppearance = true;
+      unawaited(_restoreAppearance(preferences));
+    }
+  }
+
+  Future<void> _restoreAppearance(SharedPreferencesAsync preferences) async {
+    String? stored;
+    try {
+      stored = await preferences
+          .getString(_appearanceKey)
+          .timeout(const Duration(seconds: 3));
+    } catch (_) {
+      // A failed read still permits following the platform's appearance.
+    }
+    if (!mounted) return;
+    setState(() {
+      _appearance =
+          AppAppearance.values.asNameMap()[stored] ?? AppAppearance.system;
+      _restoringAppearance = false;
+    });
+  }
+
+  Future<void> _saveAppearance(AppAppearance value) async {
+    if (_restoringAppearance || _savingAppearance || value == _appearance) {
+      return;
+    }
+    setState(() {
+      _savingAppearance = true;
+      _failedAppearance = null;
+    });
+    AppAppearance? failed;
+    try {
+      await widget.appearancePreferences?.setString(_appearanceKey, value.name);
+    } catch (_) {
+      failed = value;
+    }
+    if (!mounted) return;
+    setState(() {
+      if (failed == null) _appearance = value;
+      _failedAppearance = failed;
+      _savingAppearance = false;
+    });
   }
 
   @override
@@ -83,10 +133,15 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
     locale: const Locale('zh'),
     supportedLocales: const [Locale('zh'), Locale('en')],
     localizationsDelegates: GlobalCupertinoLocalizations.delegates,
-    theme: readerAppTheme(_brightness),
+    theme: readerAppTheme(_appearance.brightness),
     home: AppShell(
-      brightness: _brightness,
-      onThemeChanged: (value) => setState(() => _brightness = value),
+      appearance: DeviceAppearanceSettings(
+        value: _appearance,
+        restoring: _restoringAppearance,
+        saving: _savingAppearance,
+        failed: _failedAppearance,
+        onChanged: (value) => unawaited(_saveAppearance(value)),
+      ),
       platform: widget.platform,
       platformFactory: widget.platformFactory,
       connectionPreferences: widget.connectionPreferences,
@@ -96,8 +151,7 @@ class _KaruyomiAppState extends State<KaruyomiApp> {
 
 class const AppShell({
   super.key,
-  required final Brightness? brightness,
-  required final ValueChanged<Brightness?> onThemeChanged,
+  required final Widget appearance,
   final PlatformRuntime? platform,
   final PlatformRuntime Function(Uri? origin)? platformFactory,
   final SharedPreferencesAsync? connectionPreferences,
@@ -115,7 +169,6 @@ class _AppShellState extends ConsumerState<AppShell> {
       : ref.read(
           settingsControllerProvider(_catalog!, _catalog!.settings).notifier,
         );
-  Brightness? _confirmedTheme;
   String? _configurationError;
   String? _notice;
   Map<String, Object?>? _pendingContinuation;
@@ -160,12 +213,6 @@ class _AppShellState extends ConsumerState<AppShell> {
       }
     }
     _select(index);
-  }
-
-  void _applyTheme(Brightness? value) {
-    if (_confirmedTheme == value) return;
-    _confirmedTheme = value;
-    widget.onThemeChanged(value);
   }
 
   void _initialize() {
@@ -462,7 +509,6 @@ class _AppShellState extends ConsumerState<AppShell> {
       try {
         final old = _platform;
         final oldCatalog = _catalog;
-        _applyTheme(null);
         if (oldCatalog != null) {
           await oldCatalog.flushReadingProgress();
           if (!mounted) return;
@@ -516,35 +562,12 @@ class _AppShellState extends ConsumerState<AppShell> {
       onAuthenticateReader: _authenticateReader,
       configurationError: _configurationError,
     ),
-    _ => switch (_catalog) {
-      final catalog? => GlobalSettingsPanel(
-        catalog: catalog,
-        connection: _connectionSettings(),
-        openConnectionOnMount: _openSettingsConnectionOnMount,
-      ),
-      null => CupertinoPageScaffold(
-        navigationBar: const CupertinoNavigationBar(middle: Text('服务连接')),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              children: [
-                _connectionSettings(),
-                const SizedBox(height: 8),
-                Text(
-                  '连接并确认身份后可读取和保存同步设置。',
-                  style: TextStyle(
-                    color: AppColors.secondaryLabel.resolveFrom(context),
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    },
+    _ => GlobalSettingsPanel(
+      catalog: _catalog,
+      connection: _connectionSettings(),
+      appearance: widget.appearance,
+      openConnectionOnMount: _openSettingsConnectionOnMount,
+    ),
   };
 
   Widget _connectionSettings() {
@@ -802,23 +825,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     });
     final catalog = useListenable(_catalog);
     if (catalog != null) {
-      final theme = ref.watch(
-        settingsControllerProvider(catalog, catalog.settings).select(
-          (state) => state.available ? state.snapshot?.global.theme : null,
-        ),
-      );
-      // Keep the paused document's appearance from its confirmed snapshot.
-      // A new account replaces the settings repository and clears that snapshot.
-      final pausedTheme = catalog.accessPaused && catalog.subject != null
-          ? catalog.installationSettings?.global.theme
-          : null;
-      final activeTheme = theme ?? pausedTheme;
-      final desired = activeTheme == null ? null : appBrightness(activeTheme);
-      if (_confirmedTheme != desired) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && identical(catalog, _catalog)) _applyTheme(desired);
-        });
-      }
+      ref.watch(settingsControllerProvider(catalog, catalog.settings).notifier);
     }
     return CupertinoPageScaffold(
       navigationBar: _index == 2

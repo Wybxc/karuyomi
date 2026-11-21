@@ -1,24 +1,29 @@
-# 非敏感阅读设置
+# 本机与账户阅读设置
 
-同步设置覆盖应用主题、阅读模式、页组、图像适配、裁白、阅读背景、应用内调暗、点击区与键盘预设。Worker API + D1 是唯一业务权威，Web/iOS/Android 共用 `business.proto` 生成模型与标准 ProtoJSON。完整 P1 的实现与验收状态按 [P1](../plan/p1-library-and-progress.md) 分别维护。
+当前账户设置覆盖阅读模式、页组、图像适配、裁白、阅读背景、应用内调暗、点击区与键盘预设。Worker API + D1 确认账户值，Web/iOS/Android 共用 `business.proto` 生成模型与标准 ProtoJSON。阅读显示与输入的后续归属见[实施计划](../plan/device-settings-adaptive-covers.md)。
+
+## 本机外观
+
+跟随系统、浅色和深色由本机偏好保存，初始值为跟随系统。连接和登录前即可选择。成功写入本机偏好后立即应用，失败时可重试。账号与服务切换共用同一份设备外观，Web 的存储范围由浏览器资料和文档 origin 决定。
+
+`GlobalSettingsValues` 将原主题的字段编号和名称标记为 reserved。D1 的单次数据规范化清除旧账户文档和已存设置回执中的主题属性，保留其它字段、revision、操作 UUID 和请求摘要。
 
 ## 全局默认与漫画覆盖
 
-| 偏好       | 有类型的取值                                         | 作用域                              |
-| ---------- | ---------------------------------------------------- | ----------------------------------- |
-| 应用主题   | SYSTEM / LIGHT / DARK                                | 全局；SYSTEM 由各端跟随本机系统外观 |
-| 阅读模式   | LEFT_TO_RIGHT / RIGHT_TO_LEFT / CONTINUOUS / WEBTOON | 全局默认，可逐漫画覆盖              |
-| 页组       | AUTO / SINGLE / DOUBLE                               | 全局默认，可逐漫画覆盖              |
-| 图像适配   | CONTAIN / WIDTH / HEIGHT                             | 全局默认，可逐漫画覆盖              |
-| 裁白       | false / true                                         | 全局默认，可逐漫画覆盖              |
-| 阅读背景   | BLACK / WHITE / THEME                                | 全局默认，可逐漫画覆盖              |
-| 应用内调暗 | 0–80 的整数百分比                                    | 全局默认，可逐漫画覆盖              |
-| 点击区     | STANDARD / REVERSED / DISABLED                       | 全局默认，可逐漫画覆盖              |
-| 键盘       | STANDARD / REVERSED / DISABLED                       | 全局默认，可逐漫画覆盖              |
+| 偏好       | 有类型的取值                                         | 作用域                 |
+| ---------- | ---------------------------------------------------- | ---------------------- |
+| 阅读模式   | LEFT_TO_RIGHT / RIGHT_TO_LEFT / CONTINUOUS / WEBTOON | 全局默认，可逐漫画覆盖 |
+| 页组       | AUTO / SINGLE / DOUBLE                               | 全局默认，可逐漫画覆盖 |
+| 图像适配   | CONTAIN / WIDTH / HEIGHT                             | 全局默认，可逐漫画覆盖 |
+| 裁白       | false / true                                         | 全局默认，可逐漫画覆盖 |
+| 阅读背景   | BLACK / WHITE / THEME                                | 全局默认，可逐漫画覆盖 |
+| 应用内调暗 | 0–80 的整数百分比                                    | 全局默认，可逐漫画覆盖 |
+| 点击区     | STANDARD / REVERSED / DISABLED                       | 全局默认，可逐漫画覆盖 |
+| 键盘       | STANDARD / REVERSED / DISABLED                       | 全局默认，可逐漫画覆盖 |
 
-全局默认是 SYSTEM、LEFT_TO_RIGHT、AUTO、CONTAIN、裁白关闭、BLACK、调暗 0%、STANDARD 点击区与 STANDARD 键盘。AUTO 由客户端按实际可用宽度决定单双页，不同步设备宽度或当前计算结果；连续/Webtoon 不显示双页，但仍保留偏好，以便恢复分页模式。
+全局默认是 LEFT_TO_RIGHT、AUTO、CONTAIN、裁白关闭、BLACK、调暗 0%、STANDARD 点击区与 STANDARD 键盘。AUTO 由客户端按实际可用宽度决定单双页，不同步设备宽度或当前计算结果；连续/Webtoon 不显示双页，但仍保留偏好，以便恢复分页模式。
 
-漫画覆盖使用 `ReaderSettingsOverride` 的 optional 字段。字段缺省表示继承全局；显式 AUTO 表示覆盖为自动布局，不能当成继承。提交完整覆盖文档，未包含的字段恢复继承；空 `overrides` 清空全部覆盖。应用主题没有漫画覆盖。调暗覆盖的显式 0 表示不调暗，与缺省继承不同；D1 计算有效值时以字段 presence 合并，不能按数值真假选择默认值。裁白覆盖的显式 false 表示关闭，与缺省继承不同；D1 有效值保持真正的 JSON bool。全局变化会改变未覆盖字段的有效值，但不会修改漫画覆盖的 revision。
+漫画覆盖使用 `ReaderSettingsOverride` 的 optional 字段。字段缺省表示继承全局；显式 AUTO 表示覆盖为自动布局，不能当成继承。提交完整覆盖文档，未包含的字段恢复继承；空 `overrides` 清空全部覆盖。调暗覆盖的显式 0 表示不调暗，与缺省继承不同；D1 计算有效值时以字段 presence 合并，不能按数值真假选择默认值。裁白覆盖的显式 false 表示关闭，与缺省继承不同；D1 有效值保持真正的 JSON bool。全局变化会改变未覆盖字段的有效值，但不会修改漫画覆盖的 revision。
 
 确认值比较遵循 IDL 字段语义：全局设置中的非 optional 标量按生成 getter 的有效值比较，标准 ProtoJSON 省略的 false/0 与显式默认值等价；三个列表仍保留顺序并核对所有字段。漫画 optional 覆盖继续核对 presence，显式 false/0 不能等同继承。相同 revision 的只读重取使用同一语义，实际值变化仍拒绝；mutation ID、CAS、ACK 后当前权威读回与原命令精确重试不变。
 

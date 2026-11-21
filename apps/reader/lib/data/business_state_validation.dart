@@ -579,10 +579,6 @@ void validateBusinessInstalledExtensions(
 }
 
 void validateBusinessGlobalSettings(wire.GlobalSettingsValues value) {
-  _require(
-    value.theme.value >= 1 && value.theme.value <= 3,
-    'Invalid application theme',
-  );
   _require(value.hasReader(), 'Missing global reader defaults');
   validateBusinessReaderSettings(value.reader);
   validateBusinessFavoriteSources(value.favoriteSources);

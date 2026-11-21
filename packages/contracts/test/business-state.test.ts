@@ -219,7 +219,6 @@ test('bookmark pages are bounded, marked, ordered by SQLite UTF-8 identity, and 
 });
 
 const globalSettingsValues = {
-  theme: 'APP_THEME_SYSTEM',
   reader: {
     mode: 'READER_MODE_LEFT_TO_RIGHT',
     pageLayout: 'READER_PAGE_LAYOUT_AUTO',
@@ -268,9 +267,10 @@ test('settings mutations require typed complete defaults and preserve per-field 
   for (const value of [
     base,
     { ...global, setManga: manga.setManga },
-    { ...base, setGlobal: { ...globalSettingsValues, theme: 0 } },
-    { ...base, setGlobal: { ...globalSettingsValues, theme: 99 } },
-    { ...base, setGlobal: { theme: 'APP_THEME_DARK' } },
+    {
+      ...base,
+      setGlobal: { ...globalSettingsValues, theme: 'APP_THEME_DARK' },
+    },
     {
       ...base,
       setGlobal: {

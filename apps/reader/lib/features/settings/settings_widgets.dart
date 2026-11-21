@@ -61,13 +61,6 @@ ReaderInputPreset readerInputPreset(wire.ReaderInputPreset value) =>
         ReaderInputPreset.disabled,
       _ => throw const FormatException('Unsupported reader input preset'),
     };
-Brightness? appBrightness(wire.AppTheme theme) => switch (theme) {
-  wire.AppTheme.APP_THEME_SYSTEM => null,
-  wire.AppTheme.APP_THEME_LIGHT => Brightness.light,
-  wire.AppTheme.APP_THEME_DARK => Brightness.dark,
-  _ => throw const FormatException('Unsupported application theme'),
-};
-
 const _modes = <wire.ReaderMode, String>{
   wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT: '从左到右',
   wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT: '从右到左',
@@ -212,8 +205,60 @@ class const GlobalSettingsPanel({
   super.key,
   required super.catalog,
   super.connection,
+  super.appearance,
   super.openConnectionOnMount,
 }) extends _SettingsEditor {}
+
+class const DeviceAppearanceSettings({
+  super.key,
+  required final AppAppearance value,
+  required final ValueChanged<AppAppearance> onChanged,
+  final bool restoring = false,
+  final bool saving = false,
+  final AppAppearance? failed,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => CupertinoFormSection.insetGrouped(
+    margin: const EdgeInsets.symmetric(vertical: 8),
+    header: const Text('本机设置'),
+    children: [
+      ChoiceField<AppAppearance>(
+        key: const ValueKey('device-theme'),
+        inline: false,
+        label: '外观',
+        value: value,
+        options: const {
+          AppAppearance.system: '跟随系统',
+          AppAppearance.light: '浅色',
+          AppAppearance.dark: '深色',
+        },
+        onChanged: restoring || saving
+            ? null
+            : (selection) {
+                if (selection != null) onChanged(selection);
+              },
+      ),
+      if (restoring || saving)
+        Semantics(
+          liveRegion: true,
+          child: Text(restoring ? '正在读取本机外观' : '正在保存本机外观'),
+        ),
+      if (failed case final selection?) ...[
+        Semantics(
+          liveRegion: true,
+          child: Text(
+            '未能保存本机外观。',
+            style: TextStyle(color: AppColors.error.resolveFrom(context)),
+          ),
+        ),
+        CupertinoButton(
+          onPressed: () => onChanged(selection),
+          child: const Text('重试保存外观'),
+        ),
+      ],
+    ],
+  );
+}
 
 enum _SettingsSection {
   appearance('appearance', '外观与主题', '跟随系统、浅色与深色', CupertinoIcons.paintbrush),
@@ -232,10 +277,13 @@ enum _SettingsSection {
 class MangaSettingsEditor extends _SettingsEditor {
   const MangaSettingsEditor({
     super.key,
-    required super.catalog,
+    required CatalogController catalog,
     required String mangaKey,
     required MangaEditContext target,
-  }) : super(mangaKey: mangaKey, mangaContext: target);
+  }) : super(catalog: catalog, mangaKey: mangaKey, mangaContext: target);
+
+  @override
+  CatalogController get catalog => super.catalog!;
 }
 
 /// One UI-only draft implements the same controls for global values and manga
@@ -289,26 +337,36 @@ final class _FormDraft {
 
 class const _SettingsEditor({
   super.key,
-  required final CatalogController catalog,
+  required final CatalogController? catalog,
   final String? mangaKey,
   final MangaEditContext? mangaContext,
   final Widget? connection,
+  final Widget? appearance,
   final bool openConnectionOnMount = false,
 }) extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final provider = settingsControllerProvider(
-      catalog,
-      catalog.settings,
-      mangaKey: mangaKey,
-    );
-    final state = ref.watch(provider);
-    final controller = ref.read(provider.notifier);
-    final owner = ref.watch(confirmedAccountProvider(catalog))?.settings;
+    final service = catalog;
+    final provider = service == null
+        ? null
+        : settingsControllerProvider(
+            service,
+            service.settings,
+            mangaKey: mangaKey,
+          );
+    final state = provider == null
+        ? const SettingsState()
+        : ref.watch(provider);
+    final controller = provider == null ? null : ref.read(provider.notifier);
+    final owner = service == null
+        ? null
+        : ref.watch(confirmedAccountProvider(service))?.settings;
     final edit = useRef<_FormDraft?>(null);
     final revision = useState(0);
     final selected = useState<_SettingsSection?>(
-      openConnectionOnMount ? _SettingsSection.connection : null,
+      openConnectionOnMount || service == null
+          ? _SettingsSection.connection
+          : null,
     );
     final detailScroll = useScrollController();
     final navigator = useMemoized(GlobalKey<NavigatorState>.new);
@@ -336,7 +394,6 @@ class const _SettingsEditor({
 
     void change(VoidCallback apply) {
       apply();
-      if (!manga) selected.value ??= _SettingsSection.appearance;
       edit.value!.dirty = true;
       revision.value++;
     }
@@ -385,7 +442,7 @@ class const _SettingsEditor({
           children: fields,
         );
 
-    final save = draft == null || r == null
+    final save = draft == null || r == null || controller == null
         ? null
         : CupertinoButton(
             padding: manga ? EdgeInsets.zero : null,
@@ -429,7 +486,12 @@ class const _SettingsEditor({
               child: save.child,
             ),
           ),
-        SettingsStatus(controller: controller, state: state, onReloaded: reset),
+        if (controller != null)
+          SettingsStatus(
+            controller: controller,
+            state: state,
+            onReloaded: reset,
+          ),
       ],
     );
     Widget content(_SettingsSection? section) => Column(
@@ -438,9 +500,10 @@ class const _SettingsEditor({
       children: [
         if (owner != null) ?mangaContext,
         if (connection != null &&
+            section != _SettingsSection.appearance &&
             section != _SettingsSection.connection &&
-            catalog.status != ServiceStatus.ready) ...[
-          if (catalog.error case final error?)
+            service?.status != ServiceStatus.ready) ...[
+          if (service?.error case final error?)
             Text(
               error,
               style: TextStyle(color: AppColors.error.resolveFrom(context)),
@@ -450,7 +513,11 @@ class const _SettingsEditor({
             child: const Text('服务连接与登录'),
           ),
         ],
-        if (section == _SettingsSection.connection) ?connection,
+        if (section == _SettingsSection.connection) ...[
+          ?connection,
+          if (service == null) const Text('连接并确认身份后可读取和保存同步设置。'),
+        ],
+        if (section == _SettingsSection.appearance) ?appearance,
         if (section == _SettingsSection.about)
           const CupertinoListTile(
             title: Text('Karuyomi'),
@@ -459,27 +526,11 @@ class const _SettingsEditor({
           ),
         if (draft == null &&
             !state.available &&
+            section != _SettingsSection.appearance &&
             section != _SettingsSection.about &&
             section != _SettingsSection.connection)
           const Text('连接并确认身份后可读取和保存同步设置。'),
         if (draft != null && r != null) ...[
-          if (draft.global case final global?
-              when section == _SettingsSection.appearance)
-            group('外观与主题', [
-              choice(
-                'theme',
-                '外观',
-                global.theme,
-                const {
-                  wire.AppTheme.APP_THEME_SYSTEM: '跟随系统',
-                  wire.AppTheme.APP_THEME_LIGHT: '浅色',
-                  wire.AppTheme.APP_THEME_DARK: '深色',
-                },
-                (value) => global.theme = value,
-                () {},
-                inherit: false,
-              ),
-            ]),
           if (manga || section == _SettingsSection.reading) ...[
             group('阅读显示', [
               choice(
@@ -596,8 +647,8 @@ class const _SettingsEditor({
           ],
         ],
         if (!manga &&
+            section != _SettingsSection.appearance &&
             ({
-                  _SettingsSection.appearance,
                   _SettingsSection.reading,
                   _SettingsSection.input,
                 }.contains(section) ||
@@ -751,6 +802,7 @@ class const _SettingsEditor({
                           child: Text('修改尚未保存。'),
                         ),
                       if (!showDetail &&
+                          controller != null &&
                           (state.pending != null || state.error != null))
                         Padding(
                           padding: const EdgeInsets.all(16),
@@ -770,14 +822,17 @@ class const _SettingsEditor({
                   middle: Text(section.title),
                 ),
                 child: SafeArea(
-                  child: SingleChildScrollView(
-                    key: ValueKey(('settings-content', section)),
+                  child: PrimaryScrollController(
                     controller: detailScroll,
-                    padding: const EdgeInsets.all(16),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 640),
-                        child: content(section),
+                    child: SingleChildScrollView(
+                      key: ValueKey(('settings-content', section)),
+                      primary: true,
+                      padding: const EdgeInsets.all(16),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 640),
+                          child: content(section),
+                        ),
                       ),
                     ),
                   ),
@@ -800,6 +855,7 @@ class const _SettingsEditor({
                         onPopWithResult: (_) => navigator.currentState!.pop(),
                         child: Navigator(
                           key: navigator,
+                          requestFocus: false,
                           pages: [
                             if (!wide)
                               AppPage<void>(

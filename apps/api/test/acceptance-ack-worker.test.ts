@@ -9,7 +9,6 @@ import {
   stateMutationSchema,
 } from '@karuyomi/contracts';
 import {
-  AppTheme,
   BusinessStateErrorCode as ErrorCode,
   ReaderBackground,
   ReaderFit,
@@ -316,7 +315,6 @@ test('default acceptance does not intercept and the existing settings fixture pr
       operation: {
         case: 'setGlobal',
         value: {
-          theme: AppTheme.DARK,
           reader: {
             mode: ReaderMode.LEFT_TO_RIGHT,
             pageLayout: ReaderPageLayout.AUTO,

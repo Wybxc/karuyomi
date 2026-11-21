@@ -26,16 +26,15 @@ BusinessStateClient _client(ApiFetch api, {String subject = 'owner-subject'}) =>
     BusinessStateClient(api: api, identity: _identity(subject));
 
 wire.GlobalSettingsValues _global({
-  wire.AppTheme theme = wire.AppTheme.APP_THEME_DARK,
+  wire.ReaderFit fit = wire.ReaderFit.READER_FIT_WIDTH,
   wire.ReaderMode mode = wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
   wire.ReaderPageLayout layout = wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
 }) => wire.GlobalSettingsValues(
-  theme: theme,
   reader: wire.ReaderSettings(
     mode: mode,
     pageLayout: layout,
     background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
-    fit: wire.ReaderFit.READER_FIT_CONTAIN,
+    fit: fit,
     tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
     keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
   ),
@@ -51,7 +50,7 @@ ApiReply _reply(GeneratedMessage value) => ApiReply(
 wire.SettingsResponse _snapshot() => wire.SettingsResponse(
   schemaVersion: 1,
   global: wire.GlobalSettings(
-    values: _global(theme: wire.AppTheme.APP_THEME_SYSTEM),
+    values: _global(fit: wire.ReaderFit.READER_FIT_CONTAIN),
   ),
   manga: wire.MangaReaderSettings(
     mangaKey: _key,
@@ -192,7 +191,7 @@ final class _FailedSettingsReads implements ApiFetch {
         wire.SettingsResponse(),
         jsonDecode(reply.body),
       );
-      value.global.values.theme = wire.AppTheme.APP_THEME_LIGHT;
+      value.global.values.reader.fit = wire.ReaderFit.READER_FIT_HEIGHT;
       return _reply(value);
     }
     return reply;
@@ -263,7 +262,7 @@ void main() {
     expect(editor.pendingGlobal()!.retryable, true);
     transport.corruptRead = false;
     final saved = await editor.setGlobal(values: _global(), basedOnRevision: 0);
-    expect(saved.global.theme, wire.AppTheme.APP_THEME_DARK);
+    expect(saved.global.reader.fit, wire.ReaderFit.READER_FIT_WIDTH);
     expect(
       server.requests.where((request) => request.method == 'POST'),
       hasLength(1),
@@ -337,7 +336,7 @@ void main() {
       final value = await repository.loadGlobal();
       expect(value.globalRevision, 0);
       expect(value.accountRevision, 0);
-      expect(value.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
+      expect(value.global.reader.fit, wire.ReaderFit.READER_FIT_CONTAIN);
       expect(
         value.effectiveReader.mode,
         wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
@@ -706,7 +705,7 @@ void main() {
       final mangaDraft = repository.pendingManga(_key)!;
       await expectLater(
         repository.setGlobal(
-          values: _global(theme: wire.AppTheme.APP_THEME_LIGHT),
+          values: _global(fit: wire.ReaderFit.READER_FIT_HEIGHT),
           basedOnRevision: 0,
         ),
         throwsStateError,
@@ -819,7 +818,7 @@ void main() {
     addTearDown(remoteClient.dispose);
     final remote = SettingsRepository(remoteClient);
     await remote.setGlobal(
-      values: _global(theme: wire.AppTheme.APP_THEME_LIGHT),
+      values: _global(fit: wire.ReaderFit.READER_FIT_HEIGHT),
       basedOnRevision: 1,
     );
     await expectLater(
@@ -841,7 +840,7 @@ void main() {
     expect(writes(), hasLength(count));
     final current = await repository.loadGlobal();
     expect(current.globalRevision, 2);
-    expect(current.global.theme, wire.AppTheme.APP_THEME_LIGHT);
+    expect(current.global.reader.fit, wire.ReaderFit.READER_FIT_HEIGHT);
     expect(repository.pendingGlobal(), isNull);
     final saved = await repository.setGlobal(
       values: _global(),
@@ -891,7 +890,6 @@ void main() {
       _snapshot()..schemaVersion = 2,
       _snapshot()..effectiveReader.cropBorders = true,
       _snapshot()..manga.mangaKey = _otherKey,
-      _snapshot()..global.values.theme = wire.AppTheme.APP_THEME_UNSPECIFIED,
       _snapshot()
         ..global.values.reader.fit = wire.ReaderFit.READER_FIT_UNSPECIFIED,
       _snapshot()..manga.overrides.fit = wire.ReaderFit.READER_FIT_UNSPECIFIED,
@@ -973,8 +971,8 @@ void main() {
     addTearDown(subscription.cancel);
     await repository.loadGlobal();
     await Future<void>.delayed(Duration.zero);
-    expect(events.map((value) => value.global.theme), [
-      wire.AppTheme.APP_THEME_SYSTEM,
+    expect(events.map((value) => value.global.reader.fit), [
+      wire.ReaderFit.READER_FIT_CONTAIN,
     ]);
     final write = repository.setGlobal(values: _global(), basedOnRevision: 0);
     await gate.received.future;
@@ -985,9 +983,9 @@ void main() {
     final confirmed = await write;
     await Future<void>.delayed(Duration.zero);
     expect(confirmed.globalRevision, 1);
-    expect(events.map((value) => value.global.theme), [
-      wire.AppTheme.APP_THEME_SYSTEM,
-      wire.AppTheme.APP_THEME_DARK,
+    expect(events.map((value) => value.global.reader.fit), [
+      wire.ReaderFit.READER_FIT_CONTAIN,
+      wire.ReaderFit.READER_FIT_WIDTH,
     ]);
   });
 
@@ -1010,7 +1008,7 @@ void main() {
       addTearDown(nextClient.dispose);
       final next = await SettingsRepository(nextClient).loadGlobal();
       expect(next.globalRevision, 0);
-      expect(next.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
+      expect(next.global.reader.fit, wire.ReaderFit.READER_FIT_CONTAIN);
       expect(
         () => nextClient.rebindApi(server, verifiedIdentity: _identity()),
         throwsArgumentError,
@@ -1021,8 +1019,10 @@ void main() {
       final originalClient = _client(server);
       addTearDown(originalClient.dispose);
       expect(
-        (await SettingsRepository(originalClient).loadGlobal()).global.theme,
-        wire.AppTheme.APP_THEME_DARK,
+        (await SettingsRepository(
+          originalClient,
+        ).loadGlobal()).global.reader.fit,
+        wire.ReaderFit.READER_FIT_WIDTH,
       );
     },
   );

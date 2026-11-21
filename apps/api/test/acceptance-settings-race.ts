@@ -4,8 +4,8 @@ import {
   settingsMutationSchema,
 } from '@karuyomi/contracts';
 import {
-  AppTheme,
   BusinessStateErrorCode,
+  ReaderFit,
   SettingsMutationResponseSchema,
   SettingsMutationSchema,
 } from '@karuyomi/protocol';
@@ -20,7 +20,7 @@ interface Arrival {
   sequence: number;
   mutation_id: string;
   expected_revision: number;
-  theme: AppTheme;
+  fit: ReaderFit;
   body_sha256: string;
   arrived_at_ms: number;
 }
@@ -50,7 +50,7 @@ export async function prepareSettingsRace(db: D1Database): Promise<void> {
     sequence INTEGER PRIMARY KEY,
     mutation_id TEXT NOT NULL UNIQUE,
     expected_revision INTEGER NOT NULL CHECK (expected_revision = 0),
-    theme INTEGER NOT NULL UNIQUE,
+    fit INTEGER NOT NULL UNIQUE,
     body_sha256 TEXT NOT NULL,
     arrived_at_ms INTEGER NOT NULL,
     expired INTEGER NOT NULL DEFAULT 0 CHECK (expired IN (0, 1)),
@@ -120,8 +120,8 @@ export async function holdSettingsRace(
     mutation.operation.case !== 'setGlobal'
   )
     return;
-  const theme = mutation.operation.value.theme;
-  if (theme !== AppTheme.DARK && theme !== AppTheme.LIGHT) return;
+  const fit = mutation.operation.value.reader?.fit;
+  if (fit !== ReaderFit.WIDTH && fit !== ReaderFit.HEIGHT) return;
 
   const [bodyHash, requestHash] = await Promise.all([
     request.clone().arrayBuffer().then(sha256),
@@ -130,19 +130,19 @@ export async function holdSettingsRace(
   const arrival = await db
     .prepare(
       `INSERT INTO acceptance_settings_race (
-        mutation_id, expected_revision, theme, body_sha256, arrived_at_ms
+        mutation_id, expected_revision, fit, body_sha256, arrived_at_ms
       )
       SELECT ?1, ?2, ?3, ?4, ?5
       WHERE (SELECT COUNT(*) FROM acceptance_settings_race) < 2
         AND NOT EXISTS (SELECT 1 FROM acceptance_settings_race
           WHERE expired = 1 OR arrived_at_ms + ?6 <= ?5)
       ON CONFLICT DO NOTHING
-      RETURNING sequence, mutation_id, expected_revision, theme, body_sha256, arrived_at_ms`,
+      RETURNING sequence, mutation_id, expected_revision, fit, body_sha256, arrived_at_ms`,
     )
     .bind(
       mutation.mutationId,
       mutation.expectedRevision,
-      theme,
+      fit,
       bodyHash,
       Date.now(),
       budgetMs,
@@ -212,7 +212,7 @@ export async function observeSettingsRace(
   const ack = settingsMutationResponseSchema.parse(
     await response.clone().json(),
   );
-  const { mutation_id: mutationId, theme } = attempt.arrival;
+  const { mutation_id: mutationId, fit } = attempt.arrival;
   if (
     ack.mutationId !== mutationId ||
     ack.global?.revision !== 1 ||
@@ -238,7 +238,7 @@ export async function observeSettingsRace(
   if (
     response.status === 200 &&
     !ack.error &&
-    ack.global.values?.theme === theme
+    ack.global.values?.reader?.fit === fit
   ) {
     if (
       receipt?.kind !== 'settings' ||
@@ -261,7 +261,7 @@ export async function observeSettingsRace(
   } else if (
     response.status !== 409 ||
     ack.error?.code !== BusinessStateErrorCode.REVISION_CONFLICT ||
-    ack.global.values?.theme === theme ||
+    ack.global.values?.reader?.fit === fit ||
     receipt !== null
   )
     throw new Error('Expected a losing settings CAS without a D1 receipt');

@@ -68,7 +68,10 @@ void main() {
     expect(platform.invocations, isEmpty);
     expect(manager.installed.single, testInstalledExtension());
     expect(manager.settings.snapshot!.global.reader, before.global.reader);
-    expect(manager.settings.snapshot!.global.theme, before.global.theme);
+    expect(
+      manager.settings.snapshot!.global.reader.fit,
+      before.global.reader.fit,
+    );
     expect(manager.cache!.artifacts.single.sha256, 'a' * 64);
     final remote = SettingsRepository(
       BusinessStateClient(
@@ -162,7 +165,7 @@ void main() {
     final remote = SettingsRepository(remoteClient);
     final snapshot = await remote.loadGlobal();
     final values = snapshot.global.deepCopy()
-      ..theme = wire.AppTheme.APP_THEME_DARK;
+      ..reader.fit = wire.ReaderFit.READER_FIT_WIDTH;
     await remote.setGlobal(
       values: values,
       basedOnRevision: snapshot.globalRevision,
@@ -175,8 +178,8 @@ void main() {
     await manager.refresh();
     expect(manager.settings.pending, isNull);
     expect(
-      manager.settings.snapshot!.global.theme,
-      wire.AppTheme.APP_THEME_DARK,
+      manager.settings.snapshot!.global.reader.fit,
+      wire.ReaderFit.READER_FIT_WIDTH,
     );
     final posts = platform.businessServer.requests
         .where((request) => request.method == 'POST')

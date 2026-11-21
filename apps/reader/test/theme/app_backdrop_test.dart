@@ -4,6 +4,7 @@ import 'dart:ui' show ImageByteFormat;
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/main.dart';
 import 'package:karuyomi/theme/app_theme.dart';
 import 'package:karuyomi/widgets/app_routes.dart';
@@ -27,7 +28,19 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      tester.widget<AppShell>(find.byType(AppShell)).onThemeChanged(brightness);
+      await tester.tap(find.byKey(const ValueKey(('app-destination', 2))));
+      await tester.pumpAndSettle();
+      tester
+          .widget<DeviceAppearanceSettings>(
+            find.byType(DeviceAppearanceSettings),
+          )
+          .onChanged(
+            brightness == Brightness.dark
+                ? AppAppearance.dark
+                : AppAppearance.light,
+          );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey(('app-destination', 0))));
       await tester.pumpAndSettle();
       final context = tester.element(find.byType(AppShell));
       final expected = AppColors.background.resolveFrom(context);

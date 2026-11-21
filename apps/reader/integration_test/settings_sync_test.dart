@@ -33,10 +33,7 @@ const _lifecycleBudget = Duration(minutes: 5);
 const _ackSubject = 'acceptance-owner';
 const _unconfirmed = '设置尚未确认，本会话保留原操作。';
 const _retry = '重试原设置操作';
-const _presets = {
-  'dark-rtl-double-width-crop',
-  'light-webtoon-auto-height-no-crop',
-};
+const _presets = {'rtl-double-width-crop', 'webtoon-auto-height-no-crop'};
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -85,7 +82,6 @@ void main() {
       final before = await repository.loadGlobal().timeout(_operationBudget);
       _expectSnapshot(before, expected);
       await _expectForm(tester, before.global);
-      _expectTheme(tester, before.global.theme);
       expect(editor.state.pending, isNull);
       expect(editor.state.error, isNull);
 
@@ -134,20 +130,18 @@ void main() {
 }
 
 wire.GlobalSettingsValues _target(SettingsSnapshot before) {
-  // Only these five visible preferences change. The form retains every other
+  // Only these four visible preferences change. The form retains every other
   // confirmed reader field, favorite Source, installation and repository.
   final target = before.global.deepCopy();
   switch (_preset) {
-    case 'dark-rtl-double-width-crop':
-      target.theme = wire.AppTheme.APP_THEME_DARK;
+    case 'rtl-double-width-crop':
       target.reader
         ..mode = wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT
         ..pageLayout = wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE
         ..fit = wire.ReaderFit.READER_FIT_WIDTH
         ..cropBorders = true;
       break;
-    case 'light-webtoon-auto-height-no-crop':
-      target.theme = wire.AppTheme.APP_THEME_LIGHT;
+    case 'webtoon-auto-height-no-crop':
       target.reader
         ..mode = wire.ReaderMode.READER_MODE_WEBTOON
         ..pageLayout = wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO
@@ -158,11 +152,8 @@ wire.GlobalSettingsValues _target(SettingsSnapshot before) {
       throw StateError('Unknown SETTINGS_PRESET: $_preset');
   }
   expect(
-    (theme: target.theme, reader: _readerValues(target.reader)),
-    isNot((
-      theme: before.global.theme,
-      reader: _readerValues(before.global.reader),
-    )),
+    _readerValues(target.reader),
+    isNot(_readerValues(before.global.reader)),
     reason: '写入和前台恢复须从不同于预设的已确认值开始',
   );
   return target;
@@ -175,14 +166,12 @@ Future<SettingsSnapshot> _write(
   SettingsSnapshot before,
 ) async {
   final target = _target(before);
-  await _select<wire.AppTheme>(tester, target.theme);
   await _select<wire.ReaderMode>(tester, target.reader.mode);
   await _select<wire.ReaderPageLayout>(tester, target.reader.pageLayout);
   await _select<wire.ReaderFit>(tester, target.reader.fit);
   await _select<bool>(tester, target.reader.cropBorders);
   await _expectForm(tester, target);
-  // A draft cannot apply the theme or become confirmed before the save ACK.
-  _expectTheme(tester, before.global.theme);
+  // A draft stays outside the confirmed snapshot until the save ACK.
   _expectGlobal(editor.state.snapshot!.global, before.global);
   expect(editor.state.pending, isNull);
   await _tap(tester, find.widgetWithText(CupertinoButton, '保存全局设置'));
@@ -197,7 +186,6 @@ Future<SettingsSnapshot> _write(
   _expectGlobal(editor.state.snapshot!.global, target);
   expect(editor.state.error, isNull);
   await _expectForm(tester, target);
-  _expectTheme(tester, target.theme);
   return after;
 }
 
@@ -257,7 +245,6 @@ Future<SettingsSnapshot> _resume(
   _expectCommittedTarget(after, before, target);
   expect(editor.state.pending, isNull);
   await _expectForm(tester, target);
-  _expectTheme(tester, target.theme);
   return after;
 }
 
@@ -269,13 +256,13 @@ Future<SettingsSnapshot> _ackLoss(
 ) async {
   expect(before.accountRevision, 0, reason: '丢确认验收需要空 D1');
   expect(before.globalRevision, 0);
-  expect(before.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
+  expect(before.global.reader.fit, wire.ReaderFit.READER_FIT_CONTAIN);
   expect(before.global.installedExtensions, isEmpty);
-  final target = before.global.deepCopy()..theme = wire.AppTheme.APP_THEME_DARK;
+  final target = before.global.deepCopy()
+    ..reader.fit = wire.ReaderFit.READER_FIT_WIDTH;
   final save = find.widgetWithText(CupertinoButton, '保存全局设置');
   final retry = find.widgetWithText(CupertinoButton, _retry);
-  await _select(tester, target.theme);
-  _expectTheme(tester, before.global.theme);
+  await _select(tester, target.reader.fit);
   await _tap(tester, save);
   final unconfirmed = find.text(_unconfirmed);
   await _waitFor(tester, '正式保存保留未确认的设置操作', () {
@@ -291,8 +278,7 @@ Future<SettingsSnapshot> _ackLoss(
   expect(find.text('设置修改尚未确认，请明确重试原操作。'), findsOneWidget);
   _expectPendingAck(tester, editor, before, target);
   expect(editor.state.snapshot!.globalRevision, before.globalRevision);
-  _expectTheme(tester, before.global.theme);
-  await _expectSelection(tester, 'global-theme', target.theme);
+  await _expectSelection(tester, 'global-fit', target.reader.fit);
 
   // Read through a separate TLS connection so this checkpoint cannot publish a
   // confirmed value to the current editor or consume its pending operation.
@@ -305,7 +291,6 @@ Future<SettingsSnapshot> _ackLoss(
     _readerValues(target.reader),
   );
   expect(editor.state.snapshot!.globalRevision, before.globalRevision);
-  _expectTheme(tester, before.global.theme);
   _expectPendingAck(tester, editor, before, target);
   debugPrintSynchronously('SETTINGS_ACK_LOSS_COMMITTED_UNCONFIRMED pid=$pid');
 
@@ -320,8 +305,7 @@ Future<SettingsSnapshot> _ackLoss(
   _expectSnapshot(editor.state.snapshot!, committed);
   expect(editor.state.error, isNull);
   _expectPendingAck(tester, editor, before, target);
-  await _expectSelection(tester, 'global-theme', target.theme);
-  _expectTheme(tester, target.theme);
+  await _expectSelection(tester, 'global-fit', target.reader.fit);
   _expectSnapshot(editor.state.snapshot!, await _readAckSettings());
   debugPrintSynchronously('SETTINGS_ACK_LOSS_RELOADED_PENDING pid=$pid');
 
@@ -340,7 +324,6 @@ Future<SettingsSnapshot> _ackLoss(
   expect(retry, findsNothing);
   _expectSnapshot(editor.state.snapshot!, committed);
   await _expectForm(tester, target);
-  _expectTheme(tester, target.theme);
   final after = await repository.loadGlobal().timeout(_operationBudget);
   _expectSnapshot(after, committed);
   _expectSnapshot(after, await _readAckSettings());
@@ -437,7 +420,6 @@ void _expectGlobal(
   wire.GlobalSettingsValues actual,
   wire.GlobalSettingsValues expected,
 ) {
-  expect(actual.theme, expected.theme);
   expect(actual.hasReader(), expected.hasReader());
   expect(_readerValues(actual.reader), _readerValues(expected.reader));
   expect(
@@ -529,7 +511,7 @@ Future<void> _expectForm(
   WidgetTester tester,
   wire.GlobalSettingsValues values,
 ) async {
-  await _expectSelection(tester, 'global-theme', values.theme);
+  await openSettingsSection(tester, 'reading');
   await _expectSelection(tester, 'global-mode', values.reader.mode);
   await _expectSelection(tester, 'global-layout', values.reader.pageLayout);
   await _expectSelection(tester, 'global-fit', values.reader.fit);
@@ -551,19 +533,6 @@ Future<void> _expectSelection<T>(
   await tester.pump(const Duration(milliseconds: 300));
   expect(finder.hitTestable(), findsOneWidget);
   expect(tester.widget<ChoiceField<T>>(finder).value, value);
-}
-
-void _expectTheme(WidgetTester tester, wire.AppTheme theme) {
-  final expected = switch (theme) {
-    wire.AppTheme.APP_THEME_SYSTEM => null,
-    wire.AppTheme.APP_THEME_LIGHT => Brightness.light,
-    wire.AppTheme.APP_THEME_DARK => Brightness.dark,
-    _ => throw const FormatException('Unsupported expected application theme'),
-  };
-  expect(
-    tester.widget<CupertinoApp>(find.byType(CupertinoApp)).theme?.brightness,
-    expected,
-  );
 }
 
 Future<void> _select<T>(WidgetTester tester, T value) async {

@@ -78,6 +78,13 @@
       "when": 1794125124635,
       "tag": "0010_remove-extension-network-registry",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1795255871342,
+      "tag": "0011_local-device-appearance",
+      "breakpoints": true
     }
   ]
 }

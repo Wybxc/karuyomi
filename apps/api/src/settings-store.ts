@@ -1,6 +1,5 @@
 import { create, fromJsonString, toJsonString } from '@bufbuild/protobuf';
 import {
-  AppTheme,
   BusinessStateErrorCode as ErrorCode,
   GlobalSettingsValuesSchema,
   ReaderBackground,
@@ -23,7 +22,6 @@ const MAX_REVISION = 0xffff_ffff;
 const defaultValues = toJsonString(
   GlobalSettingsValuesSchema,
   create(GlobalSettingsValuesSchema, {
-    theme: AppTheme.SYSTEM,
     reader: {
       mode: ReaderMode.LEFT_TO_RIGHT,
       pageLayout: ReaderPageLayout.AUTO,

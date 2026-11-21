@@ -633,7 +633,8 @@ void main() {
     final repository = SettingsRepository(remote);
     final snapshot = await repository.loadGlobal();
     await repository.setGlobal(
-      values: snapshot.global.deepCopy()..theme = wire.AppTheme.APP_THEME_DARK,
+      values: snapshot.global.deepCopy()
+        ..reader.fit = wire.ReaderFit.READER_FIT_WIDTH,
       basedOnRevision: snapshot.globalRevision,
     );
     release.complete();
@@ -644,8 +645,8 @@ void main() {
     await manager.refresh(catalogToo: true);
     expect(posts(), hasLength(before));
     expect(
-      manager.settings.snapshot!.global.theme,
-      wire.AppTheme.APP_THEME_DARK,
+      manager.settings.snapshot!.global.reader.fit,
+      wire.ReaderFit.READER_FIT_WIDTH,
     );
   });
 

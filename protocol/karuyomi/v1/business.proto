@@ -275,13 +275,6 @@ message CategoryCatalogResponse {
   BusinessStateError error = 4;
 }
 
-enum AppTheme {
-  APP_THEME_UNSPECIFIED = 0;
-  APP_THEME_SYSTEM = 1;
-  APP_THEME_LIGHT = 2;
-  APP_THEME_DARK = 3;
-}
-
 enum ReaderMode {
   READER_MODE_UNSPECIFIED = 0;
   READER_MODE_LEFT_TO_RIGHT = 1;
@@ -370,7 +363,9 @@ message ExtensionRepository {
 }
 
 message GlobalSettingsValues {
-  AppTheme theme = 1;
+  reserved 1;
+  reserved "theme";
+
   ReaderSettings reader = 2;
   repeated FavoriteSource favorite_sources = 3;
   repeated InstalledExtension installed_extensions = 4;

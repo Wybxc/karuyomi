@@ -25,11 +25,6 @@ class const PendingGlobalSettings({
           alignment: Alignment.centerLeft,
           child: Text(
             [
-              '应用主题：${switch (values.theme) {
-                wire.AppTheme.APP_THEME_DARK => '深色',
-                wire.AppTheme.APP_THEME_LIGHT => '浅色',
-                _ => '跟随系统',
-              }}',
               '阅读模式：${switch (reader.mode) {
                 wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT => '从右到左',
                 wire.ReaderMode.READER_MODE_CONTINUOUS => '竖向连续',

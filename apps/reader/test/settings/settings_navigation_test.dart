@@ -22,6 +22,7 @@ import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/features/reader/reader_preferences.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/main.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:karuyomi/runtime/platform_runtime_native.dart' as native;
 import 'package:reader_core/reader_core.dart';
@@ -87,7 +88,7 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 Future<void> _choose<T>(WidgetTester tester, String label) async {
   await openSettingsSection(
     tester,
-    T == wire.AppTheme ? 'appearance' : 'reading',
+    T == AppAppearance ? 'appearance' : 'reading',
   );
   await _tap(tester, find.byType(ChoiceField<T>));
   await _tap(tester, find.widgetWithText(CupertinoMenuItem, label));
@@ -115,7 +116,7 @@ Finder _navigation(String label) => find.descendant(
 );
 Future<void> _openSettings(WidgetTester tester) async {
   await _tap(tester, _navigation('设置'));
-  await openSettingsSection(tester, 'appearance');
+  await openSettingsSection(tester, 'reading');
 }
 
 Future<void> _dim(
@@ -167,7 +168,7 @@ Future<void> _start(
 
 Future<void> _globalDefaults(WidgetTester tester, {bool dark = false}) async {
   await _openSettings(tester);
-  if (dark) await _choose<wire.AppTheme>(tester, '深色');
+  if (dark) await _choose<AppAppearance>(tester, '深色');
   await _choose<wire.ReaderMode>(tester, '从右到左');
   await _choose<wire.ReaderPageLayout>(tester, '双页');
   await _chooseField<wire.ReaderFit>(tester, '图像适配', '适宽');
@@ -481,94 +482,102 @@ void main() {
     }
   }
 
-  testWidgets('returning to the foreground reads a confirmed remote theme', (
-    tester,
-  ) async {
-    final platform = TestPlatform(seedDefaultInstallation: false);
-    final remotePlatform = TestPlatform(
-      businessServer: platform.businessServer,
-      seedDefaultInstallation: false,
-    );
-    final remote = CatalogController(
-      api: remotePlatform,
-      runtime: remotePlatform.runtime,
-      rebuildRuntime: remotePlatform.rebuild,
-      deploymentOrigin: remotePlatform.origin,
-    );
-    addTearDown(() async {
-      remote.dispose();
-      await remote.closeReadingProgress();
-      await remotePlatform.dispose();
-    });
-    await tester.runAsync(remote.connect);
-    await _start(tester, platform);
-    await _openSettings(tester);
-    final panel = find.byType(GlobalSettingsPanel);
-    final catalog = tester.widget<GlobalSettingsPanel>(panel).catalog;
-    final container = ProviderScope.containerOf(
-      tester.element(panel),
-      listen: false,
-    );
-    final provider = settingsControllerProvider(catalog, catalog.settings);
-    final controller = container.read(provider.notifier);
-    expect(container.read(provider).snapshot!.globalRevision, 0);
-    expect(
-      tester.widget<CupertinoApp>(find.byType(CupertinoApp)).theme?.brightness,
-      null,
-    );
-
-    final binding = tester.binding;
-    setAppLifecycleState(binding, AppLifecycleState.inactive);
-    setAppLifecycleState(binding, AppLifecycleState.hidden);
-    await tester.runAsync(() async {
-      final repository = remote.settings!;
-      final current = await repository.loadGlobal();
-      await repository.setGlobal(
-        values: current.global.deepCopy()..theme = wire.AppTheme.APP_THEME_DARK,
-        basedOnRevision: current.globalRevision,
+  testWidgets(
+    'returning to the foreground reads the confirmed account reading preference',
+    (tester) async {
+      final platform = TestPlatform(seedDefaultInstallation: false);
+      final remotePlatform = TestPlatform(
+        businessServer: platform.businessServer,
+        seedDefaultInstallation: false,
       );
-    });
-    await tester.pump();
-    expect(container.read(provider).snapshot!.globalRevision, 0);
+      final remote = CatalogController(
+        api: remotePlatform,
+        runtime: remotePlatform.runtime,
+        rebuildRuntime: remotePlatform.rebuild,
+        deploymentOrigin: remotePlatform.origin,
+      );
+      addTearDown(() async {
+        remote.dispose();
+        await remote.closeReadingProgress();
+        await remotePlatform.dispose();
+      });
+      await tester.runAsync(remote.connect);
+      await _start(tester, platform);
+      await _openSettings(tester);
+      final panel = find.byType(GlobalSettingsPanel);
+      final catalog = tester.widget<GlobalSettingsPanel>(panel).catalog!;
+      final container = ProviderScope.containerOf(
+        tester.element(panel),
+        listen: false,
+      );
+      final provider = settingsControllerProvider(catalog, catalog.settings);
+      final controller = container.read(provider.notifier);
+      expect(container.read(provider).snapshot!.globalRevision, 0);
+      expect(
+        tester
+            .widget<CupertinoApp>(find.byType(CupertinoApp))
+            .theme
+            ?.brightness,
+        null,
+      );
 
-    setAppLifecycleState(binding, AppLifecycleState.inactive);
-    setAppLifecycleState(binding, AppLifecycleState.resumed);
-    await tester.pumpAndSettle();
-    expect(
-      container.read(
-        settingsControllerProvider(catalog, catalog.settings).notifier,
-      ),
-      same(controller),
-    );
-    expect(container.read(provider).snapshot!.globalRevision, 1);
-    expect(
-      tester
-          .widget<ChoiceField<wire.AppTheme>>(
-            find.byKey(const ValueKey('global-theme')),
-          )
-          .value,
-      wire.AppTheme.APP_THEME_DARK,
-    );
-    expect(
-      tester.widget<CupertinoApp>(find.byType(CupertinoApp)).theme?.brightness,
-      Brightness.dark,
-    );
-    expect(platform.businessServer.appliedMutations, 1);
-    expect(
-      platform.businessServer.requests.where(
-        (request) => request.uri.path == '/api/settings/mutations',
-      ),
-      hasLength(1),
-    );
-    expect(platform.openedBuilds, isEmpty);
-    expect(tester.takeException(), isNull);
-    await tester.pumpApp(const SizedBox.shrink());
-    await tester.pumpAndSettle();
-  });
+      final binding = tester.binding;
+      setAppLifecycleState(binding, AppLifecycleState.inactive);
+      setAppLifecycleState(binding, AppLifecycleState.hidden);
+      await tester.runAsync(() async {
+        final repository = remote.settings!;
+        final current = await repository.loadGlobal();
+        await repository.setGlobal(
+          values: current.global.deepCopy()
+            ..reader.fit = wire.ReaderFit.READER_FIT_WIDTH,
+          basedOnRevision: current.globalRevision,
+        );
+      });
+      await tester.pump();
+      expect(container.read(provider).snapshot!.globalRevision, 0);
+
+      setAppLifecycleState(binding, AppLifecycleState.inactive);
+      setAppLifecycleState(binding, AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(
+        container.read(
+          settingsControllerProvider(catalog, catalog.settings).notifier,
+        ),
+        same(controller),
+      );
+      expect(container.read(provider).snapshot!.globalRevision, 1);
+      expect(
+        tester
+            .widget<ChoiceField<wire.ReaderFit>>(
+              find.byKey(const ValueKey('global-fit')),
+            )
+            .value,
+        wire.ReaderFit.READER_FIT_WIDTH,
+      );
+      expect(
+        tester
+            .widget<CupertinoApp>(find.byType(CupertinoApp))
+            .theme
+            ?.brightness,
+        null,
+      );
+      expect(platform.businessServer.appliedMutations, 1);
+      expect(
+        platform.businessServer.requests.where(
+          (request) => request.uri.path == '/api/settings/mutations',
+        ),
+        hasLength(1),
+      );
+      expect(platform.openedBuilds, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpApp(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
 
   for (final denied in [false, true]) {
     testWidgets(
-      'confirmed appearance survives Access ${denied ? 'denial' : 'expiry'} until the identity is rechecked',
+      'device appearance remains selected across Access ${denied ? 'denial' : 'expiry'} and account change',
       (tester) async {
         final platformBrightness = denied ? Brightness.light : Brightness.dark;
         final confirmedBrightness = denied ? Brightness.dark : Brightness.light;
@@ -582,9 +591,8 @@ void main() {
         Brightness appearance() =>
             CupertinoTheme.brightnessOf(tester.element(settings));
         expect(appearance(), platformBrightness);
-        await _choose<wire.AppTheme>(tester, denied ? '深色' : '浅色');
-        expect(appearance(), platformBrightness);
-        await _tap(tester, find.text('保存全局设置'));
+        await _choose<AppAppearance>(tester, denied ? '深色' : '浅色');
+        await openSettingsSection(tester, 'reading');
         expect(appearance(), confirmedBrightness);
 
         platform.afterBusinessReply = (request, reply) {
@@ -605,20 +613,21 @@ void main() {
           find.text(denied ? '当前身份没有访问权限' : '访问验证已失效，请重新登录'),
           findsOneWidget,
         );
-        expect(find.byKey(const ValueKey('global-theme')), findsNothing);
+        await openSettingsSection(tester, 'appearance');
+        expect(find.byKey(const ValueKey('device-theme')), findsOneWidget);
         expect(appearance(), confirmedBrightness);
 
         platform.bootstrapSubject = 'other-subject';
         await openSettingsSection(tester, 'connection');
         await _tap(tester, find.text('连接服务'));
         expect(find.text(denied ? '访问被拒绝' : '需要重新登录'), findsOneWidget);
-        expect(appearance(), platformBrightness);
+        expect(appearance(), confirmedBrightness);
 
         platform.afterBusinessReply = null;
         await _tap(tester, find.text('连接服务'));
         expect(find.text('已连接，身份已确认'), findsOneWidget);
-        expect(appearance(), platformBrightness);
-        expect(platform.businessServer.appliedMutations, 1);
+        expect(appearance(), confirmedBrightness);
+        expect(platform.businessServer.appliedMutations, 0);
         expect(platform.openedBuilds, isEmpty);
         expect(tester.takeException(), isNull);
         await tester.pumpApp(const SizedBox.shrink());
@@ -633,7 +642,7 @@ void main() {
         await _start(tester, platform);
         await _openSettings(tester);
         final initial = globalSettings(tester);
-        await _choose<wire.AppTheme>(tester, '深色');
+        await _choose<wire.ReaderFit>(tester, '适宽');
         platform.afterBusinessReply = (request, reply) {
           if (request.method != 'POST' ||
               request.uri.path != '/api/settings/mutations') {
@@ -669,7 +678,7 @@ void main() {
         expect(
           tester
               .widget<GlobalSettingsPanel>(find.byType(GlobalSettingsPanel))
-              .catalog
+              .catalog!
               .email,
           'owner@example.com',
         );
@@ -698,8 +707,8 @@ void main() {
         expect(platform.businessServer.appliedMutations, 1);
         expect(recovered.state.pending, isNull);
         expect(
-          recovered.state.snapshot!.global.theme,
-          wire.AppTheme.APP_THEME_DARK,
+          recovered.state.snapshot!.global.reader.fit,
+          wire.ReaderFit.READER_FIT_WIDTH,
         );
         expect(platform.openedBuilds, isEmpty);
         expect(tester.takeException(), isNull);
@@ -730,7 +739,7 @@ void main() {
         await _openSettings(tester);
         final initial = globalSettings(tester);
         final originalRevision = initial.state.snapshot!.globalRevision;
-        await _choose<wire.AppTheme>(tester, '深色');
+        await _choose<wire.ReaderFit>(tester, '适宽');
         platform.afterBusinessReply = (request, reply) {
           if (request.method != 'POST' ||
               request.uri.path != '/api/settings/mutations') {
@@ -754,7 +763,10 @@ void main() {
         );
         expect(originalMutation.mutationId, isNotEmpty);
         expect(originalMutation.expectedRevision, originalRevision);
-        expect(originalMutation.setGlobal.theme, wire.AppTheme.APP_THEME_DARK);
+        expect(
+          originalMutation.setGlobal.reader.fit,
+          wire.ReaderFit.READER_FIT_WIDTH,
+        );
         expect(initial.state.pending, isNotNull);
         expect(platform.businessServer.appliedMutations, 1);
         expect(platform.openedBuilds, isEmpty);
@@ -768,8 +780,8 @@ void main() {
         expect(reconnected.state.pending, isNotNull);
         expect(reconnected.state.pending!.basedOnRevision, originalRevision);
         expect(
-          reconnected.state.pending!.global!.theme,
-          wire.AppTheme.APP_THEME_DARK,
+          reconnected.state.pending!.global!.reader.fit,
+          wire.ReaderFit.READER_FIT_WIDTH,
         );
         expect(reconnected.repository.client, same(initial.repository.client));
         expect(factoryOrigins, isEmpty);
@@ -800,11 +812,8 @@ void main() {
         expect(reconnected.state.pending, isNull);
         expect(find.text('重试原设置操作'), findsNothing);
         expect(
-          tester
-              .widget<CupertinoApp>(find.byType(CupertinoApp))
-              .theme
-              ?.brightness,
-          Brightness.dark,
+          reconnected.state.snapshot!.global.reader.fit,
+          wire.ReaderFit.READER_FIT_WIDTH,
         );
         expect(tester.takeException(), isNull);
         await tester.pumpApp(const SizedBox.shrink());
@@ -833,7 +842,7 @@ void main() {
         );
         await _openSettings(tester);
         final initial = globalSettings(tester);
-        await _choose<wire.AppTheme>(tester, '深色');
+        await _choose<wire.ReaderFit>(tester, '适宽');
         platform.afterBusinessReply = (request, reply) {
           if (request.method != 'POST' ||
               request.uri.path != '/api/settings/mutations') {
@@ -934,7 +943,7 @@ void main() {
         );
         await _openSettings(tester);
         final previous = globalSettings(tester);
-        await _choose<wire.AppTheme>(tester, '深色');
+        await _choose<wire.ReaderFit>(tester, '适宽');
         original.afterBusinessReply = (request, reply) {
           if (request.method != 'POST' ||
               request.uri.path != '/api/settings/mutations') {
@@ -974,8 +983,8 @@ void main() {
         );
         expect(current.state.pending, isNull);
         expect(
-          current.state.snapshot!.global.theme,
-          wire.AppTheme.APP_THEME_SYSTEM,
+          current.state.snapshot!.global.reader.fit,
+          wire.ReaderFit.READER_FIT_CONTAIN,
         );
         expect(previous.state.available, false);
         expect(previous.state.canRetry, false);
@@ -1001,7 +1010,7 @@ void main() {
           expect(original.rebuildCount, 1);
           expect(original.disposalCount, 0);
         }
-        await _choose<wire.AppTheme>(tester, '浅色');
+        await _choose<wire.ReaderFit>(tester, '适高');
         await _tap(tester, find.text('保存全局设置'));
         final newRequest = replacement.businessServer.requests
             .where((request) => request.uri.path == '/api/settings/mutations')
@@ -1012,15 +1021,18 @@ void main() {
         );
         expect(newMutation.mutationId, isNot(oldMutation.mutationId));
         expect(newMutation.expectedRevision, 0);
-        expect(newMutation.setGlobal.theme, wire.AppTheme.APP_THEME_LIGHT);
+        expect(
+          newMutation.setGlobal.reader.fit,
+          wire.ReaderFit.READER_FIT_HEIGHT,
+        );
         expect(
           newRequest.headers['X-App-Subject'],
           replacement.bootstrapSubject,
         );
         expect(current.state.pending, isNull);
         expect(
-          current.state.snapshot!.global.theme,
-          wire.AppTheme.APP_THEME_LIGHT,
+          current.state.snapshot!.global.reader.fit,
+          wire.ReaderFit.READER_FIT_HEIGHT,
         );
         expect(original.businessServer.appliedMutations, changeOrigin ? 1 : 2);
         if (changeOrigin) {
@@ -1036,7 +1048,7 @@ void main() {
   }
 
   testWidgets(
-    'global settings save confirms the app theme and reader defaults are inherited by a manga',
+    'device appearance saves immediately and confirmed reader defaults are inherited by a manga',
     (tester) async {
       final platform = _platform();
       await _start(tester, platform);
@@ -1046,7 +1058,7 @@ void main() {
             .widget<CupertinoApp>(find.byType(CupertinoApp))
             .theme
             ?.brightness,
-        null,
+        Brightness.dark,
       );
       expect(
         platform.businessServer.requests.where(
@@ -1066,8 +1078,7 @@ void main() {
       final inherited = await tester.runAsync(
         () => catalog.settings!.loadManga(_mangaKey),
       );
-      expect(inherited!.global.theme, wire.AppTheme.APP_THEME_DARK);
-      expect(inherited.overrides!.hasMode(), false);
+      expect(inherited!.overrides!.hasMode(), false);
       expect(inherited.overrides!.hasPageLayout(), false);
       expect(inherited.overrides!.hasFit(), false);
       expect(inherited.overrides!.hasCropBorders(), false);

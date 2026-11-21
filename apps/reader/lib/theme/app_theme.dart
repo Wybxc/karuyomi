@@ -1,5 +1,17 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 
+enum AppAppearance {
+  system,
+  light,
+  dark;
+
+  Brightness? get brightness => switch (this) {
+    system => null,
+    light => Brightness.light,
+    dark => Brightness.dark,
+  };
+}
+
 /// Cupertino semantic roles resolve against the confirmed appearance, contrast,
 /// and interface elevation. Mihon's palette remains reference evidence only.
 abstract final class AppColors {

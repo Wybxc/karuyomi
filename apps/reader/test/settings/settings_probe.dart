@@ -33,7 +33,7 @@ SettingsProbe globalSettings(WidgetTester tester) {
   final panel = find.byType(GlobalSettingsPanel);
   return SettingsProbe(
     ProviderScope.containerOf(tester.element(panel), listen: false),
-    tester.widget<GlobalSettingsPanel>(panel).catalog,
+    tester.widget<GlobalSettingsPanel>(panel).catalog!,
   );
 }
 

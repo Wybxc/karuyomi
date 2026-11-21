@@ -798,12 +798,6 @@ export function validateExtensionRepositories(
 export function validateGlobalSettingsValues(
   value: pb.GlobalSettingsValues,
 ): void {
-  requireCondition(
-    Number.isInteger(value.theme) &&
-      value.theme >= pb.AppTheme.SYSTEM &&
-      value.theme <= pb.AppTheme.DARK,
-    'Unknown application theme',
-  );
   requireFields(value, ['reader']);
   validateReaderSettings(value.reader);
   validateFavoriteSources(value.favoriteSources);

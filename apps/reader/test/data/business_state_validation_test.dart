@@ -48,7 +48,6 @@ wire.SettingsMutation favoriteSourceSettings(
 ) => wire.SettingsMutation(
   schemaVersion: 1,
   setGlobal: wire.GlobalSettingsValues(
-    theme: wire.AppTheme.APP_THEME_SYSTEM,
     reader: wire.ReaderSettings(
       mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
       pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,

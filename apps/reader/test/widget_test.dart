@@ -1,7 +1,6 @@
 import '../test_support/cupertino.dart';
 
 import 'package:karuyomi/widgets/app_routes.dart';
-import 'package:karuyomi/widgets/choice_field.dart';
 
 import 'test_app.dart';
 
@@ -260,7 +259,7 @@ void main() {
         await tester.tap(find.text('设置').last);
         await tester.pumpAndSettle();
         expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
-        expect(find.byType(ChoiceField<wire.AppTheme>), findsNothing);
+        expect(find.byKey(const ValueKey('service-origin')), findsOneWidget);
 
         tester.view.physicalSize = size.shortestSide >= 600
             ? const Size(800, 360)
@@ -454,8 +453,14 @@ void main() {
         await tester.ensureVisible(origin);
         await tester.enterText(origin, 'https://draft.example');
         expect(
-          PrimaryScrollController.of(tester.element(find.byType(AppShell)))
-              .positions,
+          PrimaryScrollController.of(
+            tester.element(
+              find.ancestor(
+                of: origin,
+                matching: find.byType(SingleChildScrollView),
+              ),
+            ),
+          ).positions,
           hasLength(1),
           reason: 'keyboard scrolling has one content target',
         );

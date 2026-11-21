@@ -6,7 +6,6 @@ import {
 } from '@bufbuild/protobuf';
 import {
   BusinessStateErrorCode as ErrorCode,
-  AppTheme,
   ReaderBackground,
   ReaderFit,
   ReaderInputPreset,
@@ -1053,7 +1052,7 @@ test('a failed bookmark batch leaves no bookmark, manga revision, account revisi
 
 function globalSettings(
   expectedRevision = 0,
-  theme = AppTheme.DARK,
+  fit = ReaderFit.WIDTH,
   mode = ReaderMode.WEBTOON,
   pageLayout = ReaderPageLayout.DOUBLE,
   favoriteSources: MessageInitShape<typeof FavoriteSourceSchema>[] = [],
@@ -1066,14 +1065,13 @@ function globalSettings(
     operation: {
       case: 'setGlobal',
       value: {
-        theme,
         favoriteSources,
         installedExtensions,
         reader: {
           mode,
           pageLayout,
           background: ReaderBackground.BLACK,
-          fit: ReaderFit.CONTAIN,
+          fit,
           dimPercent: 0,
           tapZones: ReaderInputPreset.STANDARD,
           keyboard: ReaderInputPreset.STANDARD,
@@ -1110,7 +1108,7 @@ test('settings reads do not write, defaults inherit per field, and clearing over
   const key = favorite().mangaKey;
   const initial = await first.settings();
   expect(initial.global?.revision).toBe(0);
-  expect(initial.global?.values?.theme).toBe(AppTheme.SYSTEM);
+  expect(initial.global?.values?.reader?.fit).toBe(ReaderFit.CONTAIN);
   expect(initial.effectiveReader).toMatchObject({
     mode: ReaderMode.LEFT_TO_RIGHT,
     pageLayout: ReaderPageLayout.AUTO,
@@ -1154,7 +1152,7 @@ test('settings reads do not write, defaults inherit per field, and clearing over
       await first.mutateSettings(
         globalSettings(
           1,
-          AppTheme.LIGHT,
+          ReaderFit.HEIGHT,
           ReaderMode.CONTINUOUS,
           ReaderPageLayout.SINGLE,
         ),
@@ -1191,6 +1189,36 @@ test('settings reads do not write, defaults inherit per field, and clearing over
       .bind(first.subject, key)
       .first('revision'),
   ).toBe(3);
+});
+
+test('device appearance migration removes the old account theme and preserves manga settings replay', async () => {
+  const owner = await client();
+  const key = favorite().mangaKey;
+  expect((await owner.mutateSettings(globalSettings())).status).toBe(200);
+  const command = mangaSettings(key, 0, { fit: ReaderFit.HEIGHT });
+  const saved = await owner.mutateSettings(command);
+  expect(saved.status).toBe(200);
+  const before = await owner.settings(key);
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE reader_settings SET values_json = json_set(values_json, '$.theme', 'APP_THEME_DARK') WHERE subject = ? AND scope_key = ''",
+    ).bind(owner.subject),
+    env.DB.prepare(
+      "UPDATE state_mutations SET response_json = json_set(response_json, '$.global.values.theme', 'APP_THEME_DARK') WHERE subject = ? AND mutation_id = ?",
+    ).bind(owner.subject, command.mutationId),
+  ]);
+
+  const migration = env.TEST_MIGRATIONS.find(
+    ({ name }) => name === '0011_local-device-appearance.sql',
+  );
+  if (!migration) throw new Error('Device appearance migration is missing');
+  await env.DB.batch(migration.queries.map((query) => env.DB.prepare(query)));
+
+  expect(await owner.settings(key)).toEqual(before);
+  const replayed = await owner.mutateSettings(command);
+  expect(replayed.status).toBe(200);
+  expect(replayed.body).toEqual(saved.body);
+  expect((await owner.settings(key)).accountRevision).toBe(2);
 });
 
 test('reader preferences preserve explicit zero and false, inherit all fields and reject invalid writes without touching reading state', async () => {
@@ -1327,7 +1355,7 @@ test('global, manga and reading-progress writes have independent CAS and each AC
   const progress = await second.mutate(save(key, 0));
   expect(progress.status).toBe(200);
   expect(
-    (await first.mutateSettings(globalSettings(1, AppTheme.LIGHT))).status,
+    (await first.mutateSettings(globalSettings(1, ReaderFit.HEIGHT))).status,
   ).toBe(200);
   expect(
     (
@@ -1346,7 +1374,7 @@ test('settings CAS has one winner, durable retries retain their snapshot, and UU
   const first = await client();
   const second = await client(first.subject);
   const a = globalSettings();
-  const b = globalSettings(0, AppTheme.LIGHT);
+  const b = globalSettings(0, ReaderFit.HEIGHT);
   const results = await Promise.all([
     first.mutateSettings(a),
     second.mutateSettings(b),
@@ -1355,7 +1383,7 @@ test('settings CAS has one winner, durable retries retain their snapshot, and UU
   const winner = results[0]?.status === 200 ? a : b;
   const acknowledged = results.find((result) => result.status === 200)?.body;
   expect(
-    (await first.mutateSettings(globalSettings(1, AppTheme.SYSTEM))).status,
+    (await first.mutateSettings(globalSettings(1, ReaderFit.CONTAIN))).status,
   ).toBe(200);
   expect((await second.mutateSettings(winner)).body).toEqual(acknowledged);
   expect((await second.settings()).global?.revision).toBe(2);
@@ -1467,7 +1495,7 @@ test('a settings batch failure rolls back values, scope/account revisions and it
     const canonical = await reader.settings();
     expect(canonical.accountRevision).toBe(0);
     expect(canonical.global?.revision).toBe(0);
-    expect(canonical.global?.values?.theme).toBe(AppTheme.SYSTEM);
+    expect(canonical.global?.values?.reader?.fit).toBe(ReaderFit.CONTAIN);
     expect(
       await env.DB.prepare(
         'SELECT count(*) count FROM state_mutations WHERE subject = ?',
@@ -1482,7 +1510,7 @@ test('a settings batch failure rolls back values, scope/account revisions and it
   expect(retried.status).toBe(200);
   expect(retried.body.accountRevision).toBe(1);
   expect(retried.body.global?.revision).toBe(1);
-  expect(retried.body.global?.values?.theme).toBe(AppTheme.DARK);
+  expect(retried.body.global?.values?.reader?.fit).toBe(ReaderFit.WIDTH);
 });
 
 function chapterRead(
@@ -1851,7 +1879,7 @@ test('favorite Sources use confirmed global CAS and durable ACKs never restore r
   expect(initial.global?.values?.favoriteSources).toEqual([]);
   const add = globalSettings(
     0,
-    AppTheme.DARK,
+    ReaderFit.WIDTH,
     ReaderMode.WEBTOON,
     ReaderPageLayout.DOUBLE,
     sources,
@@ -1870,7 +1898,7 @@ test('favorite Sources use confirmed global CAS and durable ACKs never restore r
   const stale = await second.mutateSettings(
     globalSettings(
       0,
-      AppTheme.LIGHT,
+      ReaderFit.HEIGHT,
       ReaderMode.LEFT_TO_RIGHT,
       ReaderPageLayout.SINGLE,
       [],
@@ -1881,7 +1909,7 @@ test('favorite Sources use confirmed global CAS and durable ACKs never restore r
   expect(stale.body.global).toEqual(saved.body.global);
   const remove = globalSettings(
     1,
-    AppTheme.DARK,
+    ReaderFit.WIDTH,
     ReaderMode.WEBTOON,
     ReaderPageLayout.DOUBLE,
     [source],
@@ -1891,13 +1919,13 @@ test('favorite Sources use confirmed global CAS and durable ACKs never restore r
   expect(removed.body.global?.values?.reader).toEqual(
     saved.body.global?.values?.reader,
   );
-  expect(removed.body.global?.values?.theme).toBe(AppTheme.DARK);
+  expect(removed.body.global?.values?.reader?.fit).toBe(ReaderFit.WIDTH);
   expect((await first.mutateSettings(add)).body).toEqual(saved.body);
   expect((await first.settings()).global).toEqual(removed.body.global);
   const clear = await first.mutateSettings(
     globalSettings(
       2,
-      AppTheme.DARK,
+      ReaderFit.WIDTH,
       ReaderMode.WEBTOON,
       ReaderPageLayout.DOUBLE,
       [],
@@ -1933,7 +1961,7 @@ test('invalid favorite Source fields, duplicate pairs, counts and oversized sett
   await owner.mutateSettings(
     globalSettings(
       0,
-      AppTheme.DARK,
+      ReaderFit.WIDTH,
       ReaderMode.WEBTOON,
       ReaderPageLayout.DOUBLE,
       [source],
@@ -1967,7 +1995,7 @@ test('invalid favorite Source fields, duplicate pairs, counts and oversized sett
     const rejected = await owner.mutateSettings(
       globalSettings(
         1,
-        AppTheme.LIGHT,
+        ReaderFit.HEIGHT,
         ReaderMode.LEFT_TO_RIGHT,
         ReaderPageLayout.SINGLE,
         sources,
@@ -2008,7 +2036,7 @@ test('installed extensions preserve confirmed settings through cross-client repl
   expect(initial.global?.values?.installedExtensions).toEqual([]);
   const install = globalSettings(
     0,
-    AppTheme.DARK,
+    ReaderFit.WIDTH,
     ReaderMode.WEBTOON,
     ReaderPageLayout.DOUBLE,
     [source],
@@ -2038,7 +2066,6 @@ test('installed extensions preserve confirmed settings through cross-client repl
       case: 'setGlobal',
       value: {
         ...values,
-        theme: AppTheme.LIGHT,
         reader: {
           ...values.reader,
           fit: ReaderFit.WIDTH,
@@ -2063,7 +2090,7 @@ test('installed extensions preserve confirmed settings through cross-client repl
   };
   const replace = globalSettings(
     1,
-    AppTheme.DARK,
+    ReaderFit.WIDTH,
     ReaderMode.LEFT_TO_RIGHT,
     ReaderPageLayout.AUTO,
     [],
@@ -2096,7 +2123,6 @@ test('installed extensions preserve confirmed settings through cross-client repl
   expect(replaced.body.global?.values?.favoriteSources).toEqual(
     current.favoriteSources,
   );
-  expect(replaced.body.global?.values?.theme).toBe(AppTheme.LIGHT);
   const reused = create(SettingsMutationSchema, {
     ...replaceConfirmed,
     operation: {
@@ -2134,7 +2160,6 @@ test('installed extensions preserve confirmed settings through cross-client repl
   expect(final.global?.values?.favoriteSources).toEqual(
     current.favoriteSources,
   );
-  expect(final.global?.values?.theme).toBe(AppTheme.LIGHT);
   expect((await other.settings()).global).toEqual(initial.global);
   expect(
     await env.DB.prepare(
@@ -2158,7 +2183,7 @@ test('invalid or oversized installed extension lists cannot change D1 values, re
   await owner.mutateSettings(
     globalSettings(
       0,
-      AppTheme.DARK,
+      ReaderFit.WIDTH,
       ReaderMode.WEBTOON,
       ReaderPageLayout.DOUBLE,
       [],
@@ -2754,7 +2779,7 @@ test('additional repositories share global CAS and UUID receipts, reserve the de
   }
   const remove = globalSettings(
     1,
-    AppTheme.SYSTEM,
+    ReaderFit.CONTAIN,
     ReaderMode.WEBTOON,
     ReaderPageLayout.SINGLE,
     [],

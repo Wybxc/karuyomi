@@ -29,7 +29,6 @@ final class _Account {
   final globalSettings = wire.GlobalSettings(
     revision: 0,
     values: wire.GlobalSettingsValues(
-      theme: wire.AppTheme.APP_THEME_SYSTEM,
       reader: wire.ReaderSettings(
         mode: wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
         pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,

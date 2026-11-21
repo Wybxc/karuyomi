@@ -39,22 +39,6 @@ final $typed_data.Uint8List businessStateErrorCodeDescriptor = $convert.base64De
     'JPUl9DT0RFX1VOQVZBSUxBQkxFEAUSLAooQlVTSU5FU1NfU1RBVEVfRVJST1JfQ09ERV9MSU1J'
     'VF9FWENFRURFRBAG');
 
-@$core.Deprecated('Use appThemeDescriptor instead')
-const AppTheme$json = {
-  '1': 'AppTheme',
-  '2': [
-    {'1': 'APP_THEME_UNSPECIFIED', '2': 0},
-    {'1': 'APP_THEME_SYSTEM', '2': 1},
-    {'1': 'APP_THEME_LIGHT', '2': 2},
-    {'1': 'APP_THEME_DARK', '2': 3},
-  ],
-};
-
-/// Descriptor for `AppTheme`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List appThemeDescriptor = $convert.base64Decode(
-    'CghBcHBUaGVtZRIZChVBUFBfVEhFTUVfVU5TUEVDSUZJRUQQABIUChBBUFBfVEhFTUVfU1lTVE'
-    'VNEAESEwoPQVBQX1RIRU1FX0xJR0hUEAISEgoOQVBQX1RIRU1FX0RBUksQAw==');
-
 @$core.Deprecated('Use readerModeDescriptor instead')
 const ReaderMode$json = {
   '1': 'ReaderMode',
@@ -1423,14 +1407,6 @@ const GlobalSettingsValues$json = {
   '1': 'GlobalSettingsValues',
   '2': [
     {
-      '1': 'theme',
-      '3': 1,
-      '4': 1,
-      '5': 14,
-      '6': '.karuyomi.v1.AppTheme',
-      '10': 'theme'
-    },
-    {
       '1': 'reader',
       '3': 2,
       '4': 1,
@@ -1463,17 +1439,20 @@ const GlobalSettingsValues$json = {
       '10': 'repositories'
     },
   ],
+  '9': [
+    {'1': 1, '2': 2},
+  ],
+  '10': ['theme'],
 };
 
 /// Descriptor for `GlobalSettingsValues`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List globalSettingsValuesDescriptor = $convert.base64Decode(
-    'ChRHbG9iYWxTZXR0aW5nc1ZhbHVlcxIrCgV0aGVtZRgBIAEoDjIVLmthcnV5b21pLnYxLkFwcF'
-    'RoZW1lUgV0aGVtZRIzCgZyZWFkZXIYAiABKAsyGy5rYXJ1eW9taS52MS5SZWFkZXJTZXR0aW5n'
-    'c1IGcmVhZGVyEkYKEGZhdm9yaXRlX3NvdXJjZXMYAyADKAsyGy5rYXJ1eW9taS52MS5GYXZvcm'
-    'l0ZVNvdXJjZVIPZmF2b3JpdGVTb3VyY2VzElIKFGluc3RhbGxlZF9leHRlbnNpb25zGAQgAygL'
-    'Mh8ua2FydXlvbWkudjEuSW5zdGFsbGVkRXh0ZW5zaW9uUhNpbnN0YWxsZWRFeHRlbnNpb25zEk'
-    'QKDHJlcG9zaXRvcmllcxgFIAMoCzIgLmthcnV5b21pLnYxLkV4dGVuc2lvblJlcG9zaXRvcnlS'
-    'DHJlcG9zaXRvcmllcw==');
+    'ChRHbG9iYWxTZXR0aW5nc1ZhbHVlcxIzCgZyZWFkZXIYAiABKAsyGy5rYXJ1eW9taS52MS5SZW'
+    'FkZXJTZXR0aW5nc1IGcmVhZGVyEkYKEGZhdm9yaXRlX3NvdXJjZXMYAyADKAsyGy5rYXJ1eW9t'
+    'aS52MS5GYXZvcml0ZVNvdXJjZVIPZmF2b3JpdGVTb3VyY2VzElIKFGluc3RhbGxlZF9leHRlbn'
+    'Npb25zGAQgAygLMh8ua2FydXlvbWkudjEuSW5zdGFsbGVkRXh0ZW5zaW9uUhNpbnN0YWxsZWRF'
+    'eHRlbnNpb25zEkQKDHJlcG9zaXRvcmllcxgFIAMoCzIgLmthcnV5b21pLnYxLkV4dGVuc2lvbl'
+    'JlcG9zaXRvcnlSDHJlcG9zaXRvcmllc0oECAEQAlIFdGhlbWU=');
 
 @$core.Deprecated('Use globalSettingsDescriptor instead')
 const GlobalSettings$json = {

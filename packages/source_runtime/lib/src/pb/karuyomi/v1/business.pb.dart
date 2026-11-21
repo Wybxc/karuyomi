@@ -4027,14 +4027,12 @@ class ExtensionRepository extends $pb.GeneratedMessage {
 
 class GlobalSettingsValues extends $pb.GeneratedMessage {
   factory GlobalSettingsValues({
-    AppTheme? theme,
     ReaderSettings? reader,
     $core.Iterable<FavoriteSource>? favoriteSources,
     $core.Iterable<InstalledExtension>? installedExtensions,
     $core.Iterable<ExtensionRepository>? repositories,
   }) {
     final result = GlobalSettingsValues._();
-    if (theme != null) result.theme = theme;
     if (reader != null) result.reader = reader;
     if (favoriteSources != null) result.favoriteSources.addAll(favoriteSources);
     if (installedExtensions != null)
@@ -4056,8 +4054,6 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'GlobalSettingsValues',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: GlobalSettingsValues.$_createMessage)
-    ..aE<AppTheme>(1, _omitFieldNames ? '' : 'theme',
-        enumValues: AppTheme.values)
     ..aOM<ReaderSettings>(2, _omitFieldNames ? '' : 'reader',
         subBuilder: ReaderSettings.$_createMessage)
     ..pPM<FavoriteSource>(3, _omitFieldNames ? '' : 'favoriteSources',
@@ -4091,34 +4087,25 @@ class GlobalSettingsValues extends $pb.GeneratedMessage {
           GlobalSettingsValues.$_createMessage);
   static GlobalSettingsValues? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  AppTheme get theme => $_getN(0);
-  @$pb.TagNumber(1)
-  set theme(AppTheme value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasTheme() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearTheme() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  ReaderSettings get reader => $_getN(1);
+  ReaderSettings get reader => $_getN(0);
   @$pb.TagNumber(2)
   set reader(ReaderSettings value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasReader() => $_has(1);
+  $core.bool hasReader() => $_has(0);
   @$pb.TagNumber(2)
   void clearReader() => $_clearField(2);
   @$pb.TagNumber(2)
-  ReaderSettings ensureReader() => $_ensure(1);
+  ReaderSettings ensureReader() => $_ensure(0);
 
   @$pb.TagNumber(3)
-  $pb.PbList<FavoriteSource> get favoriteSources => $_getList(2);
+  $pb.PbList<FavoriteSource> get favoriteSources => $_getList(1);
 
   @$pb.TagNumber(4)
-  $pb.PbList<InstalledExtension> get installedExtensions => $_getList(3);
+  $pb.PbList<InstalledExtension> get installedExtensions => $_getList(2);
 
   @$pb.TagNumber(5)
-  $pb.PbList<ExtensionRepository> get repositories => $_getList(4);
+  $pb.PbList<ExtensionRepository> get repositories => $_getList(3);
 }
 
 class GlobalSettings extends $pb.GeneratedMessage {

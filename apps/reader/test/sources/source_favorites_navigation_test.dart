@@ -34,7 +34,6 @@ wire.FavoriteSource _favorite({
 wire.GlobalSettingsValues _values({
   List<wire.FavoriteSource> favorites = const [],
 }) => wire.GlobalSettingsValues(
-  theme: wire.AppTheme.APP_THEME_DARK,
   reader: wire.ReaderSettings(
     mode: wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
     pageLayout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
@@ -289,7 +288,6 @@ void main() {
         jsonDecode(posts().last.body!),
       );
       expect(command.setGlobal.reader, original.reader);
-      expect(command.setGlobal.theme, original.theme);
       release.complete();
       await tester.pumpAndSettle();
       expect(find.text('正在等待服务端确认设置修改'), findsNothing);
@@ -306,7 +304,6 @@ void main() {
       final confirmed = await remoteSettings.loadGlobal();
       expect(confirmed.global.favoriteSources, isEmpty);
       expect(confirmed.global.reader, original.reader);
-      expect(confirmed.global.theme, original.theme);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },
@@ -419,9 +416,9 @@ void main() {
       subscription.close();
       await show(tester);
       expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
-      expect(find.textContaining('应用主题：深色'), findsNothing);
+      expect(find.textContaining('图像适配：适高'), findsNothing);
       await tap(tester, find.text('查看未确认的原全局设置'));
-      expect(find.textContaining('应用主题：深色'), findsOneWidget);
+      expect(find.textContaining('图像适配：适高'), findsOneWidget);
       await reveal(tester, toggle());
       expect(tester.widget<CupertinoButton>(toggle()).onPressed, isNull);
       await tap(tester, find.text('重新读取设置'));
@@ -462,7 +459,7 @@ void main() {
           expect(tester.takeException(), isNull);
           expect(find.text('取消收藏源：旧来源名称'), findsOneWidget);
           expect(
-            find.textContaining('应用主题：'),
+            find.textContaining('图像适配：'),
             expanded ? findsOneWidget : findsNothing,
           );
           expect(posts(), hasLength(postCount));
@@ -507,7 +504,7 @@ void main() {
           expect(tester.getTopLeft(error).dx, greaterThanOrEqualTo(16));
           expect(tester.getBottomRight(error).dx, lessThanOrEqualTo(344));
           expect(find.text('取消收藏源：旧来源名称'), findsOneWidget);
-          expect(find.textContaining('应用主题：'), findsNothing);
+          expect(find.textContaining('图像适配：'), findsNothing);
           await tap(tester, find.text('重新读取设置'));
           expect(posts(), hasLength(postCount));
           expect(find.text('取消收藏源：旧来源名称'), findsOneWidget);
@@ -520,7 +517,7 @@ void main() {
           );
           expect(find.text('取消收藏源：旧来源名称'), findsOneWidget);
           await tap(tester, find.text('查看未确认的原全局设置'));
-          expect(find.textContaining('应用主题：深色'), findsOneWidget);
+          expect(find.textContaining('图像适配：适高'), findsOneWidget);
           await tap(tester, find.text('重试原设置操作'));
           expect(posts(), hasLength(postCount + 1));
           expect(posts().last.body, original);

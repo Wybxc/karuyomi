@@ -331,7 +331,6 @@ const globalSettingsValues: JsonObject = {
       name: 'Other 仓库',
     },
   ],
-  theme: 'APP_THEME_SYSTEM',
   reader: globalReader,
   installedExtensions: [
     {
@@ -661,7 +660,6 @@ export const goldenFixtures: GoldenFixture[] = [
       schemaVersion: 1,
       global: {
         values: {
-          theme: 'APP_THEME_SYSTEM',
           reader: {
             mode: 'READER_MODE_LEFT_TO_RIGHT',
             pageLayout: 'READER_PAGE_LAYOUT_AUTO',

@@ -59,31 +59,6 @@ class BusinessStateErrorCode extends $pb.ProtobufEnum {
   const BusinessStateErrorCode._(super.value, super.name);
 }
 
-class AppTheme extends $pb.ProtobufEnum {
-  static const AppTheme APP_THEME_UNSPECIFIED =
-      AppTheme._(0, _omitEnumNames ? '' : 'APP_THEME_UNSPECIFIED');
-  static const AppTheme APP_THEME_SYSTEM =
-      AppTheme._(1, _omitEnumNames ? '' : 'APP_THEME_SYSTEM');
-  static const AppTheme APP_THEME_LIGHT =
-      AppTheme._(2, _omitEnumNames ? '' : 'APP_THEME_LIGHT');
-  static const AppTheme APP_THEME_DARK =
-      AppTheme._(3, _omitEnumNames ? '' : 'APP_THEME_DARK');
-
-  static const $core.List<AppTheme> values = <AppTheme>[
-    APP_THEME_UNSPECIFIED,
-    APP_THEME_SYSTEM,
-    APP_THEME_LIGHT,
-    APP_THEME_DARK,
-  ];
-
-  static final $core.List<AppTheme?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
-  static AppTheme? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const AppTheme._(super.value, super.name);
-}
-
 class ReaderMode extends $pb.ProtobufEnum {
   static const ReaderMode READER_MODE_UNSPECIFIED =
       ReaderMode._(0, _omitEnumNames ? '' : 'READER_MODE_UNSPECIFIED');

@@ -9,15 +9,14 @@ import 'settings_fixture.dart';
 
 const _key = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 wire.GlobalSettingsValues _global({
-  wire.AppTheme theme = wire.AppTheme.APP_THEME_DARK,
+  wire.ReaderFit fit = wire.ReaderFit.READER_FIT_WIDTH,
   wire.ReaderMode mode = wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
   wire.ReaderPageLayout layout = wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO,
 }) => wire.GlobalSettingsValues(
-  theme: theme,
   reader: wire.ReaderSettings(
     mode: mode,
     pageLayout: layout,
-    fit: wire.ReaderFit.READER_FIT_CONTAIN,
+    fit: fit,
     background: wire.ReaderBackground.READER_BACKGROUND_BLACK,
     tapZones: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
     keyboard: wire.ReaderInputPreset.READER_INPUT_PRESET_STANDARD,
@@ -121,7 +120,10 @@ void main() {
     expect(writes(), hasLength(1));
     expect(server.appliedMutations, 1);
     expect(state().pending, isNull);
-    expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_DARK);
+    expect(
+      state().snapshot!.global.reader.fit,
+      wire.ReaderFit.READER_FIT_WIDTH,
+    );
   });
 
   test('only ACKs confirm settings and an uncertain command requires exact explicit retry', () async {
@@ -131,23 +133,32 @@ void main() {
     await received.future;
     expect(state().busy, true);
     expect(state().canEdit, false);
-    expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
+    expect(
+      state().snapshot!.global.reader.fit,
+      wire.ReaderFit.READER_FIT_CONTAIN,
+    );
     expect(state().snapshot!.globalRevision, 0);
     release.complete();
     expect(await write, true);
-    expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_DARK);
+    expect(
+      state().snapshot!.global.reader.fit,
+      wire.ReaderFit.READER_FIT_WIDTH,
+    );
     expect(state().snapshot!.globalRevision, 1);
     server.loseNextResponse = true;
     expect(
       await controller.saveGlobal(
-        _global(theme: wire.AppTheme.APP_THEME_LIGHT),
+        _global(fit: wire.ReaderFit.READER_FIT_HEIGHT),
         1,
       ),
       false,
     );
     expect(state().error, contains('尚未确认'));
     expect(state().pending!.retryable, true);
-    expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_DARK);
+    expect(
+      state().snapshot!.global.reader.fit,
+      wire.ReaderFit.READER_FIT_WIDTH,
+    );
     final original = writes().last.body;
     expect(await controller.saveGlobal(_global(), 1), false);
     expect(writes(), hasLength(2));
@@ -160,7 +171,10 @@ void main() {
     expect(server.appliedMutations, 2);
     expect(state().pending, isNull);
     expect(state().canEdit, true);
-    expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_LIGHT);
+    expect(
+      state().snapshot!.global.reader.fit,
+      wire.ReaderFit.READER_FIT_HEIGHT,
+    );
     expect(state().snapshot!.globalRevision, 2);
   });
 
@@ -173,12 +187,18 @@ void main() {
       await received.future;
       fixture.platform.bootstrapSubject = 'another-owner';
       await fixture.catalog.connect();
-      expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
+      expect(
+        state().snapshot!.global.reader.fit,
+        wire.ReaderFit.READER_FIT_CONTAIN,
+      );
       expect(state().pending, isNull);
       release.complete();
       expect(await write, false);
       expect(state().snapshot!.globalRevision, 0);
-      expect(state().snapshot!.global.theme, wire.AppTheme.APP_THEME_SYSTEM);
+      expect(
+        state().snapshot!.global.reader.fit,
+        wire.ReaderFit.READER_FIT_CONTAIN,
+      );
     },
   );
 

@@ -5,7 +5,6 @@ import {
   settingsResponseSchema,
 } from '@karuyomi/contracts';
 import {
-  AppTheme,
   BusinessStateErrorCode,
   ReaderBackground,
   ReaderFit,
@@ -49,7 +48,7 @@ afterEach(async () => {
   await env.DB.exec('DROP TABLE IF EXISTS acceptance_settings_race');
 });
 
-function command(theme: AppTheme, expectedRevision = 0) {
+function command(fit: ReaderFit, expectedRevision = 0) {
   const mutation = create(SettingsMutationSchema, {
     schemaVersion: businessSchemaVersion,
     mutationId: crypto.randomUUID(),
@@ -57,12 +56,11 @@ function command(theme: AppTheme, expectedRevision = 0) {
     operation: {
       case: 'setGlobal',
       value: {
-        theme,
         reader: {
           mode: ReaderMode.LEFT_TO_RIGHT,
           pageLayout: ReaderPageLayout.AUTO,
           background: ReaderBackground.BLACK,
-          fit: ReaderFit.CONTAIN,
+          fit,
           tapZones: ReaderInputPreset.STANDARD,
           keyboard: ReaderInputPreset.STANDARD,
         },
@@ -72,7 +70,7 @@ function command(theme: AppTheme, expectedRevision = 0) {
   const body = toJsonString(SettingsMutationSchema, mutation);
   return {
     mutationId: mutation.mutationId,
-    theme,
+    fit,
     body,
     hash: createHash('sha256').update(body).digest('hex'),
   };
@@ -119,25 +117,25 @@ async function readSettings(subject: string) {
 test('both real settings mutations arrive before release, then only one CAS writes', async () => {
   const subject = 'settings-race-owner';
   await prepareSettingsRace(env.DB);
-  const dark = command(AppTheme.DARK);
-  const light = command(AppTheme.LIGHT);
-  const first = fetchAcceptance(subject, post(subject, dark.body));
+  const width = command(ReaderFit.WIDTH);
+  const height = command(ReaderFit.HEIGHT);
+  const first = fetchAcceptance(subject, post(subject, width.body));
   await expect
     .poll(() => settingsRaceAttempts(env.DB))
     .toMatchObject([
-      { sequence: 1, mutation_id: dark.mutationId, http_status: null },
+      { sequence: 1, mutation_id: width.mutationId, http_status: null },
     ]);
   expect(await readSettings(subject)).toMatchObject({
     accountRevision: 0,
-    global: { revision: 0, values: { theme: AppTheme.SYSTEM } },
+    global: { revision: 0, values: { reader: { fit: ReaderFit.CONTAIN } } },
   });
-  const duplicate = await fetchAcceptance(subject, post(subject, dark.body));
+  const duplicate = await fetchAcceptance(subject, post(subject, width.body));
   expect(duplicate.status).toBe(503);
   expect(await settingsRaceAttempts(env.DB)).toHaveLength(1);
 
   const responses = await Promise.all([
     first,
-    fetchAcceptance(subject, post(subject, light.body)),
+    fetchAcceptance(subject, post(subject, height.body)),
   ]);
   expect(responses.map((response) => response.status).sort()).toEqual([
     200, 409,
@@ -161,13 +159,13 @@ test('both real settings mutations arrive before release, then only one CAS writ
   const laterArrival = Math.max(
     ...audit.map((attempt) => attempt.arrived_at_ms),
   );
-  for (const [index, input] of [dark, light].entries()) {
+  for (const [index, input] of [width, height].entries()) {
     const attempt = audit[index]!;
     const won = winner?.body.mutationId === input.mutationId;
     expect(attempt).toMatchObject({
       mutation_id: input.mutationId,
       expected_revision: 0,
-      theme: input.theme,
+      fit: input.fit,
       body_sha256: input.hash,
       http_status: won ? 200 : 409,
       global_revision: 1,
@@ -186,9 +184,11 @@ test('both real settings mutations arrive before release, then only one CAS writ
   expect(current.global).toEqual(winner?.body.global);
 
   // A new intent after the loser reads the confirmed revision is not gated.
-  const losingTheme =
-    loser?.body.mutationId === dark.mutationId ? AppTheme.DARK : AppTheme.LIGHT;
-  const next = command(losingTheme, 1);
+  const losingFit =
+    loser?.body.mutationId === width.mutationId
+      ? ReaderFit.WIDTH
+      : ReaderFit.HEIGHT;
+  const next = command(losingFit, 1);
   const secondWrite = await fetchAcceptance(subject, post(subject, next.body));
   expect(secondWrite.status).toBe(200);
   await expect(secondWrite.json()).resolves.toMatchObject({
@@ -202,9 +202,9 @@ test('both real settings mutations arrive before release, then only one CAS writ
 test('a single arrival expires without a business write and cannot be released by a late contender', async () => {
   const subject = 'settings-race-timeout-owner';
   await prepareSettingsRace(env.DB);
-  const dark = command(AppTheme.DARK);
+  const width = command(ReaderFit.WIDTH);
   const timedOut = await holdSettingsRace(
-    post(subject, dark.body),
+    post(subject, width.body),
     env.DB,
     origin,
     subject,
@@ -217,7 +217,7 @@ test('a single arrival expires without a business write and cannot be released b
   expect(timedOut.status).toBe(503);
   expect(await settingsRaceAttempts(env.DB)).toMatchObject([
     {
-      mutation_id: dark.mutationId,
+      mutation_id: width.mutationId,
       expired: 1,
       dispatch_at_ms: null,
       http_status: null,
@@ -225,12 +225,12 @@ test('a single arrival expires without a business write and cannot be released b
   ]);
   const late = await fetchAcceptance(
     subject,
-    post(subject, command(AppTheme.LIGHT).body),
+    post(subject, command(ReaderFit.HEIGHT).body),
   );
   expect(late.status).toBe(503);
   expect(await settingsRaceAttempts(env.DB)).toHaveLength(1);
   expect(await readSettings(subject)).toMatchObject({
     accountRevision: 0,
-    global: { revision: 0, values: { theme: AppTheme.SYSTEM } },
+    global: { revision: 0, values: { reader: { fit: ReaderFit.CONTAIN } } },
   });
 });
