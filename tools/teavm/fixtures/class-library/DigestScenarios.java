@@ -49,7 +49,7 @@ final class DigestScenarios {
     require(hex(digest.digest()).equals(empty), algorithm + " resets its buffered input");
   }
 
-  private static String hex(byte[] bytes) {
+  static String hex(byte[] bytes) {
     StringBuilder result = new StringBuilder();
     for (byte value : bytes) {
       result.append(Character.forDigit((value >>> 4) & 15, 16));

@@ -6,11 +6,13 @@ import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 
 public final class ClassLibraryScenarios {
   private static int checks;
 
-  public static void main(String[] args) throws IOException, NoSuchAlgorithmException {
+  public static void main(String[] args)
+      throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
     DateFormatScenarios.main(args);
     String path = "/assets/example.txt";
     URL absolute = ClassLibraryScenarios.class.getResource(path);
@@ -37,6 +39,7 @@ public final class ClassLibraryScenarios {
     }
     System.out.println("PACKAGED_RESOURCE_SCENARIOS_PASS " + checks);
     DigestScenarios.run();
+    Pbkdf2Scenarios.run();
   }
 
   private static String read(URL url) throws IOException {

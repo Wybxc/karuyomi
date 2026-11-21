@@ -25,6 +25,11 @@
       <artifactId>teavm-extension-spi</artifactId>
       <version>${teavm.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-jso-apis</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
   </dependencies>
   <build>
     <plugins>

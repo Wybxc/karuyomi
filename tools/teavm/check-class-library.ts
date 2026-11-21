@@ -66,6 +66,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     'ClassLibraryScenarios.java',
     'ClassLibraryResources.java',
     'DigestScenarios.java',
+    'Pbkdf2Scenarios.java',
   ])
     copyFileSync(
       path.join(fixtures, name),
@@ -95,17 +96,36 @@ async function runContracts(root: string, output: string): Promise<void> {
   });
   const compat = path.join(root, 'runtime/teavm/java/compat');
   const classes = path.join(output, 'target/classes');
+  const jsoClasspath = ['teavm-interop', 'teavm-jso', 'teavm-jso-apis']
+    .map((artifact) =>
+      path.join(
+        local,
+        'build-cache/m2/org/teavm',
+        artifact,
+        LOCK.teavm,
+        `${artifact}-${LOCK.teavm}.jar`,
+      ),
+    )
+    .join(path.delimiter);
   mkdirSync(classes, { recursive: true });
   await execute(path.join(javaHome, 'bin/javac'), [
     '--patch-module',
     `java.base=${compat}`,
+    '--add-reads',
+    'java.base=ALL-UNNAMED',
+    '-cp',
+    jsoClasspath,
     '-d',
     classes,
     ...[
-      'InvalidParameterException.java',
-      'MessageDigest.java',
-      'MessageDigestSpi.java',
-    ].map((name) => path.join(compat, 'java/security', name)),
+      'java/security/InvalidParameterException.java',
+      'java/security/MessageDigest.java',
+      'java/security/MessageDigestSpi.java',
+      'java/security/spec/InvalidKeySpecException.java',
+      'javax/crypto/SecretKeyFactory.java',
+      'javax/crypto/spec/PBEKeySpec.java',
+      'javax/crypto/spec/SecretKeySpec.java',
+    ].map((name) => path.join(compat, name)),
   ]);
   await execute(
     maven,
@@ -132,6 +152,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     !oracle.stdout.includes('DATE_FORMAT_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('PACKAGED_RESOURCE_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('DIGEST_SCENARIOS_PASS ') ||
+    !oracle.stdout.includes('PBKDF2_SCENARIOS_PASS ') ||
     generated.stdout !== oracle.stdout
   )
     throw new Error(
