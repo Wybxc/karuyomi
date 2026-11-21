@@ -60,7 +60,9 @@
 
 2026-11-22，在 `macbook-pro-4` 固定 `eac70b4` 补编 Softkomik 1.6.4，正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `f0606f04683feb3e0d4cf56c5a21ad39eac08f3b4838259c54f1396806a16809`，共享材料逐字节一致，候选预检纳入第 36 个补编结果。生产仍为 revision `ef76d5d1952b4733a10704d8401748ad`，已读回的公开索引含 191 个扩展。在线出图与 DNS 错误情况待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
 
-2026-11-22，ebookjapan 冻结构建缺少 `Rect.exactCenterX`。宿主补齐双轴中心计算，JDK 与生成的 TeaVM JavaScript 共通过 54 项图形变换断言，其中 9 项覆盖半像素中心、平移、围绕中心旋转及 Android 整数算术。Android API 35 原生图形参考通过 6 项测试，使用 3×1 位图验证半像素中心旋转后的实际像素。完整 `pnpm teavm:check` 通过，扩展正式补编待复验。[Android Rect](https://developer.android.com/reference/android/graphics/Rect)
+2026-11-22，ebookjapan 冻结构建缺少 `Rect.exactCenterX`。宿主补齐双轴中心计算，JDK 与生成的 TeaVM JavaScript 共通过 54 项图形变换断言，其中 9 项覆盖半像素中心、平移、围绕中心旋转及 Android 整数算术。Android API 35 原生图形参考通过 6 项测试，使用 3×1 位图验证半像素中心旋转后的实际像素。完整 `pnpm teavm:check` 通过。[Android Rect](https://developer.android.com/reference/android/graphics/Rect)
+
+2026-11-22，在 `macbook-pro-4` 固定 `0472569` 和同一 Keiyoushi 提交补编 ebookjapan 1.6.5。正式 AOT、产物完整性和 `hostAcquireCover` 检查通过，包含 1 个 Source，canonical SHA-256 为 `abed0629eb3a43f00a36dc49bd1e95fda8b6cee59b54b8989a93bc4bb836ac11`。候选装配预检核对共享材料与生产父快照，累计纳入 37 个补编结果。该包保持 `compiled_unverified`，待生产发布和在线出图验收。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
 
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
