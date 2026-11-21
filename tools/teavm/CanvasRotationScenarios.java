@@ -122,6 +122,30 @@ public final class CanvasRotationScenarios {
     }
   }
 
+  public static void runRectCenterPivot() {
+    Bitmap tile = Bitmap.createBitmap(3, 1, Bitmap.Config.ARGB_8888);
+    Bitmap output = Bitmap.createBitmap(5, 5, Bitmap.Config.ARGB_8888);
+    try {
+      tile.setPixel(0, 0, Color.RED);
+      tile.setPixel(1, 0, Color.GREEN);
+      tile.setPixel(2, 0, Color.BLUE);
+      Rect target = new Rect(0, 0, 3, 1);
+      require(target.exactCenterX() == 1.5f && target.exactCenterY() == .5f, "fractional pivot");
+      Canvas canvas = new Canvas(output);
+      canvas.translate(1, 2);
+      canvas.rotate(90, target.exactCenterX(), target.exactCenterY());
+      canvas.drawBitmap(tile, null, target, null);
+      pixel(output, 2, 1, Color.RED);
+      pixel(output, 2, 2, Color.GREEN);
+      pixel(output, 2, 3, Color.BLUE);
+      pixel(output, 1, 2, Color.TRANSPARENT);
+      pixel(output, 3, 2, Color.TRANSPARENT);
+    } finally {
+      output.recycle();
+      tile.recycle();
+    }
+  }
+
   public static void runBitmapMatrixAndColorFilter() {
     Bitmap tile = Bitmap.createBitmap(2, 1, Bitmap.Config.ARGB_8888);
     Bitmap output = Bitmap.createBitmap(8, 4, Bitmap.Config.ARGB_8888);

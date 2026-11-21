@@ -37,6 +37,7 @@ public final class AndroidTextTest {
   @Test
   public void nativeAndroidCanvasRotation() {
     CanvasRotationScenarios.run();
+    CanvasRotationScenarios.runRectCenterPivot();
   }
 
   @Test

@@ -27,6 +27,15 @@ public final class GraphicsTransformTest {
     require(!pivot.mapsWholePixels(), "scale resamples the source");
     pivot.setTranslate(.5f, 0);
     require(!pivot.mapsWholePixels(), "fractional translation resamples the source");
+    Rect bounds = new Rect(-4, 2, -1, 7);
+    require(bounds.exactCenterX() == -2.5f && bounds.exactCenterY() == 4.5f, "half-pixel center");
+    Matrix centered = new Matrix();
+    centered.preRotate(90, bounds.exactCenterX(), bounds.exactCenterY());
+    expect(centered, 0, 1, -1, 0, 2, 7);
+    bounds.offset(3, -2);
+    require(bounds.exactCenterX() == .5f && bounds.exactCenterY() == 2.5f, "offset center");
+    bounds.set(Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE);
+    require(bounds.exactCenterX() == -1f && bounds.exactCenterY() == 0f, "Android int arithmetic");
 
     ColorMatrix source =
         new ColorMatrix(new float[] {0, 0, 1, 0, 0, 0, 1, 0, 0, 32, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0});

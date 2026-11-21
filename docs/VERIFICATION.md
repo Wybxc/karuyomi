@@ -60,6 +60,8 @@
 
 2026-11-22，在 `macbook-pro-4` 固定 `eac70b4` 补编 Softkomik 1.6.4，正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `f0606f04683feb3e0d4cf56c5a21ad39eac08f3b4838259c54f1396806a16809`，共享材料逐字节一致，候选预检纳入第 36 个补编结果。生产仍为 revision `ef76d5d1952b4733a10704d8401748ad`，已读回的公开索引含 191 个扩展。在线出图与 DNS 错误情况待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
 
+2026-11-22，ebookjapan 冻结构建缺少 `Rect.exactCenterX`。宿主补齐双轴中心计算，JDK 与生成的 TeaVM JavaScript 共通过 54 项图形变换断言，其中 9 项覆盖半像素中心、平移、围绕中心旋转及 Android 整数算术。Android API 35 原生图形参考通过 6 项测试，使用 3×1 位图验证半像素中心旋转后的实际像素。完整 `pnpm teavm:check` 通过，扩展正式补编待复验。[Android Rect](https://developer.android.com/reference/android/graphics/Rect)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)

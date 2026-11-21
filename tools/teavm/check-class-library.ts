@@ -62,6 +62,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     'android/graphics/ColorMatrix.java',
     'android/graphics/ColorMatrixColorFilter.java',
     'android/graphics/Matrix.java',
+    'android/graphics/Rect.java',
     'org/teavm/classlib/java/lang/WaitObjectMethods.java',
     'org/teavm/classlib/java/lang/WaitInterruptSupport.java',
     'org/teavm/classlib/java/util/regex/MatcherFindMethods.java',
