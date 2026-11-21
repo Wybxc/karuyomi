@@ -32,6 +32,8 @@
 
 2026-11-22，`7e0c053` 的 P‑256 适配通过 `pnpm teavm:check`。JDK 与生成的 JavaScript 均通过 12 项密钥和签名断言，验证 RFC 6979 的公开向量，两端也能互相读入 X.509 公钥并验签。LunarAnime 与 ProComic 已在 `macbook-pro-4` 排入固定提交的正式补编。[宿主实现](../runtime/teavm/README.md)
 
+2026-11-22，在 `macbook-pro-4` 的独立 `7e0c053` checkout，ProComic 1.6.4 通过正式构建、产物完整性和 `hostAcquireCover` 检查，包含 1 个 Source。共享运行材料逐字节匹配，canonical SHA-256 为 `c6234a722a92ca4200f0261c50fb1ad7fe93af14e7643432ffb6e14b84c40a2d`，保持 `compiled_unverified`。同一批次的 Lunar Manga 越过密钥接口错误，正式 AOT 仍卡在上游 Turnstile helper 所需的 Android Activity 和 WebView 接口。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
