@@ -1862,6 +1862,7 @@ void main() {
       final slider = find.byType(CupertinoSlider);
       final label = find.semantics.byLabel('页码跳转');
       final data = label.evaluate().single.getSemanticsData();
+      expect(data.identifier, readerPageSliderIdentifier);
       expect(data.flagsCollection.isSlider, isTrue);
       expect(data.value, '1');
       expect(data.minValue, '1');

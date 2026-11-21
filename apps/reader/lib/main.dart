@@ -14,6 +14,8 @@ import 'diagnostics/reader_baseline.dart';
 import 'diagnostics/reader_baseline_host.dart';
 import 'features/reader/reading_progress_controller.dart';
 import 'features/reader/reader_recovery.dart';
+import 'features/reader/reader_slider_focus.dart'
+    if (dart.library.js_interop) 'features/reader/reader_slider_focus_web.dart';
 import 'features/reader/chapter_reader_route.dart';
 import 'features/browse/catalog_controller.dart';
 import 'features/browse/catalog_page.dart';
@@ -46,6 +48,19 @@ class const KaruyomiApp({
 
 class _KaruyomiAppState extends State<KaruyomiApp> {
   Brightness? _brightness;
+  late final VoidCallback _stopPreservingSliderFocus;
+
+  @override
+  void initState() {
+    super.initState();
+    _stopPreservingSliderFocus = preserveReaderSliderFocus();
+  }
+
+  @override
+  void dispose() {
+    _stopPreservingSliderFocus();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => CupertinoApp(

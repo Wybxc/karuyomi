@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 
 import '../../theme/app_theme.dart';
+
+const readerPageSliderIdentifier = 'reader-page-slider';
 
 class ReaderPageNavigation extends StatefulWidget {
   const ReaderPageNavigation({
@@ -41,6 +44,10 @@ class _ReaderPageNavigationState extends State<ReaderPageNavigation> {
     if (_previewIndex != null) setState(() => _previewIndex = null);
   }
 
+  void _updateFocusOutline(bool show) {
+    if (_showFocus != show) setState(() => _showFocus = show);
+  }
+
   void _select(int index) {
     _clearPreview();
     final target = index.clamp(0, widget.pageCount - 1);
@@ -73,6 +80,7 @@ class _ReaderPageNavigationState extends State<ReaderPageNavigation> {
       child: Semantics(
         container: true,
         slider: true,
+        identifier: readerPageSliderIdentifier,
         enabled: enabled,
         label: '页码跳转',
         value: '${index + 1}',
@@ -84,7 +92,9 @@ class _ReaderPageNavigationState extends State<ReaderPageNavigation> {
         onDecrease: canDecrease ? () => _select(index - 1) : null,
         child: FocusableActionDetector(
           enabled: enabled && widget.keyboardEnabled,
-          onShowFocusHighlight: (show) => setState(() => _showFocus = show),
+          // A resize can restore DOM focus while Web still reports pointer mode.
+          onFocusChange: kIsWeb ? _updateFocusOutline : null,
+          onShowFocusHighlight: kIsWeb ? null : _updateFocusOutline,
           child: ExcludeSemantics(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -236,7 +246,7 @@ class _ReaderPageNavigationState extends State<ReaderPageNavigation> {
                 const SizedBox(width: countGap),
               ],
               Expanded(
-                key: const ValueKey('reader-page-slider'),
+                key: const ValueKey(readerPageSliderIdentifier),
                 child: _slider(index),
               ),
             ]),
