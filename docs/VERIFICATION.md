@@ -2,6 +2,12 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
+
+2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
+
+2026-11-21，`65c63fd` 正式 Web 跨源搜索 `Prelude Suite` 返回五项，其中四项显示真实封面。《Prelude Suite: Keen-Edge, Silver Blade》保持占位。带本机诊断日志的同功能构建曾显示五张。将获取期限临时放宽到 15 秒仍复现一张占位，该作品的正式详情和两章列表可打开。分支沿用 10 秒单张获取期限，个别缺图原因另行核验。完整工程及 Web/Wasm 构建通过。[GitHub Actions](https://github.com/Wybxc/karuyomi/actions/runs/44904585608)
+
 2026-11-21，书架、跨源结果和迁移候选接入普通封面。164 项 Flutter 定向回归、95 项运行宿主与合同测试、10 项跨语言协议测试通过。组件测试通过真实 Flutter 解码受管测试文件，同一作品源的两张书架封面复用第二槽并释放两份资源，账户写入数与基线一致。双槽测试核对搜索启动前按原请求身份取消封面并确认临时会话关闭，取消等待中的封面时保留两个活动搜索会话。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，固定 `92a0059` 与锁定 Keiyoushi 源码在本机 Apple Silicon 独立重编 Arknights Comics 1.6.2。正式工具用官方 JAR 生成 671,300 字节 gzip，canonical SHA-256 为 `4dc463ca25b497c28deec4bea7608f368c01bdee2519580d84ca6741539b5df1`，产物完整性通过并组装单包 Static Assets 验收快照。候选保持 `compiled_unverified`、`runtimeReady=false`。[扩展构建和静态分发](EXTENSIONS.md)
