@@ -5,8 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
+import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -15,8 +14,11 @@ import java.util.TimeZone;
 public final class ClassLibraryScenarios {
   private static int checks;
 
-  public static void main(String[] args)
-      throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+  public static void main(String[] args) throws IOException, GeneralSecurityException {
+    if (args.length > 0) {
+      EcScenarios.interop(args);
+      return;
+    }
     DateFormatScenarios.main(args);
     String path = "/assets/example.txt";
     URL absolute = ClassLibraryScenarios.class.getResource(path);
@@ -49,6 +51,7 @@ public final class ClassLibraryScenarios {
         concat("ink", 17, true).equals("\1ink\2" + "17:true\1\2"),
         "concatenation preserves literal recipe tags and dynamic arguments");
     System.out.println("STRING_CONCAT_SCENARIO_PASS");
+    EcScenarios.run();
   }
 
   private static String concat(String title, int count, boolean enabled) {

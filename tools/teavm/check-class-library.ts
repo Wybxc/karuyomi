@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   rmSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -69,6 +70,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     'ClassLibraryResources.java',
     'DigestScenarios.java',
     'Pbkdf2Scenarios.java',
+    'EcScenarios.java',
   ])
     copyFileSync(
       path.join(fixtures, name),
@@ -97,6 +99,14 @@ async function runContracts(root: string, output: string): Promise<void> {
     forceKillAfterDelay: 1000,
   });
   const compat = path.join(root, 'runtime/teavm/java/compat');
+  const security = path.join(compat, 'java/security');
+  const securitySources = readdirSync(security, {
+    recursive: true,
+    withFileTypes: true,
+  })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.java'))
+    .map((entry) => path.join(entry.parentPath, entry.name))
+    .sort();
   const classes = path.join(output, 'target/classes');
   const jsoClasspath = ['teavm-interop', 'teavm-jso', 'teavm-jso-apis']
     .map((artifact) =>
@@ -119,11 +129,8 @@ async function runContracts(root: string, output: string): Promise<void> {
     jsoClasspath,
     '-d',
     classes,
+    ...securitySources,
     ...[
-      'java/security/InvalidParameterException.java',
-      'java/security/MessageDigest.java',
-      'java/security/MessageDigestSpi.java',
-      'java/security/spec/InvalidKeySpecException.java',
       'javax/crypto/SecretKeyFactory.java',
       'javax/crypto/spec/PBEKeySpec.java',
       'javax/crypto/spec/SecretKeySpec.java',
@@ -140,16 +147,22 @@ async function runContracts(root: string, output: string): Promise<void> {
     ],
     { stdout: 'inherit', stderr: 'inherit', buffer: false },
   );
-  const oracle = await execute(path.join(javaHome, 'bin/java'), [
-    '-cp',
-    classes,
-    'prototype.ClassLibraryScenarios',
-  ]);
-  const generated = await execute(process.execPath, [
-    '--input-type=commonjs',
-    '--eval',
-    `require(${JSON.stringify(path.join(output, 'target/javascript/class-library.cjs'))}).main([]);`,
-  ]);
+  const java = (...args: string[]) =>
+    execute(path.join(javaHome, 'bin/java'), [
+      '-cp',
+      classes,
+      'prototype.ClassLibraryScenarios',
+      ...args,
+    ]);
+  const javascript = (...args: string[]) =>
+    execute(process.execPath, [
+      '--input-type=commonjs',
+      '--eval',
+      `require(${JSON.stringify(path.join(output, 'target/javascript/class-library.cjs'))}).main(process.argv.slice(1));`,
+      '--',
+      ...args,
+    ]);
+  const [oracle, generated] = await Promise.all([java(), javascript()]);
   if (
     !oracle.stdout.includes('DATE_FORMAT_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('PACKAGED_RESOURCE_SCENARIOS_PASS ') ||
@@ -157,12 +170,37 @@ async function runContracts(root: string, output: string): Promise<void> {
     !oracle.stdout.includes('PBKDF2_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('TIME_ZONE_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('STRING_CONCAT_SCENARIO_PASS') ||
+    !oracle.stdout.includes('EC_SCENARIOS_PASS ') ||
     generated.stdout !== oracle.stdout
   )
     throw new Error(
       'Generated TeaVM class library contract differs from the JDK oracle',
     );
   console.log('JDK and generated TeaVM JavaScript: ' + oracle.stdout.trim());
+  const [jdkSignature, workerSignature] = await Promise.all([
+    java('emit-ec-signature'),
+    javascript('emit-ec-signature'),
+  ]);
+  const [verifiedByJdk, verifiedByWorker] = await Promise.all([
+    java('verify-ec-signature', ...signatureFields(workerSignature.stdout)),
+    javascript('verify-ec-signature', ...signatureFields(jdkSignature.stdout)),
+  ]);
+  if (
+    [verifiedByJdk, verifiedByWorker].some(
+      (result) => result.stdout !== 'EC_INTEROP_VERIFIED',
+    )
+  )
+    throw new Error('ECDSA verification failed between the JDK and TeaVM');
+  console.log(
+    'ECDSA signatures and X.509 keys verified in both runtime directions',
+  );
+}
+
+function signatureFields(output: string): [string, string] {
+  const match = /^EC_INTEROP ([0-9a-f]{182}) ([0-9a-f]{16,144})$/.exec(output);
+  if (!match?.[1] || !match[2])
+    throw new Error('Invalid ECDSA interoperability fixture output');
+  return [match[1], match[2]];
 }
 
 if (import.meta.main) await checkClassLibrary();
