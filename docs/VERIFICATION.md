@@ -44,7 +44,9 @@
 
 2026-11-22，在 `macbook-pro-4` 固定 `9e67f54`，Emaqi 1.6.3、Epsilon Scan 1.6.5、Soft Epsilon Scan 1.6.5 均通过正式构建、产物完整性和 `hostAcquireCover` 检查，各包含 1 个 Source。两项法语扩展使用已验证的时区与打包资源读取。第五个补编批次使用与冻结批次逐字节一致的共享材料，候选预检累计纳入 34 个补编结果，仍待上线与在线验收。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
 
-2026-11-22，Tenkai Scan 冻结构建缺少位图矩阵绘制和颜色过滤接口。JDK 与生成 TeaVM JavaScript 对照通过 45 项仿射和颜色断言，Android API 35 原生图形 oracle 通过 5 项测试，核对裁剪、密度、颜色矩阵及画笔透明度的顺序。对合成 129×129 位图执行生成的 TeaVM 绘图字节码，受控 Node 图形桥核对两个不超过 64 KiB 的 RGBA 块、实际下发矩阵及模拟绘图失败后的释放，已有 21 项图形桥回归通过。扩展正式构建及在线显示待验。[宿主实现](../runtime/teavm/README.md)
+2026-11-22，Falco Scan（`tenkaiscan`）冻结构建缺少位图矩阵绘制和颜色过滤接口。JDK 与生成 TeaVM JavaScript 对照通过 45 项仿射和颜色断言，Android API 35 原生图形 oracle 通过 5 项测试，核对裁剪、密度、颜色矩阵及画笔透明度的顺序。对合成 129×129 位图执行生成的 TeaVM 绘图代码，受控 Node 图形桥核对两个不超过 64 KiB 的 RGBA 块、实际下发矩阵及模拟绘图失败后的释放，已有 21 项图形桥回归通过。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，在 `macbook-pro-4` 固定 `ddbcbb8`，Falco Scan 1.6.1 的正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `363d849a4a1d7c40cfc01c238a6113826de4d83f34043323cec153de648bffc1`，共享材料逐字节一致，候选预检纳入第 35 个补编结果，保持 `compiled_unverified`。正式出图和使用真实源站图片的阅读待验。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
 
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
