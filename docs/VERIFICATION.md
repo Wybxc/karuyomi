@@ -16,6 +16,8 @@
 
 2026-11-22，冻结批次的 Komga 缺少 `Builder.authenticator`，BookOrbit、LANraragi、Mango 缺少 `Builder.dns`。宿主补齐同源 401 和系统 DNS，`pnpm teavm:check` 的 24 项回环 HTTP 断言和 26 项网络配置断言通过，覆盖重定向凭证隔离、一次性正文及响应释放。在 `macbook-pro-4` 固定 `a2d506a` 和 Keiyoushi `efa93f5a` 补编 Komga 1.6.75、BookOrbit 1.6.1、LANraragi 1.6.2、Mango 1.6.1，四包均通过正式完整性和 `hostAcquireCover` 检查，共 7 个 Source。共享运行材料清单与冻结批次逐字节相同，四包保持 `compiled_unverified`，生产出图与源站登录待验。[Source 网络桥](design/mihon-web-design.md#84-扩展回调与网络桥)
 
+2026-11-22，冻结批次的 BookWalker 和 J-Novel 缺少 Java 摘要子类构造器与 `InvalidParameterException`。补齐宿主分派后，`pnpm teavm:check` 通过，生成的 JavaScript 与 JDK 对照通过 10 项摘要断言。在 `macbook-pro-4` 固定 `f64676e` 和同一 Keiyoushi 提交，BookWalker 1.6.2 与 J-Novel 1.6.3 均通过正式 AOT、产物完整性及 `hostAcquireCover` 检查，各包含 1 个 Source。共享运行材料一致，两包均为 `compiled_unverified`，在线验收待完成。[摘要实现](../runtime/teavm/README.md)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
