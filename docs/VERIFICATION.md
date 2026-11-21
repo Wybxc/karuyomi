@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，`b3b2db7` 的双主题正式 Web 复验跨源搜索。两色打开语言页期间收到真实 MangaDex 的 20 项和一次受控 xkcd 失败，返回后可用 Enter 重开语言页。长名单连续两次到底回顶后保留名称筛选和原勾选。两色真实分页到 34 项，随后 xkcd 独立重试返回空结果。每轮五路权威读回一致。1018 项 Flutter 测试、严格分析、依赖规则与 Web JS/Wasm 构建通过。[跨源搜索实测](verification/mihon-cupertino-fidelity.md#跨源搜索的语言返回与筛选保留)
+
 2026-11-21，`efd402a` 的正式 Web 双主题复验英文 MangaDex。切到「最新」后，所请求的分段可读，进度在内容区中央，随后两色取得真实作品。360×480 追加失败后可直接重试，前后原末排均在 y=149，新取得 20 项。两色各自七路权威响应逐字节相等。1017 项 Flutter 测试复跑通过，严格 Dart 分析及 Web JS/Wasm 构建通过。正式浏览器使用 JS 产物与默认字号。[源内浏览分页实测](verification/mihon-cupertino-fidelity.md#源内浏览的最新等待与分页重试)
 
 2026-11-21，`e95e712` 正式 Web 在 Codex 内置浏览器复验英文 xkcd 3324 的两色阅读滑杆。指针留在原轨道时从 360×480 缩至 844×390，滑杆短暂禁用，再自行恢复原焦点及蓝色焦点环。Home 与 End 可直接跳页，主动按 Tab 或打开阅读菜单后焦点留在新控件。两色各确认九次阅读进度，独立 D1 读回当前第 1 页。1013 项 Flutter 测试、严格 Dart 分析及 Web JS/Wasm 构建通过，浏览器实测使用 JS 构建。系统双倍字号与原生待验。[滑杆焦点实测](verification/mihon-cupertino-fidelity.md#缩高时页码滑杆的键盘焦点)

@@ -79,6 +79,8 @@ P0-F（Web/原生接入）、P0-R（阅读器）与 P0-A（宿主）可并行；
 
 源内浏览的两色正式 Web 已核对 MangaDex 的最新等待、实际作品及热门分页重试。[源内浏览分页实测](../verification/mihon-cupertino-fidelity.md#源内浏览的最新等待与分页重试)
 
+跨源搜索双主题正式 Web 已核对语言页返回、长名单滚动后保留筛选、同源分页和独立重试。[跨源搜索实测](../verification/mihon-cupertino-fidelity.md#跨源搜索的语言返回与筛选保留)
+
 封面编辑采用居中的完整比例预览。两色受控本地 Web 已核对短横屏选图和取消后自动显示新图四边与草稿说明。关闭并重开保留已确认封面；清除确认后可在新文档读回。实际系统选图与替换上传故障仍待。[草稿落点与确认](../verification/mihon-cupertino-fidelity.md#替换封面后自动显示草稿)
 
 作品详情支持原位下拉刷新、失败重试及清除无结果的章节筛选。两色正常 Web 验证了章节区按钮刷新，隔离 Web 用鼠标拖动在两色验到下拉失败与重试。组件回归覆盖模拟触控、禁用语义、晚到结果和空清单重读，真机触屏验收仍待。[详情刷新故障](../verification/mihon-cupertino-fidelity.md#详情刷新故障的双主题正式-web) · [下拉手势对照](../verification/mihon-cupertino-fidelity.md#下拉刷新的双主题手势对照)
