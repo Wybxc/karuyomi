@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，`0d7b34d` 将跨源分页移动到源标题旁，浅深组件中第二组标题上缘由 y=511 移至 y=439，Mihon 参考为 y=433。360×480 两倍字号复验等待、失败与重试，操作和首排位置保持。1002 项 Flutter 测试及 Web release 构建通过。内置浏览器连接超时，正式 Web 分页待验。[源间距与分页](verification/mihon-cupertino-fidelity.md#跨源搜索源间距与分页回执)
+
 2026-11-21，`da3ca05` 的两色 Flutter 组件复验将跨源搜索首个封面上移 113 逻辑像素至 y=242，Mihon 参考为 y=241，标题左缘同为 x=16。两倍字号下提交与查询仍同排，等待和返回的源标题位置一致。998 项 Flutter 测试和 Web release 构建通过。第二组及真实 Web 继续验收。[首排作品量测](verification/mihon-cupertino-fidelity.md#跨源搜索首排作品量测)
 
 2026-11-21，`e39b5ef` 修复跨源搜索打开语言选择页期间的回执丢失。两色组件从原页返回后都保留原选源，焦点回到语言行，正常显示一项结果及另一个源的失败。998 项 Flutter 测试、严格分析和 Web release 构建通过。重复滚动在组件环境的视觉与语义边界相等，内置浏览器连接超时，正式 Web 复验待验。[语言选择页返回](verification/mihon-cupertino-fidelity.md#语言选择页返回时的跨源搜索回执)
