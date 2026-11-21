@@ -166,21 +166,21 @@ Future<SettingsSnapshot> _write(
   SettingsSnapshot before,
 ) async {
   final target = _target(before);
-  await _select<wire.ReaderMode>(tester, target.reader.mode);
-  await _select<wire.ReaderPageLayout>(tester, target.reader.pageLayout);
-  await _select<wire.ReaderFit>(tester, target.reader.fit);
-  await _select<bool>(tester, target.reader.cropBorders);
-  await _expectForm(tester, target);
-  // A draft stays outside the confirmed snapshot until the save ACK.
-  _expectGlobal(editor.state.snapshot!.global, before.global);
-  expect(editor.state.pending, isNull);
-  await _tap(tester, find.widgetWithText(CupertinoButton, '保存全局设置'));
-  await _waitFor(tester, '全局设置获得服务端确认', () {
-    if (editor.state.error != null) fail('全局设置写入失败：${editor.state.error}');
-    return !editor.state.busy &&
-        editor.state.pending == null &&
-        editor.state.snapshot?.globalRevision == before.globalRevision + 1;
-  });
+  var revision = before.globalRevision;
+  Future<void> choose<T>(T value) async {
+    if (!await _select<T>(tester, value)) return;
+    revision++;
+    await _waitFor(tester, '选项自动保存并获得服务端确认', () {
+      if (editor.state.error != null) fail('全局设置写入失败：${editor.state.error}');
+      return editor.state.canEdit &&
+          editor.state.snapshot?.globalRevision == revision;
+    });
+  }
+
+  await choose(target.reader.mode);
+  await choose(target.reader.pageLayout);
+  await choose(target.reader.fit);
+  await choose(target.reader.cropBorders);
   final after = await repository.loadGlobal().timeout(_operationBudget);
   _expectCommittedTarget(after, before, target);
   _expectGlobal(editor.state.snapshot!.global, target);
@@ -260,10 +260,8 @@ Future<SettingsSnapshot> _ackLoss(
   expect(before.global.installedExtensions, isEmpty);
   final target = before.global.deepCopy()
     ..reader.fit = wire.ReaderFit.READER_FIT_WIDTH;
-  final save = find.widgetWithText(CupertinoButton, '保存全局设置');
   final retry = find.widgetWithText(CupertinoButton, _retry);
   await _select(tester, target.reader.fit);
-  await _tap(tester, save);
   final unconfirmed = find.text(_unconfirmed);
   await _waitFor(tester, '正式保存保留未确认的设置操作', () {
     if (!editor.state.busy &&
@@ -349,8 +347,10 @@ void _expectPendingAck(
   );
   expect(
     tester
-        .widget<CupertinoButton>(find.widgetWithText(CupertinoButton, '保存全局设置'))
-        .onPressed,
+        .widget<ChoiceField<wire.ReaderFit>>(
+          find.byKey(const ValueKey('global-fit')),
+        )
+        .onChanged,
     isNull,
   );
 }
@@ -392,8 +392,16 @@ void _expectCommittedTarget(
   SettingsSnapshot before,
   wire.GlobalSettingsValues target,
 ) {
-  expect(after.globalRevision, before.globalRevision + 1);
-  expect(after.accountRevision, before.accountRevision + 1);
+  final previous = before.global.reader;
+  final reader = target.reader;
+  final changed = [
+    previous.mode != reader.mode,
+    previous.pageLayout != reader.pageLayout,
+    previous.fit != reader.fit,
+    previous.cropBorders != reader.cropBorders,
+  ].where((value) => value).length;
+  expect(after.globalRevision, before.globalRevision + changed);
+  expect(after.accountRevision, before.accountRevision + changed);
   _expectGlobal(after.global, target);
   expect(_readerValues(after.effectiveReader), _readerValues(target.reader));
   expect(after.mangaKey, isNull);
@@ -527,7 +535,7 @@ Future<void> _expectSelection<T>(
   String field,
   T value,
 ) async {
-  final finder = find.byKey(ValueKey((field, value)));
+  final finder = find.byKey(ValueKey(field));
   await _waitFor(tester, '设置字段 $field', () => finder.evaluate().length == 1);
   await tester.ensureVisible(finder);
   await tester.pump(const Duration(milliseconds: 300));
@@ -535,27 +543,23 @@ Future<void> _expectSelection<T>(
   expect(tester.widget<ChoiceField<T>>(finder).value, value);
 }
 
-Future<void> _select<T>(WidgetTester tester, T value) async {
+Future<bool> _select<T>(WidgetTester tester, T value) async {
   final field = find.byType(ChoiceField<T>);
   await _waitFor(tester, '设置选择框 $T', () => field.evaluate().length == 1);
   final input = tester.widget<ChoiceField<T>>(field);
   if (input.value == value) {
-    return;
+    return false;
   }
   expect(input.onChanged, isNotNull);
-  final dropdown = find.descendant(
-    of: field,
-    matching: find.byType(ChoiceField<T>),
-  );
-  expect(dropdown, findsOneWidget);
-  final label = tester.widget<ChoiceField<T>>(dropdown).options[value]!;
+  final label = input.options[value]!;
   await _tap(tester, field);
-  await _tap(tester, find.text(label).last);
+  await _tap(tester, find.widgetWithText(CupertinoMenuItem, label));
   await _waitFor(
     tester,
     '设置选择已进入表单草稿',
     () => tester.widget<ChoiceField<T>>(field).value == value,
   );
+  return true;
 }
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {

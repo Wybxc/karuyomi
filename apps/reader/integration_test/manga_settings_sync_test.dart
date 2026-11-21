@@ -19,6 +19,7 @@ import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/runtime/platform_runtime_native.dart';
+import 'package:karuyomi/widgets/choice_field.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -39,6 +40,7 @@ const _budget = Duration(seconds: 120);
 
 const _overrideMode = wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT;
 const _overrideLayout = wire.ReaderPageLayout.READER_PAGE_LAYOUT_SINGLE;
+const _editCount = 3;
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -46,8 +48,8 @@ void main() {
     final origin = Uri.tryParse(_origin);
     final prior = switch (_phase) {
       'prime' || 'set' => 0,
-      'clear' => 1,
-      'verify' => 2,
+      'clear' => _editCount,
+      'verify' => 2 * _editCount,
       _ => fail('MANGA_SETTINGS_PHASE 必须为 prime、set、clear 或 verify'),
     };
     if ((!Platform.isAndroid && !Platform.isIOS) ||
@@ -165,7 +167,7 @@ void main() {
         _expectTransition(before, opened, writes: 0);
         _expectReader(
           tester.widget<ReaderScreen>(reader),
-          overridden: prior == 1,
+          overridden: prior == _editCount,
         );
 
         await _tap(tester, settingsButton);
@@ -189,10 +191,21 @@ void main() {
         expect(editor.repository, same(catalog.settings));
         expect(editor.state.snapshot!.mangaRevision, prior);
         expect(editor.state.pending, isNull);
-        _expectForm(prior == 1);
+        _expectForm(prior == _editCount);
 
         if (_phase == 'set' || _phase == 'clear') {
           final set = _phase == 'set';
+          Future<void> confirmChoice() async {
+            expectedRevision++;
+            await _wait(tester, '选项自动保存并获得服务端确认', () {
+              if (editor.state.error != null) {
+                fail('漫画设置保存失败：${editor.state.error}');
+              }
+              return editor.state.canEdit &&
+                  editor.state.snapshot?.mangaRevision == expectedRevision;
+            });
+          }
+
           await _choose<wire.ReaderMode>(
             tester,
             panel,
@@ -200,6 +213,7 @@ void main() {
             set ? null : _overrideMode,
             set ? '从右到左' : '跟随全局',
           );
+          await confirmChoice();
           await _choose<wire.ReaderPageLayout>(
             tester,
             panel,
@@ -207,6 +221,7 @@ void main() {
             set ? null : _overrideLayout,
             set ? '单页' : '跟随全局',
           );
+          await confirmChoice();
           await _choose<bool>(
             tester,
             panel,
@@ -214,24 +229,7 @@ void main() {
             set ? null : false,
             set ? '关闭' : '跟随全局',
           );
-          _expectForm(set);
-          expect(editor.state.snapshot!.mangaRevision, prior);
-          final draft = await _snapshot(client, target.mangaKey, _controlKey);
-          _expectTransition(before, draft, writes: 0);
-          await _tap(
-            tester,
-            find.widgetWithText(CupertinoButton, '保存本漫画设置'),
-            scrollWithin: panel,
-          );
-          expectedRevision++;
-          await _wait(tester, '本漫画设置获得服务端确认', () {
-            if (editor.state.error != null) {
-              fail('漫画设置保存失败：${editor.state.error}');
-            }
-            return !editor.state.busy &&
-                editor.state.pending == null &&
-                editor.state.snapshot?.mangaRevision == expectedRevision;
-          });
+          await confirmChoice();
           _expectForm(set);
         }
         await tester.binding.handlePopRoute();
@@ -239,7 +237,7 @@ void main() {
         final finalReader = tester.widget<ReaderScreen>(reader);
         expect(finalReader.provider, same(initialReader.provider));
         expect(finalReader.key, initialReader.key);
-        _expectReader(finalReader, overridden: expectedRevision == 1);
+        _expectReader(finalReader, overridden: expectedRevision == _editCount);
         expect(find.text('1 / 2'), findsOneWidget);
       }
 
@@ -388,7 +386,7 @@ void _expectSettings(_Snapshot snapshot, int revision) {
   expect(target.manga.revision, revision);
   final override = wire.ReaderSettingsOverride();
   final effective = inherited.deepCopy();
-  if (revision == 1) {
+  if (revision == _editCount) {
     override
       ..mode = _overrideMode
       ..pageLayout = _overrideLayout
@@ -458,7 +456,12 @@ void _expectReader(ReaderScreen reader, {required bool overridden}) {
   expect(reader.cropBorders, isFalse);
 }
 
-Finder _field<T>(String id, T? value) => find.byKey(ValueKey((id, value)));
+Finder _field<T>(String id, T? value) => find.byWidgetPredicate(
+  (widget) =>
+      widget is ChoiceField<T> &&
+      widget.key == ValueKey(id) &&
+      widget.value == value,
+);
 
 void _expectForm(bool overridden) {
   expect(
@@ -485,8 +488,8 @@ Future<void> _choose<T>(
   T? current,
   String label,
 ) async {
-  await _tap(tester, _field(id, current), scrollWithin: panel);
-  await _tap(tester, find.text(label).hitTestable().last);
+  await _tap(tester, _field<T>(id, current), scrollWithin: panel);
+  await _tap(tester, find.widgetWithText(CupertinoMenuItem, label));
 }
 
 Future<void> _waitForPage(

@@ -66,7 +66,7 @@ final class SettingsControllerProvider
 }
 
 String _$settingsControllerHash() =>
-    r'77472261b21336bb0b2f0566bbfbf03f28ab9d80';
+    r'bf7530c65c5e1d2e9f008ddf8a24087da8894576';
 
 /// One editor per verified catalog identity and global/manga scope. Submitted
 /// UUID/CAS drafts remain in BusinessStateClient when this provider is disposed.

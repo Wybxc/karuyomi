@@ -72,15 +72,15 @@ flutter test integration_test/settings_sync_test.dart --no-pub \
   --reporter expanded
 ```
 
-依次运行 A `verify` → B `write`（`rtl-double-width-crop`）→ A 新进程 `verify` → A 新进程 `write`（`webtoon-auto-height-no-crop`）→ B 新进程 `verify`。每阶段重新取得当前完整快照作为前置；保存成功后不要盲目重跑旧写阶段。正式表单修改阅读模式、页组、适配和裁白，其它字段与列表保留。驱动验证草稿不提前应用主题、服务端确认后清除 pending，并输出完整 `SETTINGS_SYNC_RESULT`。
+依次运行 A `verify` → B `write`（`rtl-double-width-crop`）→ A 新进程 `verify` → A 新进程 `write`（`webtoon-auto-height-no-crop`）→ B 新进程 `verify`。每阶段重新取得当前完整快照作为前置；保存成功后不要盲目重跑旧写阶段。正式表单修改阅读模式、页组、适配和裁白，其它字段与列表保留。驱动等待每项有效修改获确认并核对对应版本增量，最后输出完整 `SETTINGS_SYNC_RESULT`。
 
 这组顺序操作证明实际执行平台间的全局设置读写与新进程恢复；单作品覆盖见[独立驱动](#单作品阅读设置同步)，同时写竞争、丢响应、自动前台、Web↔Native、生产 Access 和真机分别验收。全局默认 false/0 与 optional 漫画覆盖的 presence 语义不同，驱动按生成 getter 核对非 optional 值。实际结果与剩余门见[设置记录](../../../docs/verification/reader-settings.md)。完成后关闭 harness，移除本轮 reverse、测试安装与专用设备，结束测试进程。
 
-另可用同一初始快照和预设验证自动前台重取：客户端 A 运行 `resume`，等到 `SETTINGS_RESUME_READY` 后用系统 Home 或 App 切换器将其送到后台，不结束进程。等 A 输出 `SETTINGS_RESUME_PAUSED` 后，在同一服务的独立客户端 B 运行 `write`，确认 account/global revision 各只增加 1。然后用系统界面回到 A 的原进程和设置页面，不点重读、不切换应用内导航、不重启。A 在暂停期间不 pump 或发起测试读取，等待实际系统事件至多 5 分钟；输出同 PID 的 `SETTINGS_RESUME_RESUMED` 后，先核对事件时的原快照，再等待正式客户端自动更新同一设置控制器、表单和实际应用主题。驱动在此期间不注入生命周期事件，也不主动重取设置。最后从独立客户端只读确认 revision 没有再次增加；记录实际平台、设备和事件。
+另可用同一初始快照和预设验证自动前台重取：客户端 A 运行 `resume`，等到 `SETTINGS_RESUME_READY` 后用系统 Home 或 App 切换器将其送到后台，不结束进程。等 A 输出 `SETTINGS_RESUME_PAUSED` 后，在同一服务的独立客户端 B 运行 `write`，确认 account/global revision 均按有效修改项数增加。然后用系统界面回到 A 的原进程和设置页面，不点重读、不切换应用内导航、不重启。A 在暂停期间不 pump 或发起测试读取，等待实际系统事件至多 5 分钟；输出同 PID 的 `SETTINGS_RESUME_RESUMED` 后，先核对事件时的原快照，再等待正式客户端自动更新同一设置控制器和表单。驱动在此期间不注入生命周期事件，也不主动重取设置。最后从独立客户端只读确认 revision 没有再次增加；记录实际平台、设备和事件。
 
 ### 全局设置已提交后丢确认
 
-为每端分别启动新的官方 HTTPS harness，设置 `ACCEPTANCE_FIXTURE=settings-ack-loss`。从另一个主机进程以正常 TLS 和本节的业务头读取 `/api/settings` 与 `/api/library`，要求空书架、系统主题、账户和全局设置 revision `0/0`。阶段 JSON 使用服务的 `APP_ORIGIN`、`SETTINGS_SUBJECT=acceptance-owner`、完整 `SETTINGS_EXPECT_JSON` 和 `SETTINGS_PHASE=ack-loss`，不传 `SETTINGS_PRESET`。Android 继续使用精确主机 debug CA 配置、`SETTINGS_TEST_CA_BASE64` 与实际端口的 `adb reverse`。
+为每端分别启动新的官方 HTTPS harness，设置 `ACCEPTANCE_FIXTURE=settings-ack-loss`。从另一个主机进程以正常 TLS 和本节的业务头读取 `/api/settings` 与 `/api/library`，要求空书架、默认完整显示、账户和全局设置 revision `0/0`。阶段 JSON 使用服务的 `APP_ORIGIN`、`SETTINGS_SUBJECT=acceptance-owner`、完整 `SETTINGS_EXPECT_JSON` 和 `SETTINGS_PHASE=ack-loss`，不传 `SETTINGS_PRESET`。Android 继续使用精确主机 debug CA 配置、`SETTINGS_TEST_CA_BASE64` 与实际端口的 `adb reverse`。
 
 用上方命令运行正式设置驱动。它只将图像适配改为适宽，验证首次丢确认保留原草稿；在同一进程以独立 HTTPS 连接核对已提交的适宽 `1/1`；用正式「重新读取设置」读回适配值但保留原待确认操作，再点「重试原设置操作」才清除提示，版本仍为 `1/1`。另一个主机进程重取设置与书架，仅允许图像适配和 revision 改变。按 Enter 停服，核对 `ACCEPTANCE_SETTINGS_ACK_AUDIT` 恰好两条、`sequence=1/2`、`drop_ack=1/0`、预期 revision 均为 0、确认 revision 均为 `1/1`，同一 mutation UUID 及正文、确认和持久回执的 SHA-256 全同。已提交的写阶段须用新 D1 才能重跑。实际结果与边界见 [Native 丢确认记录](../../../docs/verification/native-settings-ack.md)。
 
@@ -154,7 +154,7 @@ flutter test integration_test/manga_settings_sync_test.dart --no-pub \
 
 阶段 JSON 提供 `APP_ORIGIN`、`MANGA_SETTINGS_PHASE`、`MANGA_SETTINGS_BUILD_ID`、`MANGA_SETTINGS_CONTROL_KEY`（对照作品 key）。先运行 iOS `prime`：打开 `/3319/` 并确认真实图片解码，到第 2 页并确认最远进度，再回第 1 页并确认保存。用独立 HTTPS GET `/api/settings` 的实际账户 revision 作为其余三阶段共同的 `MANGA_SETTINGS_BASE_ACCOUNT`。Android 使用本地 CA 时传 `MANGA_SETTINGS_TEST_CA_BASE64`，并按上文配置隔离 debug WebView 信任和 `adb reverse`；iOS 只用设备信任。
 
-依次运行 iOS `set` → Android `clear` → iOS 新进程 `verify`。iOS 在正式 Reader 表单保存从右到左、单页、裁白显式关闭；Android 先核对已确认的覆盖及 Reader 配置，再逐项选择跟随全局；iOS 新进程确认三项均继承、Reader 恢复从左到右与自动页组。每阶段输出 `MANGA_SETTINGS_SYNC_RESULT`。独立 HTTPS 客户端对照 `/api/settings`、`/api/library?revision=REV`、两部作品的 `/api/settings/manga/KEY`、`/api/state/manga/KEY` 及其 `/progress?revision=REV`、`/bookmarks?revision=REV`，另查目标章 `/api/state/manga/KEY?chapterKey=CHAPTER_KEY`。两次保存各只推进一个账户与目标作品设置 revision，开章、退出和新进程读回不推进 revision；全局、作品业务状态及已确认进度须保持一致。失败后先核对 D1，勿盲重跑保存。结束后按上文清理。实际通过范围见[单作品设置记录](../../../docs/verification/reader-settings.md#ios-与-android-模拟器单作品设置覆盖)。
+依次运行 iOS `set` → Android `clear` → iOS 新进程 `verify`。iOS 在正式 Reader 表单保存从右到左、单页、裁白显式关闭；Android 先核对已确认的覆盖及 Reader 配置，再逐项选择跟随全局；iOS 新进程确认三项均继承、Reader 恢复从左到右与自动页组。每阶段输出 `MANGA_SETTINGS_SYNC_RESULT`。独立 HTTPS 客户端对照 `/api/settings`、`/api/library?revision=REV`、两部作品的 `/api/settings/manga/KEY`、`/api/state/manga/KEY` 及其 `/progress?revision=REV`、`/bookmarks?revision=REV`，另查目标章 `/api/state/manga/KEY?chapterKey=CHAPTER_KEY`。设置和清除分别等待三项自动保存各自确认，目标作品设置 revision 依次为 0、3、6，账户版本同步增加。开章、退出和新进程读回保持相同版本，全局、作品业务状态及已确认进度须保持一致。失败后先核对 D1，勿盲重跑保存。结束后按上文清理。实际通过范围见[单作品设置记录](../../../docs/verification/reader-settings.md#ios-与-android-模拟器单作品设置覆盖)。
 
 ## Source 阅读与筛选验收
 

@@ -643,6 +643,12 @@ class const _PreferenceTextDialog({
               autofocus: true,
               autofillHints: null,
               obscureText: preference.secret,
+              textInputAction: TextInputAction.done,
+              onSubmitted: preference.secret
+                  ? null
+                  : (value) {
+                      if (controller.canEdit) dismiss(value);
+                    },
               maxLength: 4096,
               placeholder: preference.hasHint() ? preference.hint : null,
             )

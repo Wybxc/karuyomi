@@ -33,8 +33,9 @@ void main() {
       var failWrites = true;
       final preferences = _Preferences(
         beforeWrite: () {
-          if (failWrites)
+          if (failWrites) {
             throw StateError('Simulated preferences write failure');
+          }
         },
       );
       KaruyomiApp app() => KaruyomiApp(

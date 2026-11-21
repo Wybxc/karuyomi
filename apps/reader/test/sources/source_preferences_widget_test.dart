@@ -454,6 +454,12 @@ void main() {
         find.byType(CupertinoTextField).last,
         'secret-on-this-client',
       );
+      expect(
+        tester
+            .widget<CupertinoTextField>(find.byType(CupertinoTextField).last)
+            .onSubmitted,
+        isNull,
+      );
       await apply(tester);
       expect(fixture.postedBodies, hasLength(1));
       expect(find.text('secret-on-this-client'), findsNothing);
@@ -472,7 +478,8 @@ void main() {
       final noteController = noteField.controller!;
       expect(noteController.selection.textInside(noteController.text), '原备注');
       await tester.enterText(noteInput, 'session-note');
-      await apply(tester);
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
       await item(tester, '5');
       expect(fixture.callbacks, 7);
       expect(fixture.postedBodies, hasLength(4));

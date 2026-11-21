@@ -94,7 +94,6 @@ class const SettingsStatus({
   super.key,
   required final SettingsController controller,
   required final SettingsState state,
-  final VoidCallback? onReloaded,
   final bool compact = false,
 }) extends StatelessWidget {
   @override
@@ -111,11 +110,7 @@ class const SettingsStatus({
         ? Semantics(
             enabled: state.canRefresh,
             child: CupertinoButton(
-              onPressed: state.canRefresh
-                  ? () async {
-                      if (await controller.refresh()) onReloaded?.call();
-                    }
-                  : null,
+              onPressed: state.canRefresh ? controller.refresh : null,
               child: const Text('重新读取设置'),
             ),
           )
@@ -124,11 +119,7 @@ class const SettingsStatus({
         ? Semantics(
             enabled: state.canRetry,
             child: CupertinoButton(
-              onPressed: state.canRetry
-                  ? () async {
-                      if (await controller.retry()) onReloaded?.call();
-                    }
-                  : null,
+              onPressed: state.canRetry ? controller.retry : null,
               child: Text(
                 state.pending?.acknowledged == true ? '重试读取最新设置' : '重试原设置操作',
               ),
@@ -286,22 +277,24 @@ class MangaSettingsEditor extends _SettingsEditor {
   CatalogController get catalog => super.catalog!;
 }
 
-/// One UI-only draft implements the same controls for global values and manga
+/// The same controls edit global values and manga
 /// overrides. Presence is preserved: null inherits, including explicit AUTO/0.
 final class _FormDraft {
-  _FormDraft(SettingsState state, this.owner, bool manga)
+  _FormDraft(SettingsState state, bool manga)
     : global = manga
           ? null
-          : (state.pending?.global ?? state.snapshot!.global).deepCopy(),
+          : (state.unsent?.setGlobal ??
+                    state.submitting?.setGlobal ??
+                    state.pending?.global ??
+                    state.snapshot!.global)
+                .deepCopy(),
       reader = manga
-          ? (state.pending?.overrides ?? state.snapshot!.overrides!).deepCopy()
-          : wire.ReaderSettingsOverride(),
-      revision =
-          state.pending?.basedOnRevision ??
-          (manga
-              ? state.snapshot!.mangaRevision!
-              : state.snapshot!.globalRevision),
-      dirty = state.pending != null {
+          ? (state.unsent?.setManga.overrides ??
+                    state.submitting?.setManga.overrides ??
+                    state.pending?.overrides ??
+                    state.snapshot!.overrides!)
+                .deepCopy()
+          : wire.ReaderSettingsOverride() {
     if (global case final values?) {
       final r = values.reader;
       reader
@@ -315,11 +308,8 @@ final class _FormDraft {
         ..keyboard = r.keyboard;
     }
   }
-  final Object owner;
   final wire.GlobalSettingsValues? global;
   final wire.ReaderSettingsOverride reader;
-  final int revision;
-  bool dirty;
 
   wire.GlobalSettingsValues globalValues() =>
       global!.deepCopy()
@@ -361,8 +351,6 @@ class const _SettingsEditor({
     final owner = service == null
         ? null
         : ref.watch(confirmedAccountProvider(service))?.settings;
-    final edit = useRef<_FormDraft?>(null);
-    final revision = useState(0);
     final selected = useState<_SettingsSection?>(
       openConnectionOnMount || service == null
           ? _SettingsSection.connection
@@ -373,29 +361,24 @@ class const _SettingsEditor({
     final wasWide = useRef<bool?>(null);
     final directoryFocus = useFocusScopeNode();
     final detailFocus = useFocusScopeNode();
+    final dimDragOwner = useRef<Object?>(null);
+    final dimPreview = useState<int?>(null);
     final manga = mangaKey != null;
     final scope = manga ? 'manga' : 'global';
-    final confirmedRevision = manga
-        ? state.snapshot?.mangaRevision
-        : state.snapshot?.globalRevision;
-    if (owner == null) {
-      edit.value = null;
-    } else if (state.snapshot != null &&
-        (edit.value?.owner != owner ||
-            (!edit.value!.dirty &&
-                edit.value!.revision != confirmedRevision))) {
-      edit.value = _FormDraft(state, owner, manga);
-    }
-    void reset() {
-      if (!context.mounted) return;
-      edit.value = null;
-      revision.value++;
-    }
 
-    void change(VoidCallback apply) {
-      apply();
-      edit.value!.dirty = true;
-      revision.value++;
+    void change(void Function(wire.ReaderSettingsOverride) apply) {
+      if (provider == null || controller == null || !context.mounted) return;
+      final latest = ref.read(provider);
+      if (!latest.canChange || latest.snapshot == null) return;
+      final edit = _FormDraft(latest, manga);
+      final before = edit.reader.deepCopy();
+      apply(edit.reader);
+      if (edit.reader == before) return;
+      if (manga) {
+        controller.queueOverrides(edit.reader);
+      } else {
+        controller.queueGlobal(edit.globalValues());
+      }
     }
 
     Widget choice<T>(
@@ -403,36 +386,37 @@ class const _SettingsEditor({
       String label,
       T? value,
       Map<T, String> values,
-      void Function(T) set,
-      VoidCallback clear, {
-      bool inherit = true,
-    }) => Padding(
-      padding: EdgeInsets.zero,
-      child: ChoiceField<T>(
-        inline: false,
-        key: ValueKey('$scope-$id'),
-        label: label,
-        value: value,
-        options: {
-          if (manga && inherit) null: '跟随全局',
-          for (final item in values.entries) item.key: item.value,
-        },
-        onChanged: state.canEdit
-            ? (value) => change(() {
-                if (value == null) {
-                  clear();
-                } else {
-                  set(value);
-                }
-              })
-            : null,
-      ),
+      void Function(wire.ReaderSettingsOverride, T) set,
+      void Function(wire.ReaderSettingsOverride) clear,
+    ) => ChoiceField<T>(
+      inline: false,
+      key: ValueKey('$scope-$id'),
+      label: label,
+      value: value,
+      options: {
+        if (manga) null: '跟随全局',
+        for (final item in values.entries) item.key: item.value,
+      },
+      onChanged: state.canChange
+          ? (value) => change((reader) {
+              if (value == null) {
+                clear(reader);
+              } else {
+                set(reader, value);
+              }
+            })
+          : null,
     );
-    final draft = edit.value;
+    final draft = owner == null || state.snapshot == null
+        ? null
+        : _FormDraft(state, manga);
     final r = draft?.reader;
-    final canSave = state.canEdit;
-    final canClose = state.activity != SettingsActivity.saving;
+    final canClose =
+        state.activity != SettingsActivity.saving || state.submitting != null;
     final dim = r?.hasDimPercent() == true ? r!.dimPercent : null;
+    final visibleDim = dimDragOwner.value == owner
+        ? dimPreview.value ?? dim
+        : dim;
     final inheritedDim = state.snapshot?.global.reader.dimPercent ?? 0;
     Widget group(String title, List<Widget> fields, {String? footer}) =>
         CupertinoFormSection.insetGrouped(
@@ -442,56 +426,20 @@ class const _SettingsEditor({
           children: fields,
         );
 
-    final save = draft == null || r == null || controller == null
-        ? null
-        : CupertinoButton(
-            padding: manga ? EdgeInsets.zero : null,
-            onPressed: canSave
-                ? () async {
-                    final saved = manga
-                        ? await controller.saveOverrides(
-                            r.deepCopy(),
-                            draft.revision,
-                          )
-                        : await controller.saveGlobal(
-                            draft.globalValues(),
-                            draft.revision,
-                          );
-                    if (saved) reset();
-                  }
-                : null,
-            child: Text(
-              manga ? '保存' : '保存全局设置',
-              semanticsLabel: manga ? '保存本漫画设置' : null,
-            ),
-          );
     Widget feedback() => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (draft?.dirty == true &&
-            state.pending == null &&
-            state.activity != SettingsActivity.saving)
-          const Text('修改尚未保存。')
+        if (state.unsent != null)
+          const Text('有修改等待发送。')
         else if (state.snapshot != null &&
             !state.busy &&
+            state.submitting == null &&
             state.error == null &&
             state.pending == null)
           const Text('当前设置已获服务端确认。'),
-        if (!manga && save != null)
-          Semantics(
-            enabled: canSave,
-            child: CupertinoButton.filled(
-              onPressed: save.onPressed,
-              child: save.child,
-            ),
-          ),
         if (controller != null)
-          SettingsStatus(
-            controller: controller,
-            state: state,
-            onReloaded: reset,
-          ),
+          SettingsStatus(controller: controller, state: state),
       ],
     );
     Widget content(_SettingsSection? section) => Column(
@@ -530,7 +478,7 @@ class const _SettingsEditor({
             section != _SettingsSection.about &&
             section != _SettingsSection.connection)
           const Text('连接并确认身份后可读取和保存同步设置。'),
-        if (draft != null && r != null) ...[
+        if (r != null) ...[
           if (manga || section == _SettingsSection.reading) ...[
             group('阅读显示', [
               choice(
@@ -538,40 +486,40 @@ class const _SettingsEditor({
                 '阅读模式',
                 r.hasMode() ? r.mode : null,
                 _modes,
-                (value) => r.mode = value,
-                r.clearMode,
+                (reader, value) => reader.mode = value,
+                (reader) => reader.clearMode(),
               ),
               choice(
                 'layout',
                 '页组',
                 r.hasPageLayout() ? r.pageLayout : null,
                 _layouts,
-                (value) => r.pageLayout = value,
-                r.clearPageLayout,
+                (reader, value) => reader.pageLayout = value,
+                (reader) => reader.clearPageLayout(),
               ),
               choice(
                 'fit',
                 '图像适配',
                 r.hasFit() ? r.fit : null,
                 _fits,
-                (value) => r.fit = value,
-                r.clearFit,
+                (reader, value) => reader.fit = value,
+                (reader) => reader.clearFit(),
               ),
               choice(
                 'crop-borders',
                 '裁白',
                 r.hasCropBorders() ? r.cropBorders : null,
                 const {false: '关闭', true: '开启'},
-                (value) => r.cropBorders = value,
-                r.clearCropBorders,
+                (reader, value) => reader.cropBorders = value,
+                (reader) => reader.clearCropBorders(),
               ),
               choice(
                 'background',
                 '阅读背景',
                 r.hasBackground() ? r.background : null,
                 _backgrounds,
-                (value) => r.background = value,
-                r.clearBackground,
+                (reader, value) => reader.background = value,
+                (reader) => reader.clearBackground(),
               ),
             ], footer: manga ? '选择“跟随全局”时，之后的全局修改会应用到此漫画。' : null),
             group('应用内调暗', [
@@ -582,12 +530,12 @@ class const _SettingsEditor({
                     child: CupertinoSwitch(
                       key: ValueKey('$scope-dim-inherit'),
                       value: dim == null,
-                      onChanged: state.canEdit
-                          ? (inherit) => change(() {
+                      onChanged: state.canChange
+                          ? (inherit) => change((reader) {
                               if (inherit) {
-                                r.clearDimPercent();
+                                reader.clearDimPercent();
                               } else {
-                                r.dimPercent = inheritedDim;
+                                reader.dimPercent = inheritedDim;
                               }
                             })
                           : null,
@@ -603,20 +551,36 @@ class const _SettingsEditor({
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      dim == null
+                      visibleDim == null
                           ? '应用内调暗：跟随全局（$inheritedDim%）'
-                          : '应用内调暗：$dim%',
+                          : '应用内调暗：$visibleDim%',
                     ),
                     CupertinoSlider(
                       key: ValueKey('$scope-dim'),
-                      value: (dim ?? inheritedDim).toDouble(),
+                      value: (visibleDim ?? inheritedDim).toDouble(),
                       min: 0,
                       max: 80,
                       divisions: 80,
-                      onChanged: state.canEdit && dim != null
-                          ? (value) =>
-                                change(() => r.dimPercent = value.round())
+                      onChanged: state.canChange && dim != null
+                          ? (value) {
+                              if (dimDragOwner.value == null) {
+                                change(
+                                  (reader) => reader.dimPercent = value.round(),
+                                );
+                              } else if (identical(dimDragOwner.value, owner)) {
+                                dimPreview.value = value.round();
+                              }
+                            }
                           : null,
+                      onChangeStart: (_) => dimDragOwner.value = owner,
+                      onChangeEnd: (value) {
+                        final dragOwner = dimDragOwner.value;
+                        dimDragOwner.value = null;
+                        dimPreview.value = null;
+                        if (dragOwner != null && identical(dragOwner, owner)) {
+                          change((reader) => reader.dimPercent = value.round());
+                        }
+                      },
                     ),
                   ],
                 ),
@@ -630,8 +594,8 @@ class const _SettingsEditor({
                 '分页点击区',
                 r.hasTapZones() ? r.tapZones : null,
                 _inputPresets,
-                (value) => r.tapZones = value,
-                r.clearTapZones,
+                (reader, value) => reader.tapZones = value,
+                (reader) => reader.clearTapZones(),
               ),
             ], footer: '反向会交换左右翻页；关闭后仍可从中央显示工具栏，滑动翻页不变。'),
             group('阅读快捷键', [
@@ -640,8 +604,8 @@ class const _SettingsEditor({
                 '阅读快捷键',
                 r.hasKeyboard() ? r.keyboard : null,
                 _inputPresets,
-                (value) => r.keyboard = value,
-                r.clearKeyboard,
+                (reader, value) => reader.keyboard = value,
+                (reader) => reader.clearKeyboard(),
               ),
             ], footer: '反向会交换方向键、上下翻页键和空格的翻页方向。Home/End 到首末页，T 显示或隐藏工具栏。'),
           ],
@@ -652,7 +616,8 @@ class const _SettingsEditor({
                   _SettingsSection.reading,
                   _SettingsSection.input,
                 }.contains(section) ||
-                draft?.dirty == true ||
+                state.unsent != null ||
+                state.activity == SettingsActivity.saving ||
                 state.pending != null ||
                 state.error != null))
           feedback(),
@@ -671,9 +636,6 @@ class const _SettingsEditor({
                   child: const Text('关闭', semanticsLabel: '关闭设置'),
                 ),
               ),
-              trailing: save == null
-                  ? null
-                  : Semantics(enabled: canSave, child: save),
               content: Column(
                 children: [
                   Padding(
@@ -796,10 +758,10 @@ class const _SettingsEditor({
                               ),
                         ],
                       ),
-                      if (!showDetail && draft?.dirty == true)
+                      if (!showDetail && state.unsent != null)
                         const Padding(
                           padding: EdgeInsets.all(16),
-                          child: Text('修改尚未保存。'),
+                          child: Text('有修改等待发送。'),
                         ),
                       if (!showDetail &&
                           controller != null &&
@@ -809,7 +771,6 @@ class const _SettingsEditor({
                           child: SettingsStatus(
                             controller: controller,
                             state: state,
-                            onReloaded: reset,
                           ),
                         ),
                     ],

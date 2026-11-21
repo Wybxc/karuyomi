@@ -18,6 +18,8 @@
 
 change listener 返回 true 才执行该控件的标准持久化；返回 false 仍可能写别名键或清缓存，因此必须重读实际存储。点击独立执行原 listener，不能当作普通值修改。不能自动重试这两个插件操作。
 
+开关和单选在选择时提交。普通文本可通过键盘完成输入，多选在选完后应用整组值。密码及插件动作保留明确确认，每种入口都使用同一个 Source 编辑命令。
+
 ## 原对象、构造顺序与生命周期
 
 客户端先 GET 整包已确认设置，再形成 `PreferenceBootstrap(packageName,sources,syncRules)`。driver 消费账户 API 返回的同步规则，作为 `PreferenceHostConfiguration` 传给 `hostLoad`。Java 使用 init 创建的原 Application 和原 SharedPreferences.Editor，在 `Generated/createSources` 之前注入 `source_<id>`；不能构造 Source 后才更新设置，因为构造函数、lazy client 和 headers 可能已经读取旧值。

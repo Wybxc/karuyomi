@@ -166,7 +166,11 @@ Future<void> _start(
   await tester.pumpAndSettle();
 }
 
-Future<void> _globalDefaults(WidgetTester tester, {bool dark = false}) async {
+Future<void> _globalDefaults(
+  WidgetTester tester, {
+  bool dark = false,
+  VoidCallback? beforeLastChoice,
+}) async {
   await _openSettings(tester);
   if (dark) await _choose<AppAppearance>(tester, '深色');
   await _choose<wire.ReaderMode>(tester, '从右到左');
@@ -176,6 +180,7 @@ Future<void> _globalDefaults(WidgetTester tester, {bool dark = false}) async {
   await _chooseField<wire.ReaderBackground>(tester, '阅读背景', '白色');
   await _dim(tester, 'global', zero: false);
   await _chooseField<wire.ReaderInputPreset>(tester, '分页点击区', '反向');
+  beforeLastChoice?.call();
   await _chooseField<wire.ReaderInputPreset>(tester, '阅读快捷键', '关闭');
 }
 
@@ -642,7 +647,6 @@ void main() {
         await _start(tester, platform);
         await _openSettings(tester);
         final initial = globalSettings(tester);
-        await _choose<wire.ReaderFit>(tester, '适宽');
         platform.afterBusinessReply = (request, reply) {
           if (request.method != 'POST' ||
               request.uri.path != '/api/settings/mutations') {
@@ -660,7 +664,7 @@ void main() {
             ),
           );
         };
-        await _tap(tester, find.text('保存全局设置'));
+        await _choose<wire.ReaderFit>(tester, '适宽');
         final originalRequest = platform.businessServer.requests
             .where((request) => request.uri.path == '/api/settings/mutations')
             .single;
@@ -739,7 +743,6 @@ void main() {
         await _openSettings(tester);
         final initial = globalSettings(tester);
         final originalRevision = initial.state.snapshot!.globalRevision;
-        await _choose<wire.ReaderFit>(tester, '适宽');
         platform.afterBusinessReply = (request, reply) {
           if (request.method != 'POST' ||
               request.uri.path != '/api/settings/mutations') {
@@ -753,7 +756,7 @@ void main() {
             body: '{',
           );
         };
-        await _tap(tester, find.text('保存全局设置'));
+        await _choose<wire.ReaderFit>(tester, '适宽');
         final originalRequest = platform.businessServer.requests
             .where((request) => request.uri.path == '/api/settings/mutations')
             .single;
@@ -842,7 +845,6 @@ void main() {
         );
         await _openSettings(tester);
         final initial = globalSettings(tester);
-        await _choose<wire.ReaderFit>(tester, '适宽');
         platform.afterBusinessReply = (request, reply) {
           if (request.method != 'POST' ||
               request.uri.path != '/api/settings/mutations') {
@@ -856,7 +858,7 @@ void main() {
             body: '{',
           );
         };
-        await _tap(tester, find.text('保存全局设置'));
+        await _choose<wire.ReaderFit>(tester, '适宽');
         final originalRequest = platform.businessServer.requests
             .where((request) => request.uri.path == '/api/settings/mutations')
             .single;
@@ -943,7 +945,6 @@ void main() {
         );
         await _openSettings(tester);
         final previous = globalSettings(tester);
-        await _choose<wire.ReaderFit>(tester, '适宽');
         original.afterBusinessReply = (request, reply) {
           if (request.method != 'POST' ||
               request.uri.path != '/api/settings/mutations') {
@@ -957,7 +958,7 @@ void main() {
             body: '{',
           );
         };
-        await _tap(tester, find.text('保存全局设置'));
+        await _choose<wire.ReaderFit>(tester, '适宽');
         final oldRequest = original.businessServer.requests
             .where((request) => request.uri.path == '/api/settings/mutations')
             .single;
@@ -1011,7 +1012,6 @@ void main() {
           expect(original.disposalCount, 0);
         }
         await _choose<wire.ReaderFit>(tester, '适高');
-        await _tap(tester, find.text('保存全局设置'));
         final newRequest = replacement.businessServer.requests
             .where((request) => request.uri.path == '/api/settings/mutations')
             .last;
@@ -1048,7 +1048,7 @@ void main() {
   }
 
   testWidgets(
-    'device appearance saves immediately and confirmed reader defaults are inherited by a manga',
+    'the saved device appearance and account defaults apply to a manga',
     (tester) async {
       final platform = _platform();
       await _start(tester, platform);
@@ -1064,15 +1064,7 @@ void main() {
         platform.businessServer.requests.where(
           (request) => request.uri.path == '/api/settings/mutations',
         ),
-        isEmpty,
-      );
-      await _tap(tester, find.text('保存全局设置'));
-      expect(
-        tester
-            .widget<CupertinoApp>(find.byType(CupertinoApp))
-            .theme
-            ?.brightness,
-        Brightness.dark,
+        hasLength(8),
       );
       final catalog = await _details(tester);
       final inherited = await tester.runAsync(
@@ -1314,13 +1306,10 @@ void main() {
       final platform = _platform();
       await _start(tester, platform);
       await _globalDefaults(tester);
-      await _tap(tester, find.text('保存全局设置'));
       final catalog = await _details(tester);
       await _tap(tester, find.text('第一章'));
       final leafBeforeFit = _reader(tester).key;
       await _tap(tester, iconButton('阅读设置'));
-      await _chooseField<wire.ReaderFit>(tester, '图像适配', '适宽');
-      expect(find.text('修改尚未保存。'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byType(MangaSettingsEditor),
@@ -1339,7 +1328,6 @@ void main() {
       await _tap(tester, iconButton('阅读设置'));
       await _chooseField<wire.ReaderFit>(tester, '图像适配', '适高');
       await _chooseField<bool>(tester, '裁白', '关闭');
-      await _tap(tester, find.text('保存'));
       await _closeModal(tester);
       expect(_reader(tester).key, leafBeforeFit);
       expect(_reader(tester).fit, ReaderFit.height);
@@ -1387,7 +1375,6 @@ void main() {
       await _dim(tester, 'manga', zero: true);
       await _chooseField<wire.ReaderInputPreset>(tester, '分页点击区', '标准');
       await _chooseField<wire.ReaderInputPreset>(tester, '阅读快捷键', '反向');
-      await _tap(tester, find.text('保存'));
       expect(_reader(tester).key, leafBeforeAppearance);
       expect(_reader(tester).fit, ReaderFit.contain);
       expect(_reader(tester).cropBorders, false);
@@ -1405,7 +1392,6 @@ void main() {
       expect(snapshot.overrides!.hasDimPercent(), true);
       expect(snapshot.overrides!.dimPercent, 0);
       await _choose<wire.ReaderMode>(tester, '跟随全局');
-      await _tap(tester, find.text('保存'));
       snapshot = await tester.runAsync(
         () => catalog.settings!.loadManga(_mangaKey),
       );
@@ -1419,7 +1405,6 @@ void main() {
       expect(_reader(tester).doublePage, false);
       await _tap(tester, iconButton('阅读设置'));
       await _choose<wire.ReaderPageLayout>(tester, '跟随全局');
-      await _tap(tester, find.text('保存'));
       snapshot = await tester.runAsync(
         () => catalog.settings!.loadManga(_mangaKey),
       );
@@ -1503,14 +1488,13 @@ void main() {
         hasLength(writes),
       );
       await _tap(tester, iconButton('阅读设置'));
+      final leafBeforeInheritance = _reader(tester).key;
       await _chooseField<wire.ReaderFit>(tester, '图像适配', '跟随全局');
       await _chooseField<bool>(tester, '裁白', '跟随全局');
       await _chooseField<wire.ReaderBackground>(tester, '阅读背景', '跟随全局');
       await _tap(tester, find.byKey(const ValueKey('manga-dim-inherit')));
       await _chooseField<wire.ReaderInputPreset>(tester, '分页点击区', '跟随全局');
       await _chooseField<wire.ReaderInputPreset>(tester, '阅读快捷键', '跟随全局');
-      final leafBeforeInheritance = _reader(tester).key;
-      await _tap(tester, find.text('保存'));
       snapshot = await tester.runAsync(
         () => catalog.settings!.loadManga(_mangaKey),
       );
@@ -1539,8 +1523,14 @@ void main() {
     (tester) async {
       final platform = _platform();
       await _start(tester, platform, size: const Size(480, 800));
-      await _globalDefaults(tester);
-      var truncateNextAck = true;
+      int? priorWrites;
+      int? priorApplied;
+      var truncateNextAck = false;
+      final server = platform.businessServer;
+      List<String?> writes() => server.requests
+          .where((request) => request.uri.path == '/api/settings/mutations')
+          .map((request) => request.body)
+          .toList();
       platform.afterBusinessReply = (request, reply) {
         if (truncateNextAck &&
             request.method == 'POST' &&
@@ -1555,12 +1545,16 @@ void main() {
         }
         return reply;
       };
-      await _tap(tester, find.text('保存全局设置'));
-      final writes = platform.businessServer.requests
-          .where((request) => request.uri.path == '/api/settings/mutations')
-          .toList();
-      expect(writes, hasLength(1));
-      final original = writes.single.body;
+      await _globalDefaults(
+        tester,
+        beforeLastChoice: () {
+          priorWrites = writes().length;
+          priorApplied = server.appliedMutations;
+          truncateNextAck = true;
+        },
+      );
+      expect(writes(), hasLength(priorWrites! + 1));
+      final original = writes().last;
       expect(find.text('设置尚未确认，本会话保留原操作。'), findsOneWidget);
       await _tap(tester, _navigation('浏览'));
       await _openSettings(tester);
@@ -1614,20 +1608,10 @@ void main() {
         wire.ReaderInputPreset.READER_INPUT_PRESET_DISABLED,
       );
       await _tap(tester, find.text('重新读取设置'));
-      expect(
-        platform.businessServer.requests.where(
-          (request) => request.uri.path == '/api/settings/mutations',
-        ),
-        hasLength(1),
-      );
+      expect(writes(), hasLength(priorWrites! + 1));
       await _tap(tester, find.text('重试原设置操作'));
-      expect(
-        platform.businessServer.requests
-            .where((request) => request.uri.path == '/api/settings/mutations')
-            .map((request) => request.body),
-        [original, original],
-      );
-      expect(platform.businessServer.appliedMutations, 1);
+      expect(writes().skip(priorWrites!), [original, original]);
+      expect(server.appliedMutations, priorApplied! + 1);
       final catalog = await _details(tester);
       await _tap(tester, find.text('第一章'));
       expect(_reader(tester).fit, ReaderFit.width);

@@ -17,14 +17,20 @@ enum SettingsActivity { reading, saving }
 final class const SettingsState({
   final SettingsSnapshot? snapshot,
   final SettingsDraft? pending,
+  final wire.SettingsMutation? submitting,
+  final wire.SettingsMutation? unsent,
   final bool available = false,
   final SettingsActivity? activity,
   final String? error,
   final SettingsFailure? failure,
 }) {
   bool get busy => activity != null;
-  bool get canEdit => available && !busy && snapshot != null && pending == null;
-  bool get canRefresh => available && !busy;
+  bool get _canStart =>
+      available && !busy && snapshot != null && pending == null;
+  bool get canEdit => _canStart && submitting == null && unsent == null;
+  bool get canChange =>
+      canEdit || (available && submitting != null && failure == null);
+  bool get canRefresh => available && !busy && submitting == null;
   bool get canRetry => available && !busy && pending?.retryable == true;
 }
 
@@ -34,6 +40,9 @@ final class const SettingsState({
 class SettingsController extends _$SettingsController {
   Object _generation = Object();
   int _wantedGlobalRevision = -1;
+  wire.SettingsMutation? _submitting;
+  wire.SettingsMutation? _unsent;
+  void Function()? _releaseAutosave;
 
   @override
   SettingsState build(
@@ -43,6 +52,9 @@ class SettingsController extends _$SettingsController {
   }) {
     final account = ref.watch(confirmedAccountProvider(catalog));
     final generation = _generation = Object();
+    _submitting = null;
+    _unsent = null;
+    _releaseAutosave = null;
     final initial = mangaKey == null ? catalog.installationSettings : null;
     final pending = _pending();
     final failure = _rejection(pending);
@@ -124,6 +136,8 @@ class SettingsController extends _$SettingsController {
   }) => SettingsState(
     snapshot: snapshot ?? state.snapshot,
     pending: _pending(),
+    submitting: _submitting,
+    unsent: _unsent,
     available: _current(_generation),
     activity: activity,
     error: error,
@@ -133,6 +147,8 @@ class SettingsController extends _$SettingsController {
   void _refreshInheritance() {
     if (mangaKey != null &&
         state.canRefresh &&
+        _submitting == null &&
+        _unsent == null &&
         state.pending == null &&
         state.error == null &&
         _wantedGlobalRevision > (state.snapshot?.globalRevision ?? -1)) {
@@ -149,6 +165,11 @@ class SettingsController extends _$SettingsController {
           ? await repository!.loadGlobal()
           : await repository!.loadManga(mangaKey!);
       if (!_current(generation)) return false;
+      if (_pending() == null && _submitting == null) {
+        _unsent = null;
+        _releaseAutosave?.call();
+        _releaseAutosave = null;
+      }
       state = _next(snapshot: snapshot);
       return true;
     } catch (_) {
@@ -173,6 +194,84 @@ class SettingsController extends _$SettingsController {
     }
   }
 
+  void queueGlobal(wire.GlobalSettingsValues values) =>
+      _queue(wire.SettingsMutation(setGlobal: values.deepCopy()));
+
+  void queueOverrides(wire.ReaderSettingsOverride overrides) => _queue(
+    wire.SettingsMutation(
+      setManga: wire.SetMangaReaderSettings(
+        mangaKey: mangaKey!,
+        overrides: overrides.deepCopy(),
+      ),
+    ),
+  );
+
+  int? get _scopeRevision => mangaKey == null
+      ? state.snapshot?.globalRevision
+      : state.snapshot?.mangaRevision;
+
+  void _queue(wire.SettingsMutation edit) {
+    if (!_current(_generation) || !state.canChange) return;
+    final submitting = _submitting;
+    if (submitting == null) {
+      edit.expectedRevision = _scopeRevision!;
+      _unsent = edit..freeze();
+      _releaseAutosave ??= ref.keepAlive().close;
+      unawaited(_drainAutosave());
+      return;
+    }
+    edit.expectedRevision = submitting.expectedRevision + 1;
+    // If the final selection returns to the in-flight values, that ACK
+    // satisfies the editor without another revision.
+    final sameValues = edit.hasSetGlobal()
+        ? edit.setGlobal == submitting.setGlobal
+        : edit.setManga.overrides == submitting.setManga.overrides;
+    _unsent = sameValues ? null : (edit..freeze());
+    state = _next(activity: state.activity);
+  }
+
+  Future<void> _drainAutosave() async {
+    final generation = _generation;
+    while (_current(generation) && state._canStart && _unsent != null) {
+      final edit = _unsent!;
+      if (edit.expectedRevision != _scopeRevision) {
+        state = _next(
+          failure: SettingsFailure.conflict,
+          error: _failureMessage(SettingsFailure.conflict),
+        );
+        break;
+      }
+
+      _submitting = edit;
+      _unsent = null;
+      final saved = await _save(
+        (onAcknowledged) => edit.hasSetGlobal()
+            ? repository!.setGlobal(
+                values: edit.setGlobal,
+                basedOnRevision: edit.expectedRevision,
+                onAcknowledged: onAcknowledged,
+              )
+            : repository!.setManga(
+                mangaKey: edit.setManga.mangaKey,
+                overrides: edit.setManga.overrides,
+                basedOnRevision: edit.expectedRevision,
+                onAcknowledged: onAcknowledged,
+              ),
+        automatic: true,
+      );
+      if (!_current(generation)) return;
+      _submitting = null;
+      state = _next(error: state.error, failure: state.failure);
+      if (!saved) break;
+    }
+    if (!_current(generation)) return;
+    if (_unsent == null) {
+      _releaseAutosave?.call();
+      _releaseAutosave = null;
+    }
+    _refreshInheritance();
+  }
+
   Future<bool> saveGlobal(wire.GlobalSettingsValues values, int revision) =>
       _save(
         (onAcknowledged) => repository!.setGlobal(
@@ -195,10 +294,11 @@ class SettingsController extends _$SettingsController {
   );
 
   Future<bool> retry() async {
-    if (!_current(_generation)) return false;
+    final generation = _generation;
+    if (!_current(generation)) return false;
     final pending = state.pending;
     if (!state.canRetry || pending == null) return false;
-    return _save(
+    final saved = await _save(
       (onAcknowledged) => mangaKey == null
           ? repository!.setGlobal(
               values: pending.global!,
@@ -213,14 +313,21 @@ class SettingsController extends _$SettingsController {
             ),
       retrying: true,
     );
+    if (saved && _current(generation) && _unsent != null) {
+      unawaited(_drainAutosave());
+    }
+    return saved;
   }
 
   Future<bool> _save(
     Future<SettingsSnapshot> Function(void Function() onAcknowledged) send, {
     bool retrying = false,
+    bool automatic = false,
   }) async {
     if (!_current(_generation) ||
-        !(retrying ? state.canRetry : state.canEdit)) {
+        !(retrying
+            ? state.canRetry
+            : (automatic ? state._canStart : state.canEdit))) {
       return false;
     }
     final generation = _generation;

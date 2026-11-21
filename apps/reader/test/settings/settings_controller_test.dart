@@ -57,6 +57,80 @@ void main() {
   List<TestBusinessRequest> writes() =>
       server.requests.where((request) => request.method == 'POST').toList();
 
+  Future<void> until(bool Function() condition) async {
+    for (var turn = 0; turn < 100; turn++) {
+      if (condition()) return;
+      await Future<void>.delayed(Duration.zero);
+    }
+    fail('Settings autosave did not reach the expected state');
+  }
+
+  test('autosave waits for confirmation and merges the remaining choices into one write', () async {
+    expect(await controller.refresh(), true);
+    holdNextWrite = true;
+    controller.queueGlobal(_global());
+    await received.future;
+    expect(state().snapshot!.globalRevision, 0);
+    expect(state().canChange, true);
+    expect(state().canEdit, false);
+    controller.queueGlobal(_global(fit: wire.ReaderFit.READER_FIT_HEIGHT));
+    controller.queueGlobal(
+      _global(
+        fit: wire.ReaderFit.READER_FIT_HEIGHT,
+        layout: wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
+      ),
+    );
+    expect(state().unsent!.expectedRevision, 1);
+    expect(writes(), hasLength(1));
+
+    release.complete();
+    await until(() => state().canEdit && state().snapshot!.globalRevision == 2);
+    expect(state().unsent, isNull);
+    expect(writes(), hasLength(2));
+    expect(
+      state().snapshot!.effectiveReader.fit,
+      wire.ReaderFit.READER_FIT_HEIGHT,
+    );
+    expect(
+      state().snapshot!.effectiveReader.pageLayout,
+      wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
+    );
+  });
+
+  test('autosave pauses later changes until the lost acknowledgment is retried exactly', () async {
+    expect(await controller.refresh(), true);
+    var first = true;
+    fixture.platform.afterBusinessReply = (request, reply) async {
+      if (first && request.method == 'POST') {
+        first = false;
+        received.complete();
+        await release.future;
+        throw StateError('Simulated lost acknowledgment');
+      }
+      return reply;
+    };
+    controller.queueGlobal(_global());
+    await received.future;
+    final original = writes().single.body;
+    controller.queueGlobal(_global(fit: wire.ReaderFit.READER_FIT_HEIGHT));
+    release.complete();
+    await until(() => state().canRetry && state().submitting == null);
+    expect(state().snapshot!.globalRevision, 0);
+    expect(state().canChange, false);
+    expect(
+      state().unsent!.setGlobal.reader.fit,
+      wire.ReaderFit.READER_FIT_HEIGHT,
+    );
+    expect(writes(), hasLength(1));
+
+    expect(await controller.retry(), true);
+    await until(() => state().canEdit && state().snapshot!.globalRevision == 2);
+    expect(writes(), hasLength(3));
+    expect(writes()[1].body, original);
+    expect(writes()[2].body, isNot(original));
+    expect(server.appliedMutations, 2);
+  });
+
   test('recreating a settings editor retains the known rejection instead of calling it unknown', () async {
     await controller.refresh();
     expect(await controller.saveGlobal(_global(), 1), false);
@@ -179,21 +253,25 @@ void main() {
   });
 
   test(
-    'identity changes discard old views before a late settings ACK',
+    'identity changes discard queued preferences before a late settings ACK',
     () async {
       await controller.refresh();
       holdNextWrite = true;
-      final write = controller.saveGlobal(_global(), 0);
+      controller.queueGlobal(_global());
       await received.future;
+      controller.queueGlobal(_global(fit: wire.ReaderFit.READER_FIT_HEIGHT));
+      expect(state().unsent, isNotNull);
       fixture.platform.bootstrapSubject = 'another-owner';
       await fixture.catalog.connect();
+      expect(state().unsent, isNull);
       expect(
         state().snapshot!.global.reader.fit,
         wire.ReaderFit.READER_FIT_CONTAIN,
       );
       expect(state().pending, isNull);
       release.complete();
-      expect(await write, false);
+      await Future<void>.delayed(Duration.zero);
+      expect(writes(), hasLength(1));
       expect(state().snapshot!.globalRevision, 0);
       expect(
         state().snapshot!.global.reader.fit,

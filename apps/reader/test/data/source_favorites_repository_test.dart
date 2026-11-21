@@ -357,7 +357,6 @@ void main() {
       await tap(reading);
       await tap(find.byType(ChoiceField<wire.ReaderFit>));
       await tap(find.text('适高').last);
-      await tap(find.text('保存全局设置'));
       final current = await tester.runAsync(repository.loadGlobal);
       final expectedReader = original.reader.deepCopy()
         ..fit = wire.ReaderFit.READER_FIT_HEIGHT;

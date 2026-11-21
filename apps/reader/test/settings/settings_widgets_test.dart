@@ -113,18 +113,35 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> tap(WidgetTester tester, Finder finder) async {
+  Future<void> tap(
+    WidgetTester tester,
+    Finder finder, {
+    bool settle = true,
+  }) async {
     await tester.ensureVisible(finder);
     await tester.runAsync(() async {
       await tester.tap(finder);
       await Future<void>.delayed(Duration.zero);
     });
-    await tester.pumpAndSettle();
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
   }
 
-  Future<void> select<T>(WidgetTester tester, String label) async {
+  Future<void> select<T>(
+    WidgetTester tester,
+    String label, {
+    bool settle = true,
+  }) async {
     await tap(tester, find.byType(ChoiceField<T>));
-    await tap(tester, find.widgetWithText(CupertinoMenuItem, label));
+    await tap(
+      tester,
+      find.widgetWithText(CupertinoMenuItem, label),
+      settle: settle,
+    );
   }
 
   List<TestBusinessRequest> writes() =>
@@ -287,36 +304,21 @@ void main() {
             ),
             findsOneWidget,
           );
-          await select<wire.ReaderMode>(tester, '从右到左');
-          expect(find.text('修改尚未保存。'), findsOneWidget);
-          expect(find.text('修改尚未保存。').hitTestable(), findsOneWidget);
-          await tester.ensureVisible(find.text('保存'));
-          await tester.tap(find.text('保存'));
+          await select<wire.ReaderMode>(tester, '从右到左', settle: false);
           await tester.runAsync(() => saving.future);
           await tester.pump();
           expect(find.text('正在等待服务端确认设置修改'), findsOneWidget);
           expect(find.text('正在等待服务端确认设置修改').hitTestable(), findsOneWidget);
           expect(find.text('正在读取服务端设置'), findsNothing);
-          expect(find.text('修改尚未保存。'), findsNothing);
+          expect(find.text('有修改等待发送。'), findsNothing);
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
           expect(
-            enabled(find.widgetWithText(CupertinoButton, '保存')),
-            Tristate.isFalse,
-          );
-          expect(
             enabled(find.widgetWithText(CupertinoButton, '关闭')),
-            Tristate.isFalse,
-          );
-          expect(
-            tester
-                .widget<CupertinoButton>(
-                  find.widgetWithText(CupertinoButton, '关闭'),
-                )
-                .onPressed,
-            isNull,
+            Tristate.isTrue,
           );
           expect(state(manga: true).canEdit, false);
-          expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, false);
+          expect(state(manga: true).canChange, true);
+          expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, true);
           releaseSave.complete();
           await tester.runAsync(() => Future<void>.delayed(Duration.zero));
           await tester.pumpAndSettle();
@@ -345,13 +347,12 @@ void main() {
           );
           expect(find.text('当前设置已获服务端确认。'), findsOneWidget);
 
-          await select<wire.ReaderMode>(tester, '竖向连续');
           reloadGate = Completer<void>();
           await tester.ensureVisible(find.text('重新读取设置'));
           await tester.tap(find.text('重新读取设置'));
           await tester.pump();
           expect(find.text('正在读取服务端设置'), findsOneWidget);
-          expect(find.text('修改尚未保存。'), findsOneWidget);
+          expect(find.text('有修改等待发送。'), findsNothing);
           expect(find.text('正在读取服务端设置').hitTestable(), findsOneWidget);
           expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, true);
           expect(find.text('正在等待服务端确认设置修改'), findsNothing);
@@ -364,9 +365,7 @@ void main() {
             state(manga: true).snapshot!.overrides!.mode,
             wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
           );
-          expect(find.text('修改尚未保存。'), findsNothing);
           expect(writes(), hasLength(2));
-          await select<wire.ReaderMode>(tester, '竖向连续');
           final remoteClient = BusinessStateClient(
             api: server,
             identity: client.identity,
@@ -381,7 +380,7 @@ void main() {
               basedOnRevision: 1,
             ),
           );
-          await tap(tester, find.text('保存'));
+          await select<wire.ReaderMode>(tester, '竖向连续');
           expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
           expect(find.text('重试原设置操作'), findsNothing);
           expect(state(manga: true).canEdit, false);
@@ -537,7 +536,7 @@ void main() {
     );
 
     testWidgets(
-      'settings directory preserves its draft through categories and resize in $appearance',
+      'settings directory keeps the saved choice through categories and resize in $appearance',
       (tester) async {
         tester.platformDispatcher.platformBrightnessTestValue =
             appearance == Brightness.light ? Brightness.dark : Brightness.light;
@@ -586,7 +585,7 @@ void main() {
         );
         await tap(tester, find.byType(CupertinoNavigationBarBackButton));
         expect(find.byKey(const ValueKey('global-fit')), findsNothing);
-        expect(find.text('修改尚未保存。'), findsOneWidget);
+        expect(find.text('有修改等待发送。'), findsNothing);
         await openSettingsSection(tester, 'reading');
         expect(
           tester
@@ -596,11 +595,12 @@ void main() {
               .value,
           wire.ReaderFit.READER_FIT_WIDTH,
         );
+        await select<wire.ReaderFit>(tester, '适宽');
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('global-fit')), findsNothing);
-        expect(find.text('修改尚未保存。'), findsOneWidget);
-        expect(writes(), isEmpty);
+        expect(find.text('有修改等待发送。'), findsNothing);
+        expect(writes(), hasLength(1));
         expect(tester.takeException(), isNull);
         await hide(tester);
       },
@@ -639,12 +639,11 @@ void main() {
   });
 
   testWidgets(
-    'a dirty global draft keeps its opening CAS until explicit conflict reload',
+    'autosave keeps the opening CAS and requires explicit conflict reload',
     (tester) async {
       final controller = editor();
       await tester.runAsync(controller.refresh);
       await show(tester, controller);
-      await select<wire.ReaderFit>(tester, '适宽');
       final remoteClient = BusinessStateClient(
         api: server,
         identity: client.identity,
@@ -655,19 +654,9 @@ void main() {
           values: _global(fit: wire.ReaderFit.READER_FIT_HEIGHT),
           basedOnRevision: 0,
         );
-        await repository.loadGlobal();
       });
-      await tester.pumpAndSettle();
-      expect(state().snapshot!.globalRevision, 1);
-      expect(
-        tester
-            .widget<ChoiceField<wire.ReaderFit>>(
-              find.byKey(const ValueKey('global-fit')),
-            )
-            .value,
-        wire.ReaderFit.READER_FIT_WIDTH,
-      );
-      await tap(tester, find.text('保存全局设置'));
+      expect(state().snapshot!.globalRevision, 0);
+      await select<wire.ReaderFit>(tester, '适宽');
       expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
       expect(find.text('设置尚未确认，本会话保留原操作。'), findsNothing);
       expect(find.text('重试原设置操作'), findsNothing);
@@ -687,7 +676,7 @@ void main() {
             .value,
         wire.ReaderFit.READER_FIT_HEIGHT,
       );
-      await tap(tester, find.text('保存全局设置'));
+      await select<wire.ReaderFit>(tester, '适宽');
       expect(
         wire
             .decodeProtoJson(
@@ -726,7 +715,6 @@ void main() {
         isNull,
       );
       await select<wire.ReaderPageLayout>(tester, '自动');
-      await tap(tester, find.text('保存'));
       expect(state(manga: true).snapshot!.overrides!.hasPageLayout(), true);
       expect(
         state(manga: true).snapshot!.effectiveReader.pageLayout,
@@ -741,7 +729,6 @@ void main() {
             .value,
         isNull,
       );
-      await tap(tester, find.text('保存'));
       expect(state(manga: true).snapshot!.overrides!.hasPageLayout(), false);
       expect(
         state(manga: true).snapshot!.effectiveReader.pageLayout,
@@ -758,7 +745,6 @@ void main() {
     final controller = editor(manga: true);
     await tester.runAsync(controller.refresh);
     await show(tester, controller, manga: true);
-    await select<wire.ReaderPageLayout>(tester, '自动');
     final remoteClient = BusinessStateClient(
       api: server,
       identity: client.identity,
@@ -773,7 +759,7 @@ void main() {
         basedOnRevision: 0,
       ),
     );
-    await tap(tester, find.text('保存'));
+    await select<wire.ReaderPageLayout>(tester, '自动');
     expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
     expect(find.text('设置尚未确认，本会话保留原操作。'), findsNothing);
     expect(find.text('重试原设置操作'), findsNothing);
@@ -800,13 +786,12 @@ void main() {
         var controller = editor(manga: manga);
         await tester.runAsync(controller.refresh);
         await show(tester, controller, manga: manga);
+        server.loseNextResponse = true;
         if (manga) {
           await select<wire.ReaderPageLayout>(tester, '自动');
         } else {
           await select<wire.ReaderFit>(tester, '适宽');
         }
-        server.loseNextResponse = true;
-        await tap(tester, find.text(manga ? '保存' : '保存全局设置'));
         final original = writes().single.body;
         expect(server.appliedMutations, 1);
         expect(state(manga: manga).pending?.retryable, true);
@@ -854,14 +839,6 @@ void main() {
             isNull,
           );
         }
-        expect(
-          tester
-              .widget<CupertinoButton>(
-                find.widgetWithText(CupertinoButton, manga ? '保存' : '保存全局设置'),
-              )
-              .onPressed,
-          isNull,
-        );
         await tap(tester, find.text('重新读取设置'));
         expect(writes(), hasLength(1));
         await tap(tester, find.text('重试原设置操作'));
