@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**Web 0.1.0、API 与中文/全语言七材料首批已上线；其余语言基线及增量部署待验收，原生验证停止**。首次切换见[首发记录](../verification/first-web-release.md)，当前生产身份见[七材料发布](../verification/seven-material-release.md#首批生产发布与验收)。
+Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。首次切换见[首发记录](../verification/first-web-release.md)。**Web 与 API 已上线，封面宿主全量升级进行中，原生验证暂停。**
 
 Web/API 按[原型自动上线流程](../DEPLOYMENT.md)在主线 CI 成功后发布，复用同轮构建与现网扩展快照；[浏览 UI 已上线](../verification/browse-ui-flow.md#生产发布)。扩展操作入口见 [EXTENSIONS](../EXTENSIONS.md)，材料契约见 [RUNTIME-MATERIALS](../RUNTIME-MATERIALS.md)，包体方案见 [AOT-SIZE](../AOT-SIZE.md)。扩展 Release/R2 发布实现已删除。实际证据见 [VERIFICATION](../VERIFICATION.md)。
 
@@ -29,6 +29,16 @@ clab 冻结全量与三个定向补编已结束；[六材料完整候选](../ver
 同日用户指定中文和全语言优先，完成这两类后即上线。原全量队列及其子进程已安全退出；全语言 138 包已有终态，中文 59 包使用相同冻结输入、正式逐包入口和状态锁在 clab 双并发构建。按[分批首发记录](../verification/seven-material-release.md#中文与全语言优先首发)先部署已有新材料结果，其余语言随后补齐；首批不能沿用六材料的完整基线标记，完整目录仍待本地完成并确认后再恢复增量 CI。
 
 2026-11-11 19:25（UTC+8），[中文与全语言首批](../verification/seven-material-release.md#首批生产发布与验收)已完成 197 包终态和生产发布；加入已完成的 7 个阿拉伯语包后，190 包进入七材料目录，14 个编译失败。新 Worker 全部流量、26 条匿名路径、D1 账本、真实 Access 下 xkcd 更新/两页保存/新标签续读与正式 checkpoint 均确认。候选保持 `bootstrap.complete=false`；其余 1,244 包已从新检查点在 clab 通过正式入口恢复，完整基线和真实有界增量仍待完成。
+
+### 封面宿主全量升级
+
+2026-11-22，生产父快照 `ddb5ac8f3b2a46cb8efc2dafc440b3d4` 的公开索引和状态已核对。现网 191 个构建中，Arknights Comics 1.6.2 已带有普通封面的宿主入口。随后在 `ssh macbook-pro-4` 固定检出主线 `af8c203` 和 Keiyoushi `efa93f5a`，按当前工具链准备[首次全量](../EXTENSIONS.md#首次本地全量与恢复)。[生产证据](../VERIFICATION.md)
+
+远端冻结计划覆盖 1,448 个包，发现失败为 0。现网 Arknights Comics 的构建输入与新计划一致。xkcd 试编通过后，远端以两路并发启动其余 1,447 个包的全量计划，并复用已验证的 xkcd 结果。两路测试时构建进程占用约 1.3 GiB，系统内存余量为 60%，未使用交换空间。原进程释放检查点锁后，以同一计划和检查点恢复为四路并发。
+
+- [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
+- [ ] 核对完整目录的逐包结果及失败诊断，确认仍在线的旧包都取得可用的新构建，复验所有候选构建导出了封面入口，并在代表源核对实际封面读取。
+- [ ] 用正式构建和 Wrangler 发布完整候选。切换后核对流量、公开索引和状态字节，提交正式 checkpoint，再验收有界增量工作流。
 
 [首发六材料产品归档](../verification/aot-current-pilot.md#首发六材料产品归档)已带上本机服务地址、Native 登录与阅读恢复修复，回摘前后宿主指纹和六份材料完全一致。隔离 HTTP 回跳通过；原生正式签名和生产 Access 另验。
 
