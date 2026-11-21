@@ -1,4 +1,5 @@
 import '../../widgets/app_routes.dart';
+import '../../widgets/adaptive_detail_layout.dart';
 import '../../widgets/app_empty_state.dart';
 import '../../widgets/choice_field.dart';
 
@@ -161,16 +162,16 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       if (details == null || !isCurrent()) return;
       Future<void> showDetails({String? notice}) async {
         if (!isCurrent() || !controller.isCurrentSource(details.source)) return;
-        await Navigator.of(context).push<void>(
-          AppPageRoute<void>(
-            builder: (_) => MangaDetailsPage(
-              controller: controller,
-              manga: details.manga,
-              chapters: details.chapters,
-              source: details.source,
-              notice: notice,
-              onAuthenticateReader: widget.onAuthenticateReader,
-            ),
+        await openAdaptiveDetail(
+          context,
+          (_, close) => MangaDetailsPage(
+            controller: controller,
+            manga: details.manga,
+            chapters: details.chapters,
+            source: details.source,
+            notice: notice,
+            onClose: close,
+            onAuthenticateReader: widget.onAuthenticateReader,
           ),
         );
       }

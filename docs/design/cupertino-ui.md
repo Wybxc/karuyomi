@@ -11,7 +11,7 @@
 - 应用根改为 `CupertinoApp`，中文及英文 delegates 使用 `GlobalCupertinoLocalizations.delegates`。主题使用 `CupertinoThemeData`、`CupertinoColors` 和在当前上下文解析的 `CupertinoDynamicColor`，统一替换 Material 的 `ThemeData` / `ColorScheme`。
 - 服务端 `AppTheme` 继续表达跟随系统、浅色、深色；客户端分别映射到未指定 `brightness`、`Brightness.light`、`Brightness.dark`。主题切换仍由已确认设置驱动，未确认草稿单独展示，不引入平台分支或更改协议枚举。
 - 最终主题采用官方系统蓝、label/secondaryLabel、分组背景/表面、separator、系统红/绿，颜色随亮暗、提高对比度和界面层级解析。保留官方文字和绿色开关默认值；导航/阅读工具使用不透明系统背景，保持已决定的无玻璃方案。Mihon 的固定 Material 色值只作第一阶段测量证据。
-- 保留书架、浏览、设置三个入口、一个根业务 Navigator，以及按当前入口挂载业务页的策略。各窗口统一使用官方 `CupertinoTabBar`；宽屏由设置等页面内部采用目录/详情分栏，不保留第一阶段的 Material 式80dp侧栏和选中胶囊。
+- 保留书架、浏览、设置三个入口和根业务 Navigator。紧凑窗口使用 Cupertino 底部标签，空间充足时使用带文字的 Cupertino 侧栏。设置、书架和 Source 浏览还按各自剩余宽度安排目录或列表与详情。Reader 从根导航独立打开。
 - 不引入每个 tab 的嵌套 Navigator 或隐藏业务树。`CupertinoTabScaffold` / `CupertinoTabView` 会保留已访问的 tab；直接套用会改变当前退订与 Source 生命周期，不能只为导航外观采用。
 - 普通页面使用 `CupertinoPageRoute`；`AppPageRoute` 仅集中实现系统减少动态效果时淡化、禁用动画时直接切换的既有无障碍策略。设置目录/详情的内层 Navigator 使用同策略的声明式 `AppPage`，尺寸切换保持详情身份，系统返回回到目录；它只管理设置的UI层级，不增加 Source 业务树。内层导航放在独立语义容器内，防止路由的 `BlockSemantics` 隐藏同时可见的左侧目录。弹层直接使用官方 Cupertino 路由与返回值，不扩展为自建路由或设计系统。
 
@@ -53,7 +53,7 @@ Cupertino 缺少某种组件时，先检查原交互是否仍有必要。可以�
 
 设置编辑直接采用官方 `CupertinoFormSection.insetGrouped`，由其提供辅助说明的小字号和次级文字色；目录仍使用 `CupertinoListSection`。调暗标签和滑块合为一行内容，不把说明或留白作为带分隔线的独立列表项。服务地址不需要浏览器自动填充，显式使用 `autofillHints:null`；Web 地址按既有同源约定只读，Native 保留编辑。离开连接栏目应释放平台输入连接，不能留下旧地址或“提交”的合成表单。
 
-统一 Cupertino 外观，同时保留触屏、鼠标和键盘操作。核心操作不依赖长按或滑动发现；Tab、Enter、Escape、滚动、中文输入与文本选择可用，菜单/弹层关闭后焦点回到触发位置。窄屏从 360px 起验证，宽屏用页面内分栏和合理内容宽度；控件有语义名称、足够触控区域，状态不只靠颜色表达。
+统一 Cupertino 外观，同时保留触屏、鼠标和键盘操作。核心操作不依赖长按或滑动发现；Tab、Enter、Escape、滚动、中文输入与文本选择可用，菜单/弹层关闭后焦点回到触发位置。栏位按组件约束和系统字号决定。窗口缩窄时，已在双栏打开的详情占据当前内容区，原列表保持状态。紧凑窗口新打开的详情沿用 Cupertino 路由。控件提供语义名称与触控区域。
 
 浅色、深色、跟随系统、文字缩放和减少动态效果纳入组件回归。桌面视口模拟只能作为 Web 布局证据，实际设备安全区、原生 Access 和三端读写继续单独验收。
 

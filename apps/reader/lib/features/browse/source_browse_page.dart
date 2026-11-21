@@ -1,5 +1,6 @@
 import '../../theme/app_theme.dart';
 import '../../widgets/app_routes.dart';
+import '../../widgets/adaptive_detail_layout.dart';
 
 import 'dart:async';
 
@@ -229,6 +230,7 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
   }
 
   Future<void> _leave() async {
+    if (await backFromAdaptiveDetail(context) || !mounted) return;
     if (_leaving) return;
     setState(() => _leaving = true);
     final id = _preparation;
@@ -265,15 +267,15 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
       setState(() => _error = catalog.error);
       return;
     }
-    await Navigator.of(context).push<void>(
-      AppPageRoute(
-        builder: (_) => MangaDetailsPage(
-          controller: catalog,
-          manga: details.manga,
-          chapters: details.chapters,
-          source: details.source,
-          onAuthenticateReader: widget.onAuthenticateReader,
-        ),
+    await openAdaptiveDetail(
+      context,
+      (_, close) => MangaDetailsPage(
+        controller: catalog,
+        manga: details.manga,
+        chapters: details.chapters,
+        source: details.source,
+        onClose: close,
+        onAuthenticateReader: widget.onAuthenticateReader,
       ),
     );
     if (mounted) setState(() {});

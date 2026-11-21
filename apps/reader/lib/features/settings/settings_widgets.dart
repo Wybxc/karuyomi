@@ -1,6 +1,7 @@
 import '../../widgets/choice_field.dart';
 import '../../widgets/edit_sheet.dart';
 import '../../widgets/app_routes.dart';
+import '../../widgets/adaptive_layout.dart';
 import '../../theme/app_theme.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -531,9 +532,7 @@ class const _SettingsEditor({
           )
         : LayoutBuilder(
             builder: (context, constraints) {
-              final wide =
-                  constraints.maxWidth >= 600 &&
-                  MediaQuery.sizeOf(context).shortestSide >= 600;
+              final wide = fitsColumns(context, constraints, minimumWidth: 600);
               final section = selected.value ?? _SettingsSection.appearance;
               final showDetail = wide || selected.value != null;
               bool isBackControl(FocusNode node) =>

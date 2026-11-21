@@ -1,3 +1,4 @@
+import '../../widgets/adaptive_detail_layout.dart';
 import '../../widgets/app_routes.dart';
 import '../../widgets/app_empty_state.dart';
 
@@ -35,12 +36,15 @@ class const CatalogPage({
     if (build == null || catalog == null || catalog.busy) return;
     await Navigator.of(context).push<void>(
       AppPageRoute(
-        builder: (_) => SourceBrowsePage(
-          catalog: catalog,
-          build: build,
-          source: source,
-          onAuthenticateReader: onAuthenticateReader,
-          onAuthenticate: onAuthenticate,
+        builder: (_) => AdaptiveDetailLayout(
+          handleSystemBack: false,
+          child: SourceBrowsePage(
+            catalog: catalog,
+            build: build,
+            source: source,
+            onAuthenticateReader: onAuthenticateReader,
+            onAuthenticate: onAuthenticate,
+          ),
         ),
       ),
     );

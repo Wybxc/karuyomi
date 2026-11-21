@@ -17,6 +17,7 @@ import 'package:karuyomi/diagnostics/reader_baseline_host.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
+import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
@@ -40,6 +41,72 @@ Future<void> _browseDetails(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+    'wide source and shelf details keep their page across window changes',
+    (tester) async {
+      const wide = Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = wide;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final platform = TestPlatform();
+      await tester.pumpApp(KaruyomiApp(platform: platform));
+      await tester.pumpAndSettle();
+      await _browseDetails(tester);
+      final detail = find.byType(MangaDetailsPage);
+      final pane = find.byKey(const ValueKey('adaptive-detail'));
+      final list = find.byKey(const ValueKey('adaptive-list'));
+      final source = find.byType(SourceBrowsePage);
+      final shelf = find.byType(LibraryPage);
+
+      Future<void> resizeWhileSelected(Finder leading) async {
+        final page = tester.element(detail);
+        final revision = platform.businessServer.appliedMutations;
+        expect(leading, findsOneWidget);
+        expect(pane, findsOneWidget);
+        expect(tester.getRect(list).right, tester.getRect(pane).left);
+        tester.view.physicalSize = const Size(390, 800);
+        await tester.pumpAndSettle();
+        expect(leading, findsNothing);
+        expect(tester.element(detail), same(page));
+        expect(tester.getSize(pane).width, 390);
+        tester.view.physicalSize = wide;
+        await tester.pumpAndSettle();
+        expect(leading, findsOneWidget);
+        expect(tester.element(detail), same(page));
+        expect(platform.businessServer.appliedMutations, revision);
+      }
+
+      await resizeWhileSelected(source);
+      final favorite = find.descendant(of: detail, matching: find.text('加入书架'));
+      await tester.ensureVisible(favorite);
+      await tester.tap(favorite);
+      await tester.pumpAndSettle();
+      expect(platform.businessServer.appliedMutations, 1);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(detail, findsNothing);
+      expect(source, findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(source, findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey(('app-destination', 0))));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(of: shelf, matching: find.text(testManga.title)),
+      );
+      await tester.pumpAndSettle();
+      await resizeWhileSelected(shelf);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(detail, findsNothing);
+      expect(shelf, findsOneWidget);
+      expect(platform.businessServer.appliedMutations, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final key in [
     LogicalKeyboardKey.enter,
     LogicalKeyboardKey.numpadEnter,
@@ -239,8 +306,25 @@ void main() {
           readerBaselineEnabled ? findsOneWidget : findsNothing,
         );
         final navigation = find.byKey(const ValueKey('app-navigation'));
+        final content = find.byKey(const ValueKey('app-content'));
+        void expectPlacement({required bool side}) {
+          final bar = tester.getRect(navigation);
+          final page = tester.getRect(content);
+          expect(
+            find.byType(CupertinoTabBar),
+            side ? findsNothing : findsOneWidget,
+          );
+          if (side) {
+            expect(bar.right, page.left);
+            expect(bar.top, page.top);
+          } else {
+            expect(bar.top, page.bottom);
+          }
+        }
+
         expect(navigation, findsOneWidget);
-        expect(find.byType(CupertinoTabBar), findsOneWidget);
+        final side = size.width >= 768 && size.height >= 480;
+        expectPlacement(side: side);
         expect(tester.getTopLeft(find.byType(CupertinoNavigationBar)).dx, 0);
         for (var i = 0; i < 3; i++) {
           final destination = find.byKey(ValueKey(('app-destination', i)));
@@ -266,7 +350,7 @@ void main() {
             : const Size(768, 1024);
         await tester.pumpAndSettle();
         expect(navigation, findsOneWidget);
-        expect(find.byType(CupertinoTabBar), findsOneWidget);
+        expectPlacement(side: !side);
         expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
@@ -293,7 +377,7 @@ void main() {
         for (final viewport in [
           const Size(360, 480),
           const Size(800, 360),
-          const Size(768, 1024),
+          const Size(640, 1024),
         ]) {
           tester.view.physicalSize = viewport;
           tester.platformDispatcher.textScaleFactorTestValue = 1;
@@ -348,7 +432,6 @@ void main() {
         await tester.pumpApp(const KaruyomiApp());
         await tester.pumpAndSettle();
 
-        final bar = find.byKey(const ValueKey('app-navigation'));
         Finder destination(int index) =>
             find.byKey(ValueKey(('app-destination', index)));
         SemanticsData tabSemantics(int index) =>
@@ -356,7 +439,6 @@ void main() {
         bool isFocused(int index) =>
             tabSemantics(index).flagsCollection.isFocused == Tristate.isTrue;
         void expectSelected(int current) {
-          expect(tester.widget<CupertinoTabBar>(bar).currentIndex, current);
           expect(
             tabSemantics(current).flagsCollection.isSelected,
             Tristate.isTrue,
@@ -381,6 +463,10 @@ void main() {
         expect(isFocused(1), isTrue);
 
         await key(LogicalKeyboardKey.tab);
+        expect(isFocused(2), isTrue);
+        tester.view.physicalSize = const Size(1280, 900);
+        await tester.pumpAndSettle();
+        expect(find.byType(CupertinoTabBar), findsNothing);
         expect(isFocused(2), isTrue);
         tester.view.physicalSize = const Size(800, 360);
         await tester.pumpAndSettle();
@@ -496,7 +582,7 @@ void main() {
         tester.platformDispatcher.textScaleFactorTestValue = 2;
         addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
         addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-        tester.view.physicalSize = const Size(768, 1024);
+        tester.view.physicalSize = const Size(1120, 960);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
@@ -519,7 +605,7 @@ void main() {
           find.descendant(of: origin, matching: find.byType(EditableText)),
         );
         final selection = editing.controller.selection;
-        for (final size in [const Size(800, 360), const Size(768, 1024)]) {
+        for (final size in [const Size(800, 360), const Size(1120, 960)]) {
           tester.view.physicalSize = size;
           await tester.pumpAndSettle();
           expect(tester.element(origin), same(field));
@@ -533,11 +619,11 @@ void main() {
     );
 
     testWidgets(
-      'tablet settings exposes both panes to accessibility in $brightness',
+      'wide settings exposes both panes to accessibility in $brightness',
       (tester) async {
         tester.platformDispatcher.platformBrightnessTestValue = brightness;
         addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
-        tester.view.physicalSize = const Size(768, 1024);
+        tester.view.physicalSize = const Size(1120, 960);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
@@ -575,7 +661,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.semantics.byLabel('连接服务'), findsOne);
           expect(find.semantics.byLabel(RegExp('^外观与主题')), findsNothing);
-          tester.view.physicalSize = const Size(768, 1024);
+          tester.view.physicalSize = const Size(1120, 960);
           await tester.pumpAndSettle();
           expectDirectory();
           expect(find.semantics.byLabel('连接服务'), findsOne);
@@ -594,7 +680,7 @@ void main() {
       (tester) async {
         tester.platformDispatcher.platformBrightnessTestValue = brightness;
         addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
-        tester.view.physicalSize = const Size(768, 1024);
+        tester.view.physicalSize = const Size(1120, 960);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);

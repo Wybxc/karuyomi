@@ -42,6 +42,7 @@ class const MangaDetailsPage({
   required final CatalogSourceRef source,
   final ReaderAuthentication? onAuthenticateReader,
   final String? notice,
+  final VoidCallback? onClose,
 }) extends StatefulHookConsumerWidget {
   @override
   ConsumerState<MangaDetailsPage> createState() => _MangaDetailsPageState();
@@ -432,7 +433,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
     );
     setState(() => _migrating = true);
     try {
-      await Navigator.of(context).push<void>(
+      await Navigator.of(context, rootNavigator: true).push<void>(
         AppPageRoute(
           builder: (_) =>
               MigrationPage(catalog: controller, client: client, seed: seed),
@@ -668,7 +669,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
           onAuthenticate: authenticate,
         ),
       );
-      await Navigator.of(context).push<void>(readerRoute);
+      await Navigator.of(context, rootNavigator: true).push<void>(readerRoute);
       await readerRoute.completed;
       await catalog.flushReadingProgress();
     } finally {
@@ -1530,7 +1531,14 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
       navigationBar: _selectingChapters
           ? null
           : CupertinoNavigationBar(
-              middle: Text(manga.title),
+              leading: widget.onClose == null
+                  ? null
+                  : CupertinoNavigationBarBackButton(onPressed: widget.onClose),
+              middle: Text(
+                manga.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

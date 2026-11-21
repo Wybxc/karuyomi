@@ -1,4 +1,6 @@
 import 'widgets/app_routes.dart';
+import 'widgets/adaptive_layout.dart';
+import 'widgets/adaptive_detail_layout.dart';
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -183,6 +185,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   String? _originPersistenceError;
   static const _defaultOrigin = String.fromEnvironment('APP_ORIGIN');
   static const _originKey = 'native_service_origin';
+  static const _sidebarWidth = 176.0;
   late TextEditingController _originField;
   static const _labels = ['书架', '浏览', '设置'];
   static const _icons = [
@@ -550,12 +553,15 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   Widget _page() => switch (_index) {
-    0 => LibraryPage(
-      controller: _catalog,
-      onBrowse: () => _select(1),
-      onConnect: () => unawaited(_connect()),
-      onAuthenticate: () => unawaited(_authenticate()),
-      onAuthenticateReader: _authenticateReader,
+    0 => AdaptiveDetailLayout(
+      owner: _catalog?.library,
+      child: LibraryPage(
+        controller: _catalog,
+        onBrowse: () => _select(1),
+        onConnect: () => unawaited(_connect()),
+        onAuthenticate: () => unawaited(_authenticate()),
+        onAuthenticateReader: _authenticateReader,
+      ),
     ),
     1 => CatalogPage(
       controller: _catalog,
@@ -815,6 +821,59 @@ class _AppShellState extends ConsumerState<AppShell> {
     },
   );
 
+  Widget _sidebar() => SizedBox(
+    key: const ValueKey('app-navigation'),
+    width: _sidebarWidth,
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.toolbar.resolveFrom(context),
+        border: BorderDirectional(
+          end: BorderSide(color: AppColors.separator.resolveFrom(context)),
+        ),
+      ),
+      child: ListView(
+        padding: const EdgeInsets.all(12),
+        primary: false,
+        children: [
+          for (var index = 0; index < _labels.length; index++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: CupertinoFocusHalo.withRoundedSuperellipse(
+                key: GlobalObjectKey(_tabFocusNodes[index]),
+                borderRadius: const BorderRadius.all(Radius.circular(10)),
+                child: Semantics(
+                  selected: _index == index,
+                  child: CupertinoButton(
+                    key: ValueKey(('app-destination', index)),
+                    focusNode: _tabFocusNodes[index],
+                    onPressed: () => _tapTab(index),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    color: _index == index
+                        ? AppColors.selection.resolveFrom(context)
+                        : null,
+                    foregroundColor: _index == index
+                        ? AppColors.accent.resolveFrom(context)
+                        : AppColors.label.resolveFrom(context),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Row(
+                      children: [
+                        Icon(_icons[index], size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(_labels[index])),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     _originField = useTextEditingController(text: _defaultOrigin);
@@ -847,8 +906,29 @@ class _AppShellState extends ConsumerState<AppShell> {
                   ),
                 ),
               ),
-            Expanded(key: const ValueKey('app-content'), child: _page()),
-            _navigationBar(),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final sidebar = fitsColumns(
+                    context,
+                    constraints,
+                    minimumWidth: _sidebarWidth + 540,
+                  );
+                  return Flex(
+                    direction: sidebar ? Axis.horizontal : Axis.vertical,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (sidebar) _sidebar(),
+                      Expanded(
+                        key: const ValueKey('app-content'),
+                        child: _page(),
+                      ),
+                      if (!sidebar) _navigationBar(),
+                    ],
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),

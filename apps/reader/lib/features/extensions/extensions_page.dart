@@ -1,3 +1,4 @@
+import '../../widgets/adaptive_detail_layout.dart';
 import '../../widgets/app_routes.dart';
 import '../../widgets/choice_field.dart';
 import '../../widgets/edit_sheet.dart';
@@ -1217,10 +1218,13 @@ class const ExtensionDetailsPage({
                               unawaited(
                                 Navigator.of(context).push<void>(
                                   AppPageRoute(
-                                    builder: (_) => SourceBrowsePage(
-                                      catalog: controller.catalog,
-                                      build: exact!,
-                                      source: source,
+                                    builder: (_) => AdaptiveDetailLayout(
+                                      handleSystemBack: false,
+                                      child: SourceBrowsePage(
+                                        catalog: controller.catalog,
+                                        build: exact!,
+                                        source: source,
+                                      ),
                                     ),
                                   ),
                                 ),
