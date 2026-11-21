@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，`da3ca05` 的两色 Flutter 组件复验将跨源搜索首个封面上移 113 逻辑像素至 y=242，Mihon 参考为 y=241，标题左缘同为 x=16。两倍字号下提交与查询仍同排，等待和返回的源标题位置一致。998 项 Flutter 测试和 Web release 构建通过。第二组及真实 Web 继续验收。[首排作品量测](verification/mihon-cupertino-fidelity.md#跨源搜索首排作品量测)
+
 2026-11-21，`e39b5ef` 修复跨源搜索打开语言选择页期间的回执丢失。两色组件从原页返回后都保留原选源，焦点回到语言行，正常显示一项结果及另一个源的失败。998 项 Flutter 测试、严格分析和 Web release 构建通过。重复滚动在组件环境的视觉与语义边界相等，内置浏览器连接超时，正式 Web 复验待验。[语言选择页返回](verification/mihon-cupertino-fidelity.md#语言选择页返回时的跨源搜索回执)
 
 2026-11-21，`872a121` 的正式 Web 两色从短屏长选源名单末端通过空词校验及真实 xkcd 搜索。结果回顶后可重新展开范围并读回原勾选。深色 844×390 可用 Enter 提交，两色三路权威状态逐字节相等。996 项 Flutter 测试及严格分析通过。MangaDex 超时，重开范围后的重复滚动另有语义偏移待验。[跨源搜索短屏](verification/mihon-cupertino-fidelity.md#跨源搜索短屏与重新选源)
