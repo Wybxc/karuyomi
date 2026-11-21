@@ -104,6 +104,7 @@ class const CatalogPage({
       AppPageRoute(
         builder: (_) => CrossSourceSearchPage(
           service: service,
+          coverCatalog: catalog,
           onOpen: (details) async {
             bool current() =>
                 currentIdentity() && catalog.isCurrentSource(details.source);

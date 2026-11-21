@@ -2,6 +2,10 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，书架、跨源结果和迁移候选接入普通封面。164 项 Flutter 定向回归、95 项运行宿主与合同测试、10 项跨语言协议测试通过。组件测试通过真实 Flutter 解码受管测试文件，同一作品源的两张书架封面复用第二槽并释放两份资源，账户写入数与基线一致。双槽测试核对搜索启动前按原请求身份取消封面并确认临时会话关闭，取消等待中的封面时保留两个活动搜索会话。[实施计划](plan/device-settings-adaptive-covers.md)
+
+2026-11-21，固定 `92a0059` 与锁定 Keiyoushi 源码在本机 Apple Silicon 独立重编 Arknights Comics 1.6.2。正式工具用官方 JAR 生成 671,300 字节 gzip，canonical SHA-256 为 `4dc463ca25b497c28deec4bea7608f368c01bdee2519580d84ca6741539b5df1`，产物完整性通过并组装单包 Static Assets 验收快照。候选保持 `compiled_unverified`、`runtimeReady=false`。[扩展构建和静态分发](EXTENSIONS.md)
+
 2026-11-21，普通封面接入单源浏览和作品详情。71 项 Flutter 定向回归和本机全量 1,025 项 Flutter 测试通过，覆盖受管文件交付、Flutter 解码、释放与自定义封面清除后的回退。34 项运行宿主及 10 项跨语言协议测试通过。`pnpm teavm:check` 在 JVM 受控 HTTP 服务验证 Source 请求携带 Referer 与已有 Cookie，拦截器修改的字节到达图片接收器。真实扩展的新版 AOT 与在线封面待验。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，Cupertino 自适应布局通过 112 项 Flutter 定向回归。组件在手机、短横屏、平板及桌面尺寸验证主导航位置、大字号、焦点和设置连接草稿。书架和 Source 详情从 1280×900 缩至 390×800 后保留同一页面，恢复宽屏重新并排，切换尺寸和返回时业务写入数保持一致。实际浏览器与原生窗口待验。[实施计划](plan/device-settings-adaptive-covers.md)

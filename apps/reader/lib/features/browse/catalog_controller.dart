@@ -231,8 +231,13 @@ final class CatalogController extends ChangeNotifier {
 
   final SourceRuntime runtime;
   Pool? _coverPool;
-  final _activeCovers = <String>{};
+  final _coverRequests = <String, _CoverRequest>{};
+  _CoverRuntimeSlot? _coverRuntime;
+  Completer<void>? _coverAvailability;
   final SourceRuntime? _searchRuntimeOverride;
+  SourceRuntime? get _secondaryRuntime =>
+      _searchRuntimeOverride ??
+      (api is PlatformRuntime ? (api as PlatformRuntime).searchRuntime : null);
   _CatalogSourceSearch? _searchOwner;
   final _searchScopes = <_CatalogSourceSearch>{};
   final Future<void> Function() rebuildRuntime;
@@ -881,6 +886,7 @@ final class CatalogController extends ChangeNotifier {
   };
 
   void _notify() {
+    _wakeCoverRequests();
     if (!_closed) notifyListeners();
   }
 
@@ -1060,6 +1066,8 @@ final class CatalogController extends ChangeNotifier {
       _catalogBuilds.clear();
       repositoryErrors.clear();
       _notify();
+      await _coverRuntime?.release();
+      if (_closed || epoch != _epoch) return;
       // Confirm the cookie's current identity before attempting old drafts.
       // An old subject's rejected POST must not interrupt the new bootstrap.
       if (_runtimeNeedsRebuild) {
@@ -1185,6 +1193,7 @@ final class CatalogController extends ChangeNotifier {
   }) async {
     final openingEpoch = _epoch;
     await _retiringExtension;
+    await _coverRuntime?.release();
     if (_closed || openingEpoch != _epoch || shouldContinue?.call() == false) {
       return;
     }
@@ -2170,12 +2179,17 @@ final class CatalogController extends ChangeNotifier {
 
   @override
   void dispose() {
-    unawaited(_coverPool?.close());
     for (final scope in _searchScopes.toList()) {
       scope.dispose();
     }
     if (!_catalogCancelled.isCompleted) _catalogCancelled.complete();
     _closed = true;
+    _wakeCoverRequests();
+    for (final request in _coverRequests.values) {
+      unawaited(request.cancel());
+    }
+    unawaited(_coverRuntime?.release().catchError((Object _) {}));
+    unawaited(_coverPool?.close());
     final requestId = _filterRequestId;
     if (requestId != null) unawaited(cancelSourceFilterRequest(requestId));
     ++_epoch;

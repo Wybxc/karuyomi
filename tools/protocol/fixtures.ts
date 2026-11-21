@@ -489,7 +489,7 @@ export const goldenFixtures: GoldenFixture[] = [
     type: 'ControlRequest',
     value: {
       requestId,
-      slotId: 'RUNTIME_SLOT_FOREGROUND',
+      slotId: 'RUNTIME_SLOT_SEARCH',
       acquireImage: {
         requestId,
         generation,

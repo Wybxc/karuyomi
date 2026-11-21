@@ -190,16 +190,24 @@ export function validateControlRequest(value: ControlRequest): ControlRequest {
         'open',
         'invoke',
         'cancel',
+        'acquireImage',
+        'cancelImage',
+        'releaseImage',
         'closeBuild',
         'rebuild',
         'dispose',
       ].includes(value.command.case ?? ''),
-      'The search slot only supports Source search and its lifecycle',
+      'The search slot only supports Source search, cover images and their lifecycle',
     );
     if (value.command.case === 'invoke')
       requireCondition(
         value.command.value.request.case === 'search',
         'The search slot only accepts search calls',
+      );
+    if (value.command.case === 'acquireImage')
+      requireCondition(
+        value.command.value.thumbnailUrl !== undefined,
+        'The search slot only accepts Source thumbnail requests',
       );
   }
   switch (value.command.case) {
@@ -301,9 +309,16 @@ export function validateControlResponse(
   validateRuntimeSlot(value.slotId);
   if (value.slotId === pb.RuntimeSlot.SEARCH)
     requireCondition(
-      ['hello', 'session', 'source', 'closed', 'completed', 'error'].includes(
-        value.result.case ?? '',
-      ),
+      [
+        'hello',
+        'session',
+        'source',
+        'image',
+        'released',
+        'closed',
+        'completed',
+        'error',
+      ].includes(value.result.case ?? ''),
       'Invalid search slot control response',
     );
   switch (value.result.case) {

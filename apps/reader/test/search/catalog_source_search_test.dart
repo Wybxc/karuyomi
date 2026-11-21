@@ -45,6 +45,8 @@ final class _Slots implements RuntimeTransport {
   Future<void> Function(wire.CloseBuildRequest request)? beforeClose;
   Future<void> Function()? beforePageClose;
   Future<void> Function()? beforeReset;
+  Future<wire.ImageResource> Function(wire.AcquireImage request)? acquireCover;
+  void Function(wire.CancelImage request)? cancelCover;
 
   void _retire(wire.RuntimeSlot slot) {
     live.remove(slot);
@@ -96,7 +98,10 @@ final class _Slots implements RuntimeTransport {
                 supportsLatest: false,
               ),
             ),
-            capabilities: ['source-rpc'],
+            capabilities: [
+              'source-rpc',
+              if (acquireCover != null) 'cover-image-resources',
+            ],
           );
           expect(
             live.containsKey(slot),
@@ -177,6 +182,17 @@ final class _Slots implements RuntimeTransport {
           await beforePageClose?.call();
           events.add('page-closed');
           response.closed = wire.Closed(closed: true);
+        case wire.ControlRequest_Command.acquireImage:
+          final cover = request.acquireImage;
+          expect(slot, wire.RuntimeSlot.RUNTIME_SLOT_SEARCH);
+          expect(live[slot]?.generation, cover.generation);
+          events.add('cover:${cover.sourceId}');
+          response.image = await acquireCover!(cover);
+        case wire.ControlRequest_Command.cancelImage:
+          expect(slot, wire.RuntimeSlot.RUNTIME_SLOT_SEARCH);
+          events.add('cancel-cover');
+          cancelCover!(request.cancelImage);
+          response.released = wire.Released(released: true);
         case wire.ControlRequest_Command.dispose:
           _retire(slot);
           response.completed = wire.Completed(completed: true);
@@ -187,7 +203,9 @@ final class _Slots implements RuntimeTransport {
       }
     } on RuntimeException catch (failure) {
       response.error = wire.RuntimeError(
-        code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
+        code: failure.code == RuntimeErrorCode.cancelled
+            ? wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_CANCELLED
+            : wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_RUNTIME_LOST,
         message: failure.message,
       );
     }
@@ -289,6 +307,69 @@ void main() {
     search = catalog.createSourceSearch();
     targets = await search.loadTargets();
     expect(targets, hasLength(4));
+  });
+
+  test('background covers yield to ongoing search on both slots', () async {
+    final acquiring = Completer<wire.AcquireImage>();
+    final response = Completer<wire.ImageResource>();
+    slots.acquireCover = (request) {
+      acquiring.complete(request);
+      return response.future;
+    };
+    final cover = catalog.readSourceCover(
+      target: target('21'),
+      thumbnail: Uri.parse('https://source.example/cover.png'),
+      requestId: 'shelf-cover',
+      stillVisible: () => true,
+    );
+    final acquired = await acquiring.future;
+    slots.cancelCover = (request) {
+      expect(request.requestId, acquired.requestId);
+      expect(request.generation, acquired.generation);
+      response.completeError(
+        const RuntimeException(RuntimeErrorCode.cancelled, 'Cover interrupted'),
+      );
+    };
+    expect(
+      acquired.generation,
+      slots.live[wire.RuntimeSlot.RUNTIME_SLOT_SEARCH]?.generation,
+    );
+    final firstStarted = Completer<void>();
+    final secondStarted = Completer<void>();
+    final finishSearch = Completer<wire.SourceResult>();
+    addTearDown(() {
+      if (!finishSearch.isCompleted) finishSearch.complete(_page('finished'));
+    });
+    slots.invoke = (call) {
+      (call.sourceId == '11' ? firstStarted : secondStarted).complete();
+      return finishSearch.future;
+    };
+    final first = search.search(target('11'), 'find');
+    final second = search.search(target('31'), 'find');
+    await Future.wait([
+      _started(first, firstStarted.future),
+      _started(second, secondStarted.future),
+    ], eagerError: true);
+    expect(
+      slots.events,
+      containsAllInOrder([
+        'cover:21',
+        'cancel-cover',
+        'closed:build-b',
+        'invoke:11:search',
+      ]),
+    );
+    expect(
+      slots.live.values.map((value) => value.buildId),
+      unorderedEquals(['build-a', 'build-c']),
+    );
+    await catalog.cancelSourceCover('shelf-cover');
+    expect(await cover, isNull);
+    expect(slots.live, hasLength(2));
+    finishSearch.complete(_page('still active'));
+    await Future.wait([first.result, second.result]);
+    await search.stop();
+    expect(slots.live, isEmpty);
   });
 
   tearDown(() async {

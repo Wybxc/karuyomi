@@ -5,9 +5,11 @@ import '../../test_support/cupertino.dart';
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/manga_cover_tile.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
@@ -291,11 +293,67 @@ void main() {
       wire.SourceCall_Request.chapters,
     ]);
     expect(platform.invocations.first.details.manga, testManga);
-    expect(platform.openedIdentities, ['owner-subject']);
+    expect(platform.openedSlots, [
+      wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+      wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
+    ]);
+    expect(platform.openedIdentities, everyElement('owner-subject'));
     expect(find.byType(Image), findsNothing);
     expect(tester.takeException(), isNull);
     await hide(tester);
   });
+
+  testWidgets(
+    'shelf displays ordinary covers without opening a foreground Source',
+    (tester) async {
+      final temp = Directory.systemTemp.createTempSync('karuyomi.');
+      addTearDown(() => temp.deleteSync(recursive: true));
+      final encoded = img.encodePng(img.Image(width: 2, height: 3));
+      final file = File('${temp.path}/cover.png')..writeAsBytesSync(encoded);
+      final requests = <wire.AcquireImage>[];
+      platform.acquireImageHandler = (request) {
+        requests.add(request.deepCopy());
+        return wire.ImageResource(
+          resourceId: 'cover-${requests.length}',
+          generation: request.generation,
+          byteLength: encoded.length,
+          url: file.uri.toString(),
+        );
+      };
+      await favorite();
+      await favorite(
+        manga: testManga
+          ..url = '/other-manga'
+          ..title = '另一本漫画',
+      );
+      final writes = platform.businessServer.appliedMutations;
+      await show(tester);
+      for (var turn = 0; turn < 100 && platform.closedSlots.isEmpty; turn++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 5)),
+        );
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+      expect(requests.map((value) => value.thumbnailUrl), [
+        testManga.thumbnailUrl,
+        testManga.thumbnailUrl,
+      ]);
+      expect(
+        find.byKey(const ValueKey('source-cover-image')),
+        findsNWidgets(2),
+      );
+      expect(platform.openedSlots, [wire.RuntimeSlot.RUNTIME_SLOT_SEARCH]);
+      expect(platform.closedSlots, [wire.RuntimeSlot.RUNTIME_SLOT_SEARCH]);
+      expect(
+        platform.imageControls.where((value) => value.$1 == 'releaseImage'),
+        hasLength(2),
+      );
+      expect(controller.session, isNull);
+      expect(platform.businessServer.appliedMutations, writes);
+      await hide(tester);
+    },
+  );
 
   testWidgets(
     'missing Source retains the favorite and displays a retryable error',

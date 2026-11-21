@@ -10,7 +10,8 @@ import 'catalog_controller.dart';
 class const SourceMangaCover({
   super.key,
   required final CatalogController catalog,
-  required final CatalogSourceRef? source,
+  final CatalogSourceRef? source,
+  final SourceSearchTarget? target,
   required final Uri? thumbnail,
 }) extends StatefulWidget {
   @override
@@ -34,6 +35,7 @@ class _SourceMangaCoverState extends State<SourceMangaCover> {
     final next = widget.source;
     if (!identical(oldWidget.catalog, widget.catalog) ||
         oldWidget.thumbnail != widget.thumbnail ||
+        oldWidget.target?.key != widget.target?.key ||
         old?.generation != next?.generation ||
         old?.buildId != next?.buildId ||
         old?.sourceId != next?.sourceId) {
@@ -55,12 +57,18 @@ class _SourceMangaCoverState extends State<SourceMangaCover> {
       return;
     }
     final source = widget.source;
+    final target = widget.target;
     final thumbnail = widget.thumbnail;
-    if (_bytes != null || source == null || thumbnail == null) return;
+    if (_bytes != null ||
+        (source == null && target == null) ||
+        thumbnail == null) {
+      return;
+    }
     final request = _request = const Uuid().v4();
     _bytes = widget.catalog
         .readSourceCover(
           source: source,
+          target: target,
           thumbnail: thumbnail,
           requestId: request,
           stillVisible: () => mounted && _request == request,
@@ -73,9 +81,8 @@ class _SourceMangaCoverState extends State<SourceMangaCover> {
   void _cancel(SourceMangaCover cover) {
     final request = _request;
     _request = null;
-    final source = cover.source;
-    if (request != null && source != null) {
-      unawaited(cover.catalog.cancelSourceCover(request, source));
+    if (request != null) {
+      unawaited(cover.catalog.cancelSourceCover(request));
     }
   }
 
@@ -83,7 +90,12 @@ class _SourceMangaCoverState extends State<SourceMangaCover> {
   Widget build(BuildContext context) {
     final placeholder = ColoredBox(
       color: AppColors.groupedSurface.resolveFrom(context),
-      child: const Center(child: Icon(CupertinoIcons.book)),
+      child: Center(
+        child: Icon(
+          CupertinoIcons.book,
+          color: AppColors.secondaryLabel.resolveFrom(context),
+        ),
+      ),
     );
     return FutureBuilder<Uint8List?>(
       key: ObjectKey(_bytes),

@@ -18,6 +18,7 @@ import '../../theme/app_theme.dart';
 import '../browse/catalog_controller.dart';
 import '../browse/manga_cover_tile.dart';
 import '../browse/manga_details_page.dart';
+import '../browse/source_manga_cover.dart';
 import '../reader/reader_recovery.dart';
 import '../reader/chapter_reader_route.dart';
 import '../reader/chapter_sequence.dart';
@@ -1074,12 +1075,20 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 final label = '${entry.title} · $sourceLabel';
                 final draft =
                     controller?.readingDraftResume(entry.mangaKey) != null;
+                final thumbnail = sourceThumbnail(entry.snapshot.thumbnailUrl);
                 return MangaCoverTile(
                   key: ValueKey(entry.mangaKey),
                   title: entry.title,
                   subtitle: sourceLabel,
                   entry: entry,
                   covers: _covers,
+                  sourceCover: controller != null && thumbnail != null
+                      ? SourceMangaCover(
+                          catalog: controller,
+                          target: controller.libraryCoverTarget(entry),
+                          thumbnail: thumbnail,
+                        )
+                      : null,
                   selected: _selecting
                       ? selected.contains(entry.mangaKey)
                       : null,

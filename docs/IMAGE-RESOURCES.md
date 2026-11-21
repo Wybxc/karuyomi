@@ -2,7 +2,7 @@
 
 本文记录当前 Source → UI 的编码正文合同。协议定义在 `protocol/karuyomi/v1/control.proto`，TS 校验与资源所有权分别在 `packages/contracts/src/image-control.ts`、`packages/runtime-host/src/image-resources.ts`；Dart 接收在 `packages/source_runtime/lib/src/transport_runtime.dart`。实施状态见 [P0 计划](plan/p0-runtime-and-reading.md)，实际环境与范围见[验证记录](VERIFICATION.md)。传输成功不表示图片能解码、已显示或峰值受控。
 
-当前使用 `karuyomi-source-host-v4`，Page 会话及 `hostAcquireImage/hostClosePageSession` 是必需 ABI；小控制消息采用 Protobuf 生成模型和标准 ProtoJSON，正文通过独立二进制通道。控制 protocolVersion 为 2，HTTP bridgeVersion 为 2，三者含义不同。项目原型直接更新当前合同和产物，不增加旧协议兼容层；代码、协议与依赖变化按实际输入重新构建。
+当前使用 `karuyomi-source-host-v6`，Page 会话及 `hostAcquireImage/hostClosePageSession` 是必需 ABI。小控制消息采用 Protobuf 生成模型和标准 ProtoJSON，正文通过独立二进制通道。控制 protocolVersion 为 2，HTTP bridgeVersion 为 2，代码、协议与依赖变化按实际输入重新构建。
 
 ## 职责边界
 
@@ -17,6 +17,12 @@ Source 与宿主只向 UI 交付插件处理后的不透明编码字节。宿主
 `ChapterPageProvider` 绑定 Source、会话、generation 和稳定章节引用，将阅读核心的逻辑页键映射到会话内 opaque pageKey。阅读位置不保存临时会话 ID 或有签名的 imageUrl；`reader_core.PageRef` 不依赖 TeaVM 或 Source URL。
 
 章节导航负责关闭 Page 会话。`releaseImage` 结束已交付正文的所有权，`closePageSession` 解除 Java 原始 Page 引用；二者分别清理，不互相代替。
+
+## 普通漫画封面
+
+具备 `cover-image-resources` 的构建通过 `hostAcquireCover` 调用原 `HttpSource` 的客户端，并以其请求头、Cookie 与拦截器读取作品元数据中的 `thumbnailUrl`。封面请求使用 `sourceId`、`generation` 和 `thumbnailUrl`，Page 请求使用 `pageSessionId` 和 `pageKey`。封面和阅读页使用同一编码正文与所有权通道。
+
+Flutter 最多并行获取两张普通封面，每张上限 8 MiB，获取期限为 10 秒。书架和跨源结果使用账户确认安装的构建，优先复用当前同包会话，其余按批次使用空闲的第二运行槽。临时会话在批次结束或搜索接管时关闭。客户端读完受管资源即发送释放，负责解码和显示。已确认的自定义封面由书架和详情优先显示。
 
 ## 编码正文与所有权
 
@@ -65,7 +71,7 @@ END 确认非空正文与总长度一致，暂存无 MIME type 的 Blob。内部
 
 ## 控制与清理
 
-当前图片控制只有 `acquireImage({requestId,sourceId,pageSessionId,pageKey,generation,timeoutMs?})`、`cancelImage({requestId,generation})`、`releaseImage({resourceId,generation})` 和 `closePageSession({pageSessionId,generation})`。release 幂等，旧 generation 的结果不得进入当前会话。
+`acquireImage` 受 `requestId/sourceId/generation/timeoutMs` 约束，携带 `pageSessionId` 和 `pageKey` 或 `thumbnailUrl`。取消和释放沿用 `cancelImage({requestId,generation})`、`releaseImage({resourceId,generation})`，章节使用 `closePageSession({pageSessionId,generation})`。release 幂等，旧 generation 的结果不得进入当前会话。
 
 Source 调用共享串行槽，ACK 和取消通过独立图片通道到达生产者。取消先终止 sink 与当前 HTTP 句柄，再等待 Java 真正退出；`teaDone/teaFail` 没有调用身份，提前解锁会污染下一次操作。超过宽限则回收 Worker、失效 generation，由客户端重新打开章节，不重放 Source 图片操作。
 

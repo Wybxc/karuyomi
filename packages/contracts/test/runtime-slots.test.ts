@@ -47,16 +47,13 @@ describe('explicit runtime slot boundary', () => {
     });
   }
 
-  test('search slot does not expose API, images or management and only accepts searches', () => {
+  test('search slot accepts search and thumbnail calls with a bounded lifecycle', () => {
     for (const command of [
       'fetchApi',
       'prepareBuild',
       'cancelPreparation',
       'extensionCache',
       'forgetExtensionArtifact',
-      'acquireImage',
-      'cancelImage',
-      'releaseImage',
       'closePageSession',
     ]) {
       expect(() =>
@@ -86,13 +83,47 @@ describe('explicit runtime slot boundary', () => {
         }),
       ).toThrow();
     }
-    for (const result of [
-      'api',
-      'image',
-      'preparedBuild',
-      'extensionCache',
-      'released',
-    ]) {
+    const slotId = 'RUNTIME_SLOT_SEARCH';
+    const thumbnail = {
+      requestId: search.requestId,
+      sourceId: search.sourceId,
+      generation: search.generation,
+      thumbnailUrl: 'https://source.example/cover.webp',
+    };
+    const request = { requestId: 'control', slotId };
+    expect(
+      parseControlRequest({ ...request, acquireImage: thumbnail }).command.case,
+    ).toBe('acquireImage');
+    expect(() =>
+      parseControlRequest({
+        ...request,
+        acquireImage: {
+          ...identity,
+          pageSessionId: 'chapter',
+          pageKey: 'page',
+        },
+      }),
+    ).toThrow(/search slot/);
+    expect(() =>
+      parseControlRequest({
+        ...request,
+        acquireImage: { ...thumbnail, pageKey: 'page' },
+      }),
+    ).toThrow(/thumbnail request/);
+    expect(() =>
+      parseControlRequest({
+        ...request,
+        acquireImage: {
+          ...thumbnail,
+          thumbnailUrl: 'https://user@source.example/cover.webp',
+        },
+      }),
+    ).toThrow(/thumbnail request/);
+    expect(
+      parseControlResponse({ ...request, released: { released: true } }).result
+        .case,
+    ).toBe('released');
+    for (const result of ['api', 'preparedBuild', 'extensionCache']) {
       expect(() =>
         parseControlResponse({
           requestId: 'control',

@@ -78,6 +78,7 @@ final class TestPlatform extends PlatformRuntime
   afterBusinessReply;
   Future<void> Function()? beforeRebuild;
   final openedIdentities = <String>[];
+  final openedSlots = <wire.RuntimeSlot>[];
   final openedBuilds = <String>[];
   final preferenceBootstraps = <wire.PreferenceBootstrap>[];
   String manifestBuildId = 'build-1';
@@ -120,6 +121,7 @@ final class TestPlatform extends PlatformRuntime
   final cachedArtifacts = <String, wire.CachedExtensionArtifact>{};
   final preparations = <wire.PrepareBuildRequest>[];
   final buildClosures = <wire.CloseBuildRequest>[];
+  final closedSlots = <wire.RuntimeSlot>[];
   Future<void> Function(wire.PrepareBuildRequest)? beforePrepare;
   Future<void> Function(String preparationId)? beforeCancelPreparation;
   Future<wire.RuntimeError?> Function(String sha256)? beforeForgetArtifact;
@@ -231,6 +233,7 @@ final class TestPlatform extends PlatformRuntime
         );
       case wire.ControlRequest_Command.open:
         openedIdentities.add(request.open.identity);
+        openedSlots.add(request.slotId);
         preferenceBootstraps.add(request.open.preferenceBootstrap.deepCopy());
         openedBuilds.add(request.open.expectedBuildId);
         _openedBuildId = request.open.expectedBuildId;
@@ -308,6 +311,7 @@ final class TestPlatform extends PlatformRuntime
         }
       case wire.ControlRequest_Command.closeBuild:
         buildClosures.add(request.closeBuild.deepCopy()..freeze());
+        closedSlots.add(request.slotId);
         if (_liveBuild == request.closeBuild.buildId &&
             runtimeGeneration == request.closeBuild.generation) {
           _liveBuild = null;

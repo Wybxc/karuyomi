@@ -12,6 +12,7 @@ import '../../data/source_migration_matching.dart';
 import '../../data/source_migration_repository.dart';
 import '../browse/catalog_controller.dart';
 import '../browse/manga_cover_tile.dart';
+import '../browse/source_manga_cover.dart';
 import 'migration_controller.dart';
 
 class const MigrationPage({
@@ -620,6 +621,11 @@ class _MigrationPageState extends State<MigrationPage> {
                   enabled: enabled,
                   child: MangaCoverTile(
                     title: manga.title,
+                    sourceCover: SourceMangaCover(
+                      catalog: widget.catalog,
+                      source: controller.targetReference,
+                      thumbnail: manga.thumbnail,
+                    ),
                     onPressed: enabled
                         ? () => unawaited(_chooseCandidate(manga))
                         : null,

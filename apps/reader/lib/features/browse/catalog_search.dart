@@ -68,11 +68,7 @@ abstract class CatalogSourceSearch extends ChangeNotifier {
 extension CatalogCrossSourceSearch on CatalogController {
   CatalogSourceSearch createSourceSearch() {
     final client = _confirmedBusinessClient;
-    final secondary =
-        _searchRuntimeOverride ??
-        (api is PlatformRuntime
-            ? (api as PlatformRuntime).searchRuntime
-            : null);
+    final secondary = _secondaryRuntime;
     if (client == null || secondary == null || identical(runtime, secondary)) {
       throw StateError('当前服务没有两个独立的搜索执行槽。');
     }
@@ -359,9 +355,13 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
     }
     catalog._searchOwner = this;
     catalog._notify();
+    var closingForeground = false;
     try {
+      await catalog._coverRuntime?.release();
+      _check();
       final current = catalog.session;
       if (current != null) {
+        closingForeground = true;
         await catalog.runtime.closeBuild(
           buildId: current.buildId,
           generation: current.generation,
@@ -374,7 +374,9 @@ final class _CatalogSourceSearch extends CatalogSourceSearch {
       if (_free.isEmpty) _free.addAll([catalog.runtime, secondary]);
       catalog._notify();
     } catch (_) {
-      if (catalog.session != null && identical(catalog._searchOwner, this)) {
+      if (closingForeground &&
+          catalog.session != null &&
+          identical(catalog._searchOwner, this)) {
         _dirty[catalog.runtime] = null;
         _cleanupError(StateError('前台运行槽尚未关闭。'));
       } else if (identical(catalog._searchOwner, this)) {

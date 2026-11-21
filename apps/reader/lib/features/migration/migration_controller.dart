@@ -90,6 +90,11 @@ final class MigrationController extends ChangeNotifier {
   List<MigrationSourceChoice> sources = const [];
   MigrationSourceChoice? selectedSource;
   CatalogSourceRef? _targetReference;
+  CatalogSourceRef? get targetReference {
+    final ref = _targetReference;
+    return ref != null && catalog.isCurrentSource(ref) ? ref : null;
+  }
+
   List<MangaEntry> results = const [];
   String? _listingQuery;
   int _listingPage = 0;

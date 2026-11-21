@@ -8,6 +8,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../browse/catalog_controller.dart';
+import '../browse/source_manga_cover.dart';
 import '../extensions/extension_listing.dart';
 import 'cross_source_search_controller.dart';
 
@@ -20,6 +21,7 @@ class const CrossSourceSearchPage({
   super.key,
   required final CatalogSourceSearch service,
   required final OpenSourceSearchDetails onOpen,
+  final CatalogController? coverCatalog,
 }) extends StatefulHookWidget {
   @override
   State<CrossSourceSearchPage> createState() => _CrossSourceSearchPageState();
@@ -350,15 +352,26 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
                   children: [
                     AspectRatio(
                       aspectRatio: coverAspectRatio,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: AppColors.groupedSurface.resolveFrom(context),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Icon(
-                          CupertinoIcons.book,
-                          color: AppColors.secondaryLabel.resolveFrom(context),
-                        ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: switch (widget.coverCatalog) {
+                          final catalog? => SourceMangaCover(
+                            catalog: catalog,
+                            target: group.target,
+                            thumbnail: mangas[index].thumbnail,
+                          ),
+                          null => ColoredBox(
+                            color: AppColors.groupedSurface.resolveFrom(
+                              context,
+                            ),
+                            child: Icon(
+                              CupertinoIcons.book,
+                              color: AppColors.secondaryLabel.resolveFrom(
+                                context,
+                              ),
+                            ),
+                          ),
+                        },
                       ),
                     ),
                     const SizedBox(height: inset),
