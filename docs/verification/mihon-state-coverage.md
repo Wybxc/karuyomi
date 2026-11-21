@@ -317,6 +317,8 @@ stateDiagram-v2
 
 ## 12–15：源内浏览、筛选、偏好与跨源搜索
 
+2026-11-21，`f30a345` 更新 12.02、12.06 的双主题正式 Web 画面，并补 12.04 打开、取消及提交的转换证据。英文 xkcd 两色均在确认清除后才返回热门。360×480 双倍字号与模拟软键盘及失败重试有组件证据。最新、追加、真实系统键盘与原生继续复验，跨版本主图计数保持 172/173。[紧凑网格与短屏搜索](mihon-cupertino-fidelity.md#源内浏览紧凑网格与短屏搜索)
+
 依据：`presentation/browse/BrowseSourceScreen.kt` 的 refresh/append Loading/Error/Empty、`ui/browse/source/browse/SourceFilterDialog.kt` 的 typed Filter、`ui/browse/extension/details/SourcePreferencesScreen.kt`、`presentation/browse/GlobalSearchScreen.kt` 的 Loading/Success/Error。
 
 ```mermaid
