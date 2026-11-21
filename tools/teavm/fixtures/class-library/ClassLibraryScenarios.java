@@ -45,6 +45,14 @@ public final class ClassLibraryScenarios {
     DigestScenarios.run();
     Pbkdf2Scenarios.run();
     timeZones();
+    check(
+        concat("ink", 17, true).equals("\1ink\2" + "17:true\1\2"),
+        "concatenation preserves literal recipe tags and dynamic arguments");
+    System.out.println("STRING_CONCAT_SCENARIO_PASS");
+  }
+
+  private static String concat(String title, int count, boolean enabled) {
+    return "\1" + title + "\2" + count + ":" + enabled + "\1\2";
   }
 
   private static void timeZones() {

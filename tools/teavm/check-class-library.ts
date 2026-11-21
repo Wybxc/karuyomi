@@ -42,9 +42,11 @@ async function runContracts(root: string, output: string): Promise<void> {
     );
   const source = path.join(output, 'src/main/java');
   prepareSources(source, root);
-  const owned = path.join(root, 'runtime/teavm/java/src/main/java');
+  const runtime = path.join(root, 'runtime/teavm/java/src/main');
+  const owned = path.join(runtime, 'java');
   for (const relative of [
     'prototype/TeaTransformer.java',
+    'prototype/StringConcatPlugin.java',
     'prototype/PlatformSupport.java',
     'prototype/jcl/LocaleMethods.java',
     'prototype/jcl/LocaleState.java',
@@ -76,12 +78,12 @@ async function runContracts(root: string, output: string): Promise<void> {
     path.join(root, 'tools/teavm/DateFormatScenarios.java'),
     path.join(source, 'prototype/DateFormatScenarios.java'),
   );
-  cpSync(
-    path.join(fixtures, 'resources'),
-    path.join(output, 'src/main/resources'),
-    {
-      recursive: true,
-    },
+  const resources = path.join(output, 'src/main/resources');
+  cpSync(path.join(fixtures, 'resources'), resources, { recursive: true });
+  const pluginService = 'META-INF/services/org.teavm.vm.spi.TeaVMPlugin';
+  copyFileSync(
+    path.join(runtime, 'resources', pluginService),
+    path.join(resources, pluginService),
   );
   copyFileSync(path.join(fixtures, 'pom.xml'), path.join(output, 'pom.xml'));
   const execute = execa({
@@ -154,6 +156,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     !oracle.stdout.includes('DIGEST_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('PBKDF2_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('TIME_ZONE_SCENARIOS_PASS ') ||
+    !oracle.stdout.includes('STRING_CONCAT_SCENARIO_PASS') ||
     generated.stdout !== oracle.stdout
   )
     throw new Error(

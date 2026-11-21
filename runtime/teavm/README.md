@@ -4,6 +4,7 @@
 
 - `java/`：正式 Java 源码、JCL/Android/库 ABI 适配、Maven 配置与服务注册。`hostInvoke` 使用完整 DTO、分页与显式漫画/章节引用；各宿主 entry 接收 requestId、generation 和独立 token，将 HTTP 与异步回调绑定到发起 RPC。
 - `patches/teavm/`：针对固定 TeaVM 上游的兼容补丁；[物化工具](../../tools/teavm/upstream-sources.ts) 校验原始和输出摘要，只写隔离构建目录。正则和日期补丁由 `TeaTransformer` 接入。
+- 字符串拼接编译补丁通过 TeaVM 编译器插件注册。拼接指令分别取用动态参数与常量池值，`pnpm teavm:check` 对照 JDK 验证包含控制字符的拼接结果。[JDK 字符串拼接接口](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/invoke/StringConcatFactory.html)
 - `Class.getResource` 通过 TeaVM 已打包的资源表返回可读取的 URL。`pnpm teavm:check` 对照 JDK 与实际生成的 JavaScript，验证严格 HTTP 日期解析和打包资源读取。[JDK 资源读取合同](<https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Class.html#getResource(java.lang.String)>)
 - `MessageDigest` 通过标准的构造器和引擎方法调用扩展自带的摘要实现。现有内置 MD5 和 SHA-256 继续用于 Source 身份及摘要计算。子类分派、重置和内置向量由 `pnpm teavm:check` 与 JDK 对照验证。[JDK 摘要接口](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/security/MessageDigest.html)
 - `PBEKeySpec` 与 `SecretKeyFactory` 在 AOT 中通过 Worker 的 WebCrypto 实现有界的 PBKDF2-HMAC-SHA-256 和 SHA-512。合成输入的 UTF-8 编码、密钥字节及参数语义由 `pnpm teavm:check` 与 JDK 对照验证。[WebCrypto PBKDF2](https://www.w3.org/TR/webcrypto/#pbkdf2)

@@ -2,7 +2,7 @@
 
 `java/` 与 `bridge/` 是本项目维护的兼容层和运行实现，源于 release9 研究交付后继续开发。历史交付的源指纹见 [验证要点](../../docs/verification/runtime-evidence.md)，不用于冻结当前项目代码。旧参考工程、研究探针、导入脚本和原始流水不作为正式构建源。
 
-- TeaVM 0.16.0 由 `vendor/teavm` submodule 固定，Apache-2.0。正则 `Patched*` 实现从该上游源码加 `patches/teavm/` 生成，不保留平行拷贝；输出保留原有 TeaVM / ASF 许可头。`prototype/jcl/Base64.java` 是重新实现的兼容适配，保留其历史 TeaVM 作者许可头；`WaitObjectMethods.java` 提取并适配 TeaVM `TObject` 的等待逻辑，保留来源说明。
+- TeaVM 0.16.0 由 `vendor/teavm` submodule 固定，Apache-2.0。正则、日期和字符串拼接的补丁从该上游源码与 `patches/teavm/` 生成，输出保留原有 TeaVM / ASF 许可头。`prototype/jcl/Base64.java` 是重新实现的兼容适配，保留其历史 TeaVM 作者许可头。`WaitObjectMethods.java` 提取并适配 TeaVM `TObject` 的等待逻辑，保留来源说明。
 - Suwayomi-Server 由 `vendor/suwayomi-server` submodule 固定，MPL-2.0。Source、模型与部分网络 ABI 来自其依赖材料；`HttpSource.java` 是本项目的 Kotlin→Java / TeaVM ABI 适配。HTTP await / awaitSuccess 及其 continuation 直接使用锁定 seed JAR 的上游实现；构建副本仅精确接管图片 cacheless / progress 方法，复用 BrowserCall 的集成。未把旧参考 Kotlin 工程当作项目原创。历史材料来源 commit 为 `6b481e8b62938b9c060eb210b934e0fbfdfa466b`；材料原 JAR 摘要由工具链锁校验。许可证见 `licenses/Suwayomi-MPL-2.0.txt`。
 - Android `org.json` 取自固定 Suwayomi 子模块的 `AndroidCompat/src/main/java/org/json/`，其 AOSP 文件为 Apache-2.0。正式构建仅在生成目录中去掉 `JSONObject` 的 AndroidX 空值标注，保留实现与原许可头；不提交源码副本。
 - Keiyoushi 扩展源码由 `vendor/extensions-source` submodule 固定，Apache-2.0。正式构建使用其 Gradle/KSP 生成的 JAR 与 Source 元数据，不修改扩展业务字节。许可证见 `licenses/Keiyoushi-Apache-2.0.txt`。
