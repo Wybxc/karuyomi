@@ -8,6 +8,8 @@
 
 2026-11-22，`macbook-pro-4` 复用主线 `af8c203` 的 CI Web/runtime 归档，用生产父快照通过正式 Vite 装配和 Wrangler 4.156.1 dry-run。生产索引及 191 份清单与预演输入逐字节一致，191 个公开 gzip 的强 ETag 与固定 Wrangler 的上传指纹一致，MIME 与 HTTP 编码均符合交付合同。完整候选的生产交付与普通封面现场验收仍待完成。[主线 CI](https://github.com/Wybxc/karuyomi/actions/runs/44912832454)
 
+2026-11-22，在 `macbook-pro-4` 从同一冻结计划和检查点优先编译队列末尾的 54 个现网包，全部成功。逐包核对原索引中的 191 个包，其中 190 个重编并通过正式构建校验，Arknights Comics 复用同一输入的已上线构建。解码后的 191 个包均导出 `hostAcquireCover`，原有 1,035 个 Source 条目保留。四并发全量队列随后接续，父 revision、目录指纹及 1,447 个选择项与原计划一致。内置浏览器的控制调用仍超时，真实页面出图待复验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
