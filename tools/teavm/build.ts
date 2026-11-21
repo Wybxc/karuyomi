@@ -162,12 +162,11 @@ export function prepareLibraries(workRoot: string, source: string): void {
 
 /** Compile bridge classes needed before the java.base compatibility patch. */
 export async function compileBridgeBootstrap(
-  workRoot: string,
+  source: string,
+  classes: string,
   classpath: string,
   env: NodeJS.ProcessEnv = process.env,
-): Promise<string> {
-  const source = path.join(workRoot, 'java/src/main/java/prototype'),
-    classes = path.join(workRoot, 'java/target/classes');
+): Promise<void> {
   mkdirSync(classes, { recursive: true });
   await execa(
     'javac',
@@ -181,7 +180,7 @@ export async function compileBridgeBootstrap(
       ),
     ],
     {
-      cwd: workRoot,
+      cwd: source,
       env,
       extendEnv: false,
       shell: false,
@@ -193,7 +192,6 @@ export async function compileBridgeBootstrap(
       verbose: 'none',
     },
   );
-  return classes;
 }
 
 export async function compileExtension(
@@ -261,7 +259,13 @@ export async function compileExtension(
       .map((entry) => path.join(entry.parentPath, entry.name))
       .sort(),
   ]);
-  const classes = await compileBridgeBootstrap(workRoot, cp, env);
+  const classes = path.join(workRoot, 'java/target/classes');
+  await compileBridgeBootstrap(
+    path.join(workRoot, 'java/src/main/java/prototype'),
+    classes,
+    cp,
+    env,
+  );
   cp = classes + path.delimiter + cp;
   await compiler('javac', [
     '--patch-module',

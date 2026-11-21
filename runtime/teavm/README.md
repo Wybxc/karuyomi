@@ -10,6 +10,7 @@
 - `PBEKeySpec` 与 `SecretKeyFactory` 在 AOT 中通过 Worker 的 WebCrypto 实现有界的 PBKDF2-HMAC-SHA-256 和 SHA-512。合成输入的 UTF-8 编码、密钥字节及参数语义由 `pnpm teavm:check` 与 JDK 对照验证。[WebCrypto PBKDF2](https://www.w3.org/TR/webcrypto/#pbkdf2)
 - P‑256 密钥生成、X.509 / PKCS#8 编码及 SHA‑256 ECDSA 由 Worker 的 WebCrypto 执行。Java 接口使用 DER 签名，转换层通过固定公开向量，以及 JDK 和生成 JavaScript 之间的双向验签。[WebCrypto ECDSA](https://www.w3.org/TR/webcrypto/#ecdsa) · [RFC 6979 测试向量](https://www.rfc-editor.org/rfc/rfc6979#appendix-A.2.5)
 - Java `KeyAgreement` 通过 WebCrypto 的 ECDH 执行两方 P‑256 密钥协商。JDK 与生成的 JavaScript 按公开向量对照派生结果和会话复用。[WebCrypto ECDH](https://www.w3.org/TR/webcrypto-2/#ecdh) · [RFC 5903 测试向量](https://www.rfc-editor.org/rfc/rfc5903#section-8.1)
+- Java `KeyPairGenerator` 与 `Cipher` 通过 WebCrypto 支持 RSA-OAEP。参数须显式指定 SHA‑256 摘要和 MGF1 SHA‑256，可提供 `PSource.PSpecified` 标签。JDK 与生成的 JavaScript 对照验证 RSA‑2048 编码、加解密和单块长度边界。[WebCrypto RSA-OAEP](https://www.w3.org/TR/webcrypto-2/#rsa-oaep)
 - `TimeZone.toZoneId` 复用 TeaVM 的时区规则和别名表，UTC 格式化、地区夏令时和显式偏移由 `pnpm teavm:check` 与 JDK 对照验证。[JDK 时区接口](<https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/TimeZone.html#toZoneId()>)
 - Android `ApplicationInfo.dataDir` 由当前 Context 的虚拟文件目录派生，访问范围由扩展的文件命名空间决定。[Android 应用信息](https://developer.android.com/reference/android/content/pm/ApplicationInfo#dataDir)
 - `bridge/`：严格 TypeScript 产品浏览器桥。Zstd 只读取已校验的共享材料映射，Web 使用静态字节，Native 使用应用内字节。

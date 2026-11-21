@@ -52,6 +52,7 @@ public final class ClassLibraryScenarios {
         "concatenation preserves literal recipe tags and dynamic arguments");
     System.out.println("STRING_CONCAT_SCENARIO_PASS");
     EcScenarios.run();
+    RsaScenarios.run();
   }
 
   private static String concat(String title, int count, boolean enabled) {

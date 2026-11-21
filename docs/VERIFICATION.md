@@ -36,7 +36,11 @@
 
 2026-11-22，同一 `7e0c053` checkout 的 Capibara Traductor 1.6.5、Mangas.in 1.6.4、Mangas No Sekai 1.6.78 通过正式 AOT、产物完整性及 `hostAcquireCover` 检查，各包含 1 个 Source。后两包以打包资源读取适配重新构建。三个补编批次共 30 个包经候选预检，与生产父快照 `ef76d5d1952b4733a10704d8401748ad` 和冻结批次共享材料匹配。三包保持 `compiled_unverified`，等待全量发布与在线验收。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
 
-2026-11-22，Nexus Scanlation 在冻结批次因缺少 Java `KeyPairGenerator` 和 `KeyAgreement` 失败。宿主补齐两方 P‑256 协商后，JDK 和生成的 TeaVM JavaScript 对照通过 18 项椭圆曲线断言。其中 6 项新增断言覆盖 RFC 5903 公开向量、错误输入和协商状态复用。原双向 ECDSA 验签仍通过，扩展正式 AOT 待复验。[宿主实现](../runtime/teavm/README.md)
+2026-11-22，Nexus Scanlation 在冻结批次因缺少 Java `KeyPairGenerator` 和 `KeyAgreement` 失败。宿主补齐两方 P‑256 协商后，JDK 和生成的 TeaVM JavaScript 对照通过 18 项椭圆曲线断言。其中 6 项新增断言覆盖 RFC 5903 公开向量、错误输入和协商状态复用，双向 ECDSA 验签也通过。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，在 `macbook-pro-4` 固定 `65e303a` 与同一 Keiyoushi 提交补编 Nexus Scanlation 1.6.8，正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `cf7ba2151c27e2bccf2e7f2f3ec299dc77e936898cc6fd86ac8a2c86ce52f535`。共享材料逐字节一致，第四个补编批次已通过候选预检，保持 `compiled_unverified`。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，Emaqi 的冻结构建缺少 Java 的 RSA 密钥及 OAEP 参数接口。使用正式宿主兼容层在 JDK 与生成的 TeaVM JavaScript 各通过 16 项 RSA-OAEP 断言，覆盖标准密钥编码、标签和参数、单块长度、短输出重试及错误标签。正式扩展构建和在线运行需另外验收。[宿主实现](../runtime/teavm/README.md)
 
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 

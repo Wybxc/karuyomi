@@ -40,7 +40,8 @@ test('bridge bootstrap javac resolves its binary HTTP source before compatibilit
         `package prototype; public final class ${name} { ${declaration} }`,
       );
     }
-    const classes = await compileBridgeBootstrap(work, dependencies);
+    const classes = path.join(work, 'java/target/classes');
+    await compileBridgeBootstrap(source, classes, dependencies);
     for (const name of ['Bridge', 'Callbacks', 'JsonValues', 'HttpBodySource'])
       assert.ok(existsSync(path.join(classes, 'prototype', name + '.class')));
   } finally {

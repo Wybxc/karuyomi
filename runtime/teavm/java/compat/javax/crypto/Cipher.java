@@ -7,16 +7,22 @@ import java.util.*;
 import com.google.gson.*;
 import prototype.Bridge;
 
-/** The supported provider is intentionally bounded to browser WebCrypto AES. */
+/** The supported AES and RSA ciphers use WebCrypto. */
 public class Cipher {
   public static final int ENCRYPT_MODE = 1, DECRYPT_MODE = 2, WRAP_MODE = 3, UNWRAP_MODE = 4;
+  private static final String RSA_OAEP = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
   private final String transformation;
+  private final boolean rsa;
   private byte[] key, iv, aad = new byte[0];
+  private RsaCrypto.OaepKey oaep;
+  private byte[] oaepLabel;
+  private boolean rsaInputTooLong;
   private int mode, tag = 128;
   private final java.io.ByteArrayOutputStream pending = new java.io.ByteArrayOutputStream();
 
   private Cipher(String t) {
     transformation = t;
+    rsa = RSA_OAEP.equalsIgnoreCase(t);
   }
 
   public static Cipher getInstance(String t)
@@ -24,7 +30,8 @@ public class Cipher {
     if (t == null) throw new NullPointerException();
     if (!t.equalsIgnoreCase("AES/CBC/PKCS5Padding")
         && !t.equalsIgnoreCase("AES/CBC/PKCS7Padding")
-        && !t.equalsIgnoreCase("AES/GCM/NoPadding")) throw new NoSuchAlgorithmException(t);
+        && !t.equalsIgnoreCase("AES/GCM/NoPadding")
+        && !RSA_OAEP.equalsIgnoreCase(t)) throw new NoSuchAlgorithmException(t);
     return new Cipher(t);
   }
 
@@ -33,7 +40,7 @@ public class Cipher {
   }
 
   public int getBlockSize() {
-    return 16;
+    return rsa ? 0 : 16;
   }
 
   public byte[] getIV() {
@@ -43,7 +50,13 @@ public class Cipher {
   public void init(int mode, Key key, AlgorithmParameterSpec params)
       throws InvalidKeyException, InvalidAlgorithmParameterException {
     this.key = null;
-    if (mode != 1 && mode != 2) throw new IllegalArgumentException("Unsupported cipher mode");
+    oaep = null;
+    if (mode != ENCRYPT_MODE && mode != DECRYPT_MODE)
+      throw new IllegalArgumentException("Unsupported cipher mode");
+    if (rsa) {
+      initOaep(mode, key, params);
+      return;
+    }
     if (key == null || !"AES".equalsIgnoreCase(key.getAlgorithm()) || key.getEncoded() == null)
       throw new InvalidKeyException("RAW AES key required");
     byte[] bytes = key.getEncoded();
@@ -79,8 +92,29 @@ public class Cipher {
     pending.reset();
   }
 
+  private void initOaep(int mode, Key key, AlgorithmParameterSpec params)
+      throws InvalidKeyException, InvalidAlgorithmParameterException {
+    oaepLabel = null;
+    pending.reset();
+    rsaInputTooLong = false;
+    if (!(params instanceof OAEPParameterSpec spec)
+        || !"SHA-256".equalsIgnoreCase(spec.getDigestAlgorithm())
+        || !"MGF1".equalsIgnoreCase(spec.getMGFAlgorithm())
+        || !(spec.getMGFParameters() instanceof MGF1ParameterSpec mgf)
+        || !"SHA-256".equalsIgnoreCase(mgf.getDigestAlgorithm())
+        || !(spec.getPSource() instanceof PSource.PSpecified label))
+      throw new InvalidAlgorithmParameterException("Expected SHA-256 for RSA-OAEP and MGF1");
+    oaep = RsaCrypto.oaepKey(key, mode == ENCRYPT_MODE);
+    oaepLabel = label.getValue();
+  }
+
+  private void requireInitialized() {
+    if (key == null && oaep == null) throw new IllegalStateException("Cipher not initialized");
+  }
+
   public void updateAAD(byte[] bytes) {
-    if (key == null) throw new IllegalStateException("Cipher not initialized");
+    requireInitialized();
+    if (rsa) throw new UnsupportedOperationException("RSA-OAEP uses a label");
     byte[] n = Arrays.copyOf(aad, aad.length + bytes.length);
     System.arraycopy(bytes, 0, n, aad.length, bytes.length);
     aad = n;
@@ -91,8 +125,9 @@ public class Cipher {
   }
 
   public int getOutputSize(int len) {
-    if (key == null) throw new IllegalStateException("Cipher not initialized");
+    requireInitialized();
     if (len < 0) throw new IllegalArgumentException();
+    if (rsa) return oaep.modulusBytes();
     int total = Math.addExact(pending.size(), len);
     boolean gcm = transformation.toUpperCase(Locale.ROOT).contains("GCM");
     return mode == DECRYPT_MODE
@@ -102,9 +137,13 @@ public class Cipher {
 
   public int update(byte[] in, int offset, int len, byte[] out, int outOffset)
       throws ShortBufferException {
-    if (key == null) throw new IllegalStateException("Cipher not initialized");
+    requireInitialized();
     Objects.checkFromIndexSize(offset, len, in.length);
     if (outOffset < 0 || outOffset > out.length) throw new ShortBufferException("Output offset");
+    if (rsa && len > oaep.inputLimit() - pending.size()) {
+      rsaInputTooLong = true;
+      return 0;
+    }
     pending.write(in, offset, len);
     return 0;
   }
@@ -124,8 +163,9 @@ public class Cipher {
 
   public byte[] doFinal(byte[] input, int offset, int len)
       throws IllegalBlockSizeException, BadPaddingException {
-    if (key == null) throw new IllegalStateException("Cipher not initialized");
+    requireInitialized();
     Objects.checkFromIndexSize(offset, len, input.length);
+    if (rsa) return finishOaep(input, offset, len);
     if (pending.size() > 0) {
       pending.write(input, offset, len);
       input = pending.toByteArray();
@@ -151,6 +191,19 @@ public class Cipher {
     aad = new byte[0];
     pending.reset();
     return Base64.getDecoder().decode(out.get("body").getAsString());
+  }
+
+  private byte[] finishOaep(byte[] input, int offset, int len)
+      throws IllegalBlockSizeException, BadPaddingException {
+    try {
+      if (rsaInputTooLong || len > oaep.inputLimit() - pending.size())
+        throw new IllegalBlockSizeException("RSA-OAEP input exceeds the block size");
+      pending.write(input, offset, len);
+      return oaep.process(pending.toByteArray(), oaepLabel);
+    } finally {
+      pending.reset();
+      rsaInputTooLong = false;
+    }
   }
 
   static String b64(byte[] b) {

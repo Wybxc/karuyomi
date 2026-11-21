@@ -11,6 +11,7 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execa } from 'execa';
+import { compileBridgeBootstrap, prepareLibraries } from './build.ts';
 import { LOCK } from './runtime.ts';
 import { prepareSources } from './upstream-sources.ts';
 
@@ -49,11 +50,13 @@ async function runContracts(root: string, output: string): Promise<void> {
     'prototype/TeaTransformer.java',
     'prototype/StringConcatPlugin.java',
     'prototype/PlatformSupport.java',
+    'prototype/jcl/Base64.java',
     'prototype/jcl/LocaleMethods.java',
     'prototype/jcl/LocaleState.java',
     'prototype/jcl/PackagedResources.java',
     'prototype/jcl/UrlMethods.java',
     'prototype/jcl/WaitListenerMethods.java',
+    'com/google/gson/internal/Streams.java',
     'org/teavm/classlib/java/lang/WaitObjectMethods.java',
     'org/teavm/classlib/java/lang/WaitInterruptSupport.java',
     'org/teavm/classlib/java/util/regex/MatcherFindMethods.java',
@@ -71,6 +74,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     'DigestScenarios.java',
     'Pbkdf2Scenarios.java',
     'EcScenarios.java',
+    'RsaScenarios.java',
   ])
     copyFileSync(
       path.join(fixtures, name),
@@ -99,43 +103,60 @@ async function runContracts(root: string, output: string): Promise<void> {
     forceKillAfterDelay: 1000,
   });
   const compat = path.join(root, 'runtime/teavm/java/compat');
-  const security = path.join(compat, 'java/security');
-  const securitySources = readdirSync(security, {
-    recursive: true,
-    withFileTypes: true,
-  })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.java'))
-    .map((entry) => path.join(entry.parentPath, entry.name))
-    .sort();
+  const securitySources = ['java/security', 'javax/crypto'].flatMap(
+    (relative) =>
+      readdirSync(path.join(compat, relative), {
+        recursive: true,
+        withFileTypes: true,
+      })
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.java'))
+        .map((entry) => path.join(entry.parentPath, entry.name))
+        .sort(),
+  );
   const classes = path.join(output, 'target/classes');
-  const jsoClasspath = ['teavm-interop', 'teavm-jso', 'teavm-jso-apis']
-    .map((artifact) =>
-      path.join(
-        local,
-        'build-cache/m2/org/teavm',
-        artifact,
-        LOCK.teavm,
-        `${artifact}-${LOCK.teavm}.jar`,
-      ),
-    )
-    .join(path.delimiter);
-  mkdirSync(classes, { recursive: true });
-  await execute(path.join(javaHome, 'bin/javac'), [
+  const jso = ['teavm-interop', 'teavm-jso', 'teavm-jso-apis'].map((artifact) =>
+    path.join(
+      local,
+      'build-cache/m2/org/teavm',
+      artifact,
+      LOCK.teavm,
+      `${artifact}-${LOCK.teavm}.jar`,
+    ),
+  );
+  const seed = path.join(local, 'runtime-seed/public/runtime');
+  const gsonName = 'gson-2.13.2.jar';
+  const seedCopy = path.join(output, 'public/runtime');
+  mkdirSync(seedCopy, { recursive: true });
+  copyFileSync(path.join(seed, gsonName), path.join(seedCopy, gsonName));
+  prepareLibraries(output, source);
+  const gson = path.join(output, 'java/libs', gsonName);
+  const javac = path.join(javaHome, 'bin/javac');
+  await compileBridgeBootstrap(
+    path.join(owned, 'prototype'),
+    classes,
+    [
+      ...jso,
+      gson,
+      path.join(seed, 'host-44fb93b22828.jar'),
+      path.join(seed, 'kotlin-stdlib-2.4.21.jar'),
+      path.join(seed, 'okio-jvm-3.18.2.jar'),
+    ].join(path.delimiter),
+    {
+      ...process.env,
+      JAVA_HOME: javaHome,
+      PATH: [path.dirname(javac), process.env.PATH].join(path.delimiter),
+    },
+  );
+  await execute(javac, [
     '--patch-module',
     `java.base=${compat}`,
     '--add-reads',
     'java.base=ALL-UNNAMED',
     '-cp',
-    jsoClasspath,
+    [classes, ...jso, gson].join(path.delimiter),
     '-d',
     classes,
     ...securitySources,
-    ...[
-      'javax/crypto/KeyAgreement.java',
-      'javax/crypto/SecretKeyFactory.java',
-      'javax/crypto/spec/PBEKeySpec.java',
-      'javax/crypto/spec/SecretKeySpec.java',
-    ].map((name) => path.join(compat, name)),
   ]);
   await execute(
     maven,
@@ -172,6 +193,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     !oracle.stdout.includes('TIME_ZONE_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('STRING_CONCAT_SCENARIO_PASS') ||
     !oracle.stdout.includes('EC_SCENARIOS_PASS ') ||
+    !oracle.stdout.includes('RSA_OAEP_SCENARIOS_PASS ') ||
     generated.stdout !== oracle.stdout
   )
     throw new Error(

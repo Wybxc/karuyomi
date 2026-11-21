@@ -1,5 +1,8 @@
 package java.security;
 
+import static java.security.WebCryptoBuffers.toJava;
+import static java.security.WebCryptoBuffers.toJs;
+
 import java.math.BigInteger;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.*;
@@ -203,19 +206,6 @@ public final class EcCrypto {
 
   private static byte[] exportKey(SubtleCrypto subtle, String format, CryptoKey key) {
     return toJava(subtle.exportKey(format, key).await());
-  }
-
-  private static Uint8Array toJs(byte[] value) {
-    Uint8Array array = new Uint8Array(value.length);
-    for (int i = 0; i < value.length; i++) array.set(i, (short) (value[i] & 255));
-    return array;
-  }
-
-  private static byte[] toJava(ArrayBuffer buffer) {
-    Uint8Array view = new Uint8Array(buffer);
-    byte[] result = new byte[view.getByteLength()];
-    for (int i = 0; i < result.length; i++) result[i] = (byte) view.get(i);
-    return result;
   }
 
   private static JSArray<JSString> usages(String... values) {

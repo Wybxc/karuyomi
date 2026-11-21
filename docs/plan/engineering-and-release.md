@@ -52,6 +52,8 @@ Read One Piece Manga Online 的 KSP 继承校验失败已在同一上游提交�
 
 The Blank、TCB Scans、Webnex 已通过正式 AOT、产物完整性及封面入口检查。冻结批次中同一 MangaCatalog 主题的 12 个 KSP 继承校验失败全部从隔离串行复验恢复。P‑256 签名与资源适配批次随后恢复 ProComic、Capibara Traductor、Mangas.in 和 Mangas No Sekai，三个补编批次共 30 个成功结果通过装配预检。Lunar Manga 的字符串拼接和密钥接口已通过编译，仍依赖 Turnstile 的 Android Activity 和 WebView 交互。[补编证据](../VERIFICATION.md)
 
+Nexus Scanlation 使用 P‑256 密钥协商适配完成正式 AOT、完整性及封面入口检查，第四个补编批次已通过装配预检。[补编证据](../VERIFICATION.md)
+
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
 - [x] 先行发布原索引 191 个升级包，逐包读回生产资源并确认新的生产检查点。完整冻结队列继续构建后续目录。[生产证据](../VERIFICATION.md)
