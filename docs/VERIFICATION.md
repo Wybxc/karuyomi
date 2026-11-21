@@ -48,6 +48,10 @@
 
 2026-11-22，在 `macbook-pro-4` 固定 `ddbcbb8`，Falco Scan 1.6.1 的正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `363d849a4a1d7c40cfc01c238a6113826de4d83f34043323cec153de648bffc1`，共享材料逐字节一致，候选预检纳入第 35 个补编结果，保持 `compiled_unverified`。正式出图和使用真实源站图片的阅读待验。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
 
+2026-11-22，在 `macbook-pro-4` 的同一 `ddbcbb8` checkout 提前试编 U-Next、OneReader 和 MoeTruyen，三包使用相同上游源码闭包及共享材料。U-Next 1.6.4 通过正式构建、产物完整性和 `hostAcquireCover`，canonical SHA-256 为 `f7b0597516d7fbb035f2a4df681d7bc2464bbefdbdce185e62d1fd21599bf05f`，候选预检等待该包的冻结原回执。OneReader 的密钥接口已通过编译解析，缺少 Java `SequenceInputStream`。MoeTruyen 仍依赖未实现的 Android 对话框、视图及密码接口。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，顺序流兼容层在 JDK 与生成的 TeaVM JavaScript 各通过 15 项断言，覆盖延迟读取、空分段、无符号字节、EOF、提前关闭及后续关闭错误的传播。完整 `pnpm teavm:check` 通过，OneReader 正式补编待复验。[宿主实现](../runtime/teavm/README.md)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)

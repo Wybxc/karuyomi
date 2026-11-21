@@ -80,6 +80,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     'Pbkdf2Scenarios.java',
     'EcScenarios.java',
     'RsaScenarios.java',
+    'SequenceStreamScenarios.java',
   ])
     copyFileSync(
       path.join(fixtures, name),
@@ -165,6 +166,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     [classes, ...jso, gson].join(path.delimiter),
     '-d',
     classes,
+    path.join(compat, 'java/io/SequenceInputStream.java'),
     ...securitySources,
   ]);
   await execute(
@@ -203,6 +205,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     !oracle.stdout.includes('STRING_CONCAT_SCENARIO_PASS') ||
     !oracle.stdout.includes('EC_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('RSA_OAEP_SCENARIOS_PASS ') ||
+    !oracle.stdout.includes('SEQUENCE_STREAM_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('Graphics transform oracle: ') ||
     generated.stdout !== oracle.stdout
   )

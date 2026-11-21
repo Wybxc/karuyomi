@@ -108,7 +108,7 @@ node tools/extensions/pipeline.ts commit-snapshot \
 
 ### 首次全量候选的定向补编
 
-冻结全量期间如有少量包需要用新版 AOT 重编，先确认新旧 checkout 的上游源码和共享运行材料相同。等冻结批次退出并留下所有包的终态；在独立目录保留其原计划和逐包结果。新版固定 checkout 以同一份已核对的生产父状态运行 `plan --limit 10000`，按新计划中的精确 `inputFingerprint` 对指定包运行 `build --key`，每个包使用独立输出目录。两份 checkout 先各自执行 `pnpm --filter @karuyomi/runtime-host build:materials`。
+冻结全量期间如有少量包需要用新版 AOT 重编，先确认新旧 checkout 的上游源码和共享运行材料相同。新版固定 checkout 以同一份已核对的生产父状态运行 `plan --limit 10000`，按新计划中的精确 `inputFingerprint` 对指定包运行 `build --key`，每个包使用独立输出目录。两份 checkout 先各自执行 `pnpm --filter @karuyomi/runtime-host build:materials`。独立试编可以在冻结队列运行期间完成。原计划和逐包回执持续保留，完整候选在原队列取得全部终态后装配。
 
 本地候选可以同时纳入多个独立补编批次。`--supplements` 指向 JSON 数组，每项记录原计划、实际结果目录、固定 checkout 和要合入的完整包名。相对路径以该 JSON 文件所在目录为基准。每个包只能由一个补编批次提供。
 

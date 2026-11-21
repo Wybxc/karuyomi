@@ -6,6 +6,7 @@
 - `patches/teavm/`：针对固定 TeaVM 上游的兼容补丁；[物化工具](../../tools/teavm/upstream-sources.ts) 校验原始和输出摘要，只写隔离构建目录。正则和日期补丁由 `TeaTransformer` 接入。
 - 字符串拼接编译补丁通过 TeaVM 编译器插件注册。拼接指令分别取用动态参数与常量池值，`pnpm teavm:check` 对照 JDK 验证包含控制字符的拼接结果。[JDK 字符串拼接接口](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/invoke/StringConcatFactory.html)
 - `Class.getResource` 通过 TeaVM 已打包的资源表返回可读取的 URL。`pnpm teavm:check` 对照 JDK 与实际生成的 JavaScript，验证严格 HTTP 日期解析和打包资源读取。[JDK 资源读取合同](<https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Class.html#getResource(java.lang.String)>)
+- Java `SequenceInputStream` 逐个读取并关闭子流，适用于以小段前缀接续原有响应的扩展。`pnpm teavm:check` 对照验证分段读取、EOF、提前关闭与异常传播。[JDK SequenceInputStream](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/SequenceInputStream.html)
 - `MessageDigest` 通过标准的构造器和引擎方法调用扩展自带的摘要实现。现有内置 MD5 和 SHA-256 继续用于 Source 身份及摘要计算。子类分派、重置和内置向量由 `pnpm teavm:check` 与 JDK 对照验证。[JDK 摘要接口](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/security/MessageDigest.html)
 - `PBEKeySpec` 与 `SecretKeyFactory` 在 AOT 中通过 Worker 的 WebCrypto 实现有界的 PBKDF2-HMAC-SHA-256 和 SHA-512。合成输入的 UTF-8 编码、密钥字节及参数语义由 `pnpm teavm:check` 与 JDK 对照验证。[WebCrypto PBKDF2](https://www.w3.org/TR/webcrypto/#pbkdf2)
 - P‑256 密钥生成、X.509 / PKCS#8 编码及 SHA‑256 ECDSA 由 Worker 的 WebCrypto 执行。Java 接口使用 DER 签名，转换层通过固定公开向量，以及 JDK 和生成 JavaScript 之间的双向验签。[WebCrypto ECDSA](https://www.w3.org/TR/webcrypto/#ecdsa) · [RFC 6979 测试向量](https://www.rfc-editor.org/rfc/rfc6979#appendix-A.2.5)
