@@ -83,6 +83,22 @@ void main() {
   }
 
   for (final brightness in Brightness.values) {
+    testWidgets(
+      'single-mode source uses the selected label color in $brightness',
+      (tester) async {
+        platform.sourceInventory = [
+          wire.SourceInfo(id: sourceId, name: '测试漫画源', lang: 'zh'),
+        ];
+        await show(tester, brightness: brightness);
+        final label = tester.element(find.text('热门'));
+        expect(
+          DefaultTextStyle.of(label).style.color!.toARGB32(),
+          AppColors.onSelection.resolveFrom(label).toARGB32(),
+        );
+        await hide(tester);
+      },
+    );
+
     testWidgets('compact source covers follow the toolbar in $brightness', (
       tester,
     ) async {

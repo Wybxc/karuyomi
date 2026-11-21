@@ -405,6 +405,7 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
         canBrowse &&
         _results.isEmpty &&
         catalog.page > 0;
+    final popularSelected = _displayListing == 'popular';
     final mode = switch (_displayListing) {
       'search' => '搜索',
       'latest' => '最新',
@@ -589,15 +590,18 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                               )
                             else
                               Semantics(
-                                selected: _displayListing == 'popular',
+                                selected: popularSelected,
                                 child: CupertinoButton(
                                   sizeStyle: CupertinoButtonSize.small,
                                   minimumSize: const Size(44, 44),
-                                  color: _displayListing == 'popular'
+                                  color: popularSelected
                                       ? AppColors.selection
                                       : null,
-                                  foregroundColor: _displayListing == 'popular'
-                                      ? AppColors.onSelection
+                                  foregroundColor:
+                                      popularSelected && canInteract
+                                      ? AppColors.onSelection.resolveFrom(
+                                          context,
+                                        )
                                       : null,
                                   onPressed: !canInteract
                                       ? null
