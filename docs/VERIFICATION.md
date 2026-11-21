@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-21，`6df9704` 对照 Mihon 18.01 将章节多选的上栏与标记动作固定在列表两端。两色组件的选中行覆盖 x=0–360，未读标题左缘为 x=30。360×480 两倍字号从末章直接打开确认，取消后保留选择和滚动位置，点按退出或系统返回均留在详情。1006 项 Flutter 测试与 Web release 构建通过，正式 Web 与原生实拍待验。[章节多选](verification/mihon-cupertino-fidelity.md#章节多选的固定操作栏)
+
 2026-11-21，`7e4fc47` 将 Source 日期放到章节次级资料首位。对照 17.01 的四个 xkcd 章节，两色 Flutter 组件的日期值和左缘与参考相符。回归覆盖本地日期边界、两倍字号、日期缺失及刷新失败后重试。1004 项 Flutter 测试与 Web release 构建通过。真实 Source 的新版正式 Web 待验。[章节日期](verification/mihon-cupertino-fidelity.md#章节发布日期和刷新回执)
 
 2026-11-21，`11c1ed1` 的双主题章节组件将未读标题左缘从 x=80 移到 x=30，已读标题和次级资料移到 x=16，相邻标题间距从 48 增至 68 逻辑像素，与 Mihon 17.01 的对应边界一致。点按禁用书签不再打开章节，恢复后仅写入点按的重复条目。1003 项 Flutter 测试及 Web release 构建通过。正式 Web 同版渲染待验。[章节布局与独立书签](verification/mihon-cupertino-fidelity.md#章节列表的对齐与独立书签)
