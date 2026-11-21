@@ -34,8 +34,13 @@ class const SourceBrowsePage({
 }
 
 class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
+  static const _coverInset = 12.0;
+  static const _coverSpacing = 12.0;
+  static const _minimumCoverWidth = 120.0;
+
   late TextEditingController _search;
   late ScrollController _scroll;
+  bool _searchVisible = false;
   late final Object? _identity;
   late final LibraryRepository? _library;
   CoverRepository? _covers;
@@ -188,7 +193,10 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
     setState(() {
       _loading = null;
       _error = catalog.error;
-      if (_error == null && _sourceCurrent) _adoptResults();
+      if (_error == null && _sourceCurrent) {
+        _adoptResults();
+        if (kind == _ListingWork.query) _search.text = _displayQuery;
+      }
       _failed = _error == null ? null : kind;
       if (_error == null &&
           kind != _ListingWork.more &&
@@ -349,6 +357,9 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
   Widget build(BuildContext context) {
     _search = useTextEditingController();
     _scroll = useScrollController();
+    final searchFocus = useFocusNode();
+    final searchToggleFocus = useFocusNode();
+    final draftQuery = useListenableSelector(_search, () => _search.text);
     useListenable(catalog);
     final view =
         _library != null &&
@@ -383,11 +394,60 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
         catalog.extensionUnavailableReason == null &&
         !catalog.sourcePreferencesBlocked &&
         !catalog.accessPaused;
+    final canInteract = !busy && canBrowse;
+    final keyboardOpen =
+        _searchVisible &&
+        searchFocus.hasFocus &&
+        MediaQuery.viewInsetsOf(context).bottom > 0;
+    final noResults =
+        _loading == null &&
+        _error == null &&
+        canBrowse &&
+        _results.isEmpty &&
+        catalog.page > 0;
     final mode = switch (_displayListing) {
       'search' => '搜索',
       'latest' => '最新',
       _ => '热门',
     };
+    final feedback = <Widget>[
+      if (_libraryError case final error?)
+        CupertinoListTile(
+          title: Text(error),
+          trailing: CupertinoButton(
+            onPressed: () => unawaited(_refreshLibrary()),
+            child: const Text('重试读取书架'),
+          ),
+        ),
+      if (showOld &&
+          ((_displayQuery.isNotEmpty &&
+                  (!_searchVisible || draftQuery != _displayQuery)) ||
+              (_failed == _ListingWork.query && _results.isNotEmpty)))
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 16, 0),
+          child: Text(
+            _displayQuery.isEmpty ? '当前列表：$mode' : '当前查询：$_displayQuery',
+            key: const ValueKey('source-query-context'),
+            style: TextStyle(
+              color: AppColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+        ),
+      if (_loading != _ListingWork.initial && !canBrowse)
+        _failure(catalog.accessPaused ? '登录后继续' : '漫画源需要处理')
+      else if (_error != null && _failed != _ListingWork.more)
+        _failure(switch (_failed) {
+          _ListingWork.refresh => '刷新失败，原作品仍可查看',
+          _ListingWork.query => '新查询失败，仍显示原列表',
+          _ => '加载失败',
+        }),
+    ];
+
+    void submitSearch(String query) {
+      searchFocus.unfocus();
+      _start(_ListingWork.query, query: query);
+    }
+
     return PopScope<void>(
       canPop: _allowPop,
       onPopInvokedWithResult: (didPop, _) {
@@ -398,17 +458,42 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
           leading: CupertinoNavigationBarBackButton(
             onPressed: () => unawaited(_leave()),
           ),
-          middle: Text(widget.source.name),
-          trailing: CupertinoButton(
-            key: const ValueKey('source-preferences-open'),
-            onPressed: busy || !canBrowse
-                ? null
-                : () => unawaited(_preferences()),
-            padding: const EdgeInsets.all(8),
-            child: const Icon(
-              CupertinoIcons.slider_horizontal_3,
-              semanticLabel: '漫画源设置',
-            ),
+          middle: Text(
+            widget.source.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CupertinoButton(
+                key: const ValueKey('source-search-toggle'),
+                focusNode: searchToggleFocus,
+                padding: EdgeInsets.zero,
+                onPressed: canInteract
+                    ? () {
+                        if (_searchVisible) {
+                          _search.text = _displayQuery;
+                          searchToggleFocus.requestFocus();
+                        }
+                        setState(() => _searchVisible = !_searchVisible);
+                      }
+                    : null,
+                child: Icon(
+                  _searchVisible ? CupertinoIcons.xmark : CupertinoIcons.search,
+                  semanticLabel: _searchVisible ? '关闭搜索' : '搜索此源的作品',
+                ),
+              ),
+              CupertinoButton(
+                key: const ValueKey('source-preferences-open'),
+                onPressed: canInteract ? () => unawaited(_preferences()) : null,
+                padding: EdgeInsets.zero,
+                child: const Icon(
+                  CupertinoIcons.slider_horizontal_3,
+                  semanticLabel: '漫画源设置',
+                ),
+              ),
+            ],
           ),
         ),
         child: SafeArea(
@@ -417,112 +502,139 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
               constraints: const BoxConstraints(maxWidth: 1000),
               child: Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    child: CupertinoTextField(
-                      autofillHints: null,
-                      key: const ValueKey('source-manga-search'),
-                      controller: _search,
-                      enabled: !busy && canBrowse,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (query) =>
-                          _start(_ListingWork.query, query: query),
-                      placeholder: '搜索此源的作品',
-                      placeholderStyle: TextStyle(
-                        color: AppColors.secondaryLabel.resolveFrom(context),
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.groupedSurface.resolveFrom(context),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      prefix: Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(
-                          CupertinoIcons.search,
-                          color: AppColors.secondaryLabel.resolveFrom(context),
-                        ),
-                      ),
-                      suffix: CupertinoButton(
-                        onPressed: busy || !canBrowse
-                            ? null
-                            : () => _start(
-                                _ListingWork.query,
-                                query: _search.text,
+                  if (_searchVisible)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: CupertinoTextField(
+                              key: const ValueKey('source-manga-search'),
+                              controller: _search,
+                              focusNode: searchFocus,
+                              autofocus: true,
+                              autofillHints: null,
+                              enabled: canInteract,
+                              clearButtonMode: OverlayVisibilityMode.editing,
+                              textInputAction: TextInputAction.search,
+                              onSubmitted: submitSearch,
+                              placeholder: '搜索此源的作品',
+                              placeholderStyle: TextStyle(
+                                color: AppColors.secondaryLabel.resolveFrom(
+                                  context,
+                                ),
                               ),
-                        padding: const EdgeInsets.all(8),
-                        child: const Icon(
-                          CupertinoIcons.arrow_right,
-                          semanticLabel: '搜索',
+                              decoration: BoxDecoration(
+                                color: AppColors.selection.resolveFrom(context),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              prefix: Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  start: 8,
+                                ),
+                                child: Icon(
+                                  CupertinoIcons.search,
+                                  color: AppColors.secondaryLabel.resolveFrom(
+                                    context,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          CupertinoButton(
+                            key: const ValueKey('source-search-submit'),
+                            onPressed: canInteract
+                                ? () => submitSearch(_search.text)
+                                : null,
+                            padding: EdgeInsets.zero,
+                            child: const Icon(
+                              CupertinoIcons.arrow_right,
+                              semanticLabel: '提交搜索',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (!keyboardOpen)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Wrap(
+                          spacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (catalog.activeSource?.supportsLatest == true)
+                              CupertinoSlidingSegmentedControl<String>(
+                                groupValue: _displayListing == 'search'
+                                    ? null
+                                    : _displayListing,
+                                children: const {
+                                  'popular': Text('热门'),
+                                  'latest': Text('最新'),
+                                },
+                                disabledChildren: !canInteract
+                                    ? const {'popular', 'latest'}
+                                    : const {},
+                                onValueChanged: (value) {
+                                  _start(
+                                    _ListingWork.query,
+                                    query: '',
+                                    listing: value!,
+                                  );
+                                },
+                              )
+                            else
+                              Semantics(
+                                selected: _displayListing == 'popular',
+                                child: CupertinoButton(
+                                  sizeStyle: CupertinoButtonSize.small,
+                                  minimumSize: const Size(44, 44),
+                                  color: _displayListing == 'popular'
+                                      ? AppColors.selection
+                                      : null,
+                                  foregroundColor: _displayListing == 'popular'
+                                      ? AppColors.onSelection
+                                      : null,
+                                  onPressed: !canInteract
+                                      ? null
+                                      : () {
+                                          _start(
+                                            _ListingWork.query,
+                                            query: '',
+                                            listing: 'popular',
+                                          );
+                                        },
+                                  child: const Text('热门'),
+                                ),
+                              ),
+                            CupertinoButton(
+                              key: const ValueKey('source-filters-open'),
+                              sizeStyle: CupertinoButtonSize.small,
+                              minimumSize: const Size(44, 44),
+                              onPressed: !canInteract
+                                  ? null
+                                  : () => unawaited(_filters()),
+                              child: Text(_displayFiltered ? '筛选（已应用）' : '筛选'),
+                            ),
+                            CupertinoButton(
+                              key: const ValueKey('source-refresh'),
+                              onPressed: !canInteract
+                                  ? null
+                                  : () => _start(_ListingWork.refresh),
+                              padding: const EdgeInsets.all(8),
+                              child: const Icon(
+                                CupertinoIcons.refresh,
+                                semanticLabel: '刷新当前列表',
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Wrap(
-                      spacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (catalog.activeSource?.supportsLatest == true)
-                          CupertinoSlidingSegmentedControl<String>(
-                            groupValue: catalog.listing == 'search'
-                                ? null
-                                : catalog.listing,
-                            children: const {
-                              'popular': Text('热门'),
-                              'latest': Text('最新'),
-                            },
-                            disabledChildren: busy || !canBrowse
-                                ? const {'popular', 'latest'}
-                                : const {},
-                            onValueChanged: (value) {
-                              _search.clear();
-                              _start(
-                                _ListingWork.query,
-                                query: '',
-                                listing: value!,
-                              );
-                            },
-                          )
-                        else
-                          CupertinoButton(
-                            onPressed: busy || !canBrowse
-                                ? null
-                                : () {
-                                    _search.clear();
-                                    _start(
-                                      _ListingWork.query,
-                                      query: '',
-                                      listing: 'popular',
-                                    );
-                                  },
-                            child: const Text('热门'),
-                          ),
-                        CupertinoButton(
-                          key: const ValueKey('source-filters-open'),
-                          onPressed: busy || !canBrowse
-                              ? null
-                              : () => unawaited(_filters()),
-                          child: Text(
-                            catalog.appliedSourceFilters == null
-                                ? '筛选'
-                                : '筛选（已应用）',
-                          ),
-                        ),
-                        CupertinoButton(
-                          key: const ValueKey('source-refresh'),
-                          onPressed: busy || !canBrowse
-                              ? null
-                              : () => _start(_ListingWork.refresh),
-                          padding: const EdgeInsets.all(8),
-                          child: const Icon(
-                            CupertinoIcons.refresh,
-                            semanticLabel: '刷新当前列表',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   if (activity != null) ...[
                     const CupertinoActivityIndicator(),
                     Padding(
@@ -542,45 +654,11 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                             await _work;
                           },
                         ),
-                        SliverPadding(
-                          padding: const EdgeInsets.all(16),
-                          sliver: SliverList.list(
-                            children: [
-                              if (_libraryError != null)
-                                CupertinoListTile(
-                                  title: Text(_libraryError!),
-                                  trailing: CupertinoButton(
-                                    onPressed: () =>
-                                        unawaited(_refreshLibrary()),
-                                    child: const Text('重试读取书架'),
-                                  ),
-                                ),
-                              if (_loading != _ListingWork.initial &&
-                                  !canBrowse)
-                                _failure(
-                                  catalog.accessPaused ? '登录后继续' : '漫画源需要处理',
-                                )
-                              else if (_error != null &&
-                                  _failed != _ListingWork.more)
-                                _failure(
-                                  _failed == _ListingWork.refresh
-                                      ? '刷新失败，原作品仍可查看'
-                                      : _failed == _ListingWork.query
-                                      ? '新查询失败，仍显示原列表'
-                                      : '加载失败',
-                                ),
-                              if (showOld &&
-                                  (_results.isNotEmpty || catalog.page > 0))
-                                Text(
-                                  '$mode${_displayQuery.isEmpty ? '' : ' · $_displayQuery'}${_displayFiltered ? ' · 筛选已应用' : ''}',
-                                  key: const ValueKey('source-query-context'),
-                                ),
-                            ],
-                          ),
-                        ),
-                        if (showOld)
+                        if (feedback.isNotEmpty)
+                          SliverList.list(children: feedback),
+                        if (showOld && _results.isNotEmpty)
                           SliverPadding(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(_coverInset),
                             sliver: SliverLayoutBuilder(
                               builder: (context, constraints) =>
                                   SliverGrid.builder(
@@ -588,12 +666,13 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                                         SliverGridDelegateWithFixedCrossAxisCount(
                                           crossAxisCount:
                                               ((constraints.crossAxisExtent +
-                                                          4) /
-                                                      132)
+                                                          _coverSpacing) /
+                                                      (_minimumCoverWidth +
+                                                          _coverSpacing))
                                                   .floor()
                                                   .clamp(1, 100),
-                                          mainAxisSpacing: 4,
-                                          crossAxisSpacing: 4,
+                                          mainAxisSpacing: _coverSpacing,
+                                          crossAxisSpacing: _coverSpacing,
                                           childAspectRatio: 2 / 3,
                                         ),
                                     itemCount: _results.length,
@@ -624,96 +703,112 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                                   ),
                             ),
                           ),
-                        SliverPadding(
-                          padding: const EdgeInsets.all(16),
-                          sliver: SliverList.list(
-                            children: [
-                              if (_loading == null &&
-                                  _error == null &&
-                                  canBrowse &&
-                                  _results.isEmpty &&
-                                  catalog.page > 0)
-                                Padding(
-                                  padding: const EdgeInsets.all(32),
-                                  child: Column(
-                                    children: [
-                                      const Text('没有结果'),
-                                      Text(
-                                        catalog.query.isNotEmpty ||
-                                                catalog.appliedSourceFilters !=
-                                                    null
-                                            ? '请修改关键词或筛选条件。'
-                                            : '当前列表暂时没有作品。',
+                        if (noResults)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '没有结果',
+                                      style: CupertinoTheme.of(context)
+                                          .textTheme
+                                          .navTitleTextStyle,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      _displayQuery.isNotEmpty ||
+                                              _displayFiltered
+                                          ? '请修改关键词或筛选条件。'
+                                          : '当前列表暂时没有作品。',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: AppColors.secondaryLabel
+                                            .resolveFrom(context),
                                       ),
-                                      CupertinoButton(
-                                        onPressed: () =>
-                                            _start(_ListingWork.refresh),
-                                        child: const Text('刷新'),
-                                      ),
-                                      if (catalog.query.isNotEmpty ||
-                                          catalog.appliedSourceFilters != null)
-                                        CupertinoButton(
-                                          onPressed: () {
-                                            _search.clear();
-                                            _start(
-                                              _ListingWork.query,
-                                              query: '',
-                                              listing: 'popular',
-                                            );
-                                          },
-                                          child: const Text('清除查询'),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              if (_failed == _ListingWork.more)
-                                _failure('下一页加载失败'),
-                              if (appending && !_leaving && canBrowse)
-                                Semantics(
-                                  liveRegion: true,
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 12),
-                                    child: Wrap(
+                                    ),
+                                    Wrap(
                                       alignment: WrapAlignment.center,
-                                      crossAxisAlignment:
-                                          WrapCrossAlignment.center,
-                                      spacing: 8,
-                                      runSpacing: 4,
                                       children: [
-                                        CupertinoActivityIndicator(),
-                                        Text('正在加载下一页'),
+                                        CupertinoButton(
+                                          onPressed: canInteract
+                                              ? () =>
+                                                    _start(_ListingWork.refresh)
+                                              : null,
+                                          child: const Text('刷新'),
+                                        ),
+                                        if (_displayQuery.isNotEmpty ||
+                                            _displayFiltered)
+                                          CupertinoButton(
+                                            onPressed: canInteract
+                                                ? () => _start(
+                                                    _ListingWork.query,
+                                                    query: '',
+                                                    listing: 'popular',
+                                                  )
+                                                : null,
+                                            child: const Text('清除查询'),
+                                          ),
                                       ],
                                     ),
-                                  ),
-                                )
-                              else if (showOld &&
-                                  canBrowse &&
-                                  _results.isNotEmpty &&
-                                  _hasNextPage)
-                                Center(
-                                  child: CupertinoButton(
-                                    key: const ValueKey('source-load-more'),
-                                    onPressed: busy
-                                        ? null
-                                        : () => _start(_ListingWork.more),
-                                    child: const Text('加载下一页'),
-                                  ),
-                                )
-                              else if (showOld &&
-                                  canBrowse &&
-                                  _results.isNotEmpty &&
-                                  !_hasNextPage &&
-                                  _loading == null)
-                                const Padding(
-                                  padding: EdgeInsets.all(24),
-                                  child: Text(
-                                    '全部加载完成',
-                                    textAlign: TextAlign.center,
-                                  ),
+                                  ],
                                 ),
-                            ],
+                              ),
+                            ),
                           ),
-                        ),
+                        if (showOld && _results.isNotEmpty)
+                          SliverPadding(
+                            padding: const EdgeInsets.all(16),
+                            sliver: SliverList.list(
+                              children: [
+                                if (_failed == _ListingWork.more)
+                                  _failure('下一页加载失败')
+                                else if (appending && !_leaving && canBrowse)
+                                  Semantics(
+                                    liveRegion: true,
+                                    child: const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      child: Wrap(
+                                        alignment: WrapAlignment.center,
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
+                                        spacing: 8,
+                                        runSpacing: 4,
+                                        children: [
+                                          CupertinoActivityIndicator(),
+                                          Text('正在加载下一页'),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                else if (canBrowse && _hasNextPage)
+                                  Center(
+                                    child: CupertinoButton(
+                                      key: const ValueKey('source-load-more'),
+                                      onPressed: busy
+                                          ? null
+                                          : () => _start(_ListingWork.more),
+                                      child: const Text('加载下一页'),
+                                    ),
+                                  )
+                                else if (canBrowse &&
+                                    !_hasNextPage &&
+                                    _loading == null)
+                                  const Padding(
+                                    padding: EdgeInsets.all(24),
+                                    child: Text(
+                                      '全部加载完成',
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),

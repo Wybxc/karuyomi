@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/manga_details_page.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
+import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:source_runtime/source_runtime.dart';
 
@@ -34,9 +35,13 @@ void main() {
     await catalog.closeReadingProgress();
     await platform.dispose();
   });
-  Future<void> show(WidgetTester tester) async {
+  Future<void> show(
+    WidgetTester tester, {
+    Brightness brightness = Brightness.light,
+  }) async {
     await tester.pumpApp(
       CupertinoApp(
+        theme: readerAppTheme(brightness),
         home: Builder(
           builder: (context) => CupertinoPageScaffold(
             child: CupertinoButton(
@@ -75,6 +80,112 @@ void main() {
     await tester.ensureVisible(target);
     await tester.tap(target);
     await tester.pumpAndSettle();
+  }
+
+  for (final brightness in Brightness.values) {
+    testWidgets('compact source covers follow the toolbar in $brightness', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      platform.invokeHandler = (_) async => wire.SourceResult(
+        mangaPage: wire.MangaPage(
+          mangas: [
+            for (final title in ['作品一', '作品二', '作品三'])
+              wire.Manga(title: title, url: '/$title'),
+          ],
+        ),
+      );
+      await show(tester, brightness: brightness);
+      final first = tester.getRect(
+        find.byKey(const ValueKey(('source-manga', '/作品一'))),
+      );
+      final second = tester.getRect(
+        find.byKey(const ValueKey(('source-manga', '/作品二'))),
+      );
+      final third = tester.getRect(
+        find.byKey(const ValueKey(('source-manga', '/作品三'))),
+      );
+      final bar = tester.getRect(find.byType(CupertinoNavigationBar));
+      expect(first.top - bar.center.dy, closeTo(93, 2));
+      expect(first, Rect.fromLTWH(12, first.top, 162, 243));
+      expect(second.left, 186);
+      expect(third.top - first.top, 255);
+      expect(find.byKey(const ValueKey('source-manga-search')), findsNothing);
+      await hide(tester);
+    });
+
+    testWidgets(
+      'source search preserves the displayed query on a short screen in $brightness',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 480);
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        platform.invokeHandler = (_) async => page('原热门');
+        await show(tester, brightness: brightness);
+
+        final toggle = find.byKey(const ValueKey('source-search-toggle'));
+        final field = find.byKey(const ValueKey('source-manga-search'));
+        final submit = find.byKey(const ValueKey('source-search-submit'));
+        final beforeSearch = platform.invocations.length;
+        await tap(tester, 'source-search-toggle');
+        expect(
+          tester.widget<CupertinoTextField>(field).focusNode!.hasFocus,
+          isTrue,
+        );
+        tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+        await tester.pumpAndSettle();
+        expect(tester.getBottomRight(field).dy, lessThan(260));
+        expect(tester.getBottomRight(submit).dy, lessThan(260));
+        expect(tester.getSize(submit).width, greaterThanOrEqualTo(44));
+        await tester.enterText(field, '只输入的草稿');
+        expect(platform.invocations, hasLength(beforeSearch));
+        await tap(tester, 'source-search-toggle');
+        expect(field, findsNothing);
+        expect(
+          tester.widget<CupertinoButton>(toggle).focusNode!.hasFocus,
+          isTrue,
+        );
+        expect(catalog.mangas.single.title, '原热门');
+        expect(platform.invocations, hasLength(beforeSearch));
+
+        await tap(tester, 'source-search-toggle');
+        expect(
+          tester.widget<CupertinoTextField>(field).controller!.text,
+          isEmpty,
+        );
+        await tester.enterText(field, '已提交的关键词');
+        platform.invokeHandler = (call) async {
+          expect(call.search.query, '已提交的关键词');
+          throw const RuntimeException(RuntimeErrorCode.sourceError, 'failed');
+        };
+        await tester.tap(submit);
+        tester.view.resetViewInsets();
+        await tester.pumpAndSettle();
+        expect(find.text('当前列表：热门'), findsOneWidget);
+        expect(catalog.mangas.single.title, '原热门');
+        await tester.enterText(field, '重试前输入的文字');
+        platform.invokeHandler = (call) async {
+          expect(call.search.query, '已提交的关键词');
+          return page('搜索结果', more: false);
+        };
+        final retry = find.text('重试');
+        await tester.ensureVisible(retry);
+        await tester.pumpAndSettle();
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        expect(catalog.mangas.single.title, '搜索结果');
+        expect(catalog.query, '已提交的关键词');
+        await tap(tester, 'source-search-toggle');
+        expect(field, findsNothing);
+        expect(find.text('当前查询：已提交的关键词'), findsOneWidget);
+        expect(platform.invocations, hasLength(beforeSearch + 2));
+        expect(tester.takeException(), isNull);
+        await hide(tester);
+      },
+    );
   }
 
   testWidgets(
@@ -215,6 +326,7 @@ void main() {
       platform.invokeHandler = (_) async => page('原热门');
       await show(tester);
       final before = platform.invocations.length;
+      await tap(tester, 'source-search-toggle');
       await tester.enterText(
         find.byKey(const ValueKey('source-manga-search')),
         '新关键词',
@@ -321,6 +433,17 @@ void main() {
       await tester.tap(find.text('重试'));
       await tester.pumpAndSettle();
       expect(find.text('没有结果'), findsOneWidget);
+      expect(
+        tester.getCenter(find.text('没有结果')).dy,
+        closeTo(
+          tester
+              .getCenter(
+                find.byKey(const PageStorageKey('source-manga-scroll')),
+              )
+              .dy,
+          80,
+        ),
+      );
       expect(find.text('加载失败'), findsNothing);
       expect(tester.takeException(), isNull);
       await hide(tester);
@@ -341,6 +464,7 @@ void main() {
         await release.future;
         return page('迟到结果');
       };
+      await tap(tester, 'source-search-toggle');
       await tester.enterText(
         find.byKey(const ValueKey('source-manga-search')),
         '迟到',

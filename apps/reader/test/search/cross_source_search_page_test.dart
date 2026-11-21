@@ -1212,18 +1212,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final hint = find.byKey(const ValueKey('source-query-context'));
-    await tester.scrollUntilVisible(
-      hint,
-      200,
-      scrollable: find
-          .descendant(
-            of: find.byType(SourceBrowsePage),
-            matching: find.byType(Scrollable),
-          )
-          .first,
+    expect(
+      find.descendant(
+        of: find.byType(SourceBrowsePage),
+        matching: find.byKey(const ValueKey('source-search-toggle')),
+      ),
+      findsOneWidget,
     );
-    expect(hint, findsOneWidget);
     expect(find.widgetWithText(CupertinoButton, '最新'), findsNothing);
     await tester.pumpApp(const SizedBox());
     catalog.dispose();
