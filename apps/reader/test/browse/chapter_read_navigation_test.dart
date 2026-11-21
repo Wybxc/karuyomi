@@ -92,15 +92,19 @@ Finder _readFilter(String name) =>
     find.byKey(ValueKey(('chapter-read-filter', name)));
 Finder _preview(int index) =>
     find.byKey(ValueKey(('chapter-read-item', _sequence.entries[index].key)));
+Finder get _chaptersScrollable => find
+    .descendant(
+      of: find.descendant(
+        of: find.byType(MangaDetailsPage),
+        matching: find.byType(CustomScrollView),
+      ),
+      matching: find.byType(Scrollable),
+    )
+    .first;
 
 Future<void> _reveal(WidgetTester tester, Finder finder) async {
   if (finder.evaluate().isEmpty) {
-    final scrollable = find
-        .descendant(
-          of: find.byType(MangaDetailsPage),
-          matching: find.byType(Scrollable),
-        )
-        .first;
+    final scrollable = _chaptersScrollable;
     final position = tester.state<ScrollableState>(scrollable).position;
     position.jumpTo(position.minScrollExtent);
     await tester.pumpAndSettle();
@@ -218,6 +222,114 @@ wire.StateMutation _command(TestBusinessRequest request) =>
 
 void main() {
   for (final brightness in Brightness.values) {
+    testWidgets(
+      'chapter selection actions stay reachable on a short screen in $brightness',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final chapters = [
+          ..._chapters,
+          for (var index = 1; index <= 30; index++)
+            wire.Chapter(url: '/other/$index', name: '章节 $index'),
+        ];
+        final sequence = ChapterSequence(
+          packageName: 'eu.kanade.source.test',
+          sourceId: sourceId,
+          mangaUrl: testManga.url,
+          chapters: chapters,
+        );
+        final platform = _platform(chapters: chapters);
+        final catalog = await _details(tester, platform);
+        platform.businessServer.requests.clear();
+        final exit = _control('chapter-selection-toggle');
+        await _tap(tester, exit);
+        tester.view.physicalSize = const Size(360, 480);
+        await tester.pumpAndSettle();
+        final lastChapter = find.byKey(ValueKey(sequence.entries.last.key));
+        await _tap(tester, lastChapter);
+
+        final position = tester
+            .state<ScrollableState>(_chaptersScrollable)
+            .position;
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        final markRead = _control('chapter-mark-read');
+        expect(
+          exit.hitTestable(),
+          findsOneWidget,
+          reason: 'exit after scrolling to the last chapter',
+        );
+        expect(
+          markRead.hitTestable(),
+          findsOneWidget,
+          reason: 'preview from the last chapter',
+        );
+        expect(find.text('已选 1 章 · 当前隐藏 0 章').hitTestable(), findsOneWidget);
+        expect(tester.getRect(lastChapter).width, 360);
+        expect(
+          tester.widget<CupertinoListTile>(lastChapter).backgroundColor,
+          isNotNull,
+        );
+        final selection = find.byKey(
+          ValueKey(('chapter-select', sequence.entries.last.key)),
+        );
+        final semantics = tester.ensureSemantics();
+        try {
+          await tester.pump();
+          expect(
+            tester
+                .getSemantics(selection)
+                .getSemanticsData()
+                .flagsCollection
+                .isSelected,
+            Tristate.isTrue,
+          );
+        } finally {
+          semantics.dispose();
+        }
+        final exitRect = tester.getRect(exit);
+        final readRect = tester.getRect(markRead);
+        position.jumpTo(position.minScrollExtent);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(exit), exitRect);
+        expect(tester.getRect(markRead), readRect);
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        final offset = position.pixels;
+        await tester.tap(markRead);
+        await tester.pumpAndSettle();
+        expect(find.text('确认清单：1 章'), findsOneWidget);
+        expect(
+          find.byKey(
+            ValueKey(('chapter-read-item', sequence.entries.last.key)),
+          ),
+          findsOneWidget,
+        );
+        expect(_posts(platform), isEmpty);
+        await _tap(tester, find.text('取消'));
+        expect(position.pixels, offset);
+        expect(find.text('已选 1 章 · 当前隐藏 0 章'), findsOneWidget);
+        await tester.tap(exit);
+        await tester.pumpAndSettle();
+        expect(lastChapter.hitTestable(), findsOneWidget);
+        expect(find.text('已选 1 章 · 当前隐藏 0 章'), findsNothing);
+        await _tap(tester, exit);
+        await _tap(tester, lastChapter);
+        await _back(tester);
+        expect(find.byType(MangaDetailsPage), findsOneWidget);
+        expect(lastChapter.hitTestable(), findsOneWidget);
+        expect(find.text('已选 1 章 · 当前隐藏 0 章'), findsNothing);
+        expect(_posts(platform), isEmpty);
+        await _finish(tester, platform, catalog);
+      },
+    );
+
     for (final scale in [1.0, 2.0]) {
       testWidgets(
         'long duplicate range endpoints remain readable without submitting in $brightness at ${scale}x',
@@ -457,11 +569,14 @@ void main() {
       await _tap(tester, find.text('同名章 · 来源第 1 项').last);
       await _tap(tester, _control('chapter-select-range'));
       for (final index in [0, 1, 2, 3]) {
-        final checkbox = find.byKey(
+        final selection = find.byKey(
           ValueKey(('chapter-select', _sequence.entries[index].key)),
         );
-        await _reveal(tester, checkbox);
-        expect(tester.widget<CupertinoCheckbox>(checkbox).value, index != 3);
+        await _reveal(tester, selection);
+        expect(
+          tester.widget<Semantics>(selection).properties.selected,
+          index != 3,
+        );
       }
       await _search(tester, '同名');
       await _tap(tester, _control('chapter-mark-read'));
