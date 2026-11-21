@@ -85,8 +85,10 @@ void main() {
   }
 
   testWidgets(
-    'Source listing decodes a managed cover and releases the host resource',
+    'Source listing and wide details decode managed covers and release them',
     (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1280, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       final temp = Directory.systemTemp.createTempSync('karuyomi.');
       addTearDown(() => temp.deleteSync(recursive: true));
       final bytes = img.encodePng(img.Image(width: 2, height: 3));
@@ -95,28 +97,44 @@ void main() {
       platform.acquireImageHandler = (request) {
         requests.add(request.deepCopy());
         return wire.ImageResource(
-          resourceId: 'source-cover-1',
+          resourceId: 'source-cover-${requests.length}',
           generation: request.generation,
           byteLength: bytes.length,
           url: file.uri.toString(),
         );
       };
       await show(tester);
-      bool released() =>
-          platform.imageControls.any((event) => event.$1 == 'releaseImage');
-      for (var turn = 0; turn < 100 && !released(); turn++) {
-        await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 5)),
-        );
-        await tester.pump();
+      Future<void> untilReleased(int count) async {
+        int releases() => platform.imageControls
+            .where((event) => event.$1 == 'releaseImage')
+            .length;
+        for (var turn = 0; turn < 100 && releases() < count; turn++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 5)),
+          );
+          await tester.pump();
+        }
+        expect(releases(), count);
+        await tester.pumpAndSettle();
       }
-      expect(released(), true);
-      await tester.pumpAndSettle();
+
+      await untilReleased(1);
       expect(requests, hasLength(1));
       expect(requests.single.thumbnailUrl, testManga.thumbnailUrl);
       expect(requests.single.pageSessionId, isEmpty);
       expect(requests.single.sourceId, sourceId);
       expect(find.byKey(const ValueKey('source-cover-image')), findsOneWidget);
+      await tester.tap(find.text(testManga.title));
+      await tester.pumpAndSettle();
+      await untilReleased(2);
+      expect(requests.last.thumbnailUrl, testManga.thumbnailUrl);
+      expect(
+        find.descendant(
+          of: find.byType(MangaDetailsPage),
+          matching: find.byKey(const ValueKey('source-cover-image')),
+        ),
+        findsOneWidget,
+      );
       expect(platform.businessServer.appliedMutations, 0);
       expect(tester.takeException(), isNull);
       await hide(tester);

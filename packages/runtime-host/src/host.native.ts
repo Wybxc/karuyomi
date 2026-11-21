@@ -95,7 +95,7 @@ if (!window.karuyomiRuntime) {
       },
     };
   };
-  const createManager = (imagesEnabled: boolean) =>
+  const createManager = () =>
     new SourceRuntimeManager(
       workerUrl,
       createWorker,
@@ -108,8 +108,8 @@ if (!window.karuyomiRuntime) {
       ),
       60_000,
       {
-        enabled: imagesEnabled && configuration.imageFiles === true,
+        enabled: configuration.imageFiles === true,
       },
     );
-  installRuntime(createManager(true), () => createManager(false));
+  installRuntime(createManager(), createManager);
 }

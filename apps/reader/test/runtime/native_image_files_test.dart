@@ -134,6 +134,26 @@ void main() {
     if (await directory.exists()) await directory.delete(recursive: true);
   });
 
+  test('search-slot cover is copied and released on its own slot', () async {
+    const slot = wire.RuntimeSlot.RUNTIME_SLOT_SEARCH;
+    final control = acquire(1)..slotId = slot;
+    control.acquireImage
+      ..clearPageSessionId()
+      ..clearPageKey()
+      ..thumbnailUrl = 'https://source.example/cover.webp';
+    final response = await images.acquire(control);
+    expect(response.slotId, slot);
+    final image = response.image;
+    final location = Uri.parse(image.url);
+    expect(images.owns(image.resourceId, image.generation, location), true);
+    expect(await File.fromUri(location).exists(), true);
+
+    await images.release(release(image.resourceId)..slotId = slot);
+    expect(calls.map((value) => value.slotId), [slot, slot]);
+    expect(images.owns(image.resourceId, image.generation, location), false);
+    expect(await File.fromUri(location).exists(), false);
+  });
+
   for (final slot in [
     wire.RuntimeSlot.RUNTIME_SLOT_UNSPECIFIED,
     wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,

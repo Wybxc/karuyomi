@@ -524,12 +524,9 @@ final class NativePlatformRuntime extends PlatformRuntime
       );
     }
     if (message.slotId == wire.RuntimeSlot.RUNTIME_SLOT_SEARCH &&
-        {
-          wire.ControlRequest_Command.acquireImage,
-          wire.ControlRequest_Command.cancelImage,
-          wire.ControlRequest_Command.releaseImage,
-          wire.ControlRequest_Command.closePageSession,
-        }.contains(command)) {
+        (command == wire.ControlRequest_Command.closePageSession ||
+            (command == wire.ControlRequest_Command.acquireImage &&
+                !message.acquireImage.hasThumbnailUrl()))) {
       throw const RuntimeException(
         RuntimeErrorCode.unsupportedCapability,
         'Search slot does not own reading images',

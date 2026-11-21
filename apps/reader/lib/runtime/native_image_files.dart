@@ -146,14 +146,29 @@ final class NativeImageControl {
       _resources[_key(id, generation)]?.published == true &&
       _resources[_key(id, generation)]?.location == location;
 
-  Future<wire.ControlResponse> acquire(wire.ControlRequest control) async {
-    if (control.slotId != wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND) {
+  void _checkSlot(wire.RuntimeSlot slot, {_ImageTask? owner}) {
+    if (!{
+          wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND,
+          wire.RuntimeSlot.RUNTIME_SLOT_SEARCH,
+        }.contains(slot) ||
+        (owner != null && owner.slotId != slot)) {
       throw const RuntimeException(
         RuntimeErrorCode.protocolError,
-        'Image request must use the foreground slot',
+        'Native image runtime slot does not match its owner',
       );
     }
+  }
+
+  Future<wire.ControlResponse> acquire(wire.ControlRequest control) async {
+    _checkSlot(control.slotId);
     final request = control.acquireImage;
+    if (control.slotId == wire.RuntimeSlot.RUNTIME_SLOT_SEARCH &&
+        !request.hasThumbnailUrl()) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'The search slot only accepts Source thumbnail requests',
+      );
+    }
     final key = _key(request.requestId, request.generation);
     if (_closed) {
       throw const RuntimeException(
@@ -253,7 +268,10 @@ final class NativeImageControl {
           inner?.host.isEmpty != false ||
           inner!.origin != origin.origin ||
           image.byteLength <= 0 ||
-          image.byteLength > 64 * 1024 * 1024 ||
+          image.byteLength >
+              (request.hasThumbnailUrl()
+                  ? wire.coverByteLimit
+                  : 64 * 1024 * 1024) ||
           image.url.length > 4096) {
         throw const RuntimeException(
           RuntimeErrorCode.protocolError,
@@ -420,14 +438,18 @@ final class NativeImageControl {
   }
 
   Future<wire.ControlResponse> cancel(wire.ControlRequest control) async {
-    if (control.slotId != wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND) {
-      throw const RuntimeException(
-        RuntimeErrorCode.protocolError,
-        'Native images require the foreground runtime slot',
-      );
-    }
     final request = control.cancelImage;
     final task = _tasks[_key(request.requestId, request.generation)];
+    final owner =
+        task ??
+        _resources.values
+            .where(
+              (value) =>
+                  value.request.requestId == request.requestId &&
+                  value.request.generation == request.generation,
+            )
+            .firstOrNull;
+    _checkSlot(control.slotId, owner: owner);
     if (task == null) {
       await Future.wait([
         _cleanup(control),
@@ -502,15 +524,10 @@ final class NativeImageControl {
   }
 
   Future<wire.ControlResponse> release(wire.ControlRequest control) async {
-    if (control.slotId != wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND) {
-      throw const RuntimeException(
-        RuntimeErrorCode.protocolError,
-        'Native images require the foreground runtime slot',
-      );
-    }
     final request = control.releaseImage;
     final key = _key(request.resourceId, request.generation);
     final task = _resources[key];
+    _checkSlot(control.slotId, owner: task);
     if (task == null) {
       await _cleanup(control);
     } else {

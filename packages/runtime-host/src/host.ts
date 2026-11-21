@@ -3,7 +3,7 @@ import { VerifiedLoader } from './verified-loader.js';
 import { ExtensionArtifactCache } from './extension-artifact-cache.js';
 import { installRuntime } from './host-api.js';
 
-const createManager = (imagesEnabled: boolean) =>
+const createManager = () =>
   new SourceRuntimeManager(
     new URL(/* @vite-ignore */ './worker.js', import.meta.url),
     (url) => new Worker(url),
@@ -13,9 +13,6 @@ const createManager = (imagesEnabled: boolean) =>
       undefined,
       new ExtensionArtifactCache(),
     ),
-    60_000,
-    { enabled: imagesEnabled },
   );
 
-if (!window.karuyomiRuntime)
-  installRuntime(createManager(true), () => createManager(false));
+if (!window.karuyomiRuntime) installRuntime(createManager(), createManager);
