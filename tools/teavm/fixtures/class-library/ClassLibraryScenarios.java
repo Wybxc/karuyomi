@@ -5,11 +5,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
 
 public final class ClassLibraryScenarios {
   private static int checks;
 
-  public static void main(String[] args) throws IOException {
+  public static void main(String[] args) throws IOException, NoSuchAlgorithmException {
     DateFormatScenarios.main(args);
     String path = "/assets/example.txt";
     URL absolute = ClassLibraryScenarios.class.getResource(path);
@@ -35,6 +36,7 @@ public final class ClassLibraryScenarios {
       checks++;
     }
     System.out.println("PACKAGED_RESOURCE_SCENARIOS_PASS " + checks);
+    DigestScenarios.run();
   }
 
   private static String read(URL url) throws IOException {

@@ -65,6 +65,7 @@ async function runContracts(root: string, output: string): Promise<void> {
   for (const name of [
     'ClassLibraryScenarios.java',
     'ClassLibraryResources.java',
+    'DigestScenarios.java',
   ])
     copyFileSync(
       path.join(fixtures, name),
@@ -92,6 +93,20 @@ async function runContracts(root: string, output: string): Promise<void> {
     timeout: 180_000,
     forceKillAfterDelay: 1000,
   });
+  const compat = path.join(root, 'runtime/teavm/java/compat');
+  const classes = path.join(output, 'target/classes');
+  mkdirSync(classes, { recursive: true });
+  await execute(path.join(javaHome, 'bin/javac'), [
+    '--patch-module',
+    `java.base=${compat}`,
+    '-d',
+    classes,
+    ...[
+      'InvalidParameterException.java',
+      'MessageDigest.java',
+      'MessageDigestSpi.java',
+    ].map((name) => path.join(compat, 'java/security', name)),
+  ]);
   await execute(
     maven,
     [
@@ -105,7 +120,7 @@ async function runContracts(root: string, output: string): Promise<void> {
   );
   const oracle = await execute(path.join(javaHome, 'bin/java'), [
     '-cp',
-    path.join(output, 'target/classes'),
+    classes,
     'prototype.ClassLibraryScenarios',
   ]);
   const generated = await execute(process.execPath, [
@@ -116,6 +131,7 @@ async function runContracts(root: string, output: string): Promise<void> {
   if (
     !oracle.stdout.includes('DATE_FORMAT_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('PACKAGED_RESOURCE_SCENARIOS_PASS ') ||
+    !oracle.stdout.includes('DIGEST_SCENARIOS_PASS ') ||
     generated.stdout !== oracle.stdout
   )
     throw new Error(
