@@ -84,7 +84,7 @@ Doujin.io 1.6.5 补齐无填充的 AES 实现后通过两套材料的正式 AOT�
 
 MoeTruyen 通过 Keiyoushi 输入弹窗接收用户亲自填写的评论，MeDamTruyen、Panomic、SoaiCaComic 和 TeamLanhLung 通过同一辅助函数接收章节密码。`f00c680` 接入 Gradle 输入签名保留、TeaVM 调用转换及 Flutter 弹窗。五包均在 `macbook-pro-4` 通过八材料正式 AOT、完整性、封面入口和输入能力检查。真实 AOT 在隔离响应下通过 15 个用例，覆盖确认、取消和后台预取。发版输入已纳入五包和同提交的产品归档，连同 Monochrome Scans 和前三批补编共九个替换构建，待冻结队列收齐后装配。真实源站读章与生产发布待验。[验证记录](../VERIFICATION.md)
 
-MegaTokyo 1.6.1 的固定源码通过定向 AOT 适配使用平台 TLS 校验。在 `macbook-pro-4` 使用正常证书验证访问主站和首话，均返回 HTTP 200。正式 AOT 和实际章节待验。[MegaTokyo](https://megatokyo.com/)
+MegaTokyo 1.6.1 通过定向 AOT 适配使用平台 TLS 校验，正式构建、完整性和封面入口检查通过。在 `macbook-pro-4` 的原生 Worker 验收中，真实 Source 从公开首话取得并回传一页 GIF。八材料装配预检已纳入该包，当前共六批十个替换构建。生产发布和实际封面读取待验。[验证记录](../VERIFICATION.md)
 
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
