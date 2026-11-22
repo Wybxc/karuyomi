@@ -62,6 +62,8 @@ SoraRaw 所需的颜色数组位图构造已通过 Android API 35 原生参考�
 
 Dragon Ball Multiverse 和 ManhuaRM 使用的 `StaticLayout.Builder` 已接入简单、高质量和平衡断行及连字符。Android API 35 原生参考与宿主定向测试均覆盖策略之间的差异，两包也已在 `macbook-pro-4` 通过正式补编和封面入口检查。两包使用新的共享图形材料，按其材料身份独立装配候选，实际绘制和阅读待验。[验收记录](../VERIFICATION.md)
 
+Gölge Bahçesi、Koreli Manga、Manga Ruhu 和 Merlin Scans 分别复用打包资源读取或 PBKDF2 适配，均通过正式补编、完整性和封面入口检查。整次 HTTP 调用超时适配恢复 AnimexNovel 和 ArgosComics，带支点缩放适配恢复 MangaTR，三包也通过相同检查。七包均匹配冻结批次的共享材料，等待全量装配及实际出图验收。[补编证据](../VERIFICATION.md)
+
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
 - [x] 先行发布原索引 191 个升级包，逐包读回生产资源并确认新的生产检查点。完整冻结队列继续构建后续目录。[生产证据](../VERIFICATION.md)
