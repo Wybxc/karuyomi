@@ -5,9 +5,11 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   rmSync,
 } from 'node:fs';
+import { generateKeyPairSync } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execa } from 'execa';
@@ -81,6 +83,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     'Pbkdf2Scenarios.java',
     'EcScenarios.java',
     'RsaScenarios.java',
+    'RsaPkcs1Oracle.java',
     'SequenceStreamScenarios.java',
   ])
     copyFileSync(
@@ -114,15 +117,18 @@ async function runContracts(root: string, output: string): Promise<void> {
     forceKillAfterDelay: 1000,
   });
   const compat = path.join(root, 'runtime/teavm/java/compat');
-  const securitySources = ['java/security', 'javax/crypto'].flatMap(
-    (relative) =>
-      readdirSync(path.join(compat, relative), {
-        recursive: true,
-        withFileTypes: true,
-      })
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.java'))
-        .map((entry) => path.join(entry.parentPath, entry.name))
-        .sort(),
+  const securitySources = [
+    'java/security',
+    'javax/crypto',
+    'javax/security',
+  ].flatMap((relative) =>
+    readdirSync(path.join(compat, relative), {
+      recursive: true,
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.java'))
+      .map((entry) => path.join(entry.parentPath, entry.name))
+      .sort(),
   );
   const classes = path.join(output, 'target/classes');
   const jso = ['teavm-interop', 'teavm-jso', 'teavm-jso-apis'].map((artifact) =>
@@ -142,6 +148,19 @@ async function runContracts(root: string, output: string): Promise<void> {
   prepareLibraries(output, source);
   const gson = path.join(output, 'java/libs', gsonName);
   const javac = path.join(javaHome, 'bin/javac');
+  const mavenArgs = [
+    '-q',
+    '--batch-mode',
+    '--no-transfer-progress',
+    `-Dmaven.repo.local=${path.join(local, 'build-cache/m2')}`,
+  ];
+  const classpathFile = path.join(output, 'dependency-classpath.txt');
+  await execute(maven, [
+    ...mavenArgs,
+    'dependency:build-classpath',
+    `-Dmdep.outputFile=${classpathFile}`,
+  ]);
+  const dependencies = readFileSync(classpathFile, 'utf8').trim();
   await compileBridgeBootstrap(
     path.join(owned, 'prototype'),
     classes,
@@ -164,24 +183,18 @@ async function runContracts(root: string, output: string): Promise<void> {
     '--add-reads',
     'java.base=ALL-UNNAMED',
     '-cp',
-    [classes, ...jso, gson].join(path.delimiter),
+    [classes, dependencies].join(path.delimiter),
     '-d',
     classes,
     path.join(compat, 'java/io/SequenceInputStream.java'),
     path.join(compat, 'java/net/UnknownHostException.java'),
     ...securitySources,
   ]);
-  await execute(
-    maven,
-    [
-      '-q',
-      '--batch-mode',
-      '--no-transfer-progress',
-      `-Dmaven.repo.local=${path.join(local, 'build-cache/m2')}`,
-      'process-classes',
-    ],
-    { stdout: 'inherit', stderr: 'inherit', buffer: false },
-  );
+  await execute(maven, [...mavenArgs, 'process-classes'], {
+    stdout: 'inherit',
+    stderr: 'inherit',
+    buffer: false,
+  });
   const java = (...args: string[]) =>
     execute(path.join(javaHome, 'bin/java'), [
       '-cp',
@@ -207,6 +220,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     !oracle.stdout.includes('STRING_CONCAT_SCENARIO_PASS') ||
     !oracle.stdout.includes('EC_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('RSA_OAEP_SCENARIOS_PASS ') ||
+    !oracle.stdout.includes('RSA_PKCS1_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('SEQUENCE_STREAM_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('UNKNOWN_HOST_SCENARIO_PASS') ||
     !oracle.stdout.includes('Graphics transform oracle: ') ||
@@ -233,6 +247,35 @@ async function runContracts(root: string, output: string): Promise<void> {
   console.log(
     'ECDSA signatures and X.509 keys verified in both runtime directions',
   );
+  const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+  });
+  const spki = publicKey
+    .export({ type: 'spki', format: 'der' })
+    .toString('base64');
+  const encrypted = await javascript('emit-rsa-pkcs1', spki);
+  const ciphertext = /^RSA_PKCS1_CIPHERTEXT ([A-Za-z0-9+/]+={0,2})$/.exec(
+    encrypted.stdout,
+  )?.[1];
+  if (!ciphertext || Buffer.from(ciphertext, 'base64').length !== 256)
+    throw new Error('Invalid output from TeaVM RSA public encryption');
+  const privateFixture = privateKey
+    .export({ type: 'pkcs8', format: 'der' })
+    .toString('base64');
+  const decrypted = await execa(
+    path.join(javaHome, 'bin/java'),
+    ['-cp', classes, 'prototype.RsaPkcs1Oracle'],
+    {
+      input: privateFixture + '\n' + ciphertext + '\n',
+      cwd: output,
+      timeout: 10000,
+    },
+  );
+  if (decrypted.stdout !== 'RSA_PKCS1_INTEROP_VERIFIED')
+    throw new Error(
+      'JDK could not decrypt the TeaVM RSA public encryption fixture',
+    );
+  console.log('RSA PKCS#1 v1.5 public encryption verified against the JDK');
 }
 
 function signatureFields(output: string): [string, string] {

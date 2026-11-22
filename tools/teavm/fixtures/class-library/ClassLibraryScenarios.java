@@ -18,7 +18,9 @@ public final class ClassLibraryScenarios {
 
   public static void main(String[] args) throws IOException, GeneralSecurityException {
     if (args.length > 0) {
-      EcScenarios.interop(args);
+      if (args.length == 2 && args[0].equals("emit-rsa-pkcs1"))
+        RsaScenarios.emitPublicEncryption(args[1]);
+      else EcScenarios.interop(args);
       return;
     }
     DateFormatScenarios.main(args);

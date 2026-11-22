@@ -1,5 +1,6 @@
 /** Compile unchanged extension inputs in an explicit disposable work directory. */
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -293,6 +294,11 @@ export async function compileExtension(
   const output = path.join(workRoot, 'public/teavm', entry.key, 'app.js');
   if (!existsSync(output))
     throw new Error('TeaVM did not produce a JavaScript bundle');
+  const bouncyCastleLicense = readFileSync(
+    path.join(workRoot, 'java/BOUNCY-CASTLE-LICENSE.txt'),
+    'utf8',
+  ).trimEnd();
+  appendFileSync(output, '\n/*!\n' + bouncyCastleLicense + '\n*/\n');
   if (!env['TEAVM_DEBUG']) rmSync(output + '.map', { force: true });
   const result: AotResult = {
     plugin: entry.key,

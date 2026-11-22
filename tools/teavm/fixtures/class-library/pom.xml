@@ -37,6 +37,11 @@
       <artifactId>teavm-jso-apis</artifactId>
       <version>${teavm.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+      <version>1.87</version>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
