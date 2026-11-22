@@ -73,6 +73,10 @@ public class TeaTransformer implements ClassHolderTransformer {
         && "1".equals(System.getenv("KARUYOMI_AOT_SPYFAKKU_PLATFORM_TLS"))) {
       usePlatformTls(cls, context);
     }
+    if (cls.getName().equals("eu.kanade.tachiyomi.multisrc.mmlook.MMLook")
+        && "1".equals(System.getenv("KARUYOMI_AOT_MMLOOK_PLATFORM_TLS"))) {
+      usePlatformTlsForMmlook(cls, context);
+    }
     if (cls.getName().equals("eu.kanade.tachiyomi.extension.en.spyfakku.AnibusInterceptor")
         && "1".equals(System.getenv("KARUYOMI_AOT_SPYFAKKU_PLATFORM_TLS"))) {
       requireOfficialReader(
@@ -623,6 +627,30 @@ public class TeaTransformer implements ClassHolderTransformer {
       }
     }
     throw new IllegalStateException("Pinned SpyFakku TLS configuration is missing");
+  }
+
+  private static void usePlatformTlsForMmlook(
+      ClassHolder cls, ClassHolderTransformerContext context) {
+    var configure = cls.getMethod(CONFIGURE_CLIENT);
+    var link =
+        cls.getMethod(new MethodDescriptor("certificateWorkaround", String.class, String.class));
+    if (configure == null
+        || configure.getProgram() == null
+        || link == null
+        || link.getProgram() == null)
+      throw new IllegalStateException("Pinned MMLook transport helpers are missing");
+
+    // Keep the pinned builder's redirect policy while using the relay's TLS validation.
+    var client = ProgramEmitter.create(configure, context.getHierarchy());
+    var followRedirects = client.var(client.constant(0).getVariable(), ValueType.BOOLEAN);
+    client
+        .var(1, OKHTTP_BUILDER)
+        .invokeVirtual("followRedirects", OKHTTP_BUILDER, followRedirects)
+        .returnValue();
+
+    // Links continue to use the scheme selected by the Source.
+    var urls = ProgramEmitter.create(link, context.getHierarchy());
+    urls.var(1, String.class).returnValue();
   }
 
   private static void usePlatformHttpNegotiation(ClassHolder cls) {

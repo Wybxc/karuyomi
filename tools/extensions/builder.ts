@@ -364,6 +364,11 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       descriptor.packageName === 'eu.kanade.tachiyomi.extension.en.spyfakku' &&
       descriptor.sourceFingerprint ===
         '1e3e54808038e599235e9e222c506497bd15698625299746cfaba2a7b5576a5d';
+    const mmlookPlatformTls =
+      (descriptor.sourcePath === 'src/zh/dumanwu' ||
+        descriptor.sourcePath === 'src/zh/rumanhua') &&
+      descriptor.sourceInputs['lib-multisrc/mmlook'] ===
+        '3c085bfd4af1eac83aa758668919feded623a9fcb42e74458d0331c9ae7c8119';
     const toonlivreReaderVerification =
       descriptor.packageName ===
         'eu.kanade.tachiyomi.extension.pt.mangalivre' &&
@@ -418,6 +423,13 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
 }
 -keep,allowshrinking class eu.kanade.tachiyomi.extension.en.spyfakku.AnibusInterceptor {
     private boolean resolveInWebView(okhttp3.Request,okhttp3.Call);
+}
+`);
+    }
+    if (mmlookPlatformTls) {
+      rules.push(`-keep,allowshrinking class eu.kanade.tachiyomi.multisrc.mmlook.MMLook {
+    okhttp3.OkHttpClient$Builder configureClient(okhttp3.OkHttpClient$Builder);
+    java.lang.String certificateWorkaround(java.lang.String);
 }
 `);
     }
@@ -582,6 +594,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     delete env['TEAVM_DEBUG'];
     delete env['KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS'];
     delete env['KARUYOMI_AOT_SPYFAKKU_PLATFORM_TLS'];
+    delete env['KARUYOMI_AOT_MMLOOK_PLATFORM_TLS'];
     delete env['KARUYOMI_AOT_TOONLIVRE_READER_VERIFICATION'];
     delete env['KARUYOMI_AOT_PLATFORM_HTTP_NEGOTIATION'];
     delete env['KARUYOMI_AOT_BROWSER_VERIFICATION'];
@@ -590,6 +603,9 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     }
     if (spyfakkuPlatformTls) {
       env['KARUYOMI_AOT_SPYFAKKU_PLATFORM_TLS'] = '1';
+    }
+    if (mmlookPlatformTls) {
+      env['KARUYOMI_AOT_MMLOOK_PLATFORM_TLS'] = '1';
     }
     if (toonlivreReaderVerification) {
       env['KARUYOMI_AOT_TOONLIVRE_READER_VERIFICATION'] = '1';
