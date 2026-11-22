@@ -56,6 +56,9 @@ public class TeaTransformer implements ClassHolderTransformer {
           ValueType.object("java.lang.String"),
           ValueType.object("kotlin.coroutines.Continuation"),
           ValueType.object("java.lang.Object"));
+  private static final MethodDescriptor START_ACTIVITY =
+      new MethodDescriptor(
+          "startActivity", ValueType.object("android.content.Intent"), ValueType.VOID);
 
   public void transformClass(ClassHolder cls, ClassHolderTransformerContext context) {
     if (cls.getName().equals("eu.kanade.tachiyomi.extension.en.megatokyo.Megatokyo")
@@ -105,6 +108,16 @@ public class TeaTransformer implements ClassHolderTransformer {
           context,
           WEBSITE_VERIFICATION,
           "This website requires verification in its official browser reader.");
+    }
+    if (cls.getName().equals("android.app.Application")
+        && "1".equals(System.getenv("KARUYOMI_AOT_OFFICIAL_READER_ACTIVITY"))
+        && cls.getMethod(START_ACTIVITY) == null) {
+      // The pinned sources catch an unavailable Mihon activity and show their verification text.
+      var activity = new MethodHolder(START_ACTIVITY);
+      activity.setLevel(AccessLevel.PUBLIC);
+      setReaderVerificationError(
+          activity, context, "The source requires its official browser reader.");
+      cls.addMethod(activity);
     }
     if (cls.getName().equals("java.lang.Class")) {
       MethodDescriptor descriptor = new MethodDescriptor("getResource", String.class, URL.class);
@@ -685,6 +698,11 @@ public class TeaTransformer implements ClassHolderTransformer {
     if (method == null || method.getProgram() == null)
       throw new IllegalStateException(
           "Pinned reader verification method is missing: " + descriptor);
+    setReaderVerificationError(method, context, message);
+  }
+
+  private static void setReaderVerificationError(
+      MethodHolder method, ClassHolderTransformerContext context, String message) {
     ProgramEmitter emitter = ProgramEmitter.create(method, context.getHierarchy());
     emitter.construct(UnsupportedOperationException.class, emitter.constant(message)).raise();
   }

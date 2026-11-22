@@ -92,6 +92,17 @@ const browserVerificationSources = new Set([
   'src/vi/lxhentai',
 ]);
 
+const officialReaderActivitySources = new Map([
+  [
+    'src/fr/japscan',
+    '0ae35768d79366aa96f04700ed87bd2303468684a2f354ebea7b4e29d97547ef',
+  ],
+  [
+    'src/fr/scanmanga',
+    '02f50c2dffa7cec79ed086353ccbfe4b8b0c32c4fd4893648f2261e0ca6a916f',
+  ],
+]);
+
 export function preferenceSyncRulesForBuild(packageName: string) {
   return reviewedPreferenceRules
     .get(packageName)
@@ -385,6 +396,9 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       browserVerificationSources.has(descriptor.sourcePath) &&
       descriptor.sharedInputs['core'] ===
         'e4ecdc0da836642e3991019abc63b65cb0585dcdfd473786627b2b1502f3883d';
+    const officialReaderActivity =
+      officialReaderActivitySources.get(descriptor.sourcePath) ===
+      descriptor.sourceFingerprint;
     const wrapper = readFileSync(
       path.join(upstream, 'gradle/wrapper/gradle-wrapper.properties'),
       'utf8',
@@ -609,6 +623,7 @@ gradle.beforeProject { project ->
     delete env['KARUYOMI_AOT_TOONLIVRE_READER_VERIFICATION'];
     delete env['KARUYOMI_AOT_PLATFORM_HTTP_NEGOTIATION'];
     delete env['KARUYOMI_AOT_BROWSER_VERIFICATION'];
+    delete env['KARUYOMI_AOT_OFFICIAL_READER_ACTIVITY'];
     if (megatokyoPlatformTls) {
       env['KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS'] = '1';
     }
@@ -626,6 +641,9 @@ gradle.beforeProject { project ->
     }
     if (browserVerification) {
       env['KARUYOMI_AOT_BROWSER_VERIFICATION'] = '1';
+    }
+    if (officialReaderActivity) {
+      env['KARUYOMI_AOT_OFFICIAL_READER_ACTIVITY'] = '1';
     }
     stage = 'aot';
     activeLog = path.join(logs, 'aot.log');
