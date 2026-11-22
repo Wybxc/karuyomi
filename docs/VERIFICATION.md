@@ -156,6 +156,10 @@
 
 2026-11-23，在 `macbook-pro-4` 固定 `6035114` 与同一 Keiyoushi 上游补编 SpyFakku 1.6.2。按官方 JVM 产物修正客户端配置方法的保留签名后，正式构建、完整性及封面入口检查通过，canonical SHA-256 为 `08fb749c67d035c17e3f25e5ae74cb34d1109988da00b68e374938f673ecd053`。真实 AOT 从默认站用平台 TLS 读回 24 个目录项。隔离测试核对原图片拦截器的 HTTPS 路由及 68 字节 PNG 回传，另用原镜像设置验证触发浏览器提示时仅发送一次受控请求。预检合入两包后共有八批十二个替换构建，保留全部现网包与八份共享材料。真实镜像、源站读章及生产发布待验。
 
+2026-11-23，在 `macbook-pro-4` 固定 `bd90453` 与 Keiyoushi `efa93f5a` 补编爱看漫 1.6.2、ReiManga 1.6.9。原扩展固定 HTTP/1.1 的调用改由中继采用平台协商，原 Cookie 和拦截器继续参与请求。爱看漫实测同一目录在 HTTP/1.1 和 HTTP/2 下均返回 200。用 `f00c680` 原生 Worker 和 Node 24.15.0 执行真实 AOT，从源站返回 48 项，后两次请求携带原 Source 会话 Cookie，封面通道交付的 142,760 字节 JPEG 与源站一致。ReiManga 的真实目录返回 403，隔离响应验证原 Cookie、目录解析及 68 字节 PNG 回传。各次 Worker 关闭均获确认，应用界面与生产发布待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-23，同一提交的 TempleScan 1.6.64、Cosmic Scans ID 1.6.3 和 CodeArc 1.6.4 通过正式 AOT、完整性与封面入口检查。TempleScan 的真实 `/comics` 返回 307 并引导至站点验证，Source 返回官方浏览器验证提示。隔离测试复现提示并确认请求止于三次 GET。另两包分别通过固定原生 Worker 初始化，报出一个 Source 及封面能力，均已获关闭回执。五个定向补编输入保持 `compiled_unverified`，装配预检确认九批十七个替换构建、相同八份共享材料及全部 1,418 个现网扩展。读漫屋、如漫画的公开目录在同台机器正常 TLS 下分别遇到握手和证书校验错误。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
