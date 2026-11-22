@@ -44,7 +44,7 @@ public class BitmapFactory {
     }
   }
 
-  private static Bitmap decodeHandle(String handle, Options opts) {
+  static Bitmap decodeHandle(String handle, Options opts) {
     if (opts != null) {
       opts.outWidth = -1;
       opts.outHeight = -1;

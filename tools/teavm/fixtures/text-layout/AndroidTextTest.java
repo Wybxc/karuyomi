@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.ImageDecoder;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.text.LineBreaker;
@@ -12,6 +13,8 @@ import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
 import com.google.gson.JsonObject;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Locale;
@@ -66,6 +69,54 @@ public final class AndroidTextTest {
       packed.recycle();
       reversed.recycle();
     }
+  }
+
+  @Test
+  public void nativeAndroidByteArrayImageDecoder() throws IOException {
+    ByteArrayOutputStream png = new ByteArrayOutputStream();
+    Bitmap fixture = Bitmap.createBitmap(2, 3, Bitmap.Config.ARGB_8888);
+    try {
+      fixture.eraseColor(Color.RED);
+      assertTrue(fixture.compress(Bitmap.CompressFormat.PNG, 100, png));
+    } finally {
+      fixture.recycle();
+    }
+    byte[] image = png.toByteArray();
+    byte[] padded = new byte[image.length + 5];
+    System.arraycopy(image, 0, padded, 2, image.length);
+    ImageDecoder.Source source = ImageDecoder.createSource(padded, 2, image.length);
+    int[] callbacks = {0};
+    Bitmap bitmap =
+        ImageDecoder.decodeBitmap(
+            source,
+            (decoder, info, callbackSource) -> {
+              callbacks[0]++;
+              assertSame(source, callbackSource);
+              assertEquals(2, info.getSize().getWidth());
+              assertEquals(3, info.getSize().getHeight());
+              assertEquals("image/png", info.getMimeType());
+              assertEquals(ImageDecoder.ALLOCATOR_DEFAULT, decoder.getAllocator());
+              decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE);
+              assertEquals(ImageDecoder.ALLOCATOR_SOFTWARE, decoder.getAllocator());
+            });
+    try {
+      assertEquals(1, callbacks[0]);
+      assertEquals(2, bitmap.getWidth());
+      assertEquals(3, bitmap.getHeight());
+      assertFalse(bitmap.isMutable());
+      assertEquals(Color.RED, bitmap.getPixel(1, 2));
+      ByteArrayOutputStream encoded = new ByteArrayOutputStream();
+      assertTrue(bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 90, encoded));
+      assertArrayEquals(
+          new byte[] {'W', 'E', 'B', 'P'}, Arrays.copyOfRange(encoded.toByteArray(), 8, 12));
+    } finally {
+      bitmap.recycle();
+    }
+    assertThrows(
+        ArrayIndexOutOfBoundsException.class,
+        () -> ImageDecoder.createSource(padded, 6, image.length));
+    assertThrows(
+        IOException.class, () -> ImageDecoder.decodeBitmap(ImageDecoder.createSource(new byte[8])));
   }
 
   @Test
