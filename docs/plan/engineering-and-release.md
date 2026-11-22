@@ -102,6 +102,8 @@ ToonLivre 1.6.90 保留原目录和普通读章路径，遇到站点验证要求
 
 剩余 WebtoonLib 已用下一版图形材料通过正式 AOT 和隔离读章。M4 已从当前生产检查点启动同一上游的四路全量 AOT，计划复用已验证的 WebtoonLib 构建。Comix 的热门目录依赖 Android WebView，Japscan 和 Scan-Manga 的章页仍依赖 Android 交互。生产登录后的实际封面显示、匹配下一版材料的发布和真实有界增量继续验收。[字距验收](https://github.com/Wybxc/karuyomi/blob/440fbf716595cff033606934884067560aab7f9b/docs/verification/text-layout-runtime.md#webtoonlib-字距)
 
+下一版的正式 Web 和 Native 归档已在 M4 核对，与活动队列的八份运行材料一致。生产构建中的爱看漫、英文 Dragon Ball Multiverse、ToonLivre 和使用原备用域名设置的 Komiic 已从真实源站读回目录与封面。最新官方 Comix 的初始目录没有作品详情链接，Japscan 和 Scan-Manga 的热门路径分别返回 403 和 404，尚未取得可通过现有宿主验证的完整读章路径。[发布验证](../VERIFICATION.md)
+
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
 - [x] 先行发布原索引 191 个升级包，逐包读回生产资源并确认新的生产检查点。完整冻结队列继续构建后续目录。[生产证据](../VERIFICATION.md)

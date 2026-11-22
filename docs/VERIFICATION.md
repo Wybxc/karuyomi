@@ -172,6 +172,14 @@
 
 2026-11-23，从已确认的生产检查点在 M4 启动下一版图形材料的四路全量 AOT，冻结同一上游的 1,448 个输入，复用 WebtoonLib 1.6.1 的精确回执。该包的专题回归验证了隔离 HTTP 下的三页读章、字距和图片交付。下一版材料尚待完整装配及发布。[专题验收](https://github.com/Wybxc/karuyomi/blob/440fbf716595cff033606934884067560aab7f9b/docs/verification/text-layout-runtime.md#webtoonlib-字距)
 
+2026-11-23，主线 `193d1d8` 的工程检查、Wasm 与发布作业全过。自动发布保留 revision `ac464cf6987d4e25a556bd7b695a7c2d`，Worker `20bce439-01e8-40ba-b523-c700498a84a8` 接收全部流量。线上 47 项 Web 资源、匿名 Access 302 以及扩展状态与索引逐字节读回通过。[主线发布](https://github.com/Wybxc/karuyomi/actions/runs/45072299200)
+
+2026-11-23，在 M4 使用固定 `f00c680` 的原生 Worker 和 Node 24.15.0，直接载入生产公开索引内的实际清单与 AOT。爱看漫 1.6.2、英文 Dragon Ball Multiverse 1.6.1、ToonLivre 1.6.90 各从真实源站读回热门目录及一张封面。分别得到 48、25、24 条作品及 142,760 字节 JPEG、284,609 字节 JPEG、98,538 字节 WebP。图片通道回传字节与各源站一致，三个 Worker 均获关闭回执。Komiic 1.6.11 的默认站在公开目录查询中返回连接重置。隔离会话注入 Source 自带的已确认镜像值 `preferred_mirror=1` 后，原扩展从 `komiic.cc` 读到 30 项，并经原拦截器从 `public.komiic.cc` 取回 25,646 字节 JPEG，与响应逐字节一致。两次 Komiic Worker 均确认关闭。该轮用正常 HTTPS 和原 Source 请求，验收环境是 Node 隔离宿主。生产登录后的 Flutter 显示待验。[生产索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-23，将下一版 `afbf310` 的正式 CI Web 和 Native 归档保存到 M4。24,903,827 字节归档的 SHA-256 为 `d2c2eed0bfea81bf764b4d8b7f048886c99a577586e5c7ccaf3d84daa6ae591e`，本机下载及构建机接收两端均与官方归档摘要一致。归档包含正式 Web 入口、Native Worker 和八份运行材料，每份材料的大小和摘要均匹配活动队列的材料清单。下一版仍待 1,448 个输入的正式回执、全量装配与生产发布。[下一版 CI](https://github.com/Wybxc/karuyomi/actions/runs/45069123305)
+
+2026-11-23，复核 Keiyoushi `92906c0` 的 Comix 1.6.65、Japscan 1.6.3 和 Scan-Manga 1.6.4。M4 的普通 HTTPS 请求读到 Comix 目录 HTML 7,312 字节，其中作品详情链接和图像均为 0。上游热门目录仍通过 `runInWebView` 获取。Japscan 和 Scan-Manga 的同版公开热门路径分别返回 HTTP 403 和 404，两包的章节入口仍进入 Android WebView 流程。已有材料的三个 AOT 失败保持在生产账本中。[固定上游](https://github.com/keiyoushi/extensions-source/commit/92906c0382547f30a03b3176f2f2429be6b54dce)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
