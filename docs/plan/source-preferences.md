@@ -40,7 +40,8 @@
 - [x] 分别处理默认值、已存值和控件当前状态，使 getter、summary、选项和 Source 实际读取一致。支持回调修改其它控件及实际别名存储键，避免只实现 UI key → 输入值。
 - [x] 补必要的分组、依赖和 headless 编辑 ABI；支持范围内执行原 bind/change 回调，超出范围明确不支持，不以吞异常或伪造 Android Activity 成功掩盖缺口。
 - [x] 文本编辑弹窗接入原 `dialogMessage`，保留有界 HTTP(S) 链接。JVM 校验原文和 UTF-16 区间，Flutter 组件测试核对点击才打开链接、失败可重试和密码草稿保留。
-- [ ] 用固定上游构建 Mehgazone，验证实际设置说明、应用密码同一会话保存与 Source 在线读写。
+- [x] Mehgazone 1.6.1 用固定上游与八份运行材料通过正式 AOT、产物完整性与封面入口检查。[验证记录](../VERIFICATION.md)
+- [ ] 在新版产品构建中验证 Mehgazone 实际设置说明、应用密码同一会话保存与 Source 在线读写。
 - [x] 经现有 driver/manager 与 Dart transport 接入正式控制链；遵守 requestId/generation、超时、取消、active cancel 回收和迟到结果处理。修改 owned Java 类使用现有隔离依赖适配，保持原 JAR 不变。
 
 ### 2. D1 权威与确认顺序

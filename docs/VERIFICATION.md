@@ -106,6 +106,10 @@
 
 2026-11-22，从生产 `fd36b3a383664022934cf2f3f2abc47d` 派生八材料装配计划，保留全部 1,448 个冻结输入并纳入同材料的 MangaKakalot 成功回执。构建过程仍使用原冻结 checkout。复核时全量进程存活，已记录 94 个成功和 1 个失败。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
 
+2026-11-22，`56ab110` 接入 Source 文本设置的原弹窗说明和有界 HTTP(S) 链接。`pnpm check`、`pnpm flutter:check`、`pnpm teavm:check` 与 `pnpm build` 通过，设置 JVM 夹具共 198 项断言，Flutter 设置组件共 38 项测试。在 `macbook-pro-4` 固定 Keiyoushi `efa93f5a`，Mehgazone 1.6.1 的正式 AOT、产物完整性、弹窗描述和 `hostAcquireCover` 导出检查通过，包含 1 个 Source。八份共享材料与冻结队列相同，canonical SHA-256 为 `141fd57b59b4f6d46d386bcf5af11ba66c809bd155b387d6dff27127f9e75942`。回执保持 `compiled_unverified`，实际设置、源站登录及出图待验。[设置计划](plan/source-preferences.md)
+
+2026-11-22，以同一生产父 revision 核对 1,448 个冻结输入和两个替换包 MangaKakalot、Mehgazone。原八材料队列复核时收到 150 个成功和 2 个失败回执。最终装配仍待冻结输入全部取得正式终态。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
