@@ -116,6 +116,11 @@ public final class AndroidTextTest {
         ArrayIndexOutOfBoundsException.class,
         () -> ImageDecoder.createSource(padded, 6, image.length));
     assertThrows(
+        ArrayIndexOutOfBoundsException.class,
+        () -> ImageDecoder.createSource(padded, padded.length, 0));
+    assertThrows(
+        ArrayIndexOutOfBoundsException.class, () -> ImageDecoder.createSource(new byte[0]));
+    assertThrows(
         IOException.class, () -> ImageDecoder.decodeBitmap(ImageDecoder.createSource(new byte[8])));
   }
 

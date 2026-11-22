@@ -57,8 +57,8 @@ public final class ImageDecoder {
 
   public static Source createSource(byte[] data, int offset, int length) {
     Objects.requireNonNull(data);
-    if (offset < 0 || length < 0 || offset > data.length - length)
-      throw new ArrayIndexOutOfBoundsException();
+    if (offset < 0 || offset >= data.length || length < 0 || length > data.length - offset)
+      throw new ArrayIndexOutOfBoundsException("Invalid image array range");
     return new Source(data, offset, length);
   }
 
