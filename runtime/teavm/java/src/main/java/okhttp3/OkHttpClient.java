@@ -34,6 +34,10 @@ public class OkHttpClient implements Call.Factory {
     return b.cookieJar;
   }
 
+  public Dispatcher dispatcher() {
+    return b.dispatcher;
+  }
+
   public Authenticator authenticator() {
     return b.authenticator;
   }
@@ -79,10 +83,13 @@ public class OkHttpClient implements Call.Factory {
     Cache cache;
     CookieJar cookieJar = prototype.Cookies.INSTANCE;
     Authenticator authenticator = Authenticator.NONE;
+    Dispatcher dispatcher;
     boolean followRedirects = true, retry = true;
     int call, connect = 10000, read = 10000, write = 10000;
 
-    public Builder() {}
+    public Builder() {
+      dispatcher = new Dispatcher();
+    }
 
     Builder(Builder x) {
       interceptors.addAll(x.interceptors);
@@ -90,6 +97,7 @@ public class OkHttpClient implements Call.Factory {
       cache = x.cache;
       cookieJar = x.cookieJar;
       authenticator = x.authenticator;
+      dispatcher = x.dispatcher;
       followRedirects = x.followRedirects;
       retry = x.retry;
       call = x.call;
@@ -127,6 +135,11 @@ public class OkHttpClient implements Call.Factory {
 
     public Builder authenticator(Authenticator authenticator) {
       this.authenticator = Objects.requireNonNull(authenticator);
+      return this;
+    }
+
+    public Builder dispatcher(Dispatcher dispatcher) {
+      this.dispatcher = Objects.requireNonNull(dispatcher);
       return this;
     }
 

@@ -336,62 +336,63 @@ public final class BrowserCall implements Call {
     Operation operation = owner;
     if (operation != null) operation.register(this);
     try {
-      new Thread(
-              () -> {
-                if (operation != null) operation.enter();
-                Throwable failure = null;
-                Response response = null;
-                boolean delivered = false;
-                try {
-                  try {
-                    response = executeOwned();
-                  } catch (IOException error) {
-                    if (operation != null) operation.checkOpen();
-                    c.onFailure(this, error);
-                    return;
-                  } catch (RuntimeException | Error error) {
-                    // Like OkHttp's AsyncCall, fail the suspended consumer before propagating
-                    // an interceptor/runtime failure to its owner. Callback failures are outside
-                    // this catch, so a callback can never receive a second terminal event.
-                    failure = error;
-                    try {
-                      cancel();
-                    } catch (Throwable cleanup) {
-                      if (cleanup != error) error.addSuppressed(cleanup);
-                    }
-                    if (operation != null) operation.checkOpen();
-                    c.onFailure(this, new IOException("HTTP execution failed", error));
-                    throw error;
-                  }
-                  if (operation != null) operation.checkOpen();
-                  c.onResponse(this, response);
-                  // OkHttp transfers ownership to the callback, which may resume another
-                  // dispatcher.
-                  delivered = true;
-                } catch (Throwable error) {
-                  if (failure == null) failure = error;
-                  else if (failure != error) failure.addSuppressed(error);
-                  if (operation == null) Bridge.trace("HTTP callback failed: " + error);
-                } finally {
-                  if (!delivered) {
-                    try {
-                      if (response != null) response.close();
-                      else closeHandles();
-                    } catch (Throwable error) {
-                      if (failure == null) failure = error;
-                      else if (failure != error) failure.addSuppressed(error);
-                    }
-                  }
-                  if (operation != null) {
-                    operation.finished(this, failure);
-                    operation.leave();
-                  }
-                }
-              })
-          .start();
+      client
+          .dispatcher()
+          .hostEnqueue(this, () -> deliverCallback(c, null), error -> deliverCallback(c, error));
     } catch (Throwable error) {
       if (operation != null) operation.finished(this, error);
       throw error;
+    }
+  }
+
+  private void deliverCallback(Callback callback, IOException dispatchFailure) {
+    Operation operation = owner;
+    Operation previous = currentOperation();
+    if (operation != null) operation.enter();
+    else threadOperation.remove();
+    Throwable failure = null;
+    Response response = null;
+    boolean delivered = false;
+    try {
+      try {
+        if (dispatchFailure != null) throw dispatchFailure;
+        response = executeOwned();
+      } catch (IOException error) {
+        if (operation != null) operation.checkOpen();
+        callback.onFailure(this, error);
+        return;
+      } catch (RuntimeException | Error error) {
+        // Report interceptor failure before propagating it to the Source operation.
+        failure = error;
+        try {
+          cancel();
+        } catch (Throwable cleanup) {
+          if (cleanup != error) error.addSuppressed(cleanup);
+        }
+        if (operation != null) operation.checkOpen();
+        callback.onFailure(this, new IOException("HTTP execution failed", error));
+        throw error;
+      }
+      if (operation != null) operation.checkOpen();
+      callback.onResponse(this, response);
+      delivered = true;
+    } catch (Throwable error) {
+      if (failure == null) failure = error;
+      else if (failure != error) failure.addSuppressed(error);
+      if (operation == null) Bridge.trace("HTTP callback failed: " + error);
+    } finally {
+      if (!delivered) {
+        try {
+          if (response != null) response.close();
+          else closeHandles();
+        } catch (Throwable error) {
+          if (failure == null) failure = error;
+          else if (failure != error) failure.addSuppressed(error);
+        }
+      }
+      if (operation != null) operation.finished(this, failure);
+      if (previous != null) previous.enter();
+      else threadOperation.remove();
     }
   }
 
@@ -482,6 +483,7 @@ public final class BrowserCall implements Call {
     try {
       startCallTimeout();
       checkCallTimeout();
+      if (cancelled) throw new InterruptedIOException("Cancelled");
       response = executeOnce();
       body = new OwnedResponseBody(response.body());
       checkCallTimeout();
@@ -516,7 +518,11 @@ public final class BrowserCall implements Call {
   }
 
   public void cancel() {
-    cancelTransport(false);
+    try {
+      cancelTransport(false);
+    } finally {
+      client.dispatcher().hostCancelQueued(this);
+    }
   }
 
   private void cancelTransport(boolean timeout) {
