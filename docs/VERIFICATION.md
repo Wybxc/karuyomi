@@ -78,6 +78,12 @@
 
 2026-11-22，`58d38c7` 实现带支点的 `Canvas.scale`。Android API 35 原生图形参考共 8 项通过，新增用例对照绕非整数支点反射后的实际像素。JDK 与生成的 TeaVM JavaScript 各通过 60 项图形变换断言。MangaTR 1.6.25 在 `macbook-pro-4` 同材料 checkout `de001d3` 通过正式 AOT、产物完整性及 `hostAcquireCover` 检查，包含 1 个 Source，canonical SHA-256 为 `93e823a456a69e21e745a70bd341660cd0b903d9c0f60887582299cf9d620d19`，保持 `compiled_unverified`。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
 
+2026-11-22，OriManga 1.6.6、Paradox Scans 1.6.6、Ragnar Scans 1.6.6、Siyah Melek 1.6.7 在 `macbook-pro-4` 复用 `58f2d79` 的 PBKDF2 适配，分别通过正式 AOT、产物完整性和 `hostAcquireCover` 检查，各包含 1 个 Source。四包保持 `compiled_unverified`。全量装配预检纳入 51 个补编结果。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，`a35e3be` 和 `8cd026f` 将 Android 字节数组版 `ImageDecoder` 接到现有有界位图解码。JVM 受控桥核对同一字节句柄的头部回调、像素解码顺序，以及成功、无效数据和回调异常后的释放。Robolectric API 35 原生参考 9 项通过，新增用例使用合成 PNG 核对数组范围、软件分配、像素与 WebP 编码。该环境的 AVIF 解码返回未实现，合成 AVIF 另用固定头部解析器与 FFmpeg 独立核对尺寸及像素。完整 `pnpm teavm:check` 通过，真实浏览器 AVIF 解码和源站封面待验。[Android ImageDecoder](https://developer.android.com/reference/android/graphics/ImageDecoder)
+
+2026-11-22，HV2TComics 1.6.4 在 `macbook-pro-4` 固定 `efc86e2` 与 Keiyoushi `efa93f5a` 通过正式 Gradle、TeaVM AOT、产物完整性和 `hostAcquireCover` 检查，包含 1 个 Source。共享材料与冻结批次逐字节一致，首个补编的 canonical SHA-256 为 `f5bbcaabb676ca7fa2f038b7b9e0a5da96a8da939ac58eefd211cc9f65be813f`，保持 `compiled_unverified`。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)

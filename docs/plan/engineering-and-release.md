@@ -64,6 +64,8 @@ Dragon Ball Multiverse 和 ManhuaRM 使用的 `StaticLayout.Builder` 已接入�
 
 Gölge Bahçesi、Koreli Manga、Manga Ruhu 和 Merlin Scans 分别复用打包资源读取或 PBKDF2 适配，均通过正式补编、完整性和封面入口检查。整次 HTTP 调用超时适配恢复 AnimexNovel 和 ArgosComics，带支点缩放适配恢复 MangaTR，三包也通过相同检查。七包均匹配冻结批次的共享材料，等待全量装配及实际出图验收。[补编证据](../VERIFICATION.md)
 
+OriManga、Paradox Scans、Ragnar Scans 和 Siyah Melek 复用 PBKDF2 适配通过正式补编，装配预检累计纳入 51 个结果。HV2TComics 使用同一套有界位图解码补齐 Android 字节数组接口，正式 AOT、完整性和封面入口检查也通过。实际出图与 AVIF 浏览器解码待验。[补编证据](../VERIFICATION.md)
+
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
 - [x] 先行发布原索引 191 个升级包，逐包读回生产资源并确认新的生产检查点。完整冻结队列继续构建后续目录。[生产证据](../VERIFICATION.md)
