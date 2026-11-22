@@ -132,6 +132,10 @@
 
 2026-11-22，在 `macbook-pro-4` 使用同一产品归档和 Node 24.15.0，为八个补编包以及原冻结批次的 MangaDash、Dragon Ball Multiverse、ManhuaRM 实际调用封面入口。每包选一个 Source，通过隔离 HTTP 响应获取合成 PNG。11 个 Source 均各发出一次 GET，经二进制通道回传逐字节一致的 68 字节，资源标识、generation、分帧确认和 Worker 关闭通过。源站连通性与客户端实际显示另行验收。`f00c680` 的 CI 和 Wasm 检查已通过。[GitHub Actions](https://github.com/Wybxc/karuyomi/actions/runs/45026856832)
 
+2026-11-23，在 `macbook-pro-4` 用 MangaDash 1.6.1 真实 AOT、`f00c680` 的原生 Worker、Node 24.15.0 和 Skia Canvas 1.1.1 验证合成 PDF 读章。Source 经隔离 HTTP 各读取一次章节文档和 PDF，生成两页，并从原扩展拦截器交付 250×350 与 200×150 的 JPEG。解码核对第一页的红色及白色区域、第二页两处蓝色区域。PDFium 按需加载一次，章会话和 Worker 均确认关闭，图形句柄归零。实际源站和客户端界面待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-23，冻结目录中仍在产的 Monochrome Scans 遇到上游 KSP 处理错误。在 `macbook-pro-4` 用固定 `f00c680`、同一 Keiyoushi 提交和相同八份材料独立补编，1.6.1 的正式 Gradle、TeaVM AOT、产物完整性和封面入口检查通过，canonical SHA-256 为 `a63050c9449aa79386967a4f37278e487a3a766d052dda801437b4240b3bc848`。隔离 Worker 经一次 GET 完整回传合成封面。装配预检读回同一生产父快照，九个替换包分属五批，1,417 个现网包均保留在 1,448 项计划中。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)

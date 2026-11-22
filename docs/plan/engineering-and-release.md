@@ -74,13 +74,17 @@ OriManga、Paradox Scans、Ragnar Scans 和 Siyah Melek 复用 PBKDF2 适配通�
 
 MangaDash 使用 Android `PdfRenderer` 从虚拟文件读入 PDF 并栅格化章节。PDFium 宿主与八份运行材料的产品构建、合成双页真实像素检查、内存限额和清理测试已通过。MangaDash、Dragon Ball Multiverse 和 ManhuaRM 已在 `macbook-pro-4` 用同一材料身份通过正式 AOT 和封面入口检查。四路全量重建已启动，覆盖 1,448 个冻结输入。[验证记录](../VERIFICATION.md)
 
+MangaDash 的正式 AOT 在隔离 HTTP 夹具读入双页 PDF，经原拦截器返回两张 JPEG。尺寸、红白蓝采样、PDFium 按需加载和资源释放均通过。Monochrome Scans 在冻结批次遇到 KSP 处理错误，用同一上游和八份材料独立补编通过，已纳入装配输入，待随完整候选保留现网可用性。[验证记录](../VERIFICATION.md)
+
 MangaKakalot 1.6.28 通过 OkHttp 调度适配恢复，两套材料的正式 AOT、完整性和封面入口检查均通过。七材料构建已发布，生产目录现有 1,416 个扩展和 2,282 个 Source。八材料构建已纳入以新生产 revision 为父快照的装配计划，全量构建继续使用原冻结输入。已发布包的实际出图待验。[验证记录](../VERIFICATION.md)
 
 Mehgazone 1.6.1 在补齐文本设置弹窗说明后通过八材料正式 AOT、产物完整性和封面入口检查。该补编需要含新弹窗协议的客户端，随八材料候选交付。实际设置及出图待验。[设置计划](source-preferences.md)
 
 Doujin.io 1.6.5 补齐无填充的 AES 实现后通过两套材料的正式 AOT、完整性与封面入口检查。七材料构建已发布并读回，生产索引现有 1,417 个扩展，仍有 31 个失败输入。八材料构建已并入以新生产 revision 为父的装配计划，完整队列继续运行。实际出图待验。[验证记录](../VERIFICATION.md)
 
-MoeTruyen 通过 Keiyoushi 输入弹窗接收用户亲自填写的评论，MeDamTruyen、Panomic、SoaiCaComic 和 TeamLanhLung 通过同一辅助函数接收章节密码。`f00c680` 接入 Gradle 输入签名保留、TeaVM 调用转换及 Flutter 弹窗。五包均在 `macbook-pro-4` 通过八材料正式 AOT、完整性、封面入口和输入能力检查。真实 AOT 在隔离响应下通过 15 个用例，覆盖确认、取消和后台预取。发版输入已纳入五包和同提交的产品归档，合计四批八个替换构建，待冻结队列收齐后装配。真实源站读章与生产发布待验。[验证记录](../VERIFICATION.md)
+MoeTruyen 通过 Keiyoushi 输入弹窗接收用户亲自填写的评论，MeDamTruyen、Panomic、SoaiCaComic 和 TeamLanhLung 通过同一辅助函数接收章节密码。`f00c680` 接入 Gradle 输入签名保留、TeaVM 调用转换及 Flutter 弹窗。五包均在 `macbook-pro-4` 通过八材料正式 AOT、完整性、封面入口和输入能力检查。真实 AOT 在隔离响应下通过 15 个用例，覆盖确认、取消和后台预取。发版输入已纳入五包和同提交的产品归档，连同 Monochrome Scans 和前三批补编共九个替换构建，待冻结队列收齐后装配。真实源站读章与生产发布待验。[验证记录](../VERIFICATION.md)
+
+MegaTokyo 1.6.1 的固定源码通过定向 AOT 适配使用平台 TLS 校验。在 `macbook-pro-4` 使用正常证书验证访问主站和首话，均返回 HTTP 200。正式 AOT 和实际章节待验。[MegaTokyo](https://megatokyo.com/)
 
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
