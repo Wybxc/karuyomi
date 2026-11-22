@@ -130,6 +130,8 @@
 
 2026-11-22，五个输入扩展加入生产父 revision `448797e3feaa477c8ea18f54c6b874bd` 的八材料装配输入。预检读回生产状态，核对 1,417 个现网包仍在完整的 1,448 项计划中、四批共八个替换包的实际回执与八份共享材料。产品归档固定为 `f00c680`，SHA-256 为 `785ab4798789e112477d0e0e3d2045ff8576bae7460de1839e98a28394e9f251`。预检时冻结队列已取得 402 个成功和 6 个失败回执，正式装配待冻结终态。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
 
+2026-11-22，在 `macbook-pro-4` 使用同一产品归档和 Node 24.15.0，为八个补编包以及原冻结批次的 MangaDash、Dragon Ball Multiverse、ManhuaRM 实际调用封面入口。每包选一个 Source，通过隔离 HTTP 响应获取合成 PNG。11 个 Source 均各发出一次 GET，经二进制通道回传逐字节一致的 68 字节，资源标识、generation、分帧确认和 Worker 关闭通过。源站连通性与客户端实际显示另行验收。`f00c680` 的 CI 和 Wasm 检查已通过。[GitHub Actions](https://github.com/Wybxc/karuyomi/actions/runs/45026856832)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
