@@ -3,6 +3,7 @@ import { releaseProxy, wrap, type Remote } from 'comlink';
 import { deleteDB } from 'idb';
 import {
   integer,
+  number,
   object,
   text,
 } from '../../../../runtime/teavm/bridge/bridge-common.js';
@@ -190,6 +191,69 @@ test('the actual OffscreenCanvas bridge paints exact pixels and releases task re
     0, 0, 0, 0, 0, 0,
   ]);
   expect(() => bridge.teaGraphicsSync({ op: 'color', id, color: 0 })).toThrow();
+});
+
+test('letter spacing changes measured lines and visible glyph spacing', () => {
+  const bridge = createGraphicsBridge();
+  const paint = { family: 'monospace', size: 20 };
+  const sample = 'II II';
+  bridge.teaGraphicsBegin({ requestId: 'letter-spacing', generation: '1' });
+  try {
+    const measure = (letterSpacing: number) =>
+      number(
+        bridge.teaGraphicsSync({
+          op: 'measure',
+          text: sample,
+          paint: { ...paint, letterSpacing },
+        }).width,
+      );
+    const normalWidth = measure(0);
+    expect(measure(0.5)).toBeGreaterThan(normalWidth + 10);
+    expect(measure(-0.1)).toBeLessThan(normalWidth);
+    const layout = (letterSpacing: number) =>
+      bridge.teaGraphicsSync({
+        op: 'layout',
+        text: sample,
+        width: Math.ceil(normalWidth) + 1,
+        paint: { ...paint, letterSpacing },
+      }).lines;
+    expect(layout(0)).toHaveLength(1);
+    expect(layout(0.5)).toHaveLength(2);
+
+    const width = 128;
+    const lineHeight = 24;
+    const id = integer(
+      bridge.teaGraphicsSync({ op: 'create', width, height: lineHeight * 3 })
+        .id,
+    );
+    [0, 0.5, 0].forEach((letterSpacing, line) => {
+      bridge.teaGraphicsSync({
+        op: 'text',
+        id,
+        text: 'II',
+        x: 4,
+        y: line * lineHeight + 20,
+        paint: { ...paint, letterSpacing },
+      });
+    });
+    const { bytes } = bridge.teaGraphicsSync({ op: 'pixels', id });
+    const pixels = bridge.teaGraphicsBytesRead(text(bytes), 65536);
+    if (pixels === null) throw Error('The text bitmap returned no pixels');
+    const rightEdge = (line: number) => {
+      let right = -1;
+      const start = line * lineHeight * width * 4;
+      const end = start + lineHeight * width * 4;
+      for (let i = start; i < end; i += 4) {
+        if (pixels[i + 3]) right = Math.max(right, ((i - start) / 4) % width);
+      }
+      return right;
+    };
+    expect(rightEdge(0)).toBeGreaterThan(4);
+    expect(rightEdge(1)).toBeGreaterThan(rightEdge(0) + 4);
+    expect(rightEdge(2)).toBe(rightEdge(0));
+  } finally {
+    bridge.teaGraphicsEnd('letter-spacing', '1');
+  }
 });
 
 test('a claimed bitmap survives task end, rejects counterfeit owners and recycles explicitly', () => {

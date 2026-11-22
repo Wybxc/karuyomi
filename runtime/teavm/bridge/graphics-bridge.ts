@@ -41,6 +41,7 @@ interface Paint {
   size: number;
   family: string;
   scaleX: number;
+  letterSpacing: number;
   style: 'FILL' | 'STROKE' | 'FILL_AND_STROKE';
   direction: 'ltr' | 'rtl' | 'auto';
 }
@@ -259,6 +260,8 @@ function paintValue(value: unknown): Paint {
     size: data.size === undefined ? 12 : number(data.size),
     family: optionalText(data.family) ?? 'sans-serif',
     scaleX: data.scaleX === undefined ? 1 : number(data.scaleX),
+    letterSpacing:
+      data.letterSpacing === undefined ? 0 : number(data.letterSpacing),
     style,
   };
 }
@@ -857,6 +860,13 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
     ctx.imageSmoothingEnabled = !!(p.flags & 2);
     ctx.font = `${p.fontStyle & 2 ? 'italic' : 'normal'} ${p.fontStyle & 1 ? 'bold' : 'normal'} ${p.size ?? 12}px ${['sans-serif', 'serif', 'monospace', 'cursive', 'fantasy', 'system-ui'].includes(p.family || 'sans-serif') ? p.family || 'sans-serif' : JSON.stringify(p.family)}`;
   }
+  function spaceText(ctx: OffscreenCanvasRenderingContext2D, p: Paint) {
+    // Android specifies the gap in ems; Canvas uses a CSS length before scaling.
+    const pixels = p.letterSpacing * p.size;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = `${pixels}px`;
+    else if (pixels !== 0)
+      throw unsupported('Canvas letter spacing unavailable');
+  }
   function shape(p: Paint, fill: () => void, stroke: () => void) {
     if (p.style !== 'STROKE') fill();
     if (p.style === 'STROKE' || p.style === 'FILL_AND_STROKE') stroke();
@@ -885,7 +895,8 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
         a.paint.size < 0 ||
         a.paint.size > 4096 ||
         a.paint.scaleX < 0 ||
-        a.paint.scaleX > 64
+        a.paint.scaleX > 64 ||
+        Math.abs(a.paint.letterSpacing * a.paint.size) > 16_384
       )
         throw limit('Text paint exceeds dimensions budget');
     }
@@ -940,6 +951,7 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
         const c = canvas.getContext('2d');
         if (!c) throw Error('Canvas 2D unavailable');
         paint(c, a.paint);
+        spaceText(c, a.paint);
         const measure = (value: string) => {
           if (a.paint.size === 0)
             return {
@@ -1139,6 +1151,7 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
                 : 'ltr'
               : a.paint.direction;
           if (a.paint.size === 0) return {};
+          spaceText(c, a.paint);
           c.translate(a.x, a.y);
           c.scale(a.paint.scaleX ?? 1, 1);
           shape(

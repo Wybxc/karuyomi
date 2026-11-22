@@ -41,6 +41,7 @@ public class Paint {
   private ColorFilter colorFilter;
   private int layoutDirection;
   private Locale textLocale;
+  private float letterSpacing;
 
   public Paint() {
     flags = ANTI_ALIAS_FLAG | FILTER_BITMAP_FLAG;
@@ -69,6 +70,7 @@ public class Paint {
     colorFilter = p.colorFilter;
     layoutDirection = p.layoutDirection;
     textLocale = p.textLocale;
+    letterSpacing = p.letterSpacing;
   }
 
   public void setColor(int c) {
@@ -110,6 +112,15 @@ public class Paint {
 
   public float getTextScaleX() {
     return textScaleX;
+  }
+
+  public void setLetterSpacing(float spacing) {
+    if (!Float.isFinite(spacing)) throw new IllegalArgumentException("Invalid letter spacing");
+    letterSpacing = spacing;
+  }
+
+  public float getLetterSpacing() {
+    return letterSpacing;
   }
 
   public void setTextLocale(Locale locale) {
@@ -277,6 +288,7 @@ public class Paint {
     j.addProperty("flags", flags);
     j.addProperty("size", textSize);
     j.addProperty("scaleX", textScaleX);
+    j.addProperty("letterSpacing", letterSpacing);
     j.addProperty("strokeWidth", strokeWidth);
     j.addProperty("strokeMiter", strokeMiter);
     j.addProperty("style", style.name());
