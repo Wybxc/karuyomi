@@ -146,6 +146,38 @@ public final class CanvasRotationScenarios {
     }
   }
 
+  public static void runScaleAtPivot() {
+    Bitmap tile = Bitmap.createBitmap(3, 2, Bitmap.Config.ARGB_8888);
+    Bitmap output = Bitmap.createBitmap(5, 4, Bitmap.Config.ARGB_8888);
+    try {
+      tile.setPixels(
+          new int[] {Color.RED, Color.GREEN, Color.BLUE, Color.CYAN, Color.WHITE, Color.BLACK},
+          0,
+          3,
+          0,
+          0,
+          3,
+          2);
+      Canvas canvas = new Canvas(output);
+      canvas.translate(1, 1);
+      canvas.save();
+      canvas.scale(-1f, -1f, 1.5f, 1f);
+      canvas.drawBitmap(tile, 0, 0, null);
+      canvas.restore();
+      pixel(output, 1, 1, Color.BLACK);
+      pixel(output, 2, 1, Color.WHITE);
+      pixel(output, 3, 1, Color.CYAN);
+      pixel(output, 1, 2, Color.BLUE);
+      pixel(output, 2, 2, Color.GREEN);
+      pixel(output, 3, 2, Color.RED);
+      pixel(output, 0, 1, Color.TRANSPARENT);
+      pixel(output, 4, 2, Color.TRANSPARENT);
+    } finally {
+      output.recycle();
+      tile.recycle();
+    }
+  }
+
   public static void runBitmapMatrixAndColorFilter() {
     Bitmap tile = Bitmap.createBitmap(2, 1, Bitmap.Config.ARGB_8888);
     Bitmap output = Bitmap.createBitmap(8, 4, Bitmap.Config.ARGB_8888);

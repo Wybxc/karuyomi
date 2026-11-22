@@ -84,6 +84,10 @@ public class Canvas {
     matrix.preScale(x, y);
   }
 
+  public void scale(float x, float y, float px, float py) {
+    matrix.preScale(x, y, px, py);
+  }
+
   public void rotate(float degrees) {
     rotate(degrees, 0, 0);
   }

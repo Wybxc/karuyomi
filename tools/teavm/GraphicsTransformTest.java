@@ -37,6 +37,11 @@ public final class GraphicsTransformTest {
     bounds.set(Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE);
     require(bounds.exactCenterX() == -1f && bounds.exactCenterY() == 0f, "Android int arithmetic");
 
+    Matrix reflected = new Matrix();
+    reflected.preTranslate(1, 2);
+    reflected.preScale(-1, -1, 1.5f, 1);
+    expect(reflected, -1, 0, 0, -1, 4, 4);
+
     ColorMatrix source =
         new ColorMatrix(new float[] {0, 0, 1, 0, 0, 0, 1, 0, 0, 32, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0});
     var copied = new ColorMatrix(source);

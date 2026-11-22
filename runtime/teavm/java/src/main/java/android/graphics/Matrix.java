@@ -23,7 +23,11 @@ public class Matrix {
   }
 
   public boolean preScale(float sx, float sy) {
-    return pre(scaling(sx, sy, 0, 0));
+    return preScale(sx, sy, 0, 0);
+  }
+
+  public boolean preScale(float sx, float sy, float px, float py) {
+    return pre(scaling(sx, sy, px, py));
   }
 
   public boolean postScale(float sx, float sy, float px, float py) {
