@@ -388,7 +388,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     }
     if (spyfakkuPlatformTls) {
       rules.push(`-keep,allowshrinking class eu.kanade.tachiyomi.extension.en.spyfakku.SpyFakku {
-    public okhttp3.OkHttpClient$Builder configureClient(okhttp3.OkHttpClient$Builder);
+    protected okhttp3.OkHttpClient$Builder configureClient(okhttp3.OkHttpClient$Builder);
 }
 -keep,allowshrinking class eu.kanade.tachiyomi.extension.en.spyfakku.AnibusInterceptor {
     private boolean resolveInWebView(okhttp3.Request,okhttp3.Call);
