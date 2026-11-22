@@ -55,6 +55,26 @@ public final class Bitmap {
     return wrap(Graphics.call("create", a), c, true);
   }
 
+  public static Bitmap createBitmap(int[] colors, int width, int height, Config config) {
+    return createBitmap(colors, 0, width, width, height, config);
+  }
+
+  public static Bitmap createBitmap(
+      int[] colors, int offset, int stride, int width, int height, Config config) {
+    if (width <= 0 || height <= 0)
+      throw new IllegalArgumentException("width and height must be > 0");
+    checkArray(colors.length, offset, stride, width, height);
+    Bitmap bitmap = createBitmap(width, height, config);
+    try {
+      bitmap.setPixels(colors, offset, stride, 0, 0, width, height);
+      bitmap.mutable = false;
+      return bitmap;
+    } catch (RuntimeException | Error error) {
+      bitmap.recycle();
+      throw error;
+    }
+  }
+
   public static Bitmap createBitmap(Bitmap b) {
     return b.copy(b.config, false);
   }

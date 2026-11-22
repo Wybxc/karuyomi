@@ -3,6 +3,7 @@ package prototype;
 import static org.junit.Assert.*;
 
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.text.LineBreaker;
@@ -32,6 +33,39 @@ public final class AndroidTextTest {
     assertTrue(result.get("passed").getAsBoolean());
     assertEquals(13, result.get("checks").getAsInt());
     System.out.println("Android NATIVE Bitmap copy: " + result);
+  }
+
+  @Test
+  public void nativeAndroidBitmapColorArrayCreation() {
+    int[] colors = {Color.RED, Color.BLUE, Color.WHITE, Color.GREEN, Color.BLACK, Color.YELLOW};
+    Bitmap packed = Bitmap.createBitmap(colors, 2, 2, Bitmap.Config.ARGB_8888);
+    Bitmap reversed = Bitmap.createBitmap(colors, 3, -3, 2, 2, Bitmap.Config.ARGB_8888);
+    try {
+      assertFalse(packed.isMutable());
+      assertFalse(reversed.isMutable());
+      colors[0] = Color.CYAN;
+      assertEquals(Color.RED, packed.getPixel(0, 0));
+      assertEquals(Color.BLUE, packed.getPixel(1, 0));
+      assertEquals(Color.WHITE, packed.getPixel(0, 1));
+      assertEquals(Color.GREEN, packed.getPixel(1, 1));
+      assertEquals(Color.GREEN, reversed.getPixel(0, 0));
+      assertEquals(Color.BLACK, reversed.getPixel(1, 0));
+      assertEquals(Color.RED, reversed.getPixel(0, 1));
+      assertEquals(Color.BLUE, reversed.getPixel(1, 1));
+      assertThrows(IllegalStateException.class, () -> packed.setPixel(0, 0, Color.YELLOW));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> Bitmap.createBitmap(colors, 0, 1, 2, 2, Bitmap.Config.ARGB_8888));
+      assertThrows(
+          ArrayIndexOutOfBoundsException.class,
+          () -> Bitmap.createBitmap(colors, 2, -3, 2, 2, Bitmap.Config.ARGB_8888));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> Bitmap.createBitmap(colors, 0, 2, Bitmap.Config.ARGB_8888));
+    } finally {
+      packed.recycle();
+      reversed.recycle();
+    }
   }
 
   @Test
