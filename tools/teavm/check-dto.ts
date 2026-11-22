@@ -254,6 +254,8 @@ export async function checkDto(root = ROOT): Promise<void> {
     '-d',
     imageOutput,
     ...[
+      'runtime/teavm/java/src/main/java/okhttp3/Dispatcher.java',
+      'runtime/teavm/java/src/main/java/okhttp3/OkHttpClient.java',
       'runtime/teavm/java/src/main/java/prototype/HttpBodySource.java',
       'runtime/teavm/java/src/main/java/prototype/HttpRequestSink.java',
       'runtime/teavm/java/src/main/java/prototype/BrowserCall.java',
