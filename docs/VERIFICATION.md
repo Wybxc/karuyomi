@@ -134,6 +134,8 @@
 
 2026-11-23，在 `macbook-pro-4` 用 MangaDash 1.6.1 真实 AOT、`f00c680` 的原生 Worker、Node 24.15.0 和 Skia Canvas 1.1.1 验证合成 PDF 读章。Source 经隔离 HTTP 各读取一次章节文档和 PDF，生成两页，并从原扩展拦截器交付 250×350 与 200×150 的 JPEG。解码核对第一页的红色及白色区域、第二页两处蓝色区域。PDFium 按需加载一次，章会话和 Worker 均确认关闭，图形句柄归零。实际源站和客户端界面待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
 
+2026-11-23，在同一台构建机以 Dragon Ball Multiverse 1.6.1 的英文 Source、`f00c680` 原生 Worker、Node 24.15.0 和 Skia Canvas 1.1.1 验证文字布局。隔离 HTTP 提供章节目录、带两段对话的页面与空白 PNG。真实 AOT 经过原图片拦截器生成 320×240 JPEG，两个指定区域分别有 185 和 254 个深色像素，空白区为零。正式二进制交付、章会话及 Worker 关闭通过。源站和客户端界面待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-23，冻结目录中仍在产的 Monochrome Scans 遇到上游 KSP 处理错误。在 `macbook-pro-4` 用固定 `f00c680`、同一 Keiyoushi 提交和相同八份材料独立补编，1.6.1 的正式 Gradle、TeaVM AOT、产物完整性和封面入口检查通过，canonical SHA-256 为 `a63050c9449aa79386967a4f37278e487a3a766d052dda801437b4240b3bc848`。隔离 Worker 经一次 GET 完整回传合成封面。装配预检读回同一生产父快照，九个替换包分属五批，1,417 个现网包均保留在 1,448 项计划中。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
 
 2026-11-23，在 `macbook-pro-4` 固定 `58d3411` 与 Keiyoushi `efa93f5a` 补编 MegaTokyo 1.6.1。正式 Gradle、TeaVM AOT、产物完整性及封面入口检查通过，包含 1 个 Source，canonical SHA-256 为 `8d73d3b51211409e885aac5cd61913cbd7ef186dfbfe24b1721e081c3cb47f33`。`pnpm check` 通过。在 Node 24.15.0 中用 `f00c680` 的原生 Worker 载入新 AOT，经该 Source 读取真实首话 HTML 和图片。两次 HTTPS 请求均通过平台证书校验并返回 HTTP 200，一页 80,282 字节 GIF 经正式图片通道回传，Worker 正常关闭。新装配预检读回同一生产父快照，核对六批共十个替换构建及八份共享材料，保留全部 1,417 个现网包。生产发布、客户端显示和实际封面读取待验。[MegaTokyo 首话](https://megatokyo.com/strip/1) · [装配入口](EXTENSIONS.md#首次全量候选的定向补编)
@@ -141,6 +143,8 @@
 2026-11-23，在 `macbook-pro-4` 使用原生 Worker 和与生产 revision `448797e3feaa477c8ea18f54c6b874bd` 索引相同的两份 AOT，验证普通封面交付。Arknights Comics 1.6.2 从官方热门接口读取《Prelude Suite: The Lone Walker》的封面地址，经正常 TLS 获取 JPEG，正式二进制通道回传 58,121 字节，与源站响应逐字节一致。英文 xkcd 1.6.1 经原 Source 拦截器读到内置的 300×424 PNG，回传 15,307 字节，无源站请求。两次均释放 Worker。测试在 Node 24.15.0 隔离宿主执行，生产登录及客户端显示待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
 
 2026-11-23，在 `macbook-pro-4` 固定 `eaab1ad` 和 Keiyoushi `efa93f5a` 为现网七份材料补编 MegaTokyo 1.6.1。正式构建、完整性和封面入口通过。现网同版原生 Worker 在 Node 24.15.0 使用正常 HTTPS 读回首话 80,282 字节 GIF。正式装配保留原 1,417 个索引条目，Wrangler 4.156.1 dry-run 通过，随后 Worker `a2a4e916-2aa2-4ac1-90da-69e2dc8e6259` 接收 100% 生产流量。公开索引、状态和新增清单逐字节匹配 revision `ac983abafd1d43b49b9f5eb9f8d5c24d`。新增 879,761 字节 gzip 的强 ETag、编码与解码摘要、46 项 Web 资源及匿名 Access 302 通过。生产现有 1,418 个扩展和 2,284 个 Source，剩余 30 个失败输入。构建机提交生产 checkpoint，八材料装配输入已同步父版本并保留十个替换构建。生产认证后读图和实际封面显示待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json) · [七材料补编](https://github.com/Wybxc/karuyomi/commit/eaab1ad6f31454d23e6679108e12d8cf8a001925)
+
+2026-11-23，MegaTokyo 发布后的有界规划发现首次装配裁掉了 59 条旧失败记录。用归档的 1,448 份原始回执、19 批补编和正式 `prepare-baseline` 恢复，核对 59 条记录的构建身份和失败详情。新候选共 1,507 条回执，同一主线和上游的有界计划选择 0 项。Wrangler dry-run 后，Worker `d2615968-2271-49ce-9110-29f703e15627` 承接 100% 生产流量。revision `dde7ff44d08140d79aeeaf219aaddf21` 的状态与索引读回一致，扩展索引摘要与上一版相同，46 项 Web 资源和匿名 Access 302 复验通过。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
 
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
