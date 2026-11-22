@@ -90,6 +90,10 @@
 
 2026-11-22，带封面入口的完整扩展基线已发布。Wrangler 4.156.1 将 Worker `30f79ab5-5d7e-4390-8f67-e58ec5085986` 切换至 100% 流量，线上 revision 为 `85bf2ec61d274e83bfc3b4281034851f`。生产索引与构建状态逐字节核对，1,414 份清单、1,414 个 gzip 强 ETag 及交付头、46 项 Web 静态资源和匿名 Access 302 均通过。D1 账本读回 13 项迁移，连续至 `0012`。本机与 `macbook-pro-4` 的正式检查点均已写入。从生产读回状态后，同一主线的有界增量计划选择 0 项。定时扩展工作流保持手动停用。内置浏览器连接超时，生产登录后的出图待验。34 个扩展仍有 AOT 失败记录。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
 
+2026-11-22，`00df97d` 补齐 X.509 RSA 公钥导入及 PKCS#1 v1.5 公开加密。完整 `pnpm teavm:check` 通过，生成的 JavaScript 与 JDK 对照通过 13 项 PKCS#1 v1.5 断言和原有 16 项 OAEP 断言。JDK 独立解出了由生成代码使用合成公钥加密的测试数据。在 `macbook-pro-4` 的独立 `3fe63f1` checkout 用固定 Keiyoushi `efa93f5a` 补编漫画人 1.6.2，正式 AOT、产物完整性和 `hostAcquireCover` 检查通过。共享运行材料与生产父快照相同，canonical SHA-256 为 `78c22a39d47b1776906e16763e619406f695fad568ac5eb4ddd279b6502d41ec`。正式装配核对原有 1,414 个索引条目逐项相同，新增一个扩展和一个 Source，原失败回执保留。Vite 正式构建及 Wrangler dry-run 通过，漫画人保持 `compiled_unverified`。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，Wrangler 4.156.1 上传漫画人的清单和 gzip、扩展索引及构建状态共 4 项，Worker `9d83d2e9-be0b-4a34-9dbc-d930d54bc192` 接收 100% 流量。生产 revision `253d97308eb0412280daba751b79b945` 可分发 1,415 个扩展和 2,281 个 Source，33 个 AOT 失败保留诊断。通过 `macbook-pro-4` 读回生产索引、状态、漫画人清单和 gzip，核对安装包压缩前后摘要、强 ETag、46 项 Web 静态资源及匿名 Access 302。本机和构建机检查点均已确认，固定主线的 `plan --ci --limit 12` 选择 0 项。生产登录后的漫画人出图待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
