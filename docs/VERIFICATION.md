@@ -120,6 +120,10 @@
 
 2026-11-22，在 `macbook-pro-4` 的临时 checkout 用固定 Keiyoushi `efa93f5a` 和官方 Gradle `assembleRelease` 验证 MoeTruyen 1.6.21 与 MeDamTruyen 1.6.12。通过 Gradle init 脚本给这两个模块的 release 加入 `-keep,allowshrinking`，保留 `keiyoushi.utils.ui.DialogHelperKt.askInput` 的公开静态签名。固定 ASM 9.9.1 在两份官方 JVM JAR 中分别找到一条该签名的直接调用及一条进入辅助类的外部调用。原 MoeTruyen JAR 的该签名与直接调用均为 0。已核对上游跟踪文件，弹窗消息与 Flutter 响应仍待接入。[Android keep 规则](https://developer.android.com/topic/performance/app-optimization/add-keep-rules)
 
+2026-11-22，重新读回生产 revision `448797e3feaa477c8ea18f54c6b874bd` 的索引，摘要与已校验的发布快照匹配。逐包解码核对 1,417 份构建，全部导出 `hostAcquireCover`，覆盖 2,283 个 Source。已核对发布工件，实际出图仍逐源验收。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-22，章节输入桥通过 TypeScript、`pnpm teavm:check`、89 项 Worker 与驱动测试、39 项 Dart 传输测试及两项 Flutter 弹窗测试。隔离夹具验证当前调用绑定、无效和重复答复拒绝、明确确认产生一次模拟写入及取消零次。Flutter 核对密码遮蔽、必填与请求失效后移除对应弹窗。异步桥的真实扩展 AOT 和读章仍待复验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)

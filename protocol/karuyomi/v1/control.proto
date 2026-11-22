@@ -340,6 +340,8 @@ message SourceCall {
   string source_id = 2;
   optional uint32 timeout_ms = 3;
   string generation = 4;
+  // Only a foreground chapter request with a user input handler may set this.
+  bool allow_input = 5;
   oneof request {
     PageRequest popular = 10;
     PageRequest latest = 11;
@@ -383,6 +385,33 @@ message SourceResult {
 message CancelSourceRequest {
   string request_id = 1;
   string generation = 2;
+}
+message ReadSourceInput {
+  string request_id = 1;
+  string generation = 2;
+}
+message SourceInputPrompt {
+  string request_id = 1;
+  string generation = 2;
+  string build_id = 3;
+  string prompt_id = 4;
+  string source_id = 5;
+  string title = 6;
+  optional string message = 7;
+  optional string hint = 8;
+  optional string initial_value = 9;
+  bool password = 10;
+  bool required = 11;
+}
+message SourceInputState {
+  SourceInputPrompt prompt = 1;
+}
+message SourceInputAnswer {
+  string request_id = 1;
+  string generation = 2;
+  string prompt_id = 3;
+  // Absent on dismissal. An empty string is a distinct answer.
+  optional string text = 4;
 }
 message AcquireImage {
   string request_id = 1;
@@ -492,6 +521,7 @@ message BuildManifest {
   // Complete metadata for exactly source_ids, without running the extension.
   repeated CatalogSource sources = 14;
   repeated PreferenceSyncRule preference_sync_rules = 15;
+  optional bool supports_source_input = 16;
 }
 message ExtensionBuildDescriptor {
   string build_id = 1;
@@ -600,6 +630,8 @@ message ControlRequest {
     Empty extension_cache = 23;
     ForgetExtensionArtifactRequest forget_extension_artifact = 24;
     CloseBuildRequest close_build = 25;
+    ReadSourceInput read_source_input = 26;
+    SourceInputAnswer answer_source_input = 27;
   }
 }
 message ControlResponse {
@@ -617,6 +649,7 @@ message ControlResponse {
     RuntimeError error = 18;
     PreparedBuild prepared_build = 19;
     ExtensionCacheState extension_cache = 20;
+    SourceInputState source_input = 21;
   }
 }
 
@@ -638,6 +671,7 @@ message WorkerCommand {
     AcquireImageWorker acquire_image = 12;
     ClosePageSession close_page_session = 13;
     Empty shutdown = 14;
+    SourceInputAnswer answer_source_input = 15;
   }
 }
 message WorkerResponse {
@@ -648,5 +682,6 @@ message WorkerResponse {
     ProcessedImage image = 12;
     Closed closed = 13;
     RuntimeError error = 14;
+    SourceInputPrompt source_input = 15;
   }
 }

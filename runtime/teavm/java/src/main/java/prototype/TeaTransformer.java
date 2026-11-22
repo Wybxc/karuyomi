@@ -11,6 +11,18 @@ import prototype.jcl.PackagedResources;
 
 /** Supply absent JCL entry points in TeaVM IR; never rewrites the extension input JAR. */
 public class TeaTransformer implements ClassHolderTransformer {
+  private static final MethodDescriptor SOURCE_INPUT =
+      new MethodDescriptor(
+          "askInput",
+          ValueType.object("java.lang.String"),
+          ValueType.object("java.lang.String"),
+          ValueType.object("java.lang.String"),
+          ValueType.object("java.lang.String"),
+          ValueType.BOOLEAN,
+          ValueType.BOOLEAN,
+          ValueType.object("kotlin.coroutines.Continuation"),
+          ValueType.object("java.lang.Object"));
+
   public void transformClass(ClassHolder cls, ClassHolderTransformerContext context) {
     if (cls.getName().equals("java.lang.Class")) {
       MethodDescriptor descriptor = new MethodDescriptor("getResource", String.class, URL.class);
@@ -405,6 +417,9 @@ public class TeaTransformer implements ClassHolderTransformer {
           if (ins instanceof InvokeInstruction) {
             InvokeInstruction invoke = (InvokeInstruction) ins;
             MethodReference ref = invoke.getMethod();
+            if (ref.getClassName().equals("keiyoushi.utils.ui.DialogHelperKt")
+                && ref.getDescriptor().equals(SOURCE_INPUT))
+              invoke.setMethod(new MethodReference("prototype.SourceInput", SOURCE_INPUT));
             if (ref.getClassName().equals("org.teavm.runtime.reflect.ClassReflectionInfo")
                 && ref.getName().equals("innerClassCount")) {
               InvokeInstruction prepare = new InvokeInstruction();

@@ -27,13 +27,19 @@ export type BundleArtifact = Required<PlainMessage<pb.BundleArtifact>>;
 export type CatalogSource = Required<PlainMessage<pb.CatalogSource>>;
 export type BuildManifest = Omit<
   Required<PlainMessage<pb.BuildManifest>>,
-  'bundle' | 'hostScripts' | 'resources' | 'sources' | 'preferenceSyncRules'
+  | 'bundle'
+  | 'hostScripts'
+  | 'resources'
+  | 'sources'
+  | 'preferenceSyncRules'
+  | 'supportsSourceInput'
 > & {
   sources: CatalogSource[];
   bundle: BundleArtifact;
   hostScripts: Artifact[];
   resources: ResourceArtifact[];
   preferenceSyncRules: PlainMessage<pb.PreferenceSyncRule>[];
+  supportsSourceInput?: boolean | undefined;
 };
 export type ExtensionBuildDescriptor = Omit<
   Required<PlainMessage<pb.ExtensionBuildDescriptor>>,

@@ -6,6 +6,7 @@ import type {
   SourceInfo,
   SourceCall,
   SourcePayload,
+  SourceInputFields,
   ProcessedImage,
   Closed,
 } from '@karuyomi/contracts';
@@ -34,6 +35,8 @@ import {
   teaVMDiagnosticSchema,
 } from './runtime-diagnostics.js';
 
+type SourceInputHandler = (fields: SourceInputFields) => Promise<string | null>;
+
 export interface RuntimeDriver {
   readonly supportsCoverImages?: boolean;
   open(
@@ -44,7 +47,11 @@ export interface RuntimeDriver {
     context?: HttpCallContext,
     preferences?: pb.PreferenceBootstrap,
   ): Promise<SourceInfo[]>;
-  invoke(call: SourceCall, context?: HttpCallContext): Promise<SourcePayload>;
+  invoke(
+    call: SourceCall,
+    context?: HttpCallContext,
+    requestInput?: SourceInputHandler,
+  ): Promise<SourcePayload>;
   close(): Promise<void>;
   acquireImage?(
     sourceId: string,
@@ -139,6 +146,17 @@ export interface TeaVMGlobals {
     sequence: number,
     bytes: Uint8Array,
   ) => Promise<boolean>;
+  teaSourceInput?: (
+    requestId: string,
+    generation: string,
+    token: string,
+    title: string,
+    message: string | null,
+    hint: string | null,
+    initialValue: string | null,
+    password: boolean,
+    required: boolean,
+  ) => Promise<string | null>;
   teaBrowser?: () => never;
   teaFileSystemClose?: () => Promise<void>;
   karuyomiResources?: Record<string, string>;
@@ -162,6 +180,8 @@ export class TeaVMDriver implements RuntimeDriver {
   private imageSink: ImageSink | undefined;
   private imageFailure: RuntimeFailure | undefined;
   private graphicsContext: HttpCallContext | undefined;
+  private sourceInput:
+    { token: string; requestInput: SourceInputHandler } | undefined;
   private pdfiumLoad: AbortController | undefined;
   private readonly fallbackGeneration = crypto.randomUUID();
 
@@ -230,6 +250,39 @@ export class TeaVMDriver implements RuntimeDriver {
     scope.teaImageClose = (handle) =>
       this.captureAsync(() => this.images().close(handle));
     scope.teaImageCancel = (handle) => this.imageSink?.cancel(handle);
+    scope.teaSourceInput = (
+      requestId,
+      generation,
+      token,
+      title,
+      message,
+      hint,
+      initialValue,
+      password,
+      required,
+    ) =>
+      this.captureAsync(async () => {
+        if (
+          this.graphicsContext?.requestId !== requestId ||
+          this.graphicsContext.generation !== generation ||
+          this.binaryTransport?.operationToken !== token
+        )
+          throw new HttpOwnerFailure();
+        if (this.sourceInput?.token !== token) return null;
+        const answer = await this.sourceInput.requestInput({
+          title,
+          ...(message === null ? {} : { message }),
+          ...(hint === null ? {} : { hint }),
+          ...(initialValue === null ? {} : { initialValue }),
+          password,
+          required,
+        });
+        if (answer === null && this.binaryTransport?.operationToken === token)
+          this.recordBridgeFailure(
+            new RuntimeFailure('cancelled', 'Source input was dismissed'),
+          );
+        return answer;
+      });
     // The prototype callback relay/eval Worker is deliberately not installed.
     // Sources requiring remote scripts get an explicit capability error.
     scope.teaBrowser = () => {
@@ -502,10 +555,16 @@ export class TeaVMDriver implements RuntimeDriver {
   async invoke(
     call: SourceCall,
     context?: HttpCallContext,
+    requestInput?: SourceInputHandler,
   ): Promise<SourcePayload> {
     const invocation = javaSourceInvocation(call);
+    let inputToken: string | undefined;
     const raw = await this.call(
-      (owner, token) =>
+      (owner, token) => {
+        if (call.allowInput && requestInput) {
+          inputToken = token;
+          this.sourceInput = { token, requestInput };
+        }
         this.scope.hostInvoke!(
           call.sourceId,
           invocation.operation,
@@ -513,10 +572,13 @@ export class TeaVMDriver implements RuntimeDriver {
           owner.requestId,
           owner.generation,
           token,
-        ),
+        );
+      },
       context,
       invocation.operation,
-    );
+    ).finally(() => {
+      if (this.sourceInput?.token === inputToken) this.sourceInput = undefined;
+    });
     const payload = parseJavaSourcePayload(call, raw);
     const snapshot =
       payload.case === 'preferences'

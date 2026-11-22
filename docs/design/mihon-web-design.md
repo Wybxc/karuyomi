@@ -394,6 +394,8 @@ Wrangler 关键配置草案（并非完整部署文件，静态资源目录由 F
 
 Source 选择 `Dns.SYSTEM` 时使用 Workers 公网 fetch 的系统解析，自定义 DNS 配置返回明确的宿主错误。Source 配置的 `Authenticator` 可以处理原请求同源的 401，补发请求仍限定在该 origin，并与重定向共用次数上限。补发前释放旧响应正文，只重用可重放的请求体。[OkHttp 5.5.0 参考实现](https://github.com/square/okhttp/blob/parent-5.5.0/okhttp/src/commonJvmAndroid/kotlin/okhttp3/internal/http/RetryAndFollowUpInterceptor.kt)
 
+前台显式打开章节时，Keiyoushi 的文本输入方法可挂起当前 Source 调用。正式 Gradle 构建保留该方法的静态签名，TeaVM 在编译时将调用映射到宿主。装载时根据构建清单声明输入能力，只有带该入口的扩展开启输入控制。Worker 通过 ProtoJSON 传递来源、提示和输入类型。应用校验请求、generation、build 和弹窗标识，用户确认后才将输入交还同一次调用。弹窗默认遮蔽密码，取消以空值返回。后台预取没有输入权限，原请求结束或失效时关闭对应弹窗。每个输入字段上限为 4 KiB UTF-8，前台交互读章期限为两分钟。提示和答复只在当前调用内传递。
+
 Cookie 与偏好按扩展包/Source 登录配置分组，正确处理 Domain/Path/Expires/Secure，避免串账号；这些分组不构成对可信扩展的权限隔离。浏览器到同源网络桥按部署会话鉴权；Worker 到漫画站的出站请求只使用扩展请求描述构建，不复制入站应用 Cookie、Authorization 或 Access 头。敏感 cookie/token 仅保留在当前客户端，不增加云端凭证同步模块。
 
 业务数据、登录返回和错误响应使用 `Cache-Control: private, no-store`；API 不进入 Service Worker Cache Storage 或公共 CDN 缓存。公开 AOT 与共享材料不使用 Access 私有缓存重验证：AOT 按 Static Assets index/catalog 定位最新 build 并校验下载字节，由客户端或 Service Worker 管理更新缓存，共享材料使用内容寻址静态缓存。公开缓存与个人运行文件/HTTP Cache 分开所有权；缓存命中、版本变化和解压上限仍须实测。

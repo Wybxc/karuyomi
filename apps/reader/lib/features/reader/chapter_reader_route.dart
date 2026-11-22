@@ -24,6 +24,7 @@ import 'reader_screen.dart';
 import 'reader_preferences.dart';
 import 'reading_progress_controller.dart';
 import 'reader_recovery.dart';
+import 'source_input_dialog.dart';
 
 /// One navigation route owns the whole reading session, not one route per page
 /// list. A new leaf can only acquire images after the previous leaf's ACKs.
@@ -308,6 +309,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
         widget.catalog,
         continuation,
         isCurrent: () => !_closing && mounted,
+        onInput: _sourceInput,
       );
       if (_closing || !mounted) return;
       if (recovered == null) {
@@ -558,13 +560,29 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     WidgetsBinding.instance.ensureVisualUpdate();
   }
 
-  Future<OpenedChapter?> _openChapter(SequenceChapter chapter) =>
-      widget.catalog.openChapter(
-        _manga,
-        ChapterEntry(chapter.snapshot),
-        reference: _source,
-        logicalChapterKey: chapter.key,
-      );
+  Future<OpenedChapter?> _openChapter(
+    SequenceChapter chapter, {
+    bool interactive = false,
+  }) => widget.catalog.openChapter(
+    _manga,
+    ChapterEntry(chapter.snapshot),
+    reference: _source,
+    logicalChapterKey: chapter.key,
+    onInput: interactive ? _sourceInput : null,
+  );
+
+  Future<String?> _sourceInput(
+    wire.SourceInputPrompt prompt,
+    Future<void> ended,
+  ) async {
+    if (!mounted || _closing) return null;
+    return showSourceInputDialog(
+      context,
+      sourceName: widget.catalog.activeSource?.name ?? '漫画源',
+      prompt: prompt,
+      operationEnded: ended,
+    );
+  }
 
   Future<void> _prepareChapter(SequenceChapter target, String attempt) async {
     setState(() {
@@ -698,7 +716,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       await _progress?.flush();
       next = await _preparation.take(target);
       if (_closing || !mounted) return;
-      next ??= await _openChapter(target);
+      next ??= await _openChapter(target, interactive: true);
       if (next == null) {
         if (!_closing && mounted) {
           setState(() => _error = widget.catalog.error ?? '章节未能打开，请重试');

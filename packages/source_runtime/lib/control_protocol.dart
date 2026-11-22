@@ -20,6 +20,11 @@ const controlJsonDepthLimit = 64;
 const imageByteLimit = 64 * 1024 * 1024;
 const imageResourceLimit = 6;
 const coverByteLimit = 8 * 1024 * 1024;
+const sourceInputTextLimit = 4096;
+
+bool sourceInputTextFits(String text) =>
+    text.length <= sourceInputTextLimit &&
+    utf8.encode(text).length <= sourceInputTextLimit;
 
 /// Checks transport budgets, without duplicating the generated field schema.
 void _checkJsonNesting(Object? value) {

@@ -16,6 +16,7 @@ import 'diagnostics/reader_baseline.dart';
 import 'diagnostics/reader_baseline_host.dart';
 import 'features/reader/reading_progress_controller.dart';
 import 'features/reader/reader_recovery.dart';
+import 'features/reader/source_input_dialog.dart';
 import 'features/reader/reader_slider_focus.dart'
     if (dart.library.js_interop) 'features/reader/reader_slider_focus_web.dart';
 import 'features/reader/chapter_reader_route.dart';
@@ -338,6 +339,15 @@ class _AppShellState extends ConsumerState<AppShell> {
           controller,
           recovery,
           isCurrent: () => mounted && identical(controller, _catalog),
+          onInput: (prompt, ended) async {
+            if (!mounted || !identical(controller, _catalog)) return null;
+            return showSourceInputDialog(
+              context,
+              sourceName: controller.activeSource?.name ?? '漫画源',
+              prompt: prompt,
+              operationEnded: ended,
+            );
+          },
         );
         if (recovered == null) {
           if (!mounted || !identical(controller, _catalog)) return;

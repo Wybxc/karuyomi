@@ -996,6 +996,7 @@ final class CatalogController extends ChangeNotifier {
         error = switch (failure.code) {
           RuntimeErrorCode.accessRequired => '访问验证已失效，请重新登录',
           RuntimeErrorCode.accessDenied => '当前身份没有访问权限',
+          RuntimeErrorCode.cancelled => '已取消漫画源请求',
           RuntimeErrorCode.timeout => '漫画源响应超时，请重新连接后重试',
           RuntimeErrorCode.runtimeLost => _runtimeReconnectMessage,
           RuntimeErrorCode.unsupportedCapability => '这个漫画源功能暂未支持',
@@ -1361,6 +1362,7 @@ final class CatalogController extends ChangeNotifier {
     wire.SourceCall call, {
     void Function(String requestId)? onRequest,
     bool allowPreferenceEdit = false,
+    SourceInputHandler? onInput,
   }) async {
     if (extensionUnavailableReason case final reason?) {
       throw FormatException(reason);
@@ -1378,10 +1380,13 @@ final class CatalogController extends ChangeNotifier {
     call.requestId = 'ui-${++_requestSequence}';
     call.generation = current.generation;
     call.sourceId = source.id;
-    call.timeoutMs = 30000;
+    final input = current.capabilities.contains('source-input')
+        ? onInput
+        : null;
+    call.timeoutMs = input == null ? 30000 : 120000;
     onRequest?.call(call.requestId);
     final result = await runtime.invoke(
-      SourceRequest(packageId: build.packageName, call: call),
+      SourceRequest(packageId: build.packageName, call: call, onInput: input),
     );
     if (_closed ||
         epoch != _epoch ||
@@ -2070,6 +2075,7 @@ final class CatalogController extends ChangeNotifier {
     ChapterEntry chapter, {
     required CatalogSourceRef reference,
     String? logicalChapterKey,
+    SourceInputHandler? onInput,
   }) => _perform('正在加载章节页面', () async {
     if (!isCurrentSource(reference)) {
       throw const FormatException('章节所属漫画源会话已过期，请返回重新打开详情');
@@ -2082,6 +2088,7 @@ final class CatalogController extends ChangeNotifier {
     }
     final result = (await _invoke(
       wire.SourceCall(pages: wire.ChapterRequest(chapter: chapter.snapshot)),
+      onInput: onInput,
     )).pageList;
     final pageSessionId = result.pageSessionId;
     try {

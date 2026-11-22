@@ -192,10 +192,10 @@ export function validateDescriptor(
 
 export function put(
   output: string,
-  file: string,
+  bytes: Uint8Array,
   contentType: 'application/javascript' | 'text/javascript',
 ) {
-  const { encoded, reference } = encodeBundle(readFileSync(file), contentType);
+  const { encoded, reference } = encodeBundle(bytes, contentType);
   mkdirSync(path.join(output, 'artifacts'), { recursive: true });
   writeFileSync(
     path.join(output, 'artifacts', reference.sha256 + '.gz'),
@@ -359,6 +359,32 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       path.join(launcher, 'gradle-wrapper.properties'),
       wrapper + '\ndistributionSha256Sum=' + LOCK.gradle.sha256 + '\n',
     );
+    // Keep the Kotlin suspend boundary in the official JVM JAR so TeaVM can
+    // bind calls to host input without pulling in the Android dialog classes.
+    const inputRules = path.join(launcher, 'source-input.pro');
+    writeFileSync(
+      inputRules,
+      `-keep,allowshrinking class keiyoushi.utils.ui.DialogHelperKt {
+    public static java.lang.Object askInput(java.lang.String,java.lang.String,java.lang.String,java.lang.String,boolean,boolean,kotlin.coroutines.Continuation);
+}
+`,
+    );
+    const inputInit = path.join(launcher, 'source-input.init.gradle');
+    writeFileSync(
+      inputInit,
+      `gradle.beforeProject { project ->
+    if (project.path == System.getProperty('karuyomi.aot.module')) {
+        project.pluginManager.withPlugin('com.android.application') {
+            project.extensions.getByName('androidComponents').finalizeDsl { extension ->
+                extension.buildTypes.getByName('release').proguardFiles(
+                    new File(System.getProperty('karuyomi.aot.promptRules'))
+                )
+            }
+        }
+    }
+}
+`,
+    );
     activeLog = path.join(logs, 'upstream.log');
     console.log(JSON.stringify({ stage, module, logPath: activeLog }));
     await execa(
@@ -370,6 +396,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
         '-p',
         upstream,
         module + ':assembleRelease',
+        '--init-script',
+        inputInit,
+        `-Dkaruyomi.aot.module=${module}`,
+        `-Dkaruyomi.aot.promptRules=${inputRules}`,
         '--no-configuration-cache',
         '--no-watch-fs',
         `--max-workers=${options.workers ?? 3}`,
@@ -526,11 +556,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       throw new Error(
         'Host changed during AOT compilation; regenerate descriptor and retry',
       );
-    const bundle = put(
-      output,
+    const bundleBytes = readFileSync(
       path.join(work, 'public/teavm', key, 'app.js'),
-      'text/javascript',
     );
+    const bundle = put(output, bundleBytes, 'text/javascript');
     const manifest = buildManifestSchema.parse({
       buildId: publishedBuildId(descriptor, bundle.sha256),
       repoId: 'keiyoushi',
@@ -541,6 +570,9 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
         a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
       ),
       preferenceSyncRules: preferenceSyncRulesForBuild(descriptor.packageName),
+      ...(bundleBytes.includes('teaSourceInput')
+        ? { supportsSourceInput: true }
+        : {}),
       protocolVersion: materials.protocolVersion,
       hostAbi: materials.hostAbi,
       runtimeBaseline: materials.runtimeBaseline,

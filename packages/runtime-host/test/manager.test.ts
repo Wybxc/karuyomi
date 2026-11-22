@@ -151,6 +151,128 @@ test('the public generated control entry correlates typed Source success and str
   expect(driver.invoke).toHaveBeenCalledOnce();
 });
 
+test.each([true, false])(
+  'Source input keeps the chapter call pending and accepts only its live prompt (submit=%s)',
+  async (submit) => {
+    const sideEffects: string[] = [];
+    const { manager, workers } = await setup(
+      async (_call, _owner, ask) => {
+        const answer = await ask!({
+          title: 'Locked chapter',
+          message: 'Enter the chapter password',
+          hint: 'Password',
+          password: true,
+          required: true,
+        });
+        if (answer === null)
+          throw new RuntimeFailure('cancelled', 'Input dismissed');
+        sideEffects.push(answer);
+        return {
+          case: 'pageList',
+          value: create(pb.PageListSchema, { pageSessionId: 'pages' }),
+        };
+      },
+      { ...(await manifest()), supportsSourceInput: true },
+    );
+    vi.stubGlobal('window', { addEventListener: vi.fn() });
+    const api = installRuntime(manager, () => {
+      throw new Error('Search is not used by this fixture');
+    });
+    const session = await manager.open(options);
+    async function control(
+      requestId: string,
+      command: pb.ControlRequest['command'],
+    ) {
+      return parseControlResponse(
+        await api.control(
+          encodeControlRequest(
+            create(pb.ControlRequestSchema, {
+              requestId,
+              slotId: pb.RuntimeSlot.FOREGROUND,
+              command,
+            }),
+          ),
+        ),
+      );
+    }
+    const request = create(pb.SourceCallSchema, {
+      requestId: 'locked-chapter',
+      sourceId: session.sources[0]!.id,
+      generation: session.generation,
+      allowInput: true,
+      request: {
+        case: 'pages',
+        value: { chapter: { url: '/chapter', dateUpload: '0' } },
+      },
+    });
+    const invocation = control('chapter-control', {
+      case: 'invoke',
+      value: request,
+    });
+    const target = {
+      requestId: request.requestId,
+      generation: request.generation,
+    };
+    const read = await control('input-read', {
+      case: 'readSourceInput',
+      value: create(pb.ReadSourceInputSchema, target),
+    });
+    if (read.result.case !== 'sourceInput' || !read.result.value.prompt)
+      throw new Error('Expected a live Source prompt');
+    const prompt = read.result.value.prompt;
+    expect(prompt).toMatchObject({
+      ...target,
+      buildId: session.buildId,
+      sourceId: request.sourceId,
+      title: 'Locked chapter',
+      password: true,
+      required: true,
+    });
+    expect(sideEffects).toEqual([]);
+    const answer = (promptId: string, text?: string) =>
+      control('input-answer', {
+        case: 'answerSourceInput',
+        value: create(pb.SourceInputAnswerSchema, {
+          ...target,
+          promptId,
+          text,
+        }),
+      });
+    for (const invalid of [
+      await answer('retired-prompt', 'ignore'),
+      await answer(prompt.promptId, ''),
+    ])
+      expect(invalid.result).toMatchObject({
+        case: 'error',
+        value: { code: pb.RuntimeErrorCode.PROTOCOL_ERROR },
+      });
+    expect(workers[0]!.commands.map((item) => item.command.case)).toEqual([
+      'open',
+      'invoke',
+    ]);
+    expect(
+      (await answer(prompt.promptId, submit ? 'fixture-secret' : undefined))
+        .result.case,
+    ).toBe('completed');
+    expect((await invocation).result).toMatchObject(
+      submit
+        ? {
+            case: 'source',
+            value: {
+              requestId: request.requestId,
+              payload: { case: 'pageList' },
+            },
+          }
+        : { case: 'error', value: { code: pb.RuntimeErrorCode.CANCELLED } },
+    );
+    expect((await answer(prompt.promptId, 'duplicate')).result.case).toBe(
+      'error',
+    );
+    expect(sideEffects).toEqual(submit ? ['fixture-secret'] : []);
+    expect(manager.readSourceInput(target)).toBeUndefined();
+  },
+);
+
 async function setup(
   invoke: RuntimeDriver['invoke'] = async () => mangaPage(),
   initialBuild?: BuildManifest,

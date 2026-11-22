@@ -390,6 +390,10 @@ export function validateSourceCall(value: SourceCall): SourceCall {
       value.timeoutMs > 0 && value.timeoutMs <= 300_000,
       'Invalid Source deadline',
     );
+  requireCondition(
+    !value.allowInput || value.request.case === 'pages',
+    'Only a chapter request can ask for user input',
+  );
   switch (value.request.case) {
     case 'popular':
     case 'latest':

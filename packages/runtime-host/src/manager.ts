@@ -67,6 +67,7 @@ interface TaskBase {
 interface SourceTask extends TaskBase {
   kind: 'source';
   call: SourceCall;
+  inputPrompt?: pb.SourceInputPrompt;
   resolve(value: SourceResult): void;
 }
 interface ImageTask extends TaskBase {
@@ -385,6 +386,19 @@ export class SourceRuntimeManager {
         return;
       const waiter = this.pending.get(responseEnvelope.requestId);
       if (!waiter) return;
+      if (response.result.case === 'sourceInput') {
+        const task = this.active;
+        if (
+          task?.kind === 'source' &&
+          !task.completed &&
+          task.call.allowInput &&
+          task.requestId === responseEnvelope.requestId &&
+          task.call.sourceId === response.result.value.sourceId &&
+          !task.inputPrompt
+        )
+          task.inputPrompt = response.result.value;
+        return;
+      }
       this.pending.delete(responseEnvelope.requestId);
       if (response.result.case === 'error') {
         const failure = runtimeErrorData(response.result.value);
@@ -594,6 +608,62 @@ export class SourceRuntimeManager {
       this.queue.push(task);
       this.pump();
     });
+  }
+
+  readSourceInput(
+    request: Pick<pb.ReadSourceInput, 'requestId' | 'generation'>,
+  ): pb.SourceInputPrompt | undefined {
+    const task = this.active;
+    if (
+      task?.kind === 'source' &&
+      !task.completed &&
+      task.requestId === request.requestId &&
+      this.generation === request.generation
+    )
+      return task.inputPrompt;
+  }
+
+  answerSourceInput(answer: pb.SourceInputAnswer): void {
+    const task = this.active;
+    const session = this.session;
+    const worker = this.worker;
+    const prompt = this.readSourceInput(answer);
+    if (
+      !session ||
+      !worker ||
+      task?.kind !== 'source' ||
+      prompt?.promptId !== answer.promptId ||
+      !this.pending.has(answer.requestId) ||
+      (prompt.required && answer.text === '')
+    )
+      throw new RuntimeFailure(
+        'protocol_error',
+        'Source input answer is invalid or expired',
+      );
+    const { protocolVersion, workerInstanceId, generation, buildId } = session;
+    const command = encodeWorkerCommand(
+      create(pb.WorkerCommandSchema, {
+        envelope: {
+          protocolVersion,
+          workerInstanceId,
+          generation,
+          buildId,
+          requestId: answer.requestId,
+        },
+        command: { case: 'answerSourceInput', value: answer },
+      }),
+    );
+    delete task.inputPrompt;
+    try {
+      worker.postMessage(command);
+    } catch {
+      const failure = new RuntimeFailure(
+        'runtime_lost',
+        'Source input answer delivery failed',
+      );
+      this.invalidate(failure);
+      throw failure;
+    }
   }
 
   private pump(): void {

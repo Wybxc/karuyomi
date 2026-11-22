@@ -1498,6 +1498,7 @@ const SourceCall$json = {
       '17': true
     },
     {'1': 'generation', '3': 4, '4': 1, '5': 9, '10': 'generation'},
+    {'1': 'allow_input', '3': 5, '4': 1, '5': 8, '10': 'allowInput'},
     {
       '1': 'popular',
       '3': 10,
@@ -1590,17 +1591,18 @@ const SourceCall$json = {
 final $typed_data.Uint8List sourceCallDescriptor = $convert.base64Decode(
     'CgpTb3VyY2VDYWxsEh0KCnJlcXVlc3RfaWQYASABKAlSCXJlcXVlc3RJZBIbCglzb3VyY2VfaW'
     'QYAiABKAlSCHNvdXJjZUlkEiIKCnRpbWVvdXRfbXMYAyABKA1IAVIJdGltZW91dE1ziAEBEh4K'
-    'CmdlbmVyYXRpb24YBCABKAlSCmdlbmVyYXRpb24SNAoHcG9wdWxhchgKIAEoCzIYLmthcnV5b2'
-    '1pLnYxLlBhZ2VSZXF1ZXN0SABSB3BvcHVsYXISMgoGbGF0ZXN0GAsgASgLMhgua2FydXlvbWku'
-    'djEuUGFnZVJlcXVlc3RIAFIGbGF0ZXN0EjQKBnNlYXJjaBgMIAEoCzIaLmthcnV5b21pLnYxLl'
-    'NlYXJjaFJlcXVlc3RIAFIGc2VhcmNoEjUKB2RldGFpbHMYDSABKAsyGS5rYXJ1eW9taS52MS5N'
-    'YW5nYVJlcXVlc3RIAFIHZGV0YWlscxI3CghjaGFwdGVycxgOIAEoCzIZLmthcnV5b21pLnYxLk'
-    '1hbmdhUmVxdWVzdEgAUghjaGFwdGVycxIzCgVwYWdlcxgPIAEoCzIbLmthcnV5b21pLnYxLkNo'
-    'YXB0ZXJSZXF1ZXN0SABSBXBhZ2VzEkEKC2dldF9maWx0ZXJzGBAgASgLMh4ua2FydXlvbWkudj'
-    'EuR2V0RmlsdGVyc1JlcXVlc3RIAFIKZ2V0RmlsdGVycxI9Cg9nZXRfcHJlZmVyZW5jZXMYESAB'
-    'KAsyEi5rYXJ1eW9taS52MS5FbXB0eUgAUg5nZXRQcmVmZXJlbmNlcxJNCg9lZGl0X3ByZWZlcm'
-    'VuY2UYEiABKAsyIi5rYXJ1eW9taS52MS5QcmVmZXJlbmNlRWRpdFJlcXVlc3RIAFIOZWRpdFBy'
-    'ZWZlcmVuY2VCCQoHcmVxdWVzdEINCgtfdGltZW91dF9tcw==');
+    'CmdlbmVyYXRpb24YBCABKAlSCmdlbmVyYXRpb24SHwoLYWxsb3dfaW5wdXQYBSABKAhSCmFsbG'
+    '93SW5wdXQSNAoHcG9wdWxhchgKIAEoCzIYLmthcnV5b21pLnYxLlBhZ2VSZXF1ZXN0SABSB3Bv'
+    'cHVsYXISMgoGbGF0ZXN0GAsgASgLMhgua2FydXlvbWkudjEuUGFnZVJlcXVlc3RIAFIGbGF0ZX'
+    'N0EjQKBnNlYXJjaBgMIAEoCzIaLmthcnV5b21pLnYxLlNlYXJjaFJlcXVlc3RIAFIGc2VhcmNo'
+    'EjUKB2RldGFpbHMYDSABKAsyGS5rYXJ1eW9taS52MS5NYW5nYVJlcXVlc3RIAFIHZGV0YWlscx'
+    'I3CghjaGFwdGVycxgOIAEoCzIZLmthcnV5b21pLnYxLk1hbmdhUmVxdWVzdEgAUghjaGFwdGVy'
+    'cxIzCgVwYWdlcxgPIAEoCzIbLmthcnV5b21pLnYxLkNoYXB0ZXJSZXF1ZXN0SABSBXBhZ2VzEk'
+    'EKC2dldF9maWx0ZXJzGBAgASgLMh4ua2FydXlvbWkudjEuR2V0RmlsdGVyc1JlcXVlc3RIAFIK'
+    'Z2V0RmlsdGVycxI9Cg9nZXRfcHJlZmVyZW5jZXMYESABKAsyEi5rYXJ1eW9taS52MS5FbXB0eU'
+    'gAUg5nZXRQcmVmZXJlbmNlcxJNCg9lZGl0X3ByZWZlcmVuY2UYEiABKAsyIi5rYXJ1eW9taS52'
+    'MS5QcmVmZXJlbmNlRWRpdFJlcXVlc3RIAFIOZWRpdFByZWZlcmVuY2VCCQoHcmVxdWVzdEINCg'
+    'tfdGltZW91dF9tcw==');
 
 @$core.Deprecated('Use mangaPageDescriptor instead')
 const MangaPage$json = {
@@ -1766,6 +1768,109 @@ const CancelSourceRequest$json = {
 final $typed_data.Uint8List cancelSourceRequestDescriptor = $convert.base64Decode(
     'ChNDYW5jZWxTb3VyY2VSZXF1ZXN0Eh0KCnJlcXVlc3RfaWQYASABKAlSCXJlcXVlc3RJZBIeCg'
     'pnZW5lcmF0aW9uGAIgASgJUgpnZW5lcmF0aW9u');
+
+@$core.Deprecated('Use readSourceInputDescriptor instead')
+const ReadSourceInput$json = {
+  '1': 'ReadSourceInput',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
+  ],
+};
+
+/// Descriptor for `ReadSourceInput`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List readSourceInputDescriptor = $convert.base64Decode(
+    'Cg9SZWFkU291cmNlSW5wdXQSHQoKcmVxdWVzdF9pZBgBIAEoCVIJcmVxdWVzdElkEh4KCmdlbm'
+    'VyYXRpb24YAiABKAlSCmdlbmVyYXRpb24=');
+
+@$core.Deprecated('Use sourceInputPromptDescriptor instead')
+const SourceInputPrompt$json = {
+  '1': 'SourceInputPrompt',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
+    {'1': 'build_id', '3': 3, '4': 1, '5': 9, '10': 'buildId'},
+    {'1': 'prompt_id', '3': 4, '4': 1, '5': 9, '10': 'promptId'},
+    {'1': 'source_id', '3': 5, '4': 1, '5': 9, '10': 'sourceId'},
+    {'1': 'title', '3': 6, '4': 1, '5': 9, '10': 'title'},
+    {
+      '1': 'message',
+      '3': 7,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'message',
+      '17': true
+    },
+    {'1': 'hint', '3': 8, '4': 1, '5': 9, '9': 1, '10': 'hint', '17': true},
+    {
+      '1': 'initial_value',
+      '3': 9,
+      '4': 1,
+      '5': 9,
+      '9': 2,
+      '10': 'initialValue',
+      '17': true
+    },
+    {'1': 'password', '3': 10, '4': 1, '5': 8, '10': 'password'},
+    {'1': 'required', '3': 11, '4': 1, '5': 8, '10': 'required'},
+  ],
+  '8': [
+    {'1': '_message'},
+    {'1': '_hint'},
+    {'1': '_initial_value'},
+  ],
+};
+
+/// Descriptor for `SourceInputPrompt`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sourceInputPromptDescriptor = $convert.base64Decode(
+    'ChFTb3VyY2VJbnB1dFByb21wdBIdCgpyZXF1ZXN0X2lkGAEgASgJUglyZXF1ZXN0SWQSHgoKZ2'
+    'VuZXJhdGlvbhgCIAEoCVIKZ2VuZXJhdGlvbhIZCghidWlsZF9pZBgDIAEoCVIHYnVpbGRJZBIb'
+    'Cglwcm9tcHRfaWQYBCABKAlSCHByb21wdElkEhsKCXNvdXJjZV9pZBgFIAEoCVIIc291cmNlSW'
+    'QSFAoFdGl0bGUYBiABKAlSBXRpdGxlEh0KB21lc3NhZ2UYByABKAlIAFIHbWVzc2FnZYgBARIX'
+    'CgRoaW50GAggASgJSAFSBGhpbnSIAQESKAoNaW5pdGlhbF92YWx1ZRgJIAEoCUgCUgxpbml0aW'
+    'FsVmFsdWWIAQESGgoIcGFzc3dvcmQYCiABKAhSCHBhc3N3b3JkEhoKCHJlcXVpcmVkGAsgASgI'
+    'UghyZXF1aXJlZEIKCghfbWVzc2FnZUIHCgVfaGludEIQCg5faW5pdGlhbF92YWx1ZQ==');
+
+@$core.Deprecated('Use sourceInputStateDescriptor instead')
+const SourceInputState$json = {
+  '1': 'SourceInputState',
+  '2': [
+    {
+      '1': 'prompt',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.SourceInputPrompt',
+      '10': 'prompt'
+    },
+  ],
+};
+
+/// Descriptor for `SourceInputState`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sourceInputStateDescriptor = $convert.base64Decode(
+    'ChBTb3VyY2VJbnB1dFN0YXRlEjYKBnByb21wdBgBIAEoCzIeLmthcnV5b21pLnYxLlNvdXJjZU'
+    'lucHV0UHJvbXB0UgZwcm9tcHQ=');
+
+@$core.Deprecated('Use sourceInputAnswerDescriptor instead')
+const SourceInputAnswer$json = {
+  '1': 'SourceInputAnswer',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'generation', '3': 2, '4': 1, '5': 9, '10': 'generation'},
+    {'1': 'prompt_id', '3': 3, '4': 1, '5': 9, '10': 'promptId'},
+    {'1': 'text', '3': 4, '4': 1, '5': 9, '9': 0, '10': 'text', '17': true},
+  ],
+  '8': [
+    {'1': '_text'},
+  ],
+};
+
+/// Descriptor for `SourceInputAnswer`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sourceInputAnswerDescriptor = $convert.base64Decode(
+    'ChFTb3VyY2VJbnB1dEFuc3dlchIdCgpyZXF1ZXN0X2lkGAEgASgJUglyZXF1ZXN0SWQSHgoKZ2'
+    'VuZXJhdGlvbhgCIAEoCVIKZ2VuZXJhdGlvbhIbCglwcm9tcHRfaWQYAyABKAlSCHByb21wdElk'
+    'EhcKBHRleHQYBCABKAlIAFIEdGV4dIgBAUIHCgVfdGV4dA==');
 
 @$core.Deprecated('Use acquireImageDescriptor instead')
 const AcquireImage$json = {
@@ -2176,6 +2281,18 @@ const BuildManifest$json = {
       '6': '.karuyomi.v1.PreferenceSyncRule',
       '10': 'preferenceSyncRules'
     },
+    {
+      '1': 'supports_source_input',
+      '3': 16,
+      '4': 1,
+      '5': 8,
+      '9': 0,
+      '10': 'supportsSourceInput',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_supports_source_input'},
   ],
 };
 
@@ -2192,7 +2309,9 @@ final $typed_data.Uint8List buildManifestDescriptor = $convert.base64Decode(
     'ZmFjdFILaG9zdFNjcmlwdHMSMwoJcmVzb3VyY2VzGA0gAygLMhUua2FydXlvbWkudjEuQXJ0aW'
     'ZhY3RSCXJlc291cmNlcxI0Cgdzb3VyY2VzGA4gAygLMhoua2FydXlvbWkudjEuQ2F0YWxvZ1Nv'
     'dXJjZVIHc291cmNlcxJTChVwcmVmZXJlbmNlX3N5bmNfcnVsZXMYDyADKAsyHy5rYXJ1eW9taS'
-    '52MS5QcmVmZXJlbmNlU3luY1J1bGVSE3ByZWZlcmVuY2VTeW5jUnVsZXM=');
+    '52MS5QcmVmZXJlbmNlU3luY1J1bGVSE3ByZWZlcmVuY2VTeW5jUnVsZXMSNwoVc3VwcG9ydHNf'
+    'c291cmNlX2lucHV0GBAgASgISABSE3N1cHBvcnRzU291cmNlSW5wdXSIAQFCGAoWX3N1cHBvcn'
+    'RzX3NvdXJjZV9pbnB1dA==');
 
 @$core.Deprecated('Use extensionBuildDescriptorDescriptor instead')
 const ExtensionBuildDescriptor$json = {
@@ -2673,6 +2792,24 @@ const ControlRequest$json = {
       '9': 0,
       '10': 'closeBuild'
     },
+    {
+      '1': 'read_source_input',
+      '3': 26,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.ReadSourceInput',
+      '9': 0,
+      '10': 'readSourceInput'
+    },
+    {
+      '1': 'answer_source_input',
+      '3': 27,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.SourceInputAnswer',
+      '9': 0,
+      '10': 'answerSourceInput'
+    },
   ],
   '8': [
     {'1': 'command'},
@@ -2701,7 +2838,10 @@ final $typed_data.Uint8List controlRequestDescriptor = $convert.base64Decode(
     'h0ZW5zaW9uQ2FjaGUSaQoZZm9yZ2V0X2V4dGVuc2lvbl9hcnRpZmFjdBgYIAEoCzIrLmthcnV5'
     'b21pLnYxLkZvcmdldEV4dGVuc2lvbkFydGlmYWN0UmVxdWVzdEgAUhdmb3JnZXRFeHRlbnNpb2'
     '5BcnRpZmFjdBJBCgtjbG9zZV9idWlsZBgZIAEoCzIeLmthcnV5b21pLnYxLkNsb3NlQnVpbGRS'
-    'ZXF1ZXN0SABSCmNsb3NlQnVpbGRCCQoHY29tbWFuZA==');
+    'ZXF1ZXN0SABSCmNsb3NlQnVpbGQSSgoRcmVhZF9zb3VyY2VfaW5wdXQYGiABKAsyHC5rYXJ1eW'
+    '9taS52MS5SZWFkU291cmNlSW5wdXRIAFIPcmVhZFNvdXJjZUlucHV0ElAKE2Fuc3dlcl9zb3Vy'
+    'Y2VfaW5wdXQYGyABKAsyHi5rYXJ1eW9taS52MS5Tb3VyY2VJbnB1dEFuc3dlckgAUhFhbnN3ZX'
+    'JTb3VyY2VJbnB1dEIJCgdjb21tYW5k');
 
 @$core.Deprecated('Use controlResponseDescriptor instead')
 const ControlResponse$json = {
@@ -2815,6 +2955,15 @@ const ControlResponse$json = {
       '9': 0,
       '10': 'extensionCache'
     },
+    {
+      '1': 'source_input',
+      '3': 21,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.SourceInputState',
+      '9': 0,
+      '10': 'sourceInput'
+    },
   ],
   '8': [
     {'1': 'result'},
@@ -2835,8 +2984,9 @@ final $typed_data.Uint8List controlResponseDescriptor = $convert.base64Decode(
     'ZldGNoUmVzcG9uc2VIAFIDYXBpEjEKBWVycm9yGBIgASgLMhkua2FydXlvbWkudjEuUnVudGlt'
     'ZUVycm9ySABSBWVycm9yEkMKDnByZXBhcmVkX2J1aWxkGBMgASgLMhoua2FydXlvbWkudjEuUH'
     'JlcGFyZWRCdWlsZEgAUg1wcmVwYXJlZEJ1aWxkEksKD2V4dGVuc2lvbl9jYWNoZRgUIAEoCzIg'
-    'LmthcnV5b21pLnYxLkV4dGVuc2lvbkNhY2hlU3RhdGVIAFIOZXh0ZW5zaW9uQ2FjaGVCCAoGcm'
-    'VzdWx0');
+    'LmthcnV5b21pLnYxLkV4dGVuc2lvbkNhY2hlU3RhdGVIAFIOZXh0ZW5zaW9uQ2FjaGUSQgoMc2'
+    '91cmNlX2lucHV0GBUgASgLMh0ua2FydXlvbWkudjEuU291cmNlSW5wdXRTdGF0ZUgAUgtzb3Vy'
+    'Y2VJbnB1dEIICgZyZXN1bHQ=');
 
 @$core.Deprecated('Use openWorkerDescriptor instead')
 const OpenWorker$json = {
@@ -2956,6 +3106,15 @@ const WorkerCommand$json = {
       '9': 0,
       '10': 'shutdown'
     },
+    {
+      '1': 'answer_source_input',
+      '3': 15,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.SourceInputAnswer',
+      '9': 0,
+      '10': 'answerSourceInput'
+    },
   ],
   '8': [
     {'1': 'command'},
@@ -2970,7 +3129,9 @@ final $typed_data.Uint8List workerCommandDescriptor = $convert.base64Decode(
     'USRgoNYWNxdWlyZV9pbWFnZRgMIAEoCzIfLmthcnV5b21pLnYxLkFjcXVpcmVJbWFnZVdvcmtl'
     'ckgAUgxhY3F1aXJlSW1hZ2USTQoSY2xvc2VfcGFnZV9zZXNzaW9uGA0gASgLMh0ua2FydXlvbW'
     'kudjEuQ2xvc2VQYWdlU2Vzc2lvbkgAUhBjbG9zZVBhZ2VTZXNzaW9uEjAKCHNodXRkb3duGA4g'
-    'ASgLMhIua2FydXlvbWkudjEuRW1wdHlIAFIIc2h1dGRvd25CCQoHY29tbWFuZA==');
+    'ASgLMhIua2FydXlvbWkudjEuRW1wdHlIAFIIc2h1dGRvd24SUAoTYW5zd2VyX3NvdXJjZV9pbn'
+    'B1dBgPIAEoCzIeLmthcnV5b21pLnYxLlNvdXJjZUlucHV0QW5zd2VySABSEWFuc3dlclNvdXJj'
+    'ZUlucHV0QgkKB2NvbW1hbmQ=');
 
 @$core.Deprecated('Use workerResponseDescriptor instead')
 const WorkerResponse$json = {
@@ -3029,6 +3190,15 @@ const WorkerResponse$json = {
       '9': 0,
       '10': 'error'
     },
+    {
+      '1': 'source_input',
+      '3': 15,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.SourceInputPrompt',
+      '9': 0,
+      '10': 'sourceInput'
+    },
   ],
   '8': [
     {'1': 'result'},
@@ -3042,5 +3212,6 @@ final $typed_data.Uint8List workerResponseDescriptor = $convert.base64Decode(
     'c3Npb25IAFIHc2Vzc2lvbhIzCgZzb3VyY2UYCyABKAsyGS5rYXJ1eW9taS52MS5Tb3VyY2VSZX'
     'N1bHRIAFIGc291cmNlEjMKBWltYWdlGAwgASgLMhsua2FydXlvbWkudjEuUHJvY2Vzc2VkSW1h'
     'Z2VIAFIFaW1hZ2USLQoGY2xvc2VkGA0gASgLMhMua2FydXlvbWkudjEuQ2xvc2VkSABSBmNsb3'
-    'NlZBIxCgVlcnJvchgOIAEoCzIZLmthcnV5b21pLnYxLlJ1bnRpbWVFcnJvckgAUgVlcnJvckII'
-    'CgZyZXN1bHQ=');
+    'NlZBIxCgVlcnJvchgOIAEoCzIZLmthcnV5b21pLnYxLlJ1bnRpbWVFcnJvckgAUgVlcnJvchJD'
+    'Cgxzb3VyY2VfaW5wdXQYDyABKAsyHi5rYXJ1eW9taS52MS5Tb3VyY2VJbnB1dFByb21wdEgAUg'
+    'tzb3VyY2VJbnB1dEIICgZyZXN1bHQ=');

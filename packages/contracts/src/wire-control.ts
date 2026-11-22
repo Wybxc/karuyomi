@@ -11,6 +11,7 @@ import {
   buildManifestSchema,
   staticManifestPathSchema,
   validId,
+  validSourceId,
   validHash,
   buildIdSchema,
   extensionBuildDescriptorSchema,
@@ -40,6 +41,46 @@ export type ControlRequest = pb.ControlRequest;
 export type ControlResponse = pb.ControlResponse;
 export type WorkerCommand = pb.WorkerCommand & { envelope: pb.RpcEnvelope };
 export type WorkerResponse = pb.WorkerResponse & { envelope: pb.RpcEnvelope };
+
+export const SOURCE_INPUT_TEXT_LIMIT = 4096;
+export type SourceInputFields = Pick<
+  pb.SourceInputPrompt,
+  'title' | 'message' | 'hint' | 'initialValue' | 'password' | 'required'
+>;
+
+function validateInputText(text: string | undefined): void {
+  requireCondition(
+    text === undefined ||
+      (typeof text === 'string' &&
+        text.length <= SOURCE_INPUT_TEXT_LIMIT &&
+        new TextEncoder().encode(text).byteLength <= SOURCE_INPUT_TEXT_LIMIT),
+    'Source input text exceeds its byte budget',
+  );
+}
+
+export function validateSourceInputPrompt(prompt: pb.SourceInputPrompt): void {
+  validId(prompt.requestId);
+  validId(prompt.generation);
+  buildIdSchema.parse(prompt.buildId);
+  validId(prompt.promptId);
+  validSourceId(prompt.sourceId);
+  requireCondition(
+    typeof prompt.title === 'string' &&
+      typeof prompt.password === 'boolean' &&
+      typeof prompt.required === 'boolean',
+    'Invalid Source input fields',
+  );
+  [prompt.title, prompt.message, prompt.hint, prompt.initialValue].forEach(
+    validateInputText,
+  );
+}
+
+export function validateSourceInputAnswer(answer: pb.SourceInputAnswer): void {
+  validId(answer.requestId);
+  validId(answer.generation);
+  validId(answer.promptId);
+  validateInputText(answer.text);
+}
 
 function envelope(value: pb.RpcEnvelope | undefined): pb.RpcEnvelope {
   requireCondition(value !== undefined, 'Worker envelope is required');
@@ -86,6 +127,14 @@ export function validateWorkerCommand(value: pb.WorkerCommand): WorkerCommand {
         value.command.value.requestId === rpc.requestId &&
           value.command.value.generation === rpc.generation,
         'Source call does not match its envelope',
+      );
+      break;
+    case 'answerSourceInput':
+      validateSourceInputAnswer(value.command.value);
+      requireCondition(
+        value.command.value.requestId === rpc.requestId &&
+          value.command.value.generation === rpc.generation,
+        'Source input answer does not match its envelope',
       );
       break;
     case 'acquireImage': {
@@ -139,6 +188,17 @@ export function validateWorkerResponse(
           source.generation === rpc.generation &&
           source.buildId === rpc.buildId,
         'Source result does not match its envelope',
+      );
+      break;
+    }
+    case 'sourceInput': {
+      const prompt = value.result.value;
+      validateSourceInputPrompt(prompt);
+      requireCondition(
+        prompt.requestId === rpc.requestId &&
+          prompt.generation === rpc.generation &&
+          prompt.buildId === rpc.buildId,
+        'Source input prompt does not match its envelope',
       );
       break;
     }
@@ -268,8 +328,12 @@ export function validateControlRequest(value: ControlRequest): ControlRequest {
       validateSourceCall(value.command.value);
       break;
     case 'cancel':
+    case 'readSourceInput':
       validId(value.command.value.requestId);
       validId(value.command.value.generation);
+      break;
+    case 'answerSourceInput':
+      validateSourceInputAnswer(value.command.value);
       break;
     case 'acquireImage':
       acquireImageSchema.parse(
@@ -334,6 +398,10 @@ export function validateControlResponse(
       break;
     case 'source':
       validateSourceResult(value.result.value);
+      break;
+    case 'sourceInput':
+      if (value.result.value.prompt)
+        validateSourceInputPrompt(value.result.value.prompt);
       break;
     case 'image':
       imageResourceSchema.parse(
