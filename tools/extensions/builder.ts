@@ -341,6 +341,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       throw new Error('JDK 25 required');
     const env = buildEnvironment(runtime, options);
     const module = ':' + descriptor.sourcePath.replaceAll('/', ':');
+    const megatokyoPlatformTls =
+      descriptor.packageName === 'eu.kanade.tachiyomi.extension.en.megatokyo' &&
+      descriptor.sourceFingerprint ===
+        '0ab0e0257567ea6f706f6079c8a414782db11504319071ee0da3e4790484f07a';
     const wrapper = readFileSync(
       path.join(upstream, 'gradle/wrapper/gradle-wrapper.properties'),
       'utf8',
@@ -359,6 +363,39 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       path.join(launcher, 'gradle-wrapper.properties'),
       wrapper + '\ndistributionSha256Sum=' + LOCK.gradle.sha256 + '\n',
     );
+    const gradleArgs: string[] = [];
+    if (megatokyoPlatformTls) {
+      const keepRules = path.join(launcher, 'source-adapters.pro');
+      writeFileSync(
+        keepRules,
+        `-keep,allowshrinking class eu.kanade.tachiyomi.extension.en.megatokyo.Megatokyo {
+    private okhttp3.OkHttpClient$Builder ignoreAllSSLErrors(okhttp3.OkHttpClient$Builder);
+}
+`,
+      );
+      const sourceInit = path.join(launcher, 'source-adapters.init.gradle');
+      writeFileSync(
+        sourceInit,
+        `gradle.beforeProject { project ->
+    if (project.path == System.getProperty('karuyomi.aot.module')) {
+        project.pluginManager.withPlugin('com.android.application') {
+            project.extensions.getByName('androidComponents').finalizeDsl { extension ->
+                extension.buildTypes.getByName('release').proguardFiles(
+                    new File(System.getProperty('karuyomi.aot.keepRules'))
+                )
+            }
+        }
+    }
+}
+`,
+      );
+      gradleArgs.push(
+        '--init-script',
+        sourceInit,
+        `-Dkaruyomi.aot.module=${module}`,
+        `-Dkaruyomi.aot.keepRules=${keepRules}`,
+      );
+    }
     activeLog = path.join(logs, 'upstream.log');
     console.log(JSON.stringify({ stage, module, logPath: activeLog }));
     await execa(
@@ -370,6 +407,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
         '-p',
         upstream,
         module + ':assembleRelease',
+        ...gradleArgs,
         '--no-configuration-cache',
         '--no-watch-fs',
         `--max-workers=${options.workers ?? 3}`,
@@ -476,6 +514,9 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       symlinkSync(sharedM2, path.join(cache, 'm2'), 'dir');
     delete env['TEAVM_PROBE'];
     delete env['TEAVM_DEBUG'];
+    if (megatokyoPlatformTls) {
+      env['KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS'] = '1';
+    }
     stage = 'aot';
     activeLog = path.join(logs, 'aot.log');
     console.log(
