@@ -2,6 +2,8 @@ package prototype;
 
 import java.net.URL;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import org.teavm.model.*;
@@ -22,18 +24,55 @@ public class TeaTransformer implements ClassHolderTransformer {
           ValueType.BOOLEAN,
           ValueType.object("kotlin.coroutines.Continuation"),
           ValueType.object("java.lang.Object"));
+  private static final ValueType OKHTTP_BUILDER = ValueType.object("okhttp3.OkHttpClient$Builder");
+  private static final MethodDescriptor SPYFAKKU_CONFIGURE =
+      new MethodDescriptor("configureClient", OKHTTP_BUILDER, OKHTTP_BUILDER);
+  private static final MethodDescriptor SPYFAKKU_VERIFY =
+      new MethodDescriptor(
+          "resolveInWebView",
+          ValueType.object("okhttp3.Request"),
+          ValueType.object("okhttp3.Call"),
+          ValueType.BOOLEAN);
+  private static final MethodDescriptor TOONLIVRE_VERIFY =
+      new MethodDescriptor(
+          "openVerificationWebView",
+          ValueType.object("java.lang.String"),
+          ValueType.object("java.lang.String"),
+          ValueType.object("java.lang.String"),
+          ValueType.object("kotlin.coroutines.Continuation"),
+          ValueType.object("java.lang.Object"));
 
   public void transformClass(ClassHolder cls, ClassHolderTransformerContext context) {
     if (cls.getName().equals("eu.kanade.tachiyomi.extension.en.megatokyo.Megatokyo")
         && "1".equals(System.getenv("KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS"))) {
       // For this pinned helper the sole effect is to install weaker TLS settings.
       // Keep the ordinary builder so the relay can apply its platform TLS checks.
-      ValueType builder = ValueType.object("okhttp3.OkHttpClient$Builder");
-      var helper = cls.getMethod(new MethodDescriptor("ignoreAllSSLErrors", builder, builder));
+      var helper =
+          cls.getMethod(new MethodDescriptor("ignoreAllSSLErrors", OKHTTP_BUILDER, OKHTTP_BUILDER));
       if (helper == null || helper.getProgram() == null)
         throw new IllegalStateException("Pinned MegaTokyo TLS helper is missing");
       ProgramEmitter emitter = ProgramEmitter.create(helper, context.getHierarchy());
-      emitter.var(1, builder).returnValue();
+      emitter.var(1, OKHTTP_BUILDER).returnValue();
+    }
+    if (cls.getName().equals("eu.kanade.tachiyomi.extension.en.spyfakku.SpyFakku")
+        && "1".equals(System.getenv("KARUYOMI_AOT_SPYFAKKU_PLATFORM_TLS"))) {
+      usePlatformTls(cls, context);
+    }
+    if (cls.getName().equals("eu.kanade.tachiyomi.extension.en.spyfakku.AnibusInterceptor")
+        && "1".equals(System.getenv("KARUYOMI_AOT_SPYFAKKU_PLATFORM_TLS"))) {
+      requireOfficialReader(
+          cls,
+          context,
+          SPYFAKKU_VERIFY,
+          "This mirror requires verification in its browser reader.");
+    }
+    if (cls.getName().equals("eu.kanade.tachiyomi.extension.pt.mangalivre.MangaLivre")
+        && "1".equals(System.getenv("KARUYOMI_AOT_TOONLIVRE_READER_VERIFICATION"))) {
+      requireOfficialReader(
+          cls,
+          context,
+          TOONLIVRE_VERIFY,
+          "Este capítulo requer verificação no leitor oficial do ToonLivre.");
     }
     if (cls.getName().equals("java.lang.Class")) {
       MethodDescriptor descriptor = new MethodDescriptor("getResource", String.class, URL.class);
@@ -512,6 +551,63 @@ public class TeaTransformer implements ClassHolderTransformer {
     if (replacement == null || replacement.getProgram() == null)
       throw new IllegalStateException("Missing TeaVM date parser donor: " + sourceName);
     target.setProgram(org.teavm.model.util.ModelUtils.copyMethod(replacement).getProgram());
+  }
+
+  private static void usePlatformTls(ClassHolder cls, ClassHolderTransformerContext context) {
+    MethodHolder configure = cls.getMethod(SPYFAKKU_CONFIGURE);
+    if (configure == null || configure.getProgram() == null)
+      throw new IllegalStateException("Pinned SpyFakku client configuration is missing");
+    var classes = context.getHierarchy().getClassSource();
+    for (BasicBlock block : configure.getProgram().getBasicBlocks()) {
+      Instruction trustManager = null;
+      List<String> calls = new ArrayList<>();
+      for (Instruction instruction : block) {
+        if (instruction instanceof ConstructInstruction construct) {
+          ClassReader type = classes.get(construct.getType());
+          if (type != null && type.getInterfaces().contains("javax.net.ssl.X509TrustManager"))
+            trustManager = instruction;
+        }
+        if (trustManager == null || !(instruction instanceof InvokeInstruction invoke)) continue;
+        MethodReference call = invoke.getMethod();
+        String owner = call.getClassName();
+        if (owner.equals("javax.net.ssl.SSLContext")
+            || owner.equals("okhttp3.OkHttpClient$Builder"))
+          calls.add(owner + "." + call.getName());
+        if (!owner.equals("okhttp3.OkHttpClient$Builder")
+            || !call.getName().equals("hostnameVerifier")) continue;
+        if (!calls.equals(
+            List.of(
+                "javax.net.ssl.SSLContext.getInstance",
+                "javax.net.ssl.SSLContext.init",
+                "javax.net.ssl.SSLContext.getSocketFactory",
+                "okhttp3.OkHttpClient$Builder.sslSocketFactory",
+                "okhttp3.OkHttpClient$Builder.hostnameVerifier")))
+          throw new IllegalStateException("Pinned SpyFakku TLS configuration changed");
+        // The pinned source builds these objects only to attach its custom trust settings.
+        // Both the URL interceptor before this block and the later hooks stay in the program.
+        Instruction keep = instruction.getNext();
+        for (Instruction current = trustManager; current != keep; ) {
+          Instruction next = current.getNext();
+          current.delete();
+          current = next;
+        }
+        return;
+      }
+    }
+    throw new IllegalStateException("Pinned SpyFakku TLS configuration is missing");
+  }
+
+  private static void requireOfficialReader(
+      ClassHolder cls,
+      ClassHolderTransformerContext context,
+      MethodDescriptor descriptor,
+      String message) {
+    MethodHolder method = cls.getMethod(descriptor);
+    if (method == null || method.getProgram() == null)
+      throw new IllegalStateException(
+          "Pinned reader verification method is missing: " + descriptor);
+    ProgramEmitter emitter = ProgramEmitter.create(method, context.getHierarchy());
+    emitter.construct(UnsupportedOperationException.class, emitter.constant(message)).raise();
   }
 
   private static String standardType(String name) {

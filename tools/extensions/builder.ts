@@ -345,6 +345,15 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       descriptor.packageName === 'eu.kanade.tachiyomi.extension.en.megatokyo' &&
       descriptor.sourceFingerprint ===
         '0ab0e0257567ea6f706f6079c8a414782db11504319071ee0da3e4790484f07a';
+    const spyfakkuPlatformTls =
+      descriptor.packageName === 'eu.kanade.tachiyomi.extension.en.spyfakku' &&
+      descriptor.sourceFingerprint ===
+        '1e3e54808038e599235e9e222c506497bd15698625299746cfaba2a7b5576a5d';
+    const toonlivreReaderVerification =
+      descriptor.packageName ===
+        'eu.kanade.tachiyomi.extension.pt.mangalivre' &&
+      descriptor.sourceFingerprint ===
+        '7d70c00514cfd6b9671e065da2d8f91d944d3d6cfc1593658282ecbf99711ff2';
     const wrapper = readFileSync(
       path.join(upstream, 'gradle/wrapper/gradle-wrapper.properties'),
       'utf8',
@@ -363,22 +372,36 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       path.join(launcher, 'gradle-wrapper.properties'),
       wrapper + '\ndistributionSha256Sum=' + LOCK.gradle.sha256 + '\n',
     );
-    // Keep the Kotlin suspend boundary in the official JVM JAR so TeaVM can
-    // bind calls to host input without pulling in the Android dialog classes.
     const keepRules = path.join(launcher, 'source-adapters.pro');
-    writeFileSync(
-      keepRules,
+    // Keep the original JVM signatures used by the TeaVM transformations.
+    const rules = [
       `-keep,allowshrinking class keiyoushi.utils.ui.DialogHelperKt {
     public static java.lang.Object askInput(java.lang.String,java.lang.String,java.lang.String,java.lang.String,boolean,boolean,kotlin.coroutines.Continuation);
 }
-` +
-        (megatokyoPlatformTls
-          ? `-keep,allowshrinking class eu.kanade.tachiyomi.extension.en.megatokyo.Megatokyo {
+`,
+    ];
+    if (megatokyoPlatformTls) {
+      rules.push(`-keep,allowshrinking class eu.kanade.tachiyomi.extension.en.megatokyo.Megatokyo {
     private okhttp3.OkHttpClient$Builder ignoreAllSSLErrors(okhttp3.OkHttpClient$Builder);
 }
-`
-          : ''),
-    );
+`);
+    }
+    if (spyfakkuPlatformTls) {
+      rules.push(`-keep,allowshrinking class eu.kanade.tachiyomi.extension.en.spyfakku.SpyFakku {
+    public okhttp3.OkHttpClient$Builder configureClient(okhttp3.OkHttpClient$Builder);
+}
+-keep,allowshrinking class eu.kanade.tachiyomi.extension.en.spyfakku.AnibusInterceptor {
+    private boolean resolveInWebView(okhttp3.Request,okhttp3.Call);
+}
+`);
+    }
+    if (toonlivreReaderVerification) {
+      rules.push(`-keep,allowshrinking class eu.kanade.tachiyomi.extension.pt.mangalivre.MangaLivre {
+    private java.lang.Object openVerificationWebView(java.lang.String,java.lang.String,java.lang.String,kotlin.coroutines.Continuation);
+}
+`);
+    }
+    writeFileSync(keepRules, rules.join(''));
     const sourceInit = path.join(launcher, 'source-adapters.init.gradle');
     writeFileSync(
       sourceInit,
@@ -516,8 +539,17 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       symlinkSync(sharedM2, path.join(cache, 'm2'), 'dir');
     delete env['TEAVM_PROBE'];
     delete env['TEAVM_DEBUG'];
+    delete env['KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS'];
+    delete env['KARUYOMI_AOT_SPYFAKKU_PLATFORM_TLS'];
+    delete env['KARUYOMI_AOT_TOONLIVRE_READER_VERIFICATION'];
     if (megatokyoPlatformTls) {
       env['KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS'] = '1';
+    }
+    if (spyfakkuPlatformTls) {
+      env['KARUYOMI_AOT_SPYFAKKU_PLATFORM_TLS'] = '1';
+    }
+    if (toonlivreReaderVerification) {
+      env['KARUYOMI_AOT_TOONLIVRE_READER_VERIFICATION'] = '1';
     }
     stage = 'aot';
     activeLog = path.join(logs, 'aot.log');
