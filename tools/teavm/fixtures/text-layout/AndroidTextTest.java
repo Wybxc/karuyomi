@@ -75,6 +75,11 @@ public final class AndroidTextTest {
   }
 
   @Test
+  public void nativeAndroidCanvasScaleAtPivot() {
+    CanvasRotationScenarios.runScaleAtPivot();
+  }
+
+  @Test
   public void nativeAndroidCanvasClipAndMiter() {
     CanvasRotationScenarios.runClipAndMiter();
   }
