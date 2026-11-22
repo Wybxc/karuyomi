@@ -25,8 +25,23 @@ public class TeaTransformer implements ClassHolderTransformer {
           ValueType.object("kotlin.coroutines.Continuation"),
           ValueType.object("java.lang.Object"));
   private static final ValueType OKHTTP_BUILDER = ValueType.object("okhttp3.OkHttpClient$Builder");
-  private static final MethodDescriptor SPYFAKKU_CONFIGURE =
+  private static final MethodDescriptor CONFIGURE_CLIENT =
       new MethodDescriptor("configureClient", OKHTTP_BUILDER, OKHTTP_BUILDER);
+  private static final MethodReference OKHTTP_PROTOCOLS =
+      new MethodReference(
+          "okhttp3.OkHttpClient$Builder",
+          new MethodDescriptor("protocols", ValueType.object("java.util.List"), OKHTTP_BUILDER));
+  private static final MethodDescriptor WEBSITE_VERIFICATION =
+      new MethodDescriptor(
+          "getTurnstileToken-x2RqbK4",
+          ValueType.object("java.lang.String"),
+          ValueType.object("java.lang.String"),
+          ValueType.object("java.lang.String"),
+          ValueType.object("java.lang.String"),
+          ValueType.object("java.lang.String"),
+          ValueType.LONG,
+          ValueType.object("kotlin.coroutines.Continuation"),
+          ValueType.object("java.lang.Object"));
   private static final MethodDescriptor SPYFAKKU_VERIFY =
       new MethodDescriptor(
           "resolveInWebView",
@@ -73,6 +88,19 @@ public class TeaTransformer implements ClassHolderTransformer {
           context,
           TOONLIVRE_VERIFY,
           "Este capítulo requer verificação no leitor oficial do ToonLivre.");
+    }
+    if ("1".equals(System.getenv("KARUYOMI_AOT_PLATFORM_HTTP_NEGOTIATION"))
+        && (cls.getName().equals("eu.kanade.tachiyomi.extension.en.reimanga.Reimanga")
+            || cls.getName().equals("eu.kanade.tachiyomi.extension.zh.ikmmh.Ikmmh"))) {
+      usePlatformHttpNegotiation(cls);
+    }
+    if (cls.getName().equals("keiyoushi.utils.TurnstileHelperKt")
+        && "1".equals(System.getenv("KARUYOMI_AOT_BROWSER_VERIFICATION"))) {
+      requireOfficialReader(
+          cls,
+          context,
+          WEBSITE_VERIFICATION,
+          "This website requires verification in its official browser reader.");
     }
     if (cls.getName().equals("java.lang.Class")) {
       MethodDescriptor descriptor = new MethodDescriptor("getResource", String.class, URL.class);
@@ -554,7 +582,7 @@ public class TeaTransformer implements ClassHolderTransformer {
   }
 
   private static void usePlatformTls(ClassHolder cls, ClassHolderTransformerContext context) {
-    MethodHolder configure = cls.getMethod(SPYFAKKU_CONFIGURE);
+    MethodHolder configure = cls.getMethod(CONFIGURE_CLIENT);
     if (configure == null || configure.getProgram() == null)
       throw new IllegalStateException("Pinned SpyFakku client configuration is missing");
     var classes = context.getHierarchy().getClassSource();
@@ -595,6 +623,29 @@ public class TeaTransformer implements ClassHolderTransformer {
       }
     }
     throw new IllegalStateException("Pinned SpyFakku TLS configuration is missing");
+  }
+
+  private static void usePlatformHttpNegotiation(ClassHolder cls) {
+    MethodHolder configure = cls.getMethod(CONFIGURE_CLIENT);
+    if (configure == null || configure.getProgram() == null)
+      throw new IllegalStateException("Pinned client configuration is missing: " + cls.getName());
+    for (BasicBlock block : configure.getProgram().getBasicBlocks()) {
+      for (Instruction instruction : block) {
+        if (!(instruction instanceof InvokeInstruction invoke)
+            || !invoke.getMethod().equals(OKHTTP_PROTOCOLS)) continue;
+        // The relay negotiates HTTP with the public origin. Keep the original client hooks.
+        if (invoke.getReceiver() == null) {
+          instruction.delete();
+        } else {
+          var assignment = new AssignInstruction();
+          assignment.setReceiver(invoke.getReceiver());
+          assignment.setAssignee(invoke.getInstance());
+          instruction.replace(assignment);
+        }
+        return;
+      }
+    }
+    throw new IllegalStateException("Pinned HTTP protocol setting is missing: " + cls.getName());
   }
 
   private static void requireOfficialReader(

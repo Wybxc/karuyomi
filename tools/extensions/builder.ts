@@ -77,6 +77,21 @@ const reviewedPreferenceRules: ReadonlyMap<
   ],
 ]);
 
+const browserVerificationSources = new Set([
+  'src/all/lunaranime',
+  'src/all/schalenetwork',
+  'src/en/coffeemangaunoriginal',
+  'src/en/mangacloud',
+  'src/en/templescan',
+  'src/en/toonkotsu',
+  'src/en/webtoonlib',
+  'src/es/codearc',
+  'src/es/emperorscan',
+  'src/id/cosmicscansid',
+  'src/vi/hentaicube',
+  'src/vi/lxhentai',
+]);
+
 export function preferenceSyncRulesForBuild(packageName: string) {
   return reviewedPreferenceRules
     .get(packageName)
@@ -354,6 +369,17 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
         'eu.kanade.tachiyomi.extension.pt.mangalivre' &&
       descriptor.sourceFingerprint ===
         '7d70c00514cfd6b9671e065da2d8f91d944d3d6cfc1593658282ecbf99711ff2';
+    const platformHttpNegotiation =
+      (descriptor.packageName === 'eu.kanade.tachiyomi.extension.en.reimanga' &&
+        descriptor.sourceFingerprint ===
+          '7930687aefd2cc578edc3aa1fabc9c5cc27da23207e1a7ece632bb1d7756d916') ||
+      (descriptor.packageName === 'eu.kanade.tachiyomi.extension.zh.ikmmh' &&
+        descriptor.sourceFingerprint ===
+          'facb3e75bb2d12fbf63940f0a93900370457e394ca116bf4939720c99239cef1');
+    const browserVerification =
+      browserVerificationSources.has(descriptor.sourcePath) &&
+      descriptor.sharedInputs['core'] ===
+        'e4ecdc0da836642e3991019abc63b65cb0585dcdfd473786627b2b1502f3883d';
     const wrapper = readFileSync(
       path.join(upstream, 'gradle/wrapper/gradle-wrapper.properties'),
       'utf8',
@@ -398,6 +424,21 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     if (toonlivreReaderVerification) {
       rules.push(`-keep,allowshrinking class eu.kanade.tachiyomi.extension.pt.mangalivre.MangaLivre {
     private java.lang.Object openVerificationWebView(java.lang.String,java.lang.String,java.lang.String,kotlin.coroutines.Continuation);
+}
+`);
+    }
+    if (platformHttpNegotiation) {
+      rules.push(`-keep,allowshrinking class eu.kanade.tachiyomi.extension.en.reimanga.Reimanga {
+    protected okhttp3.OkHttpClient$Builder configureClient(okhttp3.OkHttpClient$Builder);
+}
+-keep,allowshrinking class eu.kanade.tachiyomi.extension.zh.ikmmh.Ikmmh {
+    protected okhttp3.OkHttpClient$Builder configureClient(okhttp3.OkHttpClient$Builder);
+}
+`);
+    }
+    if (browserVerification) {
+      rules.push(`-keep,allowshrinking class keiyoushi.utils.TurnstileHelperKt {
+    public static java.lang.Object getTurnstileToken-x2RqbK4(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,long,kotlin.coroutines.Continuation);
 }
 `);
     }
@@ -542,6 +583,8 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     delete env['KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS'];
     delete env['KARUYOMI_AOT_SPYFAKKU_PLATFORM_TLS'];
     delete env['KARUYOMI_AOT_TOONLIVRE_READER_VERIFICATION'];
+    delete env['KARUYOMI_AOT_PLATFORM_HTTP_NEGOTIATION'];
+    delete env['KARUYOMI_AOT_BROWSER_VERIFICATION'];
     if (megatokyoPlatformTls) {
       env['KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS'] = '1';
     }
@@ -550,6 +593,12 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     }
     if (toonlivreReaderVerification) {
       env['KARUYOMI_AOT_TOONLIVRE_READER_VERIFICATION'] = '1';
+    }
+    if (platformHttpNegotiation) {
+      env['KARUYOMI_AOT_PLATFORM_HTTP_NEGOTIATION'] = '1';
+    }
+    if (browserVerification) {
+      env['KARUYOMI_AOT_BROWSER_VERIFICATION'] = '1';
     }
     stage = 'aot';
     activeLog = path.join(logs, 'aot.log');
