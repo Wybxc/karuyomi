@@ -7,6 +7,109 @@ import 'package:test/test.dart';
 import 'support/fake_runtime_transport.dart';
 
 void main() {
+  for (final expire in [false, true]) {
+    test(
+      'chapter input follows the original request lifetime (expire=$expire)',
+      () async {
+        final transport = FakeTransport();
+        final runtime = TransportSourceRuntime(transport);
+        final waiting = Completer<void>();
+        final answer = Completer<String?>();
+        final selection = Completer<void>();
+        final closed = Completer<void>();
+        final answersSent = <wire.SourceInputAnswer>[];
+        transport.handler = (call) async {
+          final response = transport.respond(call);
+          if (call.hasOpen()) {
+            response.session.capabilities.add('source-input');
+          } else if (call.hasInvoke()) {
+            expect(call.invoke.allowInput, isTrue);
+            await waiting.future;
+            response.clearSource();
+            if (expire) {
+              response.error = wire.RuntimeError(
+                code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_TIMEOUT,
+              );
+            } else {
+              response.source = wire.SourceResult(
+                requestId: call.invoke.requestId,
+                generation: call.invoke.generation,
+                buildId: 'build-1',
+                pageList: wire.PageList(pageSessionId: 'page-session'),
+              );
+            }
+          } else if (call.hasReadSourceInput()) {
+            expect(call.readSourceInput.requestId, 'chapter-call');
+            response.sourceInput = wire.SourceInputState(
+              prompt: wire.SourceInputPrompt(
+                requestId: 'chapter-call',
+                generation: 'generation-1',
+                buildId: 'build-1',
+                promptId: 'live-prompt',
+                sourceId: sourceId,
+                title: 'Reader input',
+                required: true,
+              ),
+            );
+          } else if (call.hasAnswerSourceInput()) {
+            answersSent.add(call.answerSourceInput);
+            waiting.complete();
+          }
+          return response;
+        };
+        await runtime.open(build());
+        final invocation = runtime.invoke(
+          SourceRequest(
+            packageId: 'package-1',
+            call: wire.SourceCall(
+              requestId: 'chapter-call',
+              generation: 'generation-1',
+              sourceId: sourceId,
+              pages: wire.ChapterRequest(
+                chapter: wire.Chapter(url: '/chapter'),
+              ),
+            ),
+            onInput: (prompt, ended) {
+              expect(prompt.promptId, 'live-prompt');
+              unawaited(ended.then((_) => closed.complete()));
+              selection.complete();
+              return answer.future;
+            },
+          ),
+        );
+        final observed = expectLater(
+          invocation,
+          expire
+              ? throwsA(failure(RuntimeErrorCode.timeout))
+              : completion(
+                  isA<SourceResult>().having(
+                    (result) => result.pageList.pageSessionId,
+                    'page session',
+                    'page-session',
+                  ),
+                ),
+        );
+        await selection.future;
+        if (expire) {
+          waiting.complete();
+          await closed.future;
+        }
+        answer.complete('fixture input');
+        await observed;
+        await closed.future;
+        if (expire) {
+          expect(answersSent, isEmpty);
+        } else {
+          final sent = answersSent.single;
+          expect(sent.requestId, 'chapter-call');
+          expect(sent.promptId, 'live-prompt');
+          expect(sent.text, 'fixture input');
+        }
+        await runtime.dispose();
+      },
+    );
+  }
+
   for (final (wireCode, code) in [
     (
       wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_ACCESS_REQUIRED,

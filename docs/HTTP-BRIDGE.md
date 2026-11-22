@@ -50,9 +50,13 @@ while waiting for response headers after forwarding the request, and while
 waiting for the next nonempty body chunk or EOF on demand. It does not count
 time while the consumer is not pulling. Separately, the API limits the initial
 request META to 30 seconds, and both the API and the local HTTP handle limit
-the entire call to 300 seconds. The enclosing Source operation can still
-cancel earlier. A bridge timeout is non-retryable whether reported before
-META as HTTP 504 or after META as an ERROR frame.
+each transport exchange to 300 seconds. When the Source sets OkHttp's
+`callTimeout` or a per-call deadline, the Java adapter shares the remaining
+budget across redirects, retries, and reads of the final body. The adapter
+limits each exchange by the remaining budget and aborts active handles on
+expiry. It retires the call timer at EOF, closure, or failure. The enclosing
+Source operation can still cancel earlier. A bridge timeout is non-retryable
+whether reported before META as HTTP 504 or after META as an ERROR frame.
 
 The exported `httpResponseMetaSchema` validates these required fields:
 

@@ -20,8 +20,16 @@ public class PatchLibraries {
             ClassWriter w = new ClassWriter(ClassWriter.COMPUTE_MAXS);
             r.accept(
                 new ClassVisitor(Opcodes.ASM9, w) {
+                  private static final String APPLICATION_INFO =
+                      "android/content/pm/ApplicationInfo";
+                  private static final String APPLICATION_INFO_DESCRIPTOR =
+                      "()L" + APPLICATION_INFO + ";";
+                  private boolean hasApplicationInfo;
+
                   public MethodVisitor visitMethod(
                       int a, String n, String d, String s, String[] ex) {
+                    if (n.equals("getApplicationInfo") && d.equals(APPLICATION_INFO_DESCRIPTOR))
+                      hasApplicationInfo = true;
                     if (r.getClassName().equals("android/view/ViewGroup$LayoutParams")
                         && n.equals("<init>")
                         && d.equals("(II)V")) {
@@ -262,6 +270,39 @@ public class PatchLibraries {
                   }
 
                   public void visitEnd() {
+                    if (r.getClassName().equals("android/content/Context") && !hasApplicationInfo) {
+                      MethodVisitor method =
+                          super.visitMethod(
+                              Opcodes.ACC_PUBLIC,
+                              "getApplicationInfo",
+                              APPLICATION_INFO_DESCRIPTOR,
+                              null,
+                              null);
+                      method.visitCode();
+                      method.visitTypeInsn(Opcodes.NEW, APPLICATION_INFO);
+                      method.visitInsn(Opcodes.DUP);
+                      method.visitMethodInsn(
+                          Opcodes.INVOKESPECIAL, APPLICATION_INFO, "<init>", "()V", false);
+                      method.visitInsn(Opcodes.DUP);
+                      method.visitVarInsn(Opcodes.ALOAD, 0);
+                      method.visitMethodInsn(
+                          Opcodes.INVOKEVIRTUAL,
+                          "android/content/Context",
+                          "getFilesDir",
+                          "()Ljava/io/File;",
+                          false);
+                      method.visitMethodInsn(
+                          Opcodes.INVOKEVIRTUAL,
+                          "java/io/File",
+                          "getParent",
+                          "()Ljava/lang/String;",
+                          false);
+                      method.visitFieldInsn(
+                          Opcodes.PUTFIELD, APPLICATION_INFO, "dataDir", "Ljava/lang/String;");
+                      method.visitInsn(Opcodes.ARETURN);
+                      method.visitMaxs(3, 1);
+                      method.visitEnd();
+                    }
                     if (r.getClassName().equals("kotlinx/coroutines/JobSupport")) {
                       MethodVisitor method =
                           super.visitMethod(

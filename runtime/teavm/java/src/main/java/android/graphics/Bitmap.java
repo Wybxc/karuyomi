@@ -55,6 +55,26 @@ public final class Bitmap {
     return wrap(Graphics.call("create", a), c, true);
   }
 
+  public static Bitmap createBitmap(int[] colors, int width, int height, Config config) {
+    return createBitmap(colors, 0, width, width, height, config);
+  }
+
+  public static Bitmap createBitmap(
+      int[] colors, int offset, int stride, int width, int height, Config config) {
+    if (width <= 0 || height <= 0)
+      throw new IllegalArgumentException("width and height must be > 0");
+    checkArray(colors.length, offset, stride, width, height);
+    Bitmap bitmap = createBitmap(width, height, config);
+    try {
+      bitmap.setPixels(colors, offset, stride, 0, 0, width, height);
+      bitmap.mutable = false;
+      return bitmap;
+    } catch (RuntimeException | Error error) {
+      bitmap.recycle();
+      throw error;
+    }
+  }
+
   public static Bitmap createBitmap(Bitmap b) {
     return b.copy(b.config, false);
   }
@@ -182,20 +202,9 @@ public final class Bitmap {
     for (int row = 0; row < h; row++)
       for (int col = 0; col < w; col += Graphics.CHUNK / 4) {
         int count = Math.min(Graphics.CHUNK / 4, w - col);
-        JsonObject result = Graphics.call("pixels", tile(x + col, y + row, count, false));
-        String handle = result.get("bytes").getAsString();
-        try {
-          byte[] data = Graphics.readBytes(handle);
-          if (data == null || data.length != count * 4)
-            throw new IllegalStateException("Invalid pixel block");
-          for (int pixel = 0; pixel < count; pixel++) {
-            int p = pixel * 4;
-            out[offset + row * stride + col + pixel] =
-                Color.argb(data[p + 3] & 255, data[p] & 255, data[p + 1] & 255, data[p + 2] & 255);
-          }
-        } finally {
-          Graphics.closeBytes(handle);
-        }
+        byte[] data = readPixelBlock(x + col, y + row, count, 1);
+        for (int pixel = 0; pixel < count; pixel++)
+          out[offset + row * stride + col + pixel] = packedColor(data, pixel * 4);
       }
   }
 
@@ -212,22 +221,68 @@ public final class Bitmap {
       for (int col = 0; col < w; col += Graphics.CHUNK / 4) {
         int count = Math.min(Graphics.CHUNK / 4, w - col);
         byte[] bytes = new byte[count * 4];
-        for (int pixel = 0; pixel < count; pixel++) {
-          int c = data[offset + row * stride + col + pixel], p = pixel * 4;
-          bytes[p] = (byte) Color.red(c);
-          bytes[p + 1] = (byte) Color.green(c);
-          bytes[p + 2] = (byte) Color.blue(c);
-          bytes[p + 3] = (byte) Color.alpha(c);
-        }
-        putTile("putPixels", tile(x + col, y + row, count, false), bytes);
+        for (int pixel = 0; pixel < count; pixel++)
+          writeColor(bytes, pixel * 4, data[offset + row * stride + col + pixel]);
+        putTile("putPixels", tile(x + col, y + row, count, 1, false), bytes);
       }
   }
 
-  private JsonObject tile(int x, int y, int width, boolean f16) {
+  Bitmap copyFiltered(ColorMatrixColorFilter filter, int paintAlpha) {
+    check();
+    if (config != Config.ARGB_8888)
+      throw new UnsupportedOperationException("Color matrix requires an ARGB_8888 bitmap");
+    Bitmap filtered = createBitmap(width, height, config);
+    try {
+      filtered.density = density;
+      int tileWidth = Math.min(width, Graphics.CHUNK / 4);
+      int tileHeight = Graphics.CHUNK / (4 * tileWidth);
+      for (int y = 0; y < height; y += tileHeight) {
+        int rows = Math.min(tileHeight, height - y);
+        for (int x = 0; x < width; x += tileWidth) {
+          int columns = Math.min(tileWidth, width - x);
+          byte[] rgba = readPixelBlock(x, y, columns, rows);
+          for (int offset = 0; offset < rgba.length; offset += 4)
+            writeColor(rgba, offset, filter.filterColor(packedColor(rgba, offset), paintAlpha));
+          filtered.putTile("putPixels", filtered.tile(x, y, columns, rows, false), rgba);
+        }
+      }
+      return filtered;
+    } catch (RuntimeException | Error error) {
+      filtered.recycle();
+      throw error;
+    }
+  }
+
+  private static int packedColor(byte[] rgba, int offset) {
+    return Color.argb(
+        rgba[offset + 3] & 255, rgba[offset] & 255, rgba[offset + 1] & 255, rgba[offset + 2] & 255);
+  }
+
+  private static void writeColor(byte[] rgba, int offset, int color) {
+    rgba[offset] = (byte) Color.red(color);
+    rgba[offset + 1] = (byte) Color.green(color);
+    rgba[offset + 2] = (byte) Color.blue(color);
+    rgba[offset + 3] = (byte) Color.alpha(color);
+  }
+
+  private byte[] readPixelBlock(int x, int y, int width, int height) {
+    JsonObject result = Graphics.call("pixels", tile(x, y, width, height, false));
+    String handle = result.get("bytes").getAsString();
+    try {
+      byte[] data = Graphics.readBytes(handle);
+      if (data == null || data.length != width * height * 4)
+        throw new IllegalStateException("Invalid pixel block");
+      return data;
+    } finally {
+      Graphics.closeBytes(handle);
+    }
+  }
+
+  private JsonObject tile(int x, int y, int width, int height, boolean f16) {
     JsonObject a = Graphics.args();
     a.addProperty("id", id());
     a.addProperty("f16", f16);
-    a.add("rect", Graphics.numbers(x, y, width, 1));
+    a.add("rect", Graphics.numbers(x, y, width, height));
     return a;
   }
 
@@ -272,7 +327,7 @@ public final class Bitmap {
         int count = Math.min(blockPixels, width - col);
         byte[] bytes = new byte[count * pixelBytes];
         b.get(bytes);
-        putTile("putRaw", tile(col, row, count, f16), bytes);
+        putTile("putRaw", tile(col, row, count, 1, f16), bytes);
       }
   }
 
@@ -288,7 +343,7 @@ public final class Bitmap {
     for (int row = 0; row < height; row++)
       for (int col = 0; col < width; col += blockPixels) {
         int count = Math.min(blockPixels, width - col);
-        JsonObject result = Graphics.call("raw", tile(col, row, count, f16));
+        JsonObject result = Graphics.call("raw", tile(col, row, count, 1, f16));
         String handle = result.get("bytes").getAsString();
         try {
           byte[] bytes = Graphics.readBytes(handle);

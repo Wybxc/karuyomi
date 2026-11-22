@@ -29,6 +29,7 @@ import '../bookmarks/bookmark_status.dart';
 import '../reader/chapter_reader_route.dart';
 import '../reader/chapter_sequence.dart';
 import '../reader/reader_recovery.dart';
+import '../reader/source_input_dialog.dart';
 import '../progress/chapter_read_batch.dart';
 import '../progress/chapter_read_controller.dart';
 import '../progress/chapter_read_dialog.dart';
@@ -652,6 +653,15 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
       ChapterEntry(selected.snapshot),
       reference: selectedSource,
       logicalChapterKey: selected.key,
+      onInput: (prompt, ended) async {
+        if (!context.mounted || !isCurrent()) return null;
+        return showSourceInputDialog(
+          context,
+          sourceName: catalog.activeSource?.name ?? '漫画源',
+          prompt: prompt,
+          operationEnded: ended,
+        );
+      },
     );
     if (opened == null) {
       if (mounted) {

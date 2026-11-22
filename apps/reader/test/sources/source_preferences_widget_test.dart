@@ -8,6 +8,7 @@ import '../test_app.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/sources/source_preferences.dart';
@@ -441,6 +442,62 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'source dialog help opens only the tapped URL and keeps the draft',
+    (tester) async {
+      const url = 'https://help.fixture.invalid/account/profile/app-password';
+      const message = '🔐 生成应用密码\n\n请访问 $url 查看说明。';
+      final invoke = fixture.platform.invokeHandler!;
+      fixture.platform.invokeHandler = (call) async {
+        final result = await invoke(call);
+        if (result.hasPreferences()) {
+          final start = message.indexOf(url);
+          result.preferences.nodes[1].text.dialogMessage =
+              wire.PreferenceDialogMessage(
+                text: message,
+                links: [
+                  wire.PreferenceWebLink(start: start, end: start + url.length),
+                ],
+              );
+        }
+        return result;
+      };
+      const channel = MethodChannel('plugins.flutter.io/url_launcher');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final attempts = <String>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'launch');
+        attempts.add(call.arguments['url'] as String);
+        return attempts.length > 1;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      await open(tester, size: const Size(360, 800));
+      await item(tester, '1');
+      expect(attempts, isEmpty);
+      final input = find.byType(CupertinoTextField).last;
+      expect(tester.widget<CupertinoTextField>(input).obscureText, isTrue);
+      await tester.enterText(input, 'session draft');
+      final link = find.text(url);
+      await tester.ensureVisible(link);
+      await tester.tap(link);
+      await tester.pumpAndSettle();
+      expect(attempts, [url]);
+      expect(find.text('无法打开链接'), findsOneWidget);
+      await tester.tap(link);
+      await tester.pumpAndSettle();
+      expect(attempts, [url, url]);
+      expect(find.text('无法打开链接'), findsNothing);
+      expect(
+        tester.widget<CupertinoTextField>(input).controller!.text,
+        'session draft',
+      );
+      expect(fixture.postedBodies, isEmpty);
+      expect(fixture.callbacks, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'the formal phone sheet edits typed controls, dependency and session fields without uploading secrets',

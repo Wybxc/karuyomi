@@ -2,40 +2,44 @@ package java.security;
 
 import java.io.ByteArrayOutputStream;
 
-/** MD5 support for Mihon source IDs, derived from the algorithm in RFC 1321. */
-public class MessageDigest {
-  private String algorithm = "MD5";
-  private final ByteArrayOutputStream input = new ByteArrayOutputStream();
+/** Digest dispatch for extension providers and the host's built-in hashes. */
+public abstract class MessageDigest extends MessageDigestSpi {
+  private final String algorithm;
+
+  protected MessageDigest(String algorithm) {
+    this.algorithm = algorithm;
+  }
 
   public static MessageDigest getInstance(String algorithm) throws NoSuchAlgorithmException {
     if (!algorithm.equalsIgnoreCase("MD5")
         && !algorithm.equalsIgnoreCase("SHA-256")
         && !algorithm.equalsIgnoreCase("SHA256")) throw new NoSuchAlgorithmException(algorithm);
-    MessageDigest d = new MessageDigest();
-    d.algorithm = algorithm;
-    return d;
+    return new BufferedDigest(algorithm);
+  }
+
+  public final String getAlgorithm() {
+    return algorithm;
   }
 
   public void update(byte[] b) {
-    input.write(b, 0, b.length);
+    engineUpdate(b, 0, b.length);
   }
 
   public void update(byte[] b, int o, int n) {
-    input.write(b, o, n);
+    if (b == null || n > b.length - o) throw new IllegalArgumentException("Invalid digest input");
+    engineUpdate(b, o, n);
   }
 
   public void update(byte b) {
-    input.write(b);
+    engineUpdate(b);
   }
 
   public void reset() {
-    input.reset();
+    engineReset();
   }
 
   public byte[] digest() {
-    byte[] b = input.toByteArray();
-    reset();
-    return algorithm.equalsIgnoreCase("MD5") ? md5(b) : sha256(b);
+    return engineDigest();
   }
 
   public byte[] digest(byte[] b) {
@@ -43,6 +47,33 @@ public class MessageDigest {
     return digest();
   }
 
+  private static final class BufferedDigest extends MessageDigest {
+    private final ByteArrayOutputStream input = new ByteArrayOutputStream();
+
+    private BufferedDigest(String algorithm) {
+      super(algorithm);
+    }
+
+    protected void engineUpdate(byte b) {
+      input.write(b);
+    }
+
+    protected void engineUpdate(byte[] b, int offset, int count) {
+      input.write(b, offset, count);
+    }
+
+    protected void engineReset() {
+      input.reset();
+    }
+
+    protected byte[] engineDigest() {
+      byte[] bytes = input.toByteArray();
+      engineReset();
+      return getAlgorithm().equalsIgnoreCase("MD5") ? md5(bytes) : sha256(bytes);
+    }
+  }
+
+  // MD5 supports Mihon Source IDs using the RFC 1321 algorithm.
   private static byte[] md5(byte[] b) {
     int n = ((b.length + 8) / 64 + 1) * 64;
     byte[] data = new byte[n];

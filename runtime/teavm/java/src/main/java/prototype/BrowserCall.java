@@ -4,8 +4,11 @@ import com.google.gson.*;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import okhttp3.*;
+import okio.AsyncTimeout;
+import okio.Buffer;
 import okio.BufferedSink;
 import okio.Okio;
 import okio.Timeout;
@@ -277,9 +280,12 @@ public final class BrowserCall implements Call {
 
   private final OkHttpClient client;
   private final Request request;
+  private final AsyncTimeout callTimeout;
   private Operation owner;
   private volatile boolean executed;
   private volatile boolean cancelled;
+  private volatile boolean callTimedOut;
+  private volatile Long callDeadlineNanos;
   private final Set<String> httpHandles = new HashSet<>();
   private Call proxy;
   private OwnedResponseBody responseBody;
@@ -287,6 +293,14 @@ public final class BrowserCall implements Call {
   private BrowserCall(OkHttpClient c, Request r) {
     client = c;
     request = r;
+    callTimeout =
+        new AsyncTimeout() {
+          @Override
+          protected void timedOut() {
+            expireCall();
+          }
+        };
+    callTimeout.timeout(c.callTimeoutMillis(), TimeUnit.MILLISECONDS);
   }
 
   public static Call create(OkHttpClient c, Request r) {
@@ -322,62 +336,63 @@ public final class BrowserCall implements Call {
     Operation operation = owner;
     if (operation != null) operation.register(this);
     try {
-      new Thread(
-              () -> {
-                if (operation != null) operation.enter();
-                Throwable failure = null;
-                Response response = null;
-                boolean delivered = false;
-                try {
-                  try {
-                    response = executeOwned();
-                  } catch (IOException error) {
-                    if (operation != null) operation.checkOpen();
-                    c.onFailure(this, error);
-                    return;
-                  } catch (RuntimeException | Error error) {
-                    // Like OkHttp's AsyncCall, fail the suspended consumer before propagating
-                    // an interceptor/runtime failure to its owner. Callback failures are outside
-                    // this catch, so a callback can never receive a second terminal event.
-                    failure = error;
-                    try {
-                      cancel();
-                    } catch (Throwable cleanup) {
-                      if (cleanup != error) error.addSuppressed(cleanup);
-                    }
-                    if (operation != null) operation.checkOpen();
-                    c.onFailure(this, new IOException("HTTP execution failed", error));
-                    throw error;
-                  }
-                  if (operation != null) operation.checkOpen();
-                  c.onResponse(this, response);
-                  // OkHttp transfers ownership to the callback, which may resume another
-                  // dispatcher.
-                  delivered = true;
-                } catch (Throwable error) {
-                  if (failure == null) failure = error;
-                  else if (failure != error) failure.addSuppressed(error);
-                  if (operation == null) Bridge.trace("HTTP callback failed: " + error);
-                } finally {
-                  if (!delivered) {
-                    try {
-                      if (response != null) response.close();
-                      else closeHandles();
-                    } catch (Throwable error) {
-                      if (failure == null) failure = error;
-                      else if (failure != error) failure.addSuppressed(error);
-                    }
-                  }
-                  if (operation != null) {
-                    operation.finished(this, failure);
-                    operation.leave();
-                  }
-                }
-              })
-          .start();
+      client
+          .dispatcher()
+          .hostEnqueue(this, () -> deliverCallback(c, null), error -> deliverCallback(c, error));
     } catch (Throwable error) {
       if (operation != null) operation.finished(this, error);
       throw error;
+    }
+  }
+
+  private void deliverCallback(Callback callback, IOException dispatchFailure) {
+    Operation operation = owner;
+    Operation previous = currentOperation();
+    if (operation != null) operation.enter();
+    else threadOperation.remove();
+    Throwable failure = null;
+    Response response = null;
+    boolean delivered = false;
+    try {
+      try {
+        if (dispatchFailure != null) throw dispatchFailure;
+        response = executeOwned();
+      } catch (IOException error) {
+        if (operation != null) operation.checkOpen();
+        callback.onFailure(this, error);
+        return;
+      } catch (RuntimeException | Error error) {
+        // Report interceptor failure before propagating it to the Source operation.
+        failure = error;
+        try {
+          cancel();
+        } catch (Throwable cleanup) {
+          if (cleanup != error) error.addSuppressed(cleanup);
+        }
+        if (operation != null) operation.checkOpen();
+        callback.onFailure(this, new IOException("HTTP execution failed", error));
+        throw error;
+      }
+      if (operation != null) operation.checkOpen();
+      callback.onResponse(this, response);
+      delivered = true;
+    } catch (Throwable error) {
+      if (failure == null) failure = error;
+      else if (failure != error) failure.addSuppressed(error);
+      if (operation == null) Bridge.trace("HTTP callback failed: " + error);
+    } finally {
+      if (!delivered) {
+        try {
+          if (response != null) response.close();
+          else closeHandles();
+        } catch (Throwable error) {
+          if (failure == null) failure = error;
+          else if (failure != error) failure.addSuppressed(error);
+        }
+      }
+      if (operation != null) operation.finished(this, failure);
+      if (previous != null) previous.enter();
+      else threadOperation.remove();
     }
   }
 
@@ -392,6 +407,31 @@ public final class BrowserCall implements Call {
       source =
           Okio.buffer(
               new okio.ForwardingSource(original.source()) {
+                @Override
+                public long read(Buffer sink, long byteCount) throws IOException {
+                  checkCallTimeout();
+                  long count;
+                  try {
+                    count = super.read(sink, byteCount);
+                  } catch (IOException | RuntimeException failure) {
+                    if (finishCallTimeout()) {
+                      expireCall();
+                      throw callTimeoutError(failure);
+                    }
+                    throw failure;
+                  } catch (Error failure) {
+                    finishCallTimeout();
+                    throw failure;
+                  }
+                  checkCallTimeout();
+                  if (count == -1 && finishCallTimeout()) {
+                    expireCall();
+                    throw callTimeoutError(null);
+                  }
+                  return count;
+                }
+
+                @Override
                 public void close() {
                   release();
                 }
@@ -431,6 +471,7 @@ public final class BrowserCall implements Call {
             if (responseBody == this) responseBody = null;
           }
           if (owner != null) owner.releasedResponse(BrowserCall.this);
+          finishCallTimeout();
         }
       }
     }
@@ -440,8 +481,12 @@ public final class BrowserCall implements Call {
     Response response = null;
     OwnedResponseBody body = null;
     try {
+      startCallTimeout();
+      checkCallTimeout();
+      if (cancelled) throw new InterruptedIOException("Cancelled");
       response = executeOnce();
       body = new OwnedResponseBody(response.body());
+      checkCallTimeout();
       synchronized (this) {
         if (cancelled) throw new InterruptedIOException("Cancelled");
         if (owner != null) owner.retainResponse(this);
@@ -449,6 +494,7 @@ public final class BrowserCall implements Call {
       }
       return response.newBuilder().body(body).build();
     } catch (IOException | RuntimeException | Error error) {
+      boolean timedOut = finishCallTimeout();
       try {
         if (body != null) body.release();
         else if (response != null) response.close();
@@ -457,6 +503,7 @@ public final class BrowserCall implements Call {
       } finally {
         closeHandles();
       }
+      if (timedOut && error instanceof IOException failure) throw callTimeoutError(failure);
       throw error;
     }
   }
@@ -471,13 +518,24 @@ public final class BrowserCall implements Call {
   }
 
   public void cancel() {
+    try {
+      cancelTransport(false);
+    } finally {
+      client.dispatcher().hostCancelQueued(this);
+    }
+  }
+
+  private void cancelTransport(boolean timeout) {
     OwnedResponseBody body;
     synchronized (this) {
       cancelled = true;
       body = responseBody;
     }
     try {
-      if (body != null) body.close();
+      if (body != null) {
+        if (timeout) body.release();
+        else body.close();
+      }
     } finally {
       closeHandles();
     }
@@ -488,11 +546,57 @@ public final class BrowserCall implements Call {
   }
 
   public boolean isCanceled() {
-    return cancelled;
+    return cancelled || callTimedOut;
   }
 
   public Timeout timeout() {
-    return new Timeout();
+    return callTimeout;
+  }
+
+  private void startCallTimeout() {
+    long duration = callTimeout.timeoutNanos();
+    if (duration == 0 && !callTimeout.hasDeadline()) return;
+    long now = System.nanoTime();
+    if (callTimeout.hasDeadline()) {
+      long untilDeadline = callTimeout.deadlineNanoTime() - now;
+      duration = duration == 0 ? untilDeadline : Math.min(duration, untilDeadline);
+    }
+    callTimeout.enter();
+    callDeadlineNanos = now + duration;
+  }
+
+  private synchronized boolean finishCallTimeout() {
+    Long deadline = callDeadlineNanos;
+    if (deadline != null) {
+      callTimedOut = callTimeout.exit() || callTimedOut || deadline - System.nanoTime() <= 0;
+      callDeadlineNanos = null;
+    }
+    return callTimedOut;
+  }
+
+  private void checkCallTimeout() throws InterruptedIOException {
+    if (!callTimedOut) {
+      Long deadline = callDeadlineNanos;
+      if (deadline == null || deadline - System.nanoTime() > 0) return;
+      expireCall();
+    }
+    throw callTimeoutError(null);
+  }
+
+  private void expireCall() {
+    callTimedOut = true;
+    try {
+      // Release the transport before the next read observes the timeout.
+      cancelTransport(true);
+    } catch (RuntimeException | LinkageError failure) {
+      Bridge.trace("HTTP call timeout cleanup failed: " + failure);
+    }
+  }
+
+  private static InterruptedIOException callTimeoutError(Throwable cause) {
+    InterruptedIOException error = new InterruptedIOException("timeout");
+    if (cause != null) error.initCause(cause);
+    return error;
   }
 
   public Call clone() {
@@ -561,6 +665,7 @@ public final class BrowserCall implements Call {
       int writeMs,
       Cache cache)
       throws IOException {
+    checkCallTimeout();
     if (cancelled) throw new IOException("Cancelled");
     if (index == list.size()) return transport(r, readMs);
     return list.get(index).intercept(chain(list, index, r, connectMs, readMs, writeMs, cache));
@@ -625,7 +730,7 @@ public final class BrowserCall implements Call {
       }
 
       public okhttp3.Dns getDns() {
-        throw new UnsupportedOperationException("Chain.getDns");
+        return client.dns();
       }
 
       public okhttp3.Interceptor.Chain withDns(okhttp3.Dns a0) {
@@ -649,7 +754,7 @@ public final class BrowserCall implements Call {
       }
 
       public okhttp3.Authenticator getAuthenticator() {
-        throw new UnsupportedOperationException("Chain.getAuthenticator");
+        return client.authenticator();
       }
 
       public okhttp3.Interceptor.Chain withAuthenticator(okhttp3.Authenticator a0) {
@@ -742,39 +847,62 @@ public final class BrowserCall implements Call {
   private Response follow(Interceptor.Chain chain) throws IOException {
     Request next = chain.request();
     Response prior = null;
-    for (int redirects = 0; ; redirects++) {
+    for (int followUps = 0; ; followUps++) {
       Response response = chain.proceed(next);
       if (prior != null) response = response.newBuilder().priorResponse(prior).build();
-      String location = response.header("Location");
-      int code = response.code();
-      if (!client.followRedirects()
-          || location == null
-          || !Arrays.asList(301, 302, 303, 307, 308).contains(code)) return response;
-      if (redirects >= 10) {
-        response.close();
-        throw new IOException("Too many redirects");
+      boolean deliver = false;
+      try {
+        Request proposed = followUp(chain, next, response);
+        if (proposed == null) {
+          deliver = true;
+          return response;
+        }
+        if (followUps >= 10)
+          throw new IOException(
+              response.code() == 401 ? "Too many authentication follow-ups" : "Too many redirects");
+        prior = okhttp3.internal.UnreadableResponseBodyKt.stripBody(response);
+        next = proposed;
+      } finally {
+        if (!deliver) response.close();
       }
-      HttpUrl target = next.url().resolve(location);
-      if (target == null) {
-        response.close();
-        throw new IOException("Bad redirect");
-      }
-      Request.Builder builder = next.newBuilder().url(target);
-      if (!target.host().equals(next.url().host())
-          || target.port() != next.url().port()
-          || !target.scheme().equals(next.url().scheme()))
-        builder.removeHeader("Authorization").removeHeader("Cookie");
-      if (code == 303 && !next.method().equals("HEAD")
-          || ((code == 301 || code == 302) && next.method().equals("POST")))
-        builder
-            .get()
-            .removeHeader("Content-Type")
-            .removeHeader("Content-Length")
-            .removeHeader("Transfer-Encoding");
-      prior = okhttp3.internal.UnreadableResponseBodyKt.stripBody(response);
-      response.close();
-      next = builder.build();
     }
+  }
+
+  private Request followUp(Interceptor.Chain chain, Request request, Response response)
+      throws IOException {
+    int code = response.code();
+    if (code == 401 && sameOrigin(chain.request().url(), request.url())) {
+      Request authenticated = chain.getAuthenticator().authenticate(null, response);
+      if (authenticated == null) return null;
+      if (!sameOrigin(request.url(), authenticated.url()))
+        throw new IOException("Authenticator changed request origin");
+      RequestBody body = authenticated.body();
+      return body != null && body.isOneShot() ? null : authenticated;
+    }
+
+    String location = response.header("Location");
+    if (!client.followRedirects()
+        || location == null
+        || !Arrays.asList(301, 302, 303, 307, 308).contains(code)) return null;
+    HttpUrl target = request.url().resolve(location);
+    if (target == null) throw new IOException("Bad redirect");
+    Request.Builder builder = request.newBuilder().url(target);
+    if (!sameOrigin(target, request.url()))
+      builder.removeHeader("Authorization").removeHeader("Cookie");
+    if (code == 303 && !request.method().equals("HEAD")
+        || ((code == 301 || code == 302) && request.method().equals("POST")))
+      builder
+          .get()
+          .removeHeader("Content-Type")
+          .removeHeader("Content-Length")
+          .removeHeader("Transfer-Encoding");
+    return builder.build();
+  }
+
+  private static boolean sameOrigin(HttpUrl left, HttpUrl right) {
+    return left.host().equals(right.host())
+        && left.port() == right.port()
+        && left.scheme().equals(right.scheme());
   }
 
   private Response bridgeRequest(Interceptor.Chain chain) throws IOException {
@@ -836,9 +964,8 @@ public final class BrowserCall implements Call {
     metadata.addProperty("hasBody", body != null);
     if (bodyLength < 0) metadata.add("bodyLength", JsonNull.INSTANCE);
     else metadata.addProperty("bodyLength", bodyLength);
-    // The v2 host currently enforces one overall budget, not three separate
-    // connect/read/write idle timers. A zero OkHttp timeout uses its 5-minute cap.
-    metadata.addProperty("timeoutMs", readMs <= 0 ? 300000 : Math.min(readMs, 300000));
+    // Keep the relay inside the same absolute budget across redirects and retries.
+    metadata.addProperty("timeoutMs", requestTimeoutMillis(readMs));
     String json = metadata.toString();
     if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > HttpBodySource.MAX_CHUNK)
       throw new IOException("HTTP request metadata exceeds 64 KiB");
@@ -929,6 +1056,19 @@ public final class BrowserCall implements Call {
 
   private synchronized void forgetHandle(String handle) {
     httpHandles.remove(handle);
+  }
+
+  private int requestTimeoutMillis(int readMs) throws InterruptedIOException {
+    checkCallTimeout();
+    int transportLimit = readMs <= 0 ? 300000 : Math.min(readMs, 300000);
+    Long deadline = callDeadlineNanos;
+    if (deadline == null) return transportLimit;
+    long remaining = deadline - System.nanoTime();
+    if (remaining <= 0) {
+      expireCall();
+      throw callTimeoutError(null);
+    }
+    return (int) Math.min(transportLimit, TimeUnit.NANOSECONDS.toMillis(remaining - 1) + 1);
   }
 
   private static void cancelHandle(String handle) {

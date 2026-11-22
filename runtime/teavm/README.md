@@ -3,7 +3,23 @@
 本目录维护项目的 Java 兼容层、Source RPC 和浏览器桥。研究交付 release9 是历史起点；项目源码在这里继续开发，不受旧逐文件冻结清单约束。真正第三方源码通过根目录 `vendor/` submodules 固定，上游改动通过明确补丁物化。
 
 - `java/`：正式 Java 源码、JCL/Android/库 ABI 适配、Maven 配置与服务注册。`hostInvoke` 使用完整 DTO、分页与显式漫画/章节引用；各宿主 entry 接收 requestId、generation 和独立 token，将 HTTP 与异步回调绑定到发起 RPC。
-- `patches/teavm/`：针对固定 TeaVM 上游的兼容补丁；[物化工具](../../tools/teavm/upstream-sources.ts) 校验原始和输出摘要，只写隔离构建目录。 正则和日期补丁由 `TeaTransformer` 接入；`pnpm teavm:check` 对照 JDK 与实际生成的 JavaScript 验证严格 HTTP 日期行为。
+- `patches/teavm/`：针对固定 TeaVM 上游的兼容补丁；[物化工具](../../tools/teavm/upstream-sources.ts) 校验原始和输出摘要，只写隔离构建目录。正则和日期补丁由 `TeaTransformer` 接入。
+- 字符串拼接编译补丁通过 TeaVM 编译器插件注册。拼接指令分别取用动态参数与常量池值，`pnpm teavm:check` 对照 JDK 验证包含控制字符的拼接结果。[JDK 字符串拼接接口](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/invoke/StringConcatFactory.html)
+- `Class.getResource` 通过 TeaVM 已打包的资源表返回可读取的 URL。`pnpm teavm:check` 对照 JDK 与实际生成的 JavaScript，验证严格 HTTP 日期解析和打包资源读取。[JDK 资源读取合同](<https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Class.html#getResource(java.lang.String)>)
+- Java `SequenceInputStream` 逐个读取并关闭子流，适用于以小段前缀接续原有响应的扩展。`pnpm teavm:check` 对照验证分段读取、EOF、提前关闭与异常传播。[JDK SequenceInputStream](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/SequenceInputStream.html)
+- `MessageDigest` 通过标准的构造器和引擎方法调用扩展自带的摘要实现。现有内置 MD5 和 SHA-256 继续用于 Source 身份及摘要计算。子类分派、重置和内置向量由 `pnpm teavm:check` 与 JDK 对照验证。[JDK 摘要接口](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/security/MessageDigest.html)
+- `PBEKeySpec` 与 `SecretKeyFactory` 在 AOT 中通过 Worker 的 WebCrypto 实现有界的 PBKDF2-HMAC-SHA-256 和 SHA-512。合成输入的 UTF-8 编码、密钥字节及参数语义由 `pnpm teavm:check` 与 JDK 对照验证。[WebCrypto PBKDF2](https://www.w3.org/TR/webcrypto/#pbkdf2)
+- P‑256 密钥生成、X.509 / PKCS#8 编码及 SHA‑256 ECDSA 由 Worker 的 WebCrypto 执行。Java 接口使用 DER 签名，转换层通过固定公开向量，以及 JDK 和生成 JavaScript 之间的双向验签。[WebCrypto ECDSA](https://www.w3.org/TR/webcrypto/#ecdsa) · [RFC 6979 测试向量](https://www.rfc-editor.org/rfc/rfc6979#appendix-A.2.5)
+- Java `KeyAgreement` 通过 WebCrypto 的 ECDH 执行两方 P‑256 密钥协商。JDK 与生成的 JavaScript 按公开向量对照派生结果和会话复用。[WebCrypto ECDH](https://www.w3.org/TR/webcrypto-2/#ecdh) · [RFC 5903 测试向量](https://www.rfc-editor.org/rfc/rfc5903#section-8.1)
+- Java `KeyPairGenerator` 与 `Cipher` 通过 WebCrypto 支持 RSA-OAEP。参数须显式指定 SHA‑256 摘要和 MGF1 SHA‑256，可提供 `PSource.PSpecified` 标签。JDK 与生成的 JavaScript 对照验证 RSA‑2048 编码、加解密和单块长度边界。[WebCrypto RSA-OAEP](https://www.w3.org/TR/webcrypto-2/#rsa-oaep)
+- X.509 RSA 公钥由 Worker 的 WebCrypto 导入。`Cipher.init(mode, key)` 支持 RSA PKCS#1 v1.5 公钥加密，使用固定的 Bouncy Castle 轻量实现和 WebCrypto 随机数。现有 AES-CBC/GCM 的双参数加密初始化会生成对应的 IV 或 nonce。[JCA Cipher](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/javax/crypto/Cipher.html)
+- Source 明确请求 `AES/ECB/NoPadding` 时，Java `Cipher` 使用同一固定 Bouncy Castle 实现。分段输入由加密库保留尾部剩余字节，完整块直接交付；原地写入重叠时复制输入区间。固定 JDK 与生成的 JavaScript 对照覆盖三种 AES 密钥长度、分段输入和短缓冲重试。[JCA Cipher](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/javax/crypto/Cipher.html)
+- Java `Mac` 复用固定 Bouncy Castle，对 HMAC-SHA-256 与 HMAC-SHA-512 输入逐段计算认证码。固定 JDK 与生成的 JavaScript 对照覆盖公开向量、分段输入、重置和长密钥。[RFC 4231](https://www.rfc-editor.org/rfc/rfc4231) · [JCA Mac](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/javax/crypto/Mac.html)
+- `Canvas.drawBitmap` 支持源位图矩阵与当前 Canvas 仿射变换的组合。像素对齐的 ARGB_8888 绘制可应用颜色矩阵，经现有 ≤64 KiB 图形桥处理像素块，临时位图在绘制结束后释放。[Android Canvas](<https://developer.android.com/reference/android/graphics/Canvas#drawBitmap(android.graphics.Bitmap,%20android.graphics.Matrix,%20android.graphics.Paint)>) · [Android ColorMatrix](https://developer.android.com/reference/android/graphics/ColorMatrix)
+- `TimeZone.toZoneId` 复用 TeaVM 的时区规则和别名表，UTC 格式化、地区夏令时和显式偏移由 `pnpm teavm:check` 与 JDK 对照验证。[JDK 时区接口](<https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/TimeZone.html#toZoneId()>)
+- Android `ApplicationInfo.dataDir` 由当前 Context 的虚拟文件目录派生，访问范围由扩展的文件命名空间决定。[Android 应用信息](https://developer.android.com/reference/android/content/pm/ApplicationInfo#dataDir)
+- `PdfRenderer` 从 Source 的虚拟文件系统读取只读 PDF，查询页数和页面尺寸，并以默认变换将显示页面合成到可写 ARGB_8888 位图。文件按 ≤64 KiB 块经过图形桥，单份文件上限 64 MiB，PDFium 的 WASM 堆上限 128 MiB。打印和自定义仿射变换由接口明确拒绝。Java 页与文档关闭后释放对应句柄，请求结束时图形桥回收遗漏的 WASM 对象。扩展继续通过原有图片处理和二进制通道交付编码图片。[Android PdfRenderer](https://developer.android.com/reference/android/graphics/pdf/PdfRenderer)
+- OkHttp 的 `Dispatcher` 在 Source 宿主的异步调用队列中执行总并发及原请求域名的并发上限。客户端从 `newBuilder()` 派生后共享同一个调度器。异步名额覆盖到回调返回，同步请求可以直接执行，已取消的排队调用释放队列位置并按原操作归属交付错误。[OkHttp Dispatcher](https://github.com/square/okhttp/blob/parent-5.5.0/okhttp/src/commonJvmAndroid/kotlin/okhttp3/Dispatcher.kt)
 - `bridge/`：严格 TypeScript 产品浏览器桥。Zstd 只读取已校验的共享材料映射，Web 使用静态字节，Native 使用应用内字节。
 - `toolchain-lock.json`、`toolchain/`：工具版本、下载摘要、runtime seed 材料与 Android SDK 元数据。`toolchain/android-sdk-license` 是复制到 SDK `licenses/` 的协议接受摘要记录；协议正文在相邻 XML 元数据中。
 - [来源与许可](NOTICE.md)、`licenses/`：ABI 适配、上游来源与必须保留的许可说明。

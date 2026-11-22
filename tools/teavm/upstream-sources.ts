@@ -9,6 +9,7 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 const REGEX_PACKAGE = 'org/teavm/classlib/java/util/regex';
 const TEXT_PACKAGE = 'org/teavm/classlib/java/text';
+const COMPILER_PACKAGE = 'org/teavm/classlib/impl';
 export const PATCHES = [
   [
     REGEX_PACKAGE,
@@ -100,12 +101,22 @@ export const PATCHES = [
     'a7192474ef0e7dae2899c9dea0e1d0f1011f04abd41e5b0233ea17274dfa3485',
     'aca908f1ffbf69475f4a73d01198c159959f3be63ebb7848326741637d8d1b97',
   ],
+  [
+    COMPILER_PACKAGE,
+    'StringConcatFactorySubstitutor',
+    'e5ea63ecc006081c6a7bde94386078d96935dc8370be5ce51dd4dc648b22497b',
+    '0f53dfa559302c2b82670f0079880dabac538db03cd31e3d2e10125349a7d3a0',
+    'StringConcatFactorySubstitutor',
+  ],
 ] as const;
 
 /** Give the transformer an independent donor without changing Java trivia or
  * literals. Run before behavior patches, which may deliberately refer to T*. */
-export function generateDonorSource(name: string, source: string): string {
-  const originalName = `T${name}`;
+export function generateDonorSource(
+  name: string,
+  source: string,
+  originalName = `T${name}`,
+): string {
   const identifiers = new Map([[originalName, `Patched${name}`]]);
   if (name === 'Pattern') identifiers.set('TLexer', 'PatchedLexer');
   const { tokens } = lexAndParse(source);
@@ -192,8 +203,14 @@ export function prepareSources(destination: string, root = ROOT): string[] {
   const upstream = path.join(root, 'vendor/teavm/classlib/src/main/java'),
     patches = path.join(root, 'runtime/teavm/patches/teavm');
   const generated: string[] = [];
-  for (const [packagePath, name, sourceHash, outputHash] of PATCHES) {
-    const file = path.join(upstream, packagePath, `T${name}.java`);
+  for (const [
+    packagePath,
+    name,
+    sourceHash,
+    outputHash,
+    originalName = `T${name}`,
+  ] of PATCHES) {
+    const file = path.join(upstream, packagePath, `${originalName}.java`);
     if (!existsSync(file))
       throw new Error(
         'TeaVM sources missing; run git submodule update --init vendor/teavm',
@@ -202,7 +219,7 @@ export function prepareSources(destination: string, root = ROOT): string[] {
     if (createHash('sha256').update(data).digest('hex') !== sourceHash)
       throw new Error(`Pinned TeaVM source differs: ${file}`);
     const text = applyPatch(
-      generateDonorSource(name, data.toString()),
+      generateDonorSource(name, data.toString(), originalName),
       readFileSync(path.join(patches, `${name}.patch`), 'utf8'),
       { fuzzFactor: 0, autoConvertLineEndings: false },
     );

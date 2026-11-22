@@ -184,6 +184,9 @@ importers:
       '@cloudflare/vitest-plugin':
         specifier: 1.6.0
         version: 1.6.0(@types/node@26.6.6)(vitest@4.1.12)
+      '@hyzyla/pdfium':
+        specifier: 3.0.0
+        version: 3.0.0
       '@j178/prek':
         specifier: 0.5.9
         version: 0.5.9
@@ -238,6 +241,9 @@ importers:
       get-stream:
         specifier: 9.0.1
         version: 9.0.1
+      hyphen:
+        specifier: 1.14.1
+        version: 1.14.1
       idb:
         specifier: 8.0.4
         version: 8.0.4
@@ -374,6 +380,9 @@ importers:
       '@karuyomi/protocol':
         specifier: workspace:*
         version: link:../protocol
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
       idb:
         specifier: 8.0.4
         version: 8.0.4
@@ -1031,6 +1040,10 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@hyzyla/pdfium@3.0.0':
+    resolution: {integrity: sha512-Hw7/Pc/y2f8ZYVNXxAvDiLAV0qJT4+e5HMwbMghra/s2RKXuuWYdR/8ohoD4YwQfTL5UzSNlTtP1LJHip7LiEQ==}
+    engines: {node: '>=22'}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -2026,6 +2039,9 @@ packages:
   human-signals@8.0.1:
     resolution: {integrity: sha512-eKCa6bwnJhvxj14kZk5NCPc6Hb6BdsU9DZcOnmQKSnO1VKrfV0zCvtttPZUsBvjmNDn8rpcJfpwSYnHBjc95MQ==}
     engines: {node: '>=18.18.0'}
+
+  hyphen@1.14.1:
+    resolution: {integrity: sha512-kvL8xYl5QMTh+LwohVN72ciOxC0OEV79IPdJSTwEXok9y9QHebXGdFgrED4sWfiax/ODx++CAMk3hMy4XPJPOw==}
 
   idb@8.0.4:
     resolution: {integrity: sha512-jd0ITCrN+Zah4J7R/Z2jnR3W7A4BXDAjmo62MwWuSjxCiueUAf7X5rbodEdidWzeknwXHmLpdZkoiiCppNi30Q==}
@@ -3258,6 +3274,8 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
+  '@hyzyla/pdfium@3.0.0': {}
+
   '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.5':
@@ -4131,6 +4149,8 @@ snapshots:
   hono@4.13.16: {}
 
   human-signals@8.0.1: {}
+
+  hyphen@1.14.1: {}
 
   idb@8.0.4: {}
 

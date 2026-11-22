@@ -9,6 +9,7 @@ import {
   requireCondition,
   catalogReferenceSchema,
   type BuildManifest,
+  type SourceInputFields,
   type WorkerCommand,
 } from '@karuyomi/contracts';
 import { create } from '@bufbuild/protobuf';
@@ -23,6 +24,9 @@ export class WorkerRuntime {
   private busy = false;
   private preferencesEdited = false;
   private controller = new AbortController();
+  private input:
+    | { prompt: pb.SourceInputPrompt; resolve(text: string | null): void }
+    | undefined;
 
   constructor(
     private readonly driver: RuntimeDriver,
@@ -50,6 +54,21 @@ export class WorkerRuntime {
           envelope.buildId !== this.manifest?.buildId))
     ) {
       for (const port of ports) port.close();
+      return;
+    }
+    if (command.command.case === 'answerSourceInput') {
+      for (const port of ports) port.close();
+      const answer = command.command.value;
+      const pending = this.input;
+      if (
+        pending &&
+        pending.prompt.requestId === answer.requestId &&
+        pending.prompt.promptId === answer.promptId &&
+        !(pending.prompt.required && answer.text === '')
+      ) {
+        this.input = undefined;
+        pending.resolve(answer.text ?? null);
+      }
       return;
     }
     if (this.busy) {
@@ -123,6 +142,7 @@ export class WorkerRuntime {
                 ...(this.driver.supportsCoverImages
                   ? ['cover-image-resources']
                   : []),
+                ...(manifest.supportsSourceInput ? ['source-input'] : []),
               ],
             }),
           });
@@ -143,10 +163,16 @@ export class WorkerRuntime {
             );
           if (call.request.case === 'editPreference')
             this.preferencesEdited = true;
-          const payload = await this.driver.invoke(call, {
-            requestId: envelope.requestId,
-            generation: envelope.generation,
-          });
+          const payload = await this.driver.invoke(
+            call,
+            {
+              requestId: envelope.requestId,
+              generation: envelope.generation,
+            },
+            call.allowInput && this.manifest.supportsSourceInput
+              ? (fields) => this.requestInput(command, call.sourceId, fields)
+              : undefined,
+          );
           this.reply(command, {
             case: 'source',
             value: sourceResultFor(call, envelope.buildId, payload),
@@ -234,9 +260,41 @@ export class WorkerRuntime {
         value: runtimeErrorMessage(runtimeFailure(error).toJSON()),
       });
     } finally {
+      this.input?.resolve(null);
+      this.input = undefined;
       for (const port of ports) port.close();
       this.busy = false;
     }
+  }
+
+  private async requestInput(
+    command: WorkerCommand,
+    sourceId: string,
+    fields: SourceInputFields,
+  ): Promise<string | null> {
+    if (this.input)
+      throw new RuntimeFailure(
+        'protocol_error',
+        'A Source input prompt is already active',
+      );
+    const { requestId, generation, buildId } = command.envelope;
+    const prompt = create(pb.SourceInputPromptSchema, {
+      ...fields,
+      requestId,
+      generation,
+      buildId,
+      sourceId,
+      promptId: crypto.randomUUID(),
+    });
+    return new Promise((resolve, reject) => {
+      this.input = { prompt, resolve };
+      try {
+        this.reply(command, { case: 'sourceInput', value: prompt });
+      } catch (error) {
+        this.input = undefined;
+        reject(error);
+      }
+    });
   }
 
   private requireConfirmedPreferences(): void {

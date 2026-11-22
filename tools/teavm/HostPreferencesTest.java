@@ -3,8 +3,10 @@ package prototype;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.text.Editable;
+import android.text.SpannableString;
 import android.text.TextWatcher;
 import android.text.method.PasswordTransformationMethod;
+import android.text.util.Linkify;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -73,6 +75,7 @@ public final class HostPreferencesTest {
     int changes, binds, clicks;
     boolean reject, alias, delayed, emptyOptions, watch, excessivePosts;
     String hint = "Default host";
+    CharSequence passwordHelp;
     final List<String> inputEvents = new ArrayList<>();
     int nestedGroups;
     String textKey = "text";
@@ -206,6 +209,7 @@ public final class HostPreferencesTest {
       password.setKey("password");
       password.setDefaultValue("");
       password.setSummary("must not expose credential summary");
+      password.setDialogMessage(passwordHelp);
       password.setOnBindEditTextListener(input -> {
         input.setInputType(0x81);
         input.setHint("Must not expose secret input hint");
@@ -811,11 +815,43 @@ public final class HostPreferencesTest {
     bootstrap();
     descriptionsAndEdits();
     projectedTextValidation();
+    projectedDialogMessage();
     validationAndLifecycle();
     lateWritesAndBudgets();
     bootstrapBudgets();
     dependencyAndLayout();
     emptyDynamicOptionsAndDepth();
     System.out.println("HostPreferencesTest: " + assertions + " assertions passed");
+  }
+
+  private static void projectedDialogMessage() {
+    HostPreferences host = new HostPreferences();
+    Fixture source = new Fixture();
+    String url = "https://help.fixture.invalid/profile";
+    String body = "🔐 Open (" + url + ").\nhttps://account@invalid.example/path";
+    SpannableString help = new SpannableString(body);
+    check(Linkify.addLinks(help, Linkify.WEB_URLS), "Explicit URL was not linked");
+    source.passwordHelp = help;
+    JsonObject snapshot = read(host, source);
+    JsonObject dialog = node(snapshot, 4).getAsJsonObject("text").getAsJsonObject("dialogMessage");
+    check(dialog.get("text").getAsString().equals(body), "Dialog message changed");
+    JsonArray links = dialog.getAsJsonArray("links");
+    check(links.size() == 1, "Expected only the ordinary web URL");
+    JsonObject link = links.get(0).getAsJsonObject();
+    check(
+        link.get("start").getAsInt() == body.indexOf(url)
+            && link.get("end").getAsInt() == body.indexOf(url) + url.length(),
+        "UTF-16 ranges lost the original URL");
+    JsonObject changed = edit(host, source, snapshot, "[4]", "{\"text\":\"session value\"}");
+    JsonObject after = changed.getAsJsonObject("snapshot");
+    check(
+        node(after, 4).getAsJsonObject("text").getAsJsonObject("dialogMessage").equals(dialog),
+        "Changing the value discarded the dialog");
+    check(!contains(after, "syncValues", "password"), "Dialog leaked the secret into sync values");
+    Fixture tooLarge = new Fixture();
+    tooLarge.passwordHelp = "字".repeat(683);
+    check(
+        !node(read(host, tooLarge), 4).getAsJsonObject("text").has("dialogMessage"),
+        "Oversize dialog message was projected");
   }
 }

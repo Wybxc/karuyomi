@@ -10,6 +10,8 @@ import {
 } from './bridge-common.js';
 import { imageDimensionsFromData } from 'image-dimensions';
 import { intersection } from 'polygon-clipping';
+import type { PDFiumPage } from '@hyzyla/pdfium';
+import { openPdfDocument, PDF_HEAP_BYTES } from './pdf-rasterizer.js';
 import {
   layoutText,
   textDirection,
@@ -44,6 +46,11 @@ interface Paint {
 }
 const operations = [
   'create',
+  'openPdf',
+  'openPdfPage',
+  'renderPdfPage',
+  'closePdfPage',
+  'closePdf',
   'closeDecoder',
   'recycle',
   'measure',
@@ -93,6 +100,10 @@ interface GraphicsRequest {
   spacingMult: number;
   spacingAdd: number;
   includePad: boolean;
+  breakStrategy: number;
+  hyphenationFrequency: number;
+  locale: string;
+  pageIndex: number;
 }
 function rect(value: unknown): Rect {
   if (!Array.isArray(value) || value.length !== 4)
@@ -293,6 +304,14 @@ export function parseGraphicsRequest(value: unknown): GraphicsRequest {
     spacingMult: numeric('spacingMult', 1),
     spacingAdd: numeric('spacingAdd'),
     includePad: data.includePad === undefined ? true : bool(data.includePad),
+    breakStrategy:
+      data.breakStrategy === undefined ? 0 : integer(data.breakStrategy, 0, 2),
+    hyphenationFrequency:
+      data.hyphenationFrequency === undefined
+        ? 0
+        : integer(data.hyphenationFrequency, 0, 2),
+    locale: optionalText(data.locale) ?? 'und',
+    pageIndex: data.pageIndex === undefined ? 0 : integer(data.pageIndex),
   };
 }
 interface BitmapLease {
@@ -323,6 +342,13 @@ interface GraphicsContext {
   generation: string;
   failure?: Error;
   ended: boolean;
+}
+interface OpenPdf extends Awaited<ReturnType<typeof openPdfDocument>> {
+  owner: GraphicsContext;
+  release: () => void;
+  page?: PDFiumPage;
+  rendering: boolean;
+  retired: boolean;
 }
 interface ByteHandle {
   context: GraphicsContext;
@@ -405,6 +431,7 @@ const scope = workerScope();
 export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
   const surfaces = new Map<number, Surface>(),
     decoders = new Map<number, Decoder>(),
+    pdfs = new Map<number, OpenPdf>(),
     handles = new Map<string, ByteHandle>(),
     fonts = new Map<string, { face: FontFace; release: () => void }>();
   // The bridge must never strongly retain an adopted Java Bitmap owner.
@@ -434,6 +461,7 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
     openingDecoders = 0;
   let canvasWebp: Promise<boolean> | undefined;
   let webpEncoder: Promise<WebAssembly.Module> | undefined;
+  let pdfModule: WebAssembly.Module | undefined;
   function limit(message: string): Error {
     return Object.assign(Error(message), { code: 'limit_exceeded' });
   }
@@ -523,6 +551,8 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
     for (const [id, entry] of handles)
       if (entry.context === current && (!entry.persistent || !entry.detached))
         closeBytes(id);
+    for (const [id, entry] of pdfs)
+      if (entry.owner === current) retirePdf(id, entry);
     if (!pending) {
       scratchRelease?.();
       scratchRelease = undefined;
@@ -796,6 +826,25 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
     d.decoder.close();
     if (!d.busy) d.release();
   }
+  function pdf(id: number, owner: GraphicsContext): OpenPdf {
+    const entry = pdfs.get(id);
+    if (!entry || entry.owner !== owner) throw Error('Unknown or stale PDF');
+    if (entry.rendering) throw Error('A PDF page is being rendered');
+    return entry;
+  }
+  function retirePdf(id: number, entry: OpenPdf) {
+    pdfs.delete(id);
+    entry.retired = true;
+    releasePdf(entry);
+  }
+  function releasePdf(entry: OpenPdf) {
+    if (!entry.retired || entry.rendering) return;
+    try {
+      entry.close();
+    } finally {
+      entry.release();
+    }
+  }
   function paint(ctx: OffscreenCanvasRenderingContext2D, p: Paint) {
     ctx.globalAlpha = 1;
     ctx.fillStyle = ctx.strokeStyle = color(p.color ?? -16777216);
@@ -848,7 +897,35 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
       retire(a.id);
       return {};
     }
-    context();
+    const owner = context();
+    if (a.op === 'openPdfPage') {
+      const entry = pdf(a.id, owner);
+      if (entry.page) throw Error('A PDF page is already open');
+      const page = entry.document.getPage(a.pageIndex);
+      try {
+        const size = page.getOriginalSize();
+        const width = integer(Math.floor(size.originalWidth), 0, 2147483647);
+        const height = integer(Math.floor(size.originalHeight), 0, 2147483647);
+        entry.page = page;
+        return { width, height };
+      } catch (error) {
+        page.close();
+        throw error;
+      }
+    }
+    if (a.op === 'closePdfPage') {
+      const entry = pdf(a.id, owner);
+      if (!entry.page) throw Error('No PDF page is open');
+      entry.page.close();
+      delete entry.page;
+      return {};
+    }
+    if (a.op === 'closePdf') {
+      const entry = pdf(a.id, owner);
+      if (entry.page) throw Error('A PDF page is still open');
+      retirePdf(a.id, entry);
+      return {};
+    }
     if (a.op === 'create') return create(a.width, a.height, a.f16);
     if (a.op === 'measure' || a.op === 'layout') {
       const release = reserve(
@@ -915,6 +992,10 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
             spacingMult: a.spacingMult,
             spacingAdd: a.spacingAdd,
             includePad: a.includePad,
+            breakStrategy: a.breakStrategy,
+            hyphenationFrequency: a.hyphenationFrequency,
+            locale: a.locale,
+            fontSize: a.paint.size * a.paint.scaleX,
           },
           measure,
         );
@@ -1116,6 +1197,111 @@ export function createGraphicsBridge(options: Partial<GraphicsLimits> = {}) {
     a: GraphicsRequest,
     owner: GraphicsContext,
   ): Promise<Record<string, unknown>> {
+    if (a.op === 'openPdf') {
+      const input = borrow(a.bytes);
+      let release: (() => void) | undefined;
+      let opened: Awaited<ReturnType<typeof openPdfDocument>> | undefined;
+      try {
+        release = reserve(PDF_HEAP_BYTES);
+        if (!pdfModule) {
+          const load = scope.karuyomiLoadPdfium;
+          if (!load)
+            throw unsupported('Verified PDFium resource is unavailable');
+          pdfModule = await WebAssembly.compile(await load());
+        }
+        check(owner);
+        opened = await openPdfDocument(pdfModule, input.data);
+        check(owner);
+        const pageCount = integer(opened.document.getPageCount(), 0, 4096);
+        const id = next++;
+        pdfs.set(id, {
+          ...opened,
+          owner,
+          rendering: false,
+          retired: false,
+          release,
+        });
+        opened = undefined;
+        release = undefined;
+        return { id, pageCount };
+      } finally {
+        try {
+          opened?.close();
+        } finally {
+          release?.();
+          input.release();
+        }
+      }
+    }
+    if (a.op === 'renderPdfPage') {
+      const entry = pdf(a.source, owner);
+      const page = entry.page;
+      if (!page) throw Error('No PDF page is open');
+      const target = surface(a.id);
+      if (target.f16) throw Error('PDF requires an ARGB_8888 bitmap');
+      const [left, top, right, bottom] = a.rect ?? [
+        0,
+        0,
+        target.canvas.width,
+        target.canvas.height,
+      ];
+      integer(left, 0, target.canvas.width);
+      integer(top, 0, target.canvas.height);
+      integer(right, left, target.canvas.width);
+      integer(bottom, top, target.canvas.height);
+      const width = right - left,
+        height = bottom - top;
+      if (!width || !height) return {};
+      dimensions(width, height);
+      const bytes = width * height * 4;
+      const release = reserve(2 * bytes, 2 * bytes);
+      let canvas: OffscreenCanvas | undefined;
+      entry.rendering = true;
+      target.pins++;
+      try {
+        const rendered = await page.render({
+          width,
+          height,
+          transparent: true,
+          colorSpace: 'RGBA',
+        });
+        check(owner);
+        if (target.retired) throw Error('PDF target was recycled');
+        if (
+          rendered.width !== width ||
+          rendered.height !== height ||
+          rendered.data.byteLength !== bytes ||
+          !(rendered.data.buffer instanceof ArrayBuffer)
+        )
+          throw Error('Unexpected PDFium raster dimensions');
+        const pixels = new Uint8ClampedArray(
+          rendered.data.buffer,
+          rendered.data.byteOffset,
+          rendered.data.byteLength,
+        );
+        canvas = new OffscreenCanvas(width, height);
+        const drawing = canvas.getContext('2d');
+        if (!drawing) throw unsupported('Canvas 2D unavailable');
+        drawing.putImageData(new ImageData(pixels, width, height), 0, 0);
+        target.ctx.save();
+        try {
+          target.ctx.resetTransform();
+          target.ctx.globalAlpha = 1;
+          target.ctx.globalCompositeOperation = 'source-over';
+          target.ctx.drawImage(canvas, left, top);
+        } finally {
+          target.ctx.restore();
+        }
+        return {};
+      } finally {
+        if (canvas) canvas.width = canvas.height = 0;
+        release();
+        target.pins--;
+        releaseSurface(target);
+        entry.rendering = false;
+        releasePdf(entry);
+      }
+    }
     if (a.op === 'font') {
       if (typeof FontFace === 'undefined')
         throw unsupported('FontFace unavailable');

@@ -153,6 +153,103 @@ public final class EnqueueTest {
     }
   }
 
+  static Callback gatedResponse(CountDownLatch entered, CountDownLatch gate) {
+    return new Callback() {
+      public void onResponse(Call call, Response response) throws IOException {
+        try (response) {
+          entered.countDown();
+          if (gate != null) await(gate);
+        }
+      }
+
+      public void onFailure(Call call, IOException error) {
+        throw new AssertionError(error);
+      }
+    };
+  }
+
+  static void dispatcherLimitsAndQueuedCancellation() throws Throwable {
+    Dispatcher dispatcher = new Dispatcher();
+    check(dispatcher.getMaxRequests() == 64);
+    check(dispatcher.getMaxRequestsPerHost() == 5);
+    dispatcher.setMaxRequests(2);
+    dispatcher.setMaxRequestsPerHost(1);
+    AtomicInteger intercepted = new AtomicInteger();
+    OkHttpClient client =
+        new OkHttpClient.Builder()
+            .dispatcher(dispatcher)
+            .addInterceptor(chain -> {
+              intercepted.incrementAndGet();
+              return new Response.Builder()
+                  .request(chain.request())
+                  .protocol(Protocol.HTTP_1_1)
+                  .code(200)
+                  .message("fixture")
+                  .body(ResponseBody.create(null, new byte[0]))
+                  .build();
+            })
+            .build();
+    OkHttpClient sibling = client.newBuilder().build();
+    check(client.dispatcher() == dispatcher && sibling.dispatcher() == dispatcher);
+    var enteredAlpha = new CountDownLatch(1);
+    var enteredBeta = new CountDownLatch(1);
+    var enteredGamma = new CountDownLatch(1);
+    var enteredSibling = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var cancelled = new CountDownLatch(2);
+    Callback cancelledCallback =
+        new Callback() {
+          public void onResponse(Call call, Response response) {
+            throw new AssertionError("Cancelled queued call returned a response");
+          }
+
+          public void onFailure(Call call, IOException error) {
+            check(call.isCanceled() && error instanceof InterruptedIOException);
+            cancelled.countDown();
+          }
+        };
+    BrowserCall.Operation owner = BrowserCall.beginOperation("dispatch", "generation", "limits");
+    owner.enter();
+    try {
+      call(client, "https://alpha.fixture.invalid/held")
+          .enqueue(gatedResponse(enteredAlpha, release));
+      await(enteredAlpha);
+      Call remove = call(sibling, "https://alpha.fixture.invalid/cancelled");
+      remove.enqueue(cancelledCallback);
+      call(sibling, "https://alpha.fixture.invalid:8443/second")
+          .enqueue(gatedResponse(enteredSibling, null));
+      call(client, "https://beta.fixture.invalid/held")
+          .enqueue(gatedResponse(enteredBeta, release));
+      await(enteredBeta);
+      call(client, "https://gamma.fixture.invalid/queued")
+          .enqueue(gatedResponse(enteredGamma, null));
+      remove.cancel();
+      Call cancelledEarlier = call(client, "https://beta.fixture.invalid/never-started");
+      cancelledEarlier.cancel();
+      cancelledEarlier.enqueue(cancelledCallback);
+      await(cancelled);
+      check(enteredSibling.getCount() == 1);
+      check(enteredGamma.getCount() == 1);
+      check(intercepted.get() == 2);
+      try (Response response = call(sibling, "https://alpha.fixture.invalid/sync").execute()) {
+        check(response.code() == 200);
+      }
+      dispatcher.setMaxRequests(3);
+      await(enteredGamma);
+      check(enteredSibling.getCount() == 1);
+      dispatcher.setMaxRequestsPerHost(2);
+      await(enteredSibling);
+      release.countDown();
+      owner.drain();
+      check(intercepted.get() == 5);
+      check(Bridge.openHandles() == 0);
+    } finally {
+      release.countDown();
+      owner.close();
+      owner.leave();
+    }
+  }
+
   static void callbackFailureClosesBody() throws Throwable {
     AtomicBoolean closed = new AtomicBoolean();
     AtomicInteger failures = new AtomicInteger();
@@ -823,6 +920,7 @@ public final class EnqueueTest {
     try {
       String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/view";
       nestedBeforeDelivery(endpoint, posts);
+      dispatcherLimitsAndQueuedCancellation();
       callbackFailureClosesBody();
       postFailureIsDeliveredOnce(endpoint, posts);
       timeoutAndOldOwner(endpoint, posts);

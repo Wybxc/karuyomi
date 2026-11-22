@@ -2,13 +2,15 @@
 
 `java/` 与 `bridge/` 是本项目维护的兼容层和运行实现，源于 release9 研究交付后继续开发。历史交付的源指纹见 [验证要点](../../docs/verification/runtime-evidence.md)，不用于冻结当前项目代码。旧参考工程、研究探针、导入脚本和原始流水不作为正式构建源。
 
-- TeaVM 0.16.0 由 `vendor/teavm` submodule 固定，Apache-2.0。正则 `Patched*` 实现从该上游源码加 `patches/teavm/` 生成，不保留平行拷贝；输出保留原有 TeaVM / ASF 许可头。`prototype/jcl/Base64.java` 是重新实现的兼容适配，保留其历史 TeaVM 作者许可头；`WaitObjectMethods.java` 提取并适配 TeaVM `TObject` 的等待逻辑，保留来源说明。
+- TeaVM 0.16.0 由 `vendor/teavm` submodule 固定，Apache-2.0。正则、日期和字符串拼接的补丁从该上游源码与 `patches/teavm/` 生成，输出保留原有 TeaVM / ASF 许可头。`prototype/jcl/Base64.java` 是重新实现的兼容适配，保留其历史 TeaVM 作者许可头。`WaitObjectMethods.java` 提取并适配 TeaVM `TObject` 的等待逻辑，保留来源说明。
 - Suwayomi-Server 由 `vendor/suwayomi-server` submodule 固定，MPL-2.0。Source、模型与部分网络 ABI 来自其依赖材料；`HttpSource.java` 是本项目的 Kotlin→Java / TeaVM ABI 适配。HTTP await / awaitSuccess 及其 continuation 直接使用锁定 seed JAR 的上游实现；构建副本仅精确接管图片 cacheless / progress 方法，复用 BrowserCall 的集成。未把旧参考 Kotlin 工程当作项目原创。历史材料来源 commit 为 `6b481e8b62938b9c060eb210b934e0fbfdfa466b`；材料原 JAR 摘要由工具链锁校验。许可证见 `licenses/Suwayomi-MPL-2.0.txt`。
 - Android `org.json` 取自固定 Suwayomi 子模块的 `AndroidCompat/src/main/java/org/json/`，其 AOSP 文件为 Apache-2.0。正式构建仅在生成目录中去掉 `JSONObject` 的 AndroidX 空值标注，保留实现与原许可头；不提交源码副本。
 - Keiyoushi 扩展源码由 `vendor/extensions-source` submodule 固定，Apache-2.0。正式构建使用其 Gradle/KSP 生成的 JAR 与 Source 元数据，不修改扩展业务字节。许可证见 `licenses/Keiyoushi-Apache-2.0.txt`。
 - ICU4J 79.1 的 Unicode 许可见 `licenses/ICU4J-Unicode.txt`。`AotServiceFactory` 只分派到原 ICU 构造器；原 ICU 实现和资源保持依赖材料身份。`java.text.Collator` / `Normalizer` 是浏览器 Intl / normalize 适配。
+- Bouncy Castle 1.87 由 Maven 精确固定。RSA PKCS#1 v1.5 公钥加密调用其轻量加密接口，随机数由 Worker 的 WebCrypto 提供。构建将 [JAR 内的原许可](java/BOUNCY-CASTLE-LICENSE.txt)随 AOT JavaScript 一同分发。
 - Zstandard 的 BSD 许可见 `licenses/Zstd-BSD.txt`；`@bokuweb/zstd-wasm` 0.0.27 来源为 [bokuweb/zstd-wasm](https://github.com/bokuweb/zstd-wasm)，包声明 MIT，由精确版本与 pnpm tarball integrity 固定。生成的 JS glue 和 WASM 均来自此 npm 依赖，项目只维护类型化的桥接与有界帧校验。WASM 在 Web 作为静态资源交付，在 Native 随应用打包，构建与加载均校验其摘要；客户端构建不从私有 JVM seed 提取 WASM。
 - libwebp 1.6.0 由 `vendor/libwebp` submodule 固定。WebP 编码 WASM 随 Web 和 Native 交付，原 `COPYING` 和 `PATENTS` 从该提交输出为 `libwebp.txt`。项目仅维护有界编码接口，Flutter 的阅读图片解码不使用此 WASM。
+- `@hyzyla/pdfium@3.0.0` 来自固定 npm tarball。Vite 将 npm 包的 MIT 许可和 PDFium 8046d 的[第三方许可清单](licenses/PDFium-Third-Party.txt)合并为 `pdfium.txt`，随 Web 和 Native 交付。该清单来自紧接发布提交的上游许可提交，WASM 使用 npm 包原始字节。[上游许可提交](https://github.com/hyzyla/pdfium/commit/ff2083e4109840ce4157ec59ccdb1b253271d0bf)
 - Gson、Jsoup、OkHttp、Okio、Kotlin、Android ABI 及其他 JVM 依赖的版本和文件摘要在 `toolchain-lock.json` 的 runtime seed 中固定，各库原许可见其 JAR 的 `META-INF`。同名 Java 文件是项目为 TeaVM 提供的适配；例如 Gson `Streams` 提供递归 JSON 读写，未复制完整原库源码。
 
 正式构建中的 `PatchLibraries.java` 仅适配宿主和依赖 JAR，不改写扩展输入 JAR。发布 provenance 记录实际上游提交、材料摘要、工具链和构建输出；编译或初始化通过不代表在线网站语义与图片功能通过。

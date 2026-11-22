@@ -2,6 +2,170 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-22，主线 `af8c203` 的生产 Worker `70948d0b-ac41-4e03-a68a-d7912c0c6829` 接收全部流量。公开状态与索引逐字节匹配 revision `ddb5ac8f3b2a46cb8efc2dafc440b3d4`，46 项 Web 静态资源和匿名 Access 302 通过。Arknights Comics 1.6.2 的清单、gzip 与解码后摘要通过。逐包检查与生产索引一致的 191 个产物，只有该包导出 `hostAcquireCover`。生产登录后的普通封面显示待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，在 `macbook-pro-4` 固定 `af8c203`、Keiyoushi `efa93f5a` 和生产父快照试编 xkcd。Gradle 构建、TeaVM AOT、正式产物校验及 `hostAcquireCover` 导出检查通过，canonical SHA-256 为 `4ef740416ad8976e9870e161ce5c7edff8b60f7261e71f3648f03edee10d5f89`。该包仍标记 `compiled_unverified`。随后在同一台机器启动两并发冻结队列。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，`macbook-pro-4` 复用主线 `af8c203` 的 CI Web/runtime 归档，用生产父快照通过正式 Vite 装配和 Wrangler 4.156.1 dry-run。生产索引及 191 份清单与预演输入逐字节一致，191 个公开 gzip 的强 ETag 与固定 Wrangler 的上传指纹一致，MIME 与 HTTP 编码均符合交付合同。完整候选的生产交付与普通封面现场验收仍待完成。[主线 CI](https://github.com/Wybxc/karuyomi/actions/runs/44912832454)
+
+2026-11-22，在 `macbook-pro-4` 从同一冻结计划和检查点优先编译队列末尾的 54 个现网包，全部成功。逐包核对原索引中的 191 个包，其中 190 个重编并通过正式构建校验，Arknights Comics 复用同一输入的已上线构建。解码后的 191 个包均导出 `hostAcquireCover`，原有 1,035 个 Source 条目保留。四并发全量队列随后接续，父 revision、目录指纹及 1,447 个选择项与原计划一致。内置浏览器的控制调用仍超时，真实页面出图待复验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，原现网 191 个扩展的封面宿主升级已发布。Worker `68584fe5-3d3b-4425-8017-77ca374cc0c0` 承接 100% 流量。公开状态与索引逐字节匹配 revision `ef76d5d1952b4733a10704d8401748ad`，191 份清单、191 个安装包强 ETag、46 项 Web 静态资源及匿名 Access 302 均通过。已用正式 `commit-snapshot` 提交该检查点。完整目录仍有 1,257 个输入待计入已发布基线，`bootstrap.complete` 为 `false`。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-22，冻结批次的 MangaFire 缺少 TeaVM `Class.getResource`。宿主补充了打包资源的 URL 读取，JDK 与实际生成的 JavaScript 对照通过 8 项资源读取断言，原 80 项日期断言和 `pnpm teavm:check` 均通过。在 `macbook-pro-4` 固定 `b4cbede` 与同一上游提交补编 MangaFire 1.6.36，正式 Gradle、TeaVM 和产物完整性检查通过，打包有 7 个 Source 及 `hostAcquireCover`。共享运行材料清单与冻结批次逐字节一致，canonical SHA-256 为 `307cae848db6c5af71f33518daa46eee2c76d0e148f189b1cd6ebe2fb8573449`。结果为 `compiled_unverified`，等待完整候选合入及在线复验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，冻结批次的 Komga 缺少 `Builder.authenticator`，BookOrbit、LANraragi、Mango 缺少 `Builder.dns`。宿主补齐同源 401 和系统 DNS，`pnpm teavm:check` 的 24 项回环 HTTP 断言和 26 项网络配置断言通过，覆盖重定向凭证隔离、一次性正文及响应释放。在 `macbook-pro-4` 固定 `a2d506a` 和 Keiyoushi `efa93f5a` 补编 Komga 1.6.75、BookOrbit 1.6.1、LANraragi 1.6.2、Mango 1.6.1，四包均通过正式完整性和 `hostAcquireCover` 检查，共 7 个 Source。共享运行材料清单与冻结批次逐字节相同，四包保持 `compiled_unverified`，生产出图与源站登录待验。[Source 网络桥](design/mihon-web-design.md#84-扩展回调与网络桥)
+
+2026-11-22，冻结批次的 BookWalker 和 J-Novel 缺少 Java 摘要子类构造器与 `InvalidParameterException`。补齐宿主分派后，`pnpm teavm:check` 通过，生成的 JavaScript 与 JDK 对照通过 10 项摘要断言。在 `macbook-pro-4` 固定 `f64676e` 和同一 Keiyoushi 提交，BookWalker 1.6.2 与 J-Novel 1.6.3 均通过正式 AOT、产物完整性及 `hostAcquireCover` 检查，各包含 1 个 Source。共享运行材料一致，两包均为 `compiled_unverified`，在线验收待完成。[摘要实现](../runtime/teavm/README.md)
+
+2026-11-22，Read Berserk Manga 在冻结并发构建中因 Gradle 打包共享主题缓存时读取文件模式失败。用 `macbook-pro-4` 上独立的 `f64676e` checkout 串行复验同一 Keiyoushi 提交，Gradle、TeaVM 和正式完整性检查通过。1.6.1 产物包含 1 个 Source 与 `hostAcquireCover`，canonical SHA-256 为 `161714228319a84bb9d32249751dd604bc69a82b881dbb219bb513a76bf419d5`，保持 `compiled_unverified`，已登记到完整候选。同期其他扩展有上游 KSP `@Source` 继承校验错误，原诊断按包保留。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，`303bc67` 补齐冻结批次缺少的 Java PBKDF2 接口。`pnpm teavm:check` 通过，实际生成的 JavaScript 与 JDK 对照通过 8 项断言。在 `macbook-pro-4` 固定同一 Keiyoushi 提交补编 Coolmic 1.6.3、Manga Drama 1.6.6、Mgread.io 1.6.7，三包正式 AOT、完整性和 `hostAcquireCover` 检查通过，各保留 1 个 Source。共享运行材料与冻结批次逐字节相同。三包与此前八个补编结果通过候选装配前检查，等待全量终态。三包保持 `compiled_unverified`，生产发布与在线出图待验。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，在 `macbook-pro-4` 用 LunarAnime 的隔离构建副本复现 TeaVM 字符串拼接参数越界。`5281227` 的固定编译器补丁经 JDK 与生成 JavaScript 对照通过，`pnpm teavm:check` 通过。随后同机用原扩展正式重编，越过原异常，AOT 仍因 `KeyFactory`、`KeyPairGenerator`、`KeyPair` 和 `ECPoint` 缺失而失败。[编译器补丁](../runtime/teavm/README.md)
+
+2026-11-22，在 `macbook-pro-4` 的独立 `5281227` checkout 串行复验冻结批次上游 KSP 失败的 Read One Piece Manga Online。使用同一 Keiyoushi 提交，Gradle、TeaVM、完整性和 `hostAcquireCover` 检查均通过。1.6.1 产物包含 1 个 Source，canonical SHA-256 为 `49995bc1842d7c7464f9553f25de7d374492fcfc1e30f4e56e0bd8e5c125292e`。该包保持 `compiled_unverified`，同主题同类失败按包排队复验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，同一 `5281227` checkout 的 The Blank 1.6.5、TCB Scans 1.6.1 和 Webnex 1.6.9 通过正式 AOT、完整性和 `hostAcquireCover` 检查，各保留 1 个 Source。补编分别使用时区与资源、应用数据目录和资源读取适配。候选预检核对 `303bc67` 和 `5281227` 两批的 15 个真实产物与封面入口，生产父 revision 为 `ef76d5d1952b4733a10704d8401748ad`，两批共享材料逐字节一致。多批组装通过 62 项扩展流水线、14 项构建和 16 项完整性测试。全量落盘及生产出图待验。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，`macbook-pro-4` 的独立 `5281227` checkout 串行复验冻结批次中同一 MangaCatalog 主题的 KSP 继承校验失败。包含先行试编在内，12 个受影响扩展均在固定的 Keiyoushi 提交上通过正式构建、产物完整性和 `hostAcquireCover` 检查，共 12 个 Source。各包保持 `compiled_unverified`。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，`7e0c053` 的 P‑256 适配通过 `pnpm teavm:check`。JDK 与生成的 JavaScript 均通过 12 项密钥和签名断言，验证 RFC 6979 的公开向量，两端也能互相读入 X.509 公钥并验签。LunarAnime 与 ProComic 已在 `macbook-pro-4` 排入固定提交的正式补编。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，在 `macbook-pro-4` 的独立 `7e0c053` checkout，ProComic 1.6.4 通过正式构建、产物完整性和 `hostAcquireCover` 检查，包含 1 个 Source。共享运行材料逐字节匹配，canonical SHA-256 为 `c6234a722a92ca4200f0261c50fb1ad7fe93af14e7643432ffb6e14b84c40a2d`，保持 `compiled_unverified`。同一批次的 Lunar Manga 越过密钥接口错误，正式 AOT 仍卡在上游 Turnstile helper 所需的 Android Activity 和 WebView 接口。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，同一 `7e0c053` checkout 的 Capibara Traductor 1.6.5、Mangas.in 1.6.4、Mangas No Sekai 1.6.78 通过正式 AOT、产物完整性及 `hostAcquireCover` 检查，各包含 1 个 Source。后两包以打包资源读取适配重新构建。三个补编批次共 30 个包经候选预检，与生产父快照 `ef76d5d1952b4733a10704d8401748ad` 和冻结批次共享材料匹配。三包保持 `compiled_unverified`，等待全量发布与在线验收。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，Nexus Scanlation 在冻结批次因缺少 Java `KeyPairGenerator` 和 `KeyAgreement` 失败。宿主补齐两方 P‑256 协商后，JDK 和生成的 TeaVM JavaScript 对照通过 18 项椭圆曲线断言。其中 6 项新增断言覆盖 RFC 5903 公开向量、错误输入和协商状态复用，双向 ECDSA 验签也通过。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，在 `macbook-pro-4` 固定 `65e303a` 与同一 Keiyoushi 提交补编 Nexus Scanlation 1.6.8，正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `cf7ba2151c27e2bccf2e7f2f3ec299dc77e936898cc6fd86ac8a2c86ce52f535`。共享材料逐字节一致，第四个补编批次已通过候选预检，保持 `compiled_unverified`。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，Emaqi 的冻结构建缺少 Java 的 RSA 密钥及 OAEP 参数接口。使用正式宿主兼容层在 JDK 与生成的 TeaVM JavaScript 各通过 16 项 RSA-OAEP 断言，覆盖标准密钥编码、标签和参数、单块长度、短输出重试及错误标签。正式扩展构建和在线运行需另外验收。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，在 `macbook-pro-4` 固定 `9e67f54`，Emaqi 1.6.3、Epsilon Scan 1.6.5、Soft Epsilon Scan 1.6.5 均通过正式构建、产物完整性和 `hostAcquireCover` 检查，各包含 1 个 Source。两项法语扩展使用已验证的时区与打包资源读取。第五个补编批次使用与冻结批次逐字节一致的共享材料，候选预检累计纳入 34 个补编结果，仍待上线与在线验收。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，Falco Scan（`tenkaiscan`）冻结构建缺少位图矩阵绘制和颜色过滤接口。JDK 与生成 TeaVM JavaScript 对照通过 45 项仿射和颜色断言，Android API 35 原生图形 oracle 通过 5 项测试，核对裁剪、密度、颜色矩阵及画笔透明度的顺序。对合成 129×129 位图执行生成的 TeaVM 绘图代码，受控 Node 图形桥核对两个不超过 64 KiB 的 RGBA 块、实际下发矩阵及模拟绘图失败后的释放，已有 21 项图形桥回归通过。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，在 `macbook-pro-4` 固定 `ddbcbb8`，Falco Scan 1.6.1 的正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `363d849a4a1d7c40cfc01c238a6113826de4d83f34043323cec153de648bffc1`，共享材料逐字节一致，候选预检纳入第 35 个补编结果，保持 `compiled_unverified`。正式出图和使用真实源站图片的阅读待验。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，在 `macbook-pro-4` 的同一 `ddbcbb8` checkout 提前试编 U-Next、OneReader 和 MoeTruyen，三包使用相同上游源码闭包及共享材料。U-Next 1.6.4 通过正式构建、产物完整性和 `hostAcquireCover`，canonical SHA-256 为 `f7b0597516d7fbb035f2a4df681d7bc2464bbefdbdce185e62d1fd21599bf05f`，候选预检等待该包的冻结原回执。OneReader 的密钥接口已通过编译解析，缺少 Java `SequenceInputStream`。MoeTruyen 仍依赖未实现的 Android 对话框和视图接口，以及双参数 `Cipher.init`。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，顺序流兼容层在 JDK 与生成的 TeaVM JavaScript 各通过 15 项断言，覆盖延迟读取、空分段、无符号字节、EOF、提前关闭及后续关闭错误的传播。完整 `pnpm teavm:check` 通过，OneReader 正式补编待复验。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，在 `macbook-pro-4` 固定 `289f182` 补编 OneReader 1.6.4，正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `c2fe7b4a807128569377e50f5faab570d61303ea89c1c9a8619c56c8c9c35879`，共享材料逐字节一致。保留提前构建回执，等待冻结原回执及在线验收。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，Dragon Ball Multiverse 和 ManhuaRM 的冻结构建均缺少 `StaticLayout.Builder`。Android API 35 原生图形参考以合成段落复现三组不同断行结果。80 px 下，简单与高质量断行的第 5 行分别止于 UTF‑16 偏移 40 和 39，关闭与开启完整连字符的第 2 行分别止于 12 和 14。85 px 下，高质量与平衡断行的第 9 行分别止于 69 和 71。扩展所需的断行与连字符仍待宿主实现。[Android 参考测试](../tools/teavm/fixtures/text-layout/AndroidTextTest.java) · [Android Builder](https://developer.android.com/reference/android/text/StaticLayout.Builder)
+
+2026-11-22，宿主接入 `StaticLayout.Builder`、段落断行和按语言选用的连字符词表。布局与图形桥的 28 项定向测试通过，覆盖三种策略、硬换行、字素边界，以及补画连字符后的行宽和原始 UTF‑16 偏移。`pnpm teavm:check`、严格类型检查和正式 Web/Native 运行时构建通过。新图形材料 SHA‑256 为 `3df7d350c88ee9ed495d17df976534d1fdc00c51ed0ce5432bf34d2f263504f0`，须使用匹配的扩展构建。两个扩展的正式补编、实际绘制和生产发布待验。[文字布局计划](plan/text-layout.md)
+
+2026-11-22，在 `macbook-pro-4` 固定 `c549ae6` 和 Keiyoushi `efa93f5a` 后独立补编。Dragon Ball Multiverse 1.6.1 与 ManhuaRM 1.6.1 均通过正式 Gradle、TeaVM AOT、产物完整性和 `hostAcquireCover` 检查，共 44 个 Source。两包的 canonical SHA‑256 分别为 `0f24bf0ea7c2b3ae48a919379d57d5f3fe9a7584d16e0206a5e312b07fa06533` 与 `b5dba5b987116f30f1782832ba5eb4ba3b0435a6fd887560f5ce6de185215b8b`。补编使用与 CI Web 归档匹配的新图形材料，两包保持 `compiled_unverified`，实际绘制和生产发布待验。[GitHub CI](https://github.com/Wybxc/karuyomi/actions/runs/44962498253)
+
+2026-11-22，SoftKomik 冻结构建缺少 Java `UnknownHostException`。JDK 与生成的 TeaVM JavaScript 对照通过该异常的继承、捕获和消息保留，完整 `pnpm teavm:check` 通过。当前 HTTP 中继以通用网络错误表示请求失败，扩展在线遇到 DNS 错误时的分支仍待验证。[HTTP 传输边界](HTTP-BRIDGE.md)
+
+2026-11-22，在 `macbook-pro-4` 固定 `eac70b4` 补编 Softkomik 1.6.4，正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `f0606f04683feb3e0d4cf56c5a21ad39eac08f3b4838259c54f1396806a16809`，共享材料逐字节一致，候选预检纳入第 36 个补编结果。生产仍为 revision `ef76d5d1952b4733a10704d8401748ad`，已读回的公开索引含 191 个扩展。在线出图与 DNS 错误情况待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-22，ebookjapan 冻结构建缺少 `Rect.exactCenterX`。宿主补齐双轴中心计算，JDK 与生成的 TeaVM JavaScript 共通过 54 项图形变换断言，其中 9 项覆盖半像素中心、平移、围绕中心旋转及 Android 整数算术。Android API 35 原生图形参考通过 6 项测试，使用 3×1 位图验证半像素中心旋转后的实际像素。完整 `pnpm teavm:check` 通过。[Android Rect](https://developer.android.com/reference/android/graphics/Rect)
+
+2026-11-22，在 `macbook-pro-4` 固定 `0472569` 和同一 Keiyoushi 提交补编 ebookjapan 1.6.5。正式 AOT、产物完整性和 `hostAcquireCover` 检查通过，包含 1 个 Source，canonical SHA-256 为 `abed0629eb3a43f00a36dc49bd1e95fda8b6cee59b54b8989a93bc4bb836ac11`。候选装配预检核对共享材料与生产父快照，累计纳入 37 个补编结果。该包保持 `compiled_unverified`，待生产发布和在线出图验收。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，原冻结队列收到 U-Next 和 OneReader 的 AOT 失败回执。装配预检按原输入及共享材料校验两份正式补编，累计纳入 39 个补编结果，生产父 revision 为 `ef76d5d1952b4733a10704d8401748ad`。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，SoraRaw 冻结构建缺少颜色数组版 `Bitmap.createBitmap`。宿主复用有界像素写入，按原 API 返回独立的不可变位图。Android API 35 原生参考共通过 7 项测试，新增用例核对逐像素复制、负 stride 与无效参数。`pnpm teavm:check` 通过。在 `macbook-pro-4` 固定同材料提交 `58f2d79` 与 Keiyoushi `efa93f5a`，SoraRaw 1.6.3 通过正式 Gradle、TeaVM、完整性和 `hostAcquireCover` 检查，包含 1 个 Source，canonical SHA‑256 为 `56f21ff078d2c80b1cd991603e4e8992f91f367ea373ff438b563a58379e8cc5`。装配预检将其纳入第 40 个补编结果，保持 `compiled_unverified`。[Android Bitmap](https://developer.android.com/reference/android/graphics/Bitmap)
+
+2026-11-22，在 `macbook-pro-4` 复用固定 `58f2d79` 和 Keiyoushi `efa93f5a`，Gölge Bahçesi 1.6.2、Koreli Manga 1.6.6、Manga Ruhu 1.6.6、Merlin Scans 1.6.7 通过正式 AOT、产物完整性和 `hostAcquireCover` 检查，各包含 1 个 Source。Gölge Bahçesi 使用既有打包资源读取适配，其余三包使用既有 PBKDF2 适配。共享材料逐字节一致，装配预检纳入 44 个补编结果，四包保持 `compiled_unverified`。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，`1d82b02` 为 OkHttp 整次调用提供超时。完整 `pnpm teavm:check` 通过，包含 13 项新增回环断言，覆盖重定向后的响应头等待、流式正文超时、连接释放和异步回调次数。JDK 与生成的 TeaVM JavaScript 均通过独立的超时与退出探针。同材料固定 checkout `de001d3` 在 `macbook-pro-4` 完成 AnimexNovel 1.6.20 和 ArgosComics 1.6.64 的正式 AOT、产物完整性及 `hostAcquireCover` 检查。两包各包含 1 个 Source，保持 `compiled_unverified`。[超时语义](HTTP-BRIDGE.md)
+
+2026-11-22，`58d38c7` 实现带支点的 `Canvas.scale`。Android API 35 原生图形参考共 8 项通过，新增用例对照绕非整数支点反射后的实际像素。JDK 与生成的 TeaVM JavaScript 各通过 60 项图形变换断言。MangaTR 1.6.25 在 `macbook-pro-4` 同材料 checkout `de001d3` 通过正式 AOT、产物完整性及 `hostAcquireCover` 检查，包含 1 个 Source，canonical SHA-256 为 `93e823a456a69e21e745a70bd341660cd0b903d9c0f60887582299cf9d620d19`，保持 `compiled_unverified`。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，OriManga 1.6.6、Paradox Scans 1.6.6、Ragnar Scans 1.6.6、Siyah Melek 1.6.7 在 `macbook-pro-4` 复用 `58f2d79` 的 PBKDF2 适配，分别通过正式 AOT、产物完整性和 `hostAcquireCover` 检查，各包含 1 个 Source。四包保持 `compiled_unverified`。全量装配预检纳入 51 个补编结果。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，`a35e3be` 和 `8cd026f` 将 Android 字节数组版 `ImageDecoder` 接到现有有界位图解码。JVM 受控桥核对同一字节句柄的头部回调、像素解码顺序，以及成功、无效数据和回调异常后的释放。Robolectric API 35 原生参考 9 项通过，新增用例使用合成 PNG 核对数组范围、软件分配、像素与 WebP 编码。该环境的 AVIF 解码返回未实现，合成 AVIF 另用固定头部解析器与 FFmpeg 独立核对尺寸及像素。完整 `pnpm teavm:check` 通过，真实浏览器 AVIF 解码和源站封面待验。[Android ImageDecoder](https://developer.android.com/reference/android/graphics/ImageDecoder)
+
+2026-11-22，HV2TComics 1.6.4 在 `macbook-pro-4` 固定 `efc86e2` 与 Keiyoushi `efa93f5a` 通过正式 Gradle、TeaVM AOT、产物完整性和 `hostAcquireCover` 检查，包含 1 个 Source。共享材料与冻结批次逐字节一致，首个补编的 canonical SHA-256 为 `f5bbcaabb676ca7fa2f038b7b9e0a5da96a8da939ac58eefd211cc9f65be813f`，保持 `compiled_unverified`。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，`macbook-pro-4` 收齐冻结目录 1,448 个输入的回执。补编装配纳入 HV2TComics 的数组边界修正版 `739ff03`，以及在收尾阶段成功构建的 Tủ Sách Xinh Xinh、Yuri Garden 和 Picacomic。逐包审计确认 1,414 个可分发扩展均导出 `hostAcquireCover`，共 2,280 个 Source，保留历史可用的 1,371 包并新增 43 包。34 个输入有明确的 AOT 失败记录。漫画人复用 X.509 接口后，仍缺双参数 `Cipher.init`。正式 Vite 与 Wrangler dry-run 通过，当前批次的生产发布和实际出图待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，主线 `af8c203` 的有界增量预检曾将 55 个已由补编恢复的软件包按旧失败输入重新排队。`d7b8485` 修正账本保留逻辑，62 项扩展流水线回归、工具严格类型和依赖分层检查通过。在 `macbook-pro-4` 用同一组产物重装配 revision `85bf2ec61d274e83bfc3b4281034851f`，索引逐字节一致，保留 55 份原失败回执。固定主线的正式 `plan --ci --limit 12` 选择 0 项，生产读回待验。[补编与增量合同](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，带封面入口的完整扩展基线已发布。Wrangler 4.156.1 将 Worker `30f79ab5-5d7e-4390-8f67-e58ec5085986` 切换至 100% 流量，线上 revision 为 `85bf2ec61d274e83bfc3b4281034851f`。生产索引与构建状态逐字节核对，1,414 份清单、1,414 个 gzip 强 ETag 及交付头、46 项 Web 静态资源和匿名 Access 302 均通过。D1 账本读回 13 项迁移，连续至 `0012`。本机与 `macbook-pro-4` 的正式检查点均已写入。从生产读回状态后，同一主线的有界增量计划选择 0 项。定时扩展工作流保持手动停用。内置浏览器连接超时，生产登录后的出图待验。34 个扩展仍有 AOT 失败记录。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-22，`00df97d` 补齐 X.509 RSA 公钥导入及 PKCS#1 v1.5 公开加密。完整 `pnpm teavm:check` 通过，生成的 JavaScript 与 JDK 对照通过 13 项 PKCS#1 v1.5 断言和原有 16 项 OAEP 断言。JDK 独立解出了由生成代码使用合成公钥加密的测试数据。在 `macbook-pro-4` 的独立 `3fe63f1` checkout 用固定 Keiyoushi `efa93f5a` 补编漫画人 1.6.2，正式 AOT、产物完整性和 `hostAcquireCover` 检查通过。共享运行材料与生产父快照相同，canonical SHA-256 为 `78c22a39d47b1776906e16763e619406f695fad568ac5eb4ddd279b6502d41ec`。正式装配核对原有 1,414 个索引条目逐项相同，新增一个扩展和一个 Source，原失败回执保留。Vite 正式构建及 Wrangler dry-run 通过，漫画人保持 `compiled_unverified`。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，Wrangler 4.156.1 上传漫画人的清单和 gzip、扩展索引及构建状态共 4 项，Worker `9d83d2e9-be0b-4a34-9dbc-d930d54bc192` 接收 100% 流量。生产 revision `253d97308eb0412280daba751b79b945` 可分发 1,415 个扩展和 2,281 个 Source，33 个 AOT 失败保留诊断。通过 `macbook-pro-4` 读回生产索引、状态、漫画人清单和 gzip，核对安装包压缩前后摘要、强 ETag、46 项 Web 静态资源及匿名 Access 302。本机和构建机检查点均已确认，固定主线的 `plan --ci --limit 12` 选择 0 项。生产登录后的漫画人出图待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-22，固定 PDFium 3.0.0 的合成双页用例在 Node 24.15.0 栅格化真实像素，覆盖不同页尺寸、透明背景、坏 PDF、超内存分配、按需加载和请求结束后的句柄释放。PDF、图形和材料 29 项测试通过，`pnpm teavm:check`、严格类型、依赖分层和扩展构建与完整性检查通过。正式 Vite 构建生成八份共享材料，原生 Worker 为 6,713,931 字节，低于 8 MiB 脚本限额。原扩展正式 AOT、生产与真实阅读另验。[运行材料](RUNTIME-MATERIALS.md)
+
+2026-11-22，在 `macbook-pro-4` 固定宿主 `db79dd5` 和 Keiyoushi `efa93f5a`，MangaDash、Dragon Ball Multiverse 和 ManhuaRM 的 1.6.1 产物通过正式 AOT、完整性和 `hostAcquireCover` 检查，共覆盖 45 个 Source。运行材料版本 `5216a27745dc1bb1c1e2760ae99cd179b1352924c41b8edeb93e912ac026bcdf` 与本机产物一致。通过正式入口读回生产父 revision `253d97308eb0412280daba751b79b945` 后，四路全量重建已启动，复用这三份回执并覆盖 1,448 项。三个包均保持 `compiled_unverified`，生产发布与实际阅读待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，`08475d4` 补齐发布测试的 PDFium 材料元数据。macOS arm64 上的完整 `pnpm check` 和 `pnpm build` 通过。Web 和 Native 产物的材料身份相同。直接检查 Worker 静态目录确认 PDFium 的长度、SHA-256、`application/wasm` 与 immutable 缓存头，Web 随附上游许可。构建时扩展队列仍在运行，故本次产品构建使用空扩展目录。[运行材料](RUNTIME-MATERIALS.md)
+
+2026-11-22，`93202ca` 将 OkHttp 调度容量接入宿主的 HTTP 调用。完整 `pnpm teavm:check` 及工具类型检查通过，队列用例合计 97 项断言，覆盖总并发、按域名跨端口限额、配置调整、回调期间占用名额和排队取消。在 `macbook-pro-4` 固定 Keiyoushi `efa93f5a`，MangaKakalot 1.6.28 分别用现网材料 checkout `5a72a6f` 和新材料 checkout `65934a1` 完成正式 AOT、产物完整性和 `hostAcquireCover` 验证。两份产物均保留一个 Source。canonical SHA-256 分别为 `ab70100b7af58e91ecea5f7228f508c8c5acfaa1fb078d143a05f771cd82e66c` 和 `38259acb8dc747a1f594bdbe3a3817d8e16922071da220c45200540bc7879cf4`。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，MangaKakalot 1.6.28 加入现网索引。Wrangler 4.156.1 更新 4 项静态资源，Worker `177a3744-ed76-48e9-9f37-47653d57fd7c` 接收全部流量。生产 revision `fd36b3a383664022934cf2f3f2abc47d` 的 1,416 个扩展包含 2,282 个 Source，32 个 AOT 失败保留诊断。原有 1,415 个索引条目逐项对照通过。公开索引、状态、MangaKakalot 清单和 gzip、46 项 Web 静态资源及匿名 Access 302 均已读回确认。两地检查点已更新，同一主线的有界规划选择 0 项。该扩展保持 `compiled_unverified`，实际出图待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-22，从生产 `fd36b3a383664022934cf2f3f2abc47d` 派生八材料装配计划，保留全部 1,448 个冻结输入并纳入同材料的 MangaKakalot 成功回执。构建过程仍使用原冻结 checkout。复核时全量进程存活，已记录 94 个成功和 1 个失败。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，`56ab110` 接入 Source 文本设置的原弹窗说明和有界 HTTP(S) 链接。`pnpm check`、`pnpm flutter:check`、`pnpm teavm:check` 与 `pnpm build` 通过，设置 JVM 夹具共 198 项断言，Flutter 设置组件共 38 项测试。在 `macbook-pro-4` 固定 Keiyoushi `efa93f5a`，Mehgazone 1.6.1 的正式 AOT、产物完整性、弹窗描述和 `hostAcquireCover` 导出检查通过，包含 1 个 Source。八份共享材料与冻结队列相同，canonical SHA-256 为 `141fd57b59b4f6d46d386bcf5af11ba66c809bd155b387d6dff27127f9e75942`。回执保持 `compiled_unverified`，实际设置、源站登录及出图待验。[设置计划](plan/source-preferences.md)
+
+2026-11-22，以同一生产父 revision 核对 1,448 个冻结输入和两个替换包 MangaKakalot、Mehgazone。原八材料队列复核时收到 150 个成功和 2 个失败回执。最终装配仍待冻结输入全部取得正式终态。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，`23ae07b` 复用固定 Bouncy Castle 实现 Source 使用的 `AES/ECB/NoPadding`。`pnpm teavm:check` 与工具类型检查通过，固定 JDK 和生成的 JavaScript 均通过 45 项 AES 断言。在 `macbook-pro-4` 固定 Keiyoushi `efa93f5a`，Doujin.io 1.6.5 的七材料 checkout `027f722` 和八材料 checkout `23ae07b` 均通过正式 AOT、产物完整性和 `hostAcquireCover` 检查，各包含 1 个 Source。两个 canonical SHA-256 分别为 `3bef027571462d55e0c889c1dca178e78e71d09f3bc44ffc6e455a3f24b5b2f3` 与 `d25fc4be245d4e9359b7370a7b7f8eabe7cc30266ff0d84d2ec5b14bb8f7139b`。回执保持 `compiled_unverified`，实际出图待验。[宿主实现](../runtime/teavm/README.md) · [完整 CI 与 Web/Wasm 构建](https://github.com/Wybxc/karuyomi/actions/runs/45019244395)
+
+2026-11-22，Doujin.io 1.6.5 的七材料构建已发布。Wrangler 4.156.1 核对 Worker `5cb2eecb-b1b9-486b-892e-b4ffda8cbd60` 接收全部生产流量。revision `448797e3feaa477c8ea18f54c6b874bd` 包含 1,417 个扩展和 2,283 个 Source，保留 31 个失败输入。候选逐项比对原 1,416 个索引条目，通过 Vite 与 Wrangler dry-run。生产读回确认公开索引、状态、Doujin.io 清单、gzip 与解码后的两域摘要、强 ETag、46 项 Web 资源及匿名 Access 302。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-22，本机和 `macbook-pro-4` 已提交 revision `448797e3feaa477c8ea18f54c6b874bd` 的正式检查点。固定主线从生产状态运行的有界增量规划选择 0 项。八材料装配计划以该 revision 为父，纳入 MangaKakalot、Mehgazone 和 Doujin.io 的成功回执。原四路冻结队列复核时收到 228 个成功和 2 个失败回执。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，`943b348` 补齐流式 HMAC-SHA-512，并用同一固定库执行原有的 HMAC-SHA-256。`pnpm teavm:check` 与工具类型检查通过，固定 JDK 和生成的 JavaScript 均通过 17 项 HMAC 对照断言。用七材料 `3c21348` 与八材料 `943b348` 在 `macbook-pro-4` 重编 MoeTruyen 1.6.21，两份 JAR 均生成。两套 TeaVM 诊断均定位到 Keiyoushi `askInput` 所用的 Android 对话框、Activity 和输入控件。R8 映射确认原 `askInput` 已内联到调用者。正式 AOT 待终端输入交互接入后复验，当前没有可发布产物。[完整 CI 与 Web/Wasm 构建](https://github.com/Wybxc/karuyomi/actions/runs/45022438982)
+
+2026-11-22，在 `macbook-pro-4` 的临时 checkout 用固定 Keiyoushi `efa93f5a` 和官方 Gradle `assembleRelease` 验证 MoeTruyen 1.6.21 与 MeDamTruyen 1.6.12。通过 Gradle init 脚本给这两个模块的 release 加入 `-keep,allowshrinking`，保留 `keiyoushi.utils.ui.DialogHelperKt.askInput` 的公开静态签名。固定 ASM 9.9.1 在两份官方 JVM JAR 中分别找到一条该签名的直接调用及一条进入辅助类的外部调用。原 MoeTruyen JAR 的该签名与直接调用均为 0。已核对上游跟踪文件，弹窗消息与 Flutter 响应仍待接入。[Android keep 规则](https://developer.android.com/topic/performance/app-optimization/add-keep-rules)
+
+2026-11-22，重新读回生产 revision `448797e3feaa477c8ea18f54c6b874bd` 的索引，摘要与已校验的发布快照匹配。逐包解码核对 1,417 份构建，全部导出 `hostAcquireCover`，覆盖 2,283 个 Source。已核对发布工件，实际出图仍逐源验收。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-22，章节输入桥通过 TypeScript、`pnpm teavm:check`、89 项 Worker 与驱动测试、39 项 Dart 传输测试及两项 Flutter 弹窗测试。隔离夹具验证当前调用绑定、无效和重复答复拒绝、明确确认产生一次模拟写入及取消零次。Flutter 核对密码遮蔽、必填与请求失效后移除对应弹窗。异步桥的真实扩展 AOT 和读章仍待复验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，固定 `f00c680` 的 `pnpm check`、`pnpm flutter:check` 和 `pnpm build` 均通过。工程检查包含 611 项 Vitest 测试，Flutter 应用通过 1,031 项测试。含章节输入的产品归档传到 `macbook-pro-4` 后通过摘要校验，八份共享材料与原冻结队列逐字节一致。在同一构建机固定 Keiyoushi `efa93f5a` 补编 MoeTruyen 1.6.21，官方 Gradle、TeaVM、产物完整性、封面入口和输入能力标记均通过。canonical SHA-256 为 `2acde11ba8adc3759705713f003b884755138e8d3a11e3c55c64ea2a1f49a298`，回执保持 `compiled_unverified`。其余四包继续补编，实际读章待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，`macbook-pro-4` 收齐同一输入下五个扩展的正式成功回执。MoeTruyen 1.6.21、MeDamTruyen 1.6.12、Panomic 1.6.10、SoaiCaComic 1.6.8 和 TeamLanhLung 1.6.42 均通过产物完整性、封面入口及章节输入能力检查。固定 Node 24.15.0 使用 `f00c680` 官方构建的原生 Worker 和五份真实 AOT，每包分别执行确认、取消和后台预取，共 15 个用例。所有源站响应由进程内夹具提供。每包确认产生一次模拟 POST 并返回一页，取消返回 `cancelled` 且零写入，后台预取没有弹窗且零写入。错误提示标识、旧 generation、空必填值和重复答复均未多发请求。生产读章仍待验，回执保持 `compiled_unverified`。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-22，五个输入扩展加入生产父 revision `448797e3feaa477c8ea18f54c6b874bd` 的八材料装配输入。预检读回生产状态，核对 1,417 个现网包仍在完整的 1,448 项计划中、四批共八个替换包的实际回执与八份共享材料。产品归档固定为 `f00c680`，SHA-256 为 `785ab4798789e112477d0e0e3d2045ff8576bae7460de1839e98a28394e9f251`。预检时冻结队列已取得 402 个成功和 6 个失败回执，正式装配待冻结终态。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，在 `macbook-pro-4` 使用同一产品归档和 Node 24.15.0，为八个补编包以及原冻结批次的 MangaDash、Dragon Ball Multiverse、ManhuaRM 实际调用封面入口。每包选一个 Source，通过隔离 HTTP 响应获取合成 PNG。11 个 Source 均各发出一次 GET，经二进制通道回传逐字节一致的 68 字节，资源标识、generation、分帧确认和 Worker 关闭通过。源站连通性与客户端实际显示另行验收。`f00c680` 的 CI 和 Wasm 检查已通过。[GitHub Actions](https://github.com/Wybxc/karuyomi/actions/runs/45026856832)
+
+2026-11-23，在 `macbook-pro-4` 用 MangaDash 1.6.1 真实 AOT、`f00c680` 的原生 Worker、Node 24.15.0 和 Skia Canvas 1.1.1 验证合成 PDF 读章。Source 经隔离 HTTP 各读取一次章节文档和 PDF，生成两页，并从原扩展拦截器交付 250×350 与 200×150 的 JPEG。解码核对第一页的红色及白色区域、第二页两处蓝色区域。PDFium 按需加载一次，章会话和 Worker 均确认关闭，图形句柄归零。实际源站和客户端界面待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-23，在同一台构建机以 Dragon Ball Multiverse 1.6.1 的英文 Source、`f00c680` 原生 Worker、Node 24.15.0 和 Skia Canvas 1.1.1 验证文字布局。隔离 HTTP 提供章节目录、带两段对话的页面与空白 PNG。真实 AOT 经过原图片拦截器生成 320×240 JPEG，两个指定区域分别有 185 和 254 个深色像素，空白区为零。正式二进制交付、章会话及 Worker 关闭通过。源站和客户端界面待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-23，在 `macbook-pro-4` 用同一产品归档和 ManhuaRM 1.6.1 英文 Source 的真实 AOT，通过隔离 HTTP 验证两页合成。原扩展从合成识别结果绘制 360×250 PNG，两个对话区域分别核对黑字和白色描边，外部区域像素保持原底色。无对话页的 996 字节 PNG 与输入逐字节一致。正式二进制交付、章会话和 Worker 关闭通过。构建机直接访问公开热门目录返回 HTTP 403，源站读章及客户端显示待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-23，在同一构建机用 Dragon Ball Multiverse 1.6.1 的英文 Source 和 `f00c680` 原生 Worker 读取真实目录。两次普通 HTTPS GET 分别读取公开目录及第一项《DB Multiverse》的 JPEG 封面，均返回 HTTP 200。目录返回 25 项，封面通道回传的 284,609 字节与源站逐字节一致，Worker 正常关闭。影像验收在 Node 24.15.0 执行，客户端显示与发布待验。[公开目录](https://www.dragonball-multiverse.com/en/read.html)
+
+2026-11-23，冻结目录中仍在产的 Monochrome Scans 遇到上游 KSP 处理错误。在 `macbook-pro-4` 用固定 `f00c680`、同一 Keiyoushi 提交和相同八份材料独立补编，1.6.1 的正式 Gradle、TeaVM AOT、产物完整性和封面入口检查通过，canonical SHA-256 为 `a63050c9449aa79386967a4f37278e487a3a766d052dda801437b4240b3bc848`。隔离 Worker 经一次 GET 完整回传合成封面。装配预检读回同一生产父快照，九个替换包分属五批，1,417 个现网包均保留在 1,448 项计划中。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-23，在 `macbook-pro-4` 固定 `58d3411` 与 Keiyoushi `efa93f5a` 补编 MegaTokyo 1.6.1。正式 Gradle、TeaVM AOT、产物完整性及封面入口检查通过，包含 1 个 Source，canonical SHA-256 为 `8d73d3b51211409e885aac5cd61913cbd7ef186dfbfe24b1721e081c3cb47f33`。`pnpm check` 通过。在 Node 24.15.0 中用 `f00c680` 的原生 Worker 载入新 AOT，经该 Source 读取真实首话 HTML 和图片。两次 HTTPS 请求均通过平台证书校验并返回 HTTP 200，一页 80,282 字节 GIF 经正式图片通道回传，Worker 正常关闭。新装配预检读回同一生产父快照，核对六批共十个替换构建及八份共享材料，保留全部 1,417 个现网包。生产发布、客户端显示和实际封面读取待验。[MegaTokyo 首话](https://megatokyo.com/strip/1) · [装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-23，在 `macbook-pro-4` 使用原生 Worker 和与生产 revision `448797e3feaa477c8ea18f54c6b874bd` 索引相同的两份 AOT，验证普通封面交付。Arknights Comics 1.6.2 从官方热门接口读取《Prelude Suite: The Lone Walker》的封面地址，经正常 TLS 获取 JPEG，正式二进制通道回传 58,121 字节，与源站响应逐字节一致。英文 xkcd 1.6.1 经原 Source 拦截器读到内置的 300×424 PNG，回传 15,307 字节，无源站请求。两次均释放 Worker。测试在 Node 24.15.0 隔离宿主执行，生产登录及客户端显示待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-23，在 `macbook-pro-4` 固定 `eaab1ad` 和 Keiyoushi `efa93f5a` 为现网七份材料补编 MegaTokyo 1.6.1。正式构建、完整性和封面入口通过。现网同版原生 Worker 在 Node 24.15.0 使用正常 HTTPS 读回首话 80,282 字节 GIF。正式装配保留原 1,417 个索引条目，Wrangler 4.156.1 dry-run 通过，随后 Worker `a2a4e916-2aa2-4ac1-90da-69e2dc8e6259` 接收 100% 生产流量。公开索引、状态和新增清单逐字节匹配 revision `ac983abafd1d43b49b9f5eb9f8d5c24d`。新增 879,761 字节 gzip 的强 ETag、编码与解码摘要、46 项 Web 资源及匿名 Access 302 通过。生产现有 1,418 个扩展和 2,284 个 Source，剩余 30 个失败输入。构建机提交生产 checkpoint，八材料装配输入已同步父版本并保留十个替换构建。生产认证后读图和实际封面显示待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json) · [七材料补编](https://github.com/Wybxc/karuyomi/commit/eaab1ad6f31454d23e6679108e12d8cf8a001925)
+
+2026-11-23，MegaTokyo 发布后的有界规划发现首次装配裁掉了 59 条旧失败记录。用归档的 1,448 份原始回执、19 批补编和正式 `prepare-baseline` 恢复，核对 59 条记录的构建身份和失败详情。新候选共 1,507 条回执，同一主线和上游的有界计划选择 0 项。Wrangler dry-run 后，Worker `d2615968-2271-49ce-9110-29f703e15627` 承接 100% 生产流量。revision `dde7ff44d08140d79aeeaf219aaddf21` 的状态与索引读回一致，扩展索引摘要与上一版相同，46 项 Web 资源和匿名 Access 302 复验通过。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-23，在 `macbook-pro-4` 用固定 `f00c680` 产品归档预演八材料发布。13 份实际 AOT 包含冻结队列的三个图像处理扩展和六批十个替换构建。正式快照组装、Vite 打包与 Wrangler 4.156.1 dry-run 通过。Wrangler 回环服务读回索引、状态、根页面、13 份清单及 gzip 产物，以及含 PDFium 的八份共享材料。逐项核对响应字节与 MIME，并确认五个扩展声明 Source 输入能力。样本共 55 个 Source，快照仍为未完成基线。完整队列、正式发布及客户端现场待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-23，在 `macbook-pro-4` 固定 `017e214` 及 Keiyoushi `efa93f5a` 编译 ToonLivre 1.6.90。正式构建、完整性和封面入口检查通过，canonical SHA-256 为 `8e1991c16178fc5a7ebb84a3d39b48c53e96af976a89b653f1d290b1824f1c99`。固定 `f00c680` 原生 Worker 与 Node 24.15.0 通过正常 TLS 读回 24 个线上目录项，并完整回传官方 CDN 的 98,538 字节 WebP 封面。隔离章页接口核对原扩展筛选、去重和排序后返回两页，验证要求触发时返回官方阅读器提示并仅发送一次受控请求。另一次只读在线试验读到同一作品的目录与详情，所选章节的章页请求返回 HTTP 404。候选装配预检确认七批十一个替换构建、八份共享材料与全部 1,418 个现网包。生产发布、真实读章和验证交互待验。[上游公开入口](https://toonlivre.net/)
+
+2026-11-23，在 `macbook-pro-4` 固定 `6035114` 与同一 Keiyoushi 上游补编 SpyFakku 1.6.2。按官方 JVM 产物修正客户端配置方法的保留签名后，正式构建、完整性及封面入口检查通过，canonical SHA-256 为 `08fb749c67d035c17e3f25e5ae74cb34d1109988da00b68e374938f673ecd053`。真实 AOT 从默认站用平台 TLS 读回 24 个目录项。隔离测试核对原图片拦截器的 HTTPS 路由及 68 字节 PNG 回传，另用原镜像设置验证触发浏览器提示时仅发送一次受控请求。预检合入两包后共有八批十二个替换构建，保留全部现网包与八份共享材料。真实镜像、源站读章及生产发布待验。
+
+2026-11-23，在 `macbook-pro-4` 固定 `bd90453` 与 Keiyoushi `efa93f5a` 补编爱看漫 1.6.2、ReiManga 1.6.9。原扩展固定 HTTP/1.1 的调用改由中继采用平台协商，原 Cookie 和拦截器继续参与请求。爱看漫实测同一目录在 HTTP/1.1 和 HTTP/2 下均返回 200。用 `f00c680` 原生 Worker 和 Node 24.15.0 执行真实 AOT，从源站返回 48 项，后两次请求携带原 Source 会话 Cookie，封面通道交付的 142,760 字节 JPEG 与源站一致。ReiManga 的真实目录返回 403，隔离响应验证原 Cookie、目录解析及 68 字节 PNG 回传。各次 Worker 关闭均获确认，应用界面与生产发布待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-23，同一提交的 TempleScan 1.6.64、Cosmic Scans ID 1.6.3 和 CodeArc 1.6.4 通过正式 AOT、完整性与封面入口检查。TempleScan 的真实 `/comics` 返回 307 并引导至站点验证，Source 返回官方浏览器验证提示。隔离测试复现提示并确认请求止于三次 GET。另两包分别通过固定原生 Worker 初始化，报出一个 Source 及封面能力，均已获关闭回执。五个定向补编输入保持 `compiled_unverified`，装配预检确认九批十七个替换构建、相同八份共享材料及全部 1,418 个现网扩展。读漫屋、如漫画的公开目录在同台机器正常 TLS 下分别遇到握手和证书校验错误。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-23，固定 `bd90453` 的十四包定向补编在 `macbook-pro-4` 收齐全部回执。十三包正式 AOT 成功，WebtoonLib 在冻结图形材料下缺少 `TextPaint.setLetterSpacing`。Toonkotsu、Coffee Manga、EmperorScan、HentaiCube、MangaCloud、LxHentai、LunarAnime 和 Koharu 的八个真实产物在 `f00c680` 原生 Worker 与 Node 24.15.0 完成初始化、封面能力登记及关闭。Toonkotsu 与 Coffee Manga 的真实目录各返回 403。预检按实际包名纳入全部十三包和十八个 Source，替换总数增至九批二十五个，当前 1,418 个生产包均在完整计划内。各包保持 `compiled_unverified`，真实客户端显示及候选发布待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-23，在 `macbook-pro-4` 固定 `c503abb` 和 Keiyoushi `efa93f5a`，读漫屋和如漫画 1.6.1 通过正式 AOT、完整性及封面入口检查。固定的 MMLook 使用平台证书校验，保留原扩展禁止自动跟随重定向的策略和原 URL 的协议。以 `f00c680` 原生 Worker 和 Node 24.15.0 运行真实产物，隔离目录各返回一项，读漫屋与如漫画分别保留无斜杠和带斜杠的作品引用，封面各回传完整的 68 字节 PNG。302 测试各只发出一次 GET。真实请求分别遇到 `ECONNRESET` 与 `ERR_TLS_CERT_ALTNAME_INVALID`，各次 Worker 均获关闭回执。两包保持 `compiled_unverified`。装配核对十批二十七个精确替换、原八份材料及全部 1,418 个生产包。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
+2026-11-23，发布前从 `macbook-pro-4` 恢复固定 `f00c680` Web 和运行材料归档。归档实际 SHA-256 与已确认摘要一致，原八份共享材料逐字节一致。本机 Wrangler 4.156.1 的 OAuth 登录可用，只读核对 Worker `d2615968-2271-49ce-9110-29f703e15627` 承接 100% 流量，D1 已应用 13 个迁移至 `0012`，待应用列表为空。增量发布工作流处于停用状态，无执行中的增量任务。完整候选、切流和登录后读取待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)

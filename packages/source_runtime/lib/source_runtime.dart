@@ -84,9 +84,17 @@ typedef RuntimeSession = wire.RuntimeSession;
 typedef SourceInfo = wire.SourceInfo;
 typedef SourceResult = wire.SourceResult;
 
+/// The prompt belongs to the in-flight chapter call. This callback must close
+/// its UI when [operationEnded] completes. A null result dismisses the prompt.
+typedef SourceInputHandler = Future<String?> Function(
+  wire.SourceInputPrompt prompt,
+  Future<void> operationEnded,
+);
+
 final class const SourceRequest({
   required final String packageId,
   required final wire.SourceCall call,
+  final SourceInputHandler? onInput,
 });
 
 enum RuntimeErrorCode {

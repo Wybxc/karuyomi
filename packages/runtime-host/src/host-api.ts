@@ -184,6 +184,21 @@ function createRuntimeApi(
               value: await manager.invoke(request.command.value),
             };
             break;
+          case 'readSourceInput':
+            result = {
+              case: 'sourceInput',
+              value: create(pb.SourceInputStateSchema, {
+                prompt: manager.readSourceInput(request.command.value),
+              }),
+            };
+            break;
+          case 'answerSourceInput':
+            manager.answerSourceInput(request.command.value);
+            result = {
+              case: 'completed',
+              value: create(pb.CompletedSchema, { completed: true }),
+            };
+            break;
           case 'cancel':
             await manager.cancel(
               request.command.value.requestId,

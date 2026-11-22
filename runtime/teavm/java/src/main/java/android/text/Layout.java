@@ -2,6 +2,7 @@ package android.text;
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.text.LineBreaker;
 import com.google.gson.*;
 import prototype.Graphics;
 
@@ -15,6 +16,12 @@ public abstract class Layout {
 
   public static final int DIR_LEFT_TO_RIGHT = 1, DIR_RIGHT_TO_LEFT = -1;
   public static final float DEFAULT_LINESPACING_MULTIPLIER = 1, DEFAULT_LINESPACING_ADDITION = 0;
+  public static final int BREAK_STRATEGY_SIMPLE = LineBreaker.BREAK_STRATEGY_SIMPLE;
+  public static final int BREAK_STRATEGY_HIGH_QUALITY = LineBreaker.BREAK_STRATEGY_HIGH_QUALITY;
+  public static final int BREAK_STRATEGY_BALANCED = LineBreaker.BREAK_STRATEGY_BALANCED;
+  public static final int HYPHENATION_FREQUENCY_NONE = 0;
+  public static final int HYPHENATION_FREQUENCY_NORMAL = 1;
+  public static final int HYPHENATION_FREQUENCY_FULL = 2;
   protected final CharSequence text;
   protected final TextPaint paint;
   protected final int width;
@@ -51,11 +58,8 @@ public abstract class Layout {
     this.spacingAdd = spacingAdd;
   }
 
-  protected final void generate(boolean includePad) {
-    generate(0, text.length(), includePad);
-  }
-
-  protected final void generate(int start, int end, boolean includePad) {
+  protected final void generate(
+      int start, int end, boolean includePad, int breakStrategy, int hyphenationFrequency) {
     java.util.Objects.checkFromToIndex(start, end, text.length());
     String selected = text.subSequence(start, end).toString();
     JsonObject args = Graphics.args();
@@ -65,6 +69,10 @@ public abstract class Layout {
     args.addProperty("spacingMult", spacingMult);
     args.addProperty("spacingAdd", spacingAdd);
     args.addProperty("includePad", includePad);
+    args.addProperty("breakStrategy", breakStrategy);
+    args.addProperty("hyphenationFrequency", hyphenationFrequency);
+    if (hyphenationFrequency != HYPHENATION_FREQUENCY_NONE)
+      args.addProperty("locale", paint.getTextLocale().toLanguageTag());
     args.add("paint", paint.runtimePaint());
     JsonObject result = Graphics.call("layout", args);
     JsonArray rows = result.getAsJsonArray("lines");
@@ -73,12 +81,13 @@ public abstract class Layout {
     int previous = 0;
     for (JsonElement item : rows) {
       JsonArray row = item.getAsJsonArray();
-      if (row.size() != 10
+      if (row.size() != 11
           || row.get(0).getAsInt() != previous
           || row.get(1).getAsInt() < previous
           || row.get(1).getAsInt() > selected.length()
           || row.get(2).getAsInt() < previous
-          || row.get(2).getAsInt() > row.get(1).getAsInt())
+          || row.get(2).getAsInt() > row.get(1).getAsInt()
+          || !row.get(10).getAsJsonPrimitive().isBoolean())
         throw new IllegalStateException("Invalid layout line range");
       previous = row.get(1).getAsInt();
       for (int index = 0; index < 3; index++)
@@ -220,11 +229,9 @@ public abstract class Layout {
     drawing.setTextAlign(Paint.Align.LEFT);
     for (int index = 0; index < getLineCount(); index++) {
       drawing.setTextDirectionForLayout(getParagraphDirection(index));
-      canvas.drawText(
-          text.subSequence(getLineStart(index), getLineVisibleEnd(index)).toString(),
-          getLineLeft(index),
-          getLineBaseline(index),
-          drawing);
+      String visible = text.subSequence(getLineStart(index), getLineVisibleEnd(index)).toString();
+      if (line(index).get(10).getAsBoolean()) visible += '\u2010';
+      canvas.drawText(visible, getLineLeft(index), getLineBaseline(index), drawing);
     }
   }
 }

@@ -6,8 +6,10 @@ import '../../widgets/choice_field.dart';
 import 'dart:async';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/source_preferences_repository.dart';
 import '../browse/catalog_controller.dart';
@@ -637,20 +639,30 @@ class const _PreferenceTextDialog({
     return CupertinoAlertDialog(
       title: Text(node.title),
       content: editable
-          ? CupertinoTextField(
-              controller: input,
-              readOnly: closing.value,
-              autofocus: true,
-              autofillHints: null,
-              obscureText: preference.secret,
-              textInputAction: TextInputAction.done,
-              onSubmitted: preference.secret
-                  ? null
-                  : (value) {
-                      if (controller.canEdit) dismiss(value);
-                    },
-              maxLength: 4096,
-              placeholder: preference.hasHint() ? preference.hint : null,
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (preference.hasDialogMessage()) ...[
+                  _PreferenceDialogHelp(message: preference.dialogMessage),
+                  const SizedBox(height: 12),
+                ],
+                CupertinoTextField(
+                  controller: input,
+                  readOnly: closing.value,
+                  autofocus: true,
+                  autofillHints: null,
+                  obscureText: preference.secret,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: preference.secret
+                      ? null
+                      : (value) {
+                          if (controller.canEdit) dismiss(value);
+                        },
+                  maxLength: 4096,
+                  placeholder: preference.hasHint() ? preference.hint : null,
+                ),
+              ],
             )
           : const Text('身份或漫画源已变化，请关闭后重新打开设置。'),
       actions: [
@@ -667,6 +679,67 @@ class const _PreferenceTextDialog({
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class const _PreferenceDialogHelp({
+  required final wire.PreferenceDialogMessage message,
+}) extends HookWidget {
+  @override
+  Widget build(BuildContext context) {
+    final failed = useState(false);
+    Future<void> open(String destination) async {
+      failed.value = false;
+      var opened = false;
+      try {
+        opened = await launchUrl(
+          Uri.parse(destination),
+          mode: LaunchMode.externalApplication,
+          webOnlyWindowName: '_blank',
+        );
+      } on PlatformException {
+        // Keep the URL and the draft visible if the system rejects the launch.
+      }
+      if (context.mounted && !opened) failed.value = true;
+    }
+
+    final style = DefaultTextStyle.of(context).style;
+    final pieces = <InlineSpan>[];
+    var offset = 0;
+    for (final link in message.links) {
+      final destination = message.text.substring(link.start, link.end);
+      pieces.add(TextSpan(text: message.text.substring(offset, link.start)));
+      pieces.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          child: Semantics(
+            link: true,
+            child: CupertinoButton(
+              minimumSize: Size.zero,
+              padding: EdgeInsets.zero,
+              onPressed: () => unawaited(open(destination)),
+              child: Text(
+                destination,
+                style: style.copyWith(
+                  color: CupertinoTheme.of(context).primaryColor,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      offset = link.end;
+    }
+    pieces.add(TextSpan(text: message.text.substring(offset)));
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text.rich(TextSpan(children: pieces)),
+        if (failed.value) const Text('无法打开链接'),
       ],
     );
   }

@@ -98,8 +98,10 @@ export async function checkNetwork(root = ROOT): Promise<void> {
     '-d',
     ownedOutput,
     ...[
+      'android/content/pm/ApplicationInfo',
       'eu/kanade/tachiyomi/network/NetworkHelper',
       'okhttp3/OkHttpClient',
+      'okhttp3/Dispatcher',
       'okhttp3/Cache',
       'prototype/Bridge',
       'prototype/BrowserCall',

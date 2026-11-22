@@ -3218,6 +3218,142 @@ class PreferenceToggle extends $pb.GeneratedMessage {
   void clearValue() => $_clearField(1);
 }
 
+class PreferenceWebLink extends $pb.GeneratedMessage {
+  factory PreferenceWebLink({
+    $core.int? start,
+    $core.int? end,
+  }) {
+    final result = PreferenceWebLink._();
+    if (start != null) result.start = start;
+    if (end != null) result.end = end;
+    return result;
+  }
+
+  PreferenceWebLink._();
+
+  factory PreferenceWebLink.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceWebLink()..mergeFromBuffer(data, registry);
+  factory PreferenceWebLink.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceWebLink()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceWebLink',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceWebLink.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'start', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'end', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceWebLink clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceWebLink copyWith(void Function(PreferenceWebLink) updates) =>
+      super.copyWith((message) => updates(message as PreferenceWebLink))
+          as PreferenceWebLink;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreferenceWebLink() / PreferenceWebLink.new instead')
+  static PreferenceWebLink create() => PreferenceWebLink._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceWebLink._();
+  @$core.override
+  PreferenceWebLink createEmptyInstance() => PreferenceWebLink._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceWebLink getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PreferenceWebLink>(
+          PreferenceWebLink.$_createMessage);
+  static PreferenceWebLink? _defaultInstance;
+
+  /// UTF-16 range in the original dialog message. The displayed substring is the URL.
+  @$pb.TagNumber(1)
+  $core.int get start => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set start($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStart() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStart() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get end => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set end($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEnd() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEnd() => $_clearField(2);
+}
+
+class PreferenceDialogMessage extends $pb.GeneratedMessage {
+  factory PreferenceDialogMessage({
+    $core.String? text,
+    $core.Iterable<PreferenceWebLink>? links,
+  }) {
+    final result = PreferenceDialogMessage._();
+    if (text != null) result.text = text;
+    if (links != null) result.links.addAll(links);
+    return result;
+  }
+
+  PreferenceDialogMessage._();
+
+  factory PreferenceDialogMessage.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceDialogMessage()..mergeFromBuffer(data, registry);
+  factory PreferenceDialogMessage.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceDialogMessage()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceDialogMessage',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceDialogMessage.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..pPM<PreferenceWebLink>(2, _omitFieldNames ? '' : 'links',
+        subBuilder: PreferenceWebLink.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceDialogMessage clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceDialogMessage copyWith(
+          void Function(PreferenceDialogMessage) updates) =>
+      super.copyWith((message) => updates(message as PreferenceDialogMessage))
+          as PreferenceDialogMessage;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PreferenceDialogMessage() / PreferenceDialogMessage.new instead')
+  static PreferenceDialogMessage create() => PreferenceDialogMessage._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceDialogMessage._();
+  @$core.override
+  PreferenceDialogMessage createEmptyInstance() => PreferenceDialogMessage._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceDialogMessage getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PreferenceDialogMessage>(
+          PreferenceDialogMessage.$_createMessage);
+  static PreferenceDialogMessage? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get text => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set text($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasText() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearText() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<PreferenceWebLink> get links => $_getList(1);
+}
+
 class PreferenceText extends $pb.GeneratedMessage {
   factory PreferenceText({
     $core.String? value,
@@ -3225,6 +3361,7 @@ class PreferenceText extends $pb.GeneratedMessage {
     $core.int? inputType,
     $core.String? hint,
     $core.bool? selectAllOnOpen,
+    PreferenceDialogMessage? dialogMessage,
   }) {
     final result = PreferenceText._();
     if (value != null) result.value = value;
@@ -3232,6 +3369,7 @@ class PreferenceText extends $pb.GeneratedMessage {
     if (inputType != null) result.inputType = inputType;
     if (hint != null) result.hint = hint;
     if (selectAllOnOpen != null) result.selectAllOnOpen = selectAllOnOpen;
+    if (dialogMessage != null) result.dialogMessage = dialogMessage;
     return result;
   }
 
@@ -3253,6 +3391,8 @@ class PreferenceText extends $pb.GeneratedMessage {
     ..aI(3, _omitFieldNames ? '' : 'inputType')
     ..aOS(4, _omitFieldNames ? '' : 'hint')
     ..aOB(5, _omitFieldNames ? '' : 'selectAllOnOpen')
+    ..aOM<PreferenceDialogMessage>(6, _omitFieldNames ? '' : 'dialogMessage',
+        subBuilder: PreferenceDialogMessage.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3323,6 +3463,17 @@ class PreferenceText extends $pb.GeneratedMessage {
   $core.bool hasSelectAllOnOpen() => $_has(4);
   @$pb.TagNumber(5)
   void clearSelectAllOnOpen() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  PreferenceDialogMessage get dialogMessage => $_getN(5);
+  @$pb.TagNumber(6)
+  set dialogMessage(PreferenceDialogMessage value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasDialogMessage() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearDialogMessage() => $_clearField(6);
+  @$pb.TagNumber(6)
+  PreferenceDialogMessage ensureDialogMessage() => $_ensure(5);
 }
 
 class PreferenceChoice extends $pb.GeneratedMessage {
@@ -4134,6 +4285,7 @@ class SourceCall extends $pb.GeneratedMessage {
     $core.String? sourceId,
     $core.int? timeoutMs,
     $core.String? generation,
+    $core.bool? allowInput,
     PageRequest? popular,
     PageRequest? latest,
     SearchRequest? search,
@@ -4149,6 +4301,7 @@ class SourceCall extends $pb.GeneratedMessage {
     if (sourceId != null) result.sourceId = sourceId;
     if (timeoutMs != null) result.timeoutMs = timeoutMs;
     if (generation != null) result.generation = generation;
+    if (allowInput != null) result.allowInput = allowInput;
     if (popular != null) result.popular = popular;
     if (latest != null) result.latest = latest;
     if (search != null) result.search = search;
@@ -4192,6 +4345,7 @@ class SourceCall extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'sourceId')
     ..aI(3, _omitFieldNames ? '' : 'timeoutMs', fieldType: $pb.PbFieldType.OU3)
     ..aOS(4, _omitFieldNames ? '' : 'generation')
+    ..aOB(5, _omitFieldNames ? '' : 'allowInput')
     ..aOM<PageRequest>(10, _omitFieldNames ? '' : 'popular',
         subBuilder: PageRequest.$_createMessage)
     ..aOM<PageRequest>(11, _omitFieldNames ? '' : 'latest',
@@ -4290,104 +4444,114 @@ class SourceCall extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearGeneration() => $_clearField(4);
 
+  /// Only a foreground chapter request with a user input handler may set this.
+  @$pb.TagNumber(5)
+  $core.bool get allowInput => $_getBF(4);
+  @$pb.TagNumber(5)
+  set allowInput($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasAllowInput() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearAllowInput() => $_clearField(5);
+
   @$pb.TagNumber(10)
-  PageRequest get popular => $_getN(4);
+  PageRequest get popular => $_getN(5);
   @$pb.TagNumber(10)
   set popular(PageRequest value) => $_setField(10, value);
   @$pb.TagNumber(10)
-  $core.bool hasPopular() => $_has(4);
+  $core.bool hasPopular() => $_has(5);
   @$pb.TagNumber(10)
   void clearPopular() => $_clearField(10);
   @$pb.TagNumber(10)
-  PageRequest ensurePopular() => $_ensure(4);
+  PageRequest ensurePopular() => $_ensure(5);
 
   @$pb.TagNumber(11)
-  PageRequest get latest => $_getN(5);
+  PageRequest get latest => $_getN(6);
   @$pb.TagNumber(11)
   set latest(PageRequest value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasLatest() => $_has(5);
+  $core.bool hasLatest() => $_has(6);
   @$pb.TagNumber(11)
   void clearLatest() => $_clearField(11);
   @$pb.TagNumber(11)
-  PageRequest ensureLatest() => $_ensure(5);
+  PageRequest ensureLatest() => $_ensure(6);
 
   @$pb.TagNumber(12)
-  SearchRequest get search => $_getN(6);
+  SearchRequest get search => $_getN(7);
   @$pb.TagNumber(12)
   set search(SearchRequest value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasSearch() => $_has(6);
+  $core.bool hasSearch() => $_has(7);
   @$pb.TagNumber(12)
   void clearSearch() => $_clearField(12);
   @$pb.TagNumber(12)
-  SearchRequest ensureSearch() => $_ensure(6);
+  SearchRequest ensureSearch() => $_ensure(7);
 
   @$pb.TagNumber(13)
-  MangaRequest get details => $_getN(7);
+  MangaRequest get details => $_getN(8);
   @$pb.TagNumber(13)
   set details(MangaRequest value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasDetails() => $_has(7);
+  $core.bool hasDetails() => $_has(8);
   @$pb.TagNumber(13)
   void clearDetails() => $_clearField(13);
   @$pb.TagNumber(13)
-  MangaRequest ensureDetails() => $_ensure(7);
+  MangaRequest ensureDetails() => $_ensure(8);
 
   @$pb.TagNumber(14)
-  MangaRequest get chapters => $_getN(8);
+  MangaRequest get chapters => $_getN(9);
   @$pb.TagNumber(14)
   set chapters(MangaRequest value) => $_setField(14, value);
   @$pb.TagNumber(14)
-  $core.bool hasChapters() => $_has(8);
+  $core.bool hasChapters() => $_has(9);
   @$pb.TagNumber(14)
   void clearChapters() => $_clearField(14);
   @$pb.TagNumber(14)
-  MangaRequest ensureChapters() => $_ensure(8);
+  MangaRequest ensureChapters() => $_ensure(9);
 
   @$pb.TagNumber(15)
-  ChapterRequest get pages => $_getN(9);
+  ChapterRequest get pages => $_getN(10);
   @$pb.TagNumber(15)
   set pages(ChapterRequest value) => $_setField(15, value);
   @$pb.TagNumber(15)
-  $core.bool hasPages() => $_has(9);
+  $core.bool hasPages() => $_has(10);
   @$pb.TagNumber(15)
   void clearPages() => $_clearField(15);
   @$pb.TagNumber(15)
-  ChapterRequest ensurePages() => $_ensure(9);
+  ChapterRequest ensurePages() => $_ensure(10);
 
   @$pb.TagNumber(16)
-  GetFiltersRequest get getFilters => $_getN(10);
+  GetFiltersRequest get getFilters => $_getN(11);
   @$pb.TagNumber(16)
   set getFilters(GetFiltersRequest value) => $_setField(16, value);
   @$pb.TagNumber(16)
-  $core.bool hasGetFilters() => $_has(10);
+  $core.bool hasGetFilters() => $_has(11);
   @$pb.TagNumber(16)
   void clearGetFilters() => $_clearField(16);
   @$pb.TagNumber(16)
-  GetFiltersRequest ensureGetFilters() => $_ensure(10);
+  GetFiltersRequest ensureGetFilters() => $_ensure(11);
 
   @$pb.TagNumber(17)
-  Empty get getPreferences => $_getN(11);
+  Empty get getPreferences => $_getN(12);
   @$pb.TagNumber(17)
   set getPreferences(Empty value) => $_setField(17, value);
   @$pb.TagNumber(17)
-  $core.bool hasGetPreferences() => $_has(11);
+  $core.bool hasGetPreferences() => $_has(12);
   @$pb.TagNumber(17)
   void clearGetPreferences() => $_clearField(17);
   @$pb.TagNumber(17)
-  Empty ensureGetPreferences() => $_ensure(11);
+  Empty ensureGetPreferences() => $_ensure(12);
 
   @$pb.TagNumber(18)
-  PreferenceEditRequest get editPreference => $_getN(12);
+  PreferenceEditRequest get editPreference => $_getN(13);
   @$pb.TagNumber(18)
   set editPreference(PreferenceEditRequest value) => $_setField(18, value);
   @$pb.TagNumber(18)
-  $core.bool hasEditPreference() => $_has(12);
+  $core.bool hasEditPreference() => $_has(13);
   @$pb.TagNumber(18)
   void clearEditPreference() => $_clearField(18);
   @$pb.TagNumber(18)
-  PreferenceEditRequest ensureEditPreference() => $_ensure(12);
+  PreferenceEditRequest ensureEditPreference() => $_ensure(13);
 }
 
 class MangaPage extends $pb.GeneratedMessage {
@@ -4861,6 +5025,406 @@ class CancelSourceRequest extends $pb.GeneratedMessage {
   $core.bool hasGeneration() => $_has(1);
   @$pb.TagNumber(2)
   void clearGeneration() => $_clearField(2);
+}
+
+class ReadSourceInput extends $pb.GeneratedMessage {
+  factory ReadSourceInput({
+    $core.String? requestId,
+    $core.String? generation,
+  }) {
+    final result = ReadSourceInput._();
+    if (requestId != null) result.requestId = requestId;
+    if (generation != null) result.generation = generation;
+    return result;
+  }
+
+  ReadSourceInput._();
+
+  factory ReadSourceInput.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReadSourceInput()..mergeFromBuffer(data, registry);
+  factory ReadSourceInput.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ReadSourceInput()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReadSourceInput',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: ReadSourceInput.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOS(2, _omitFieldNames ? '' : 'generation')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReadSourceInput clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReadSourceInput copyWith(void Function(ReadSourceInput) updates) =>
+      super.copyWith((message) => updates(message as ReadSourceInput))
+          as ReadSourceInput;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use ReadSourceInput() / ReadSourceInput.new instead')
+  static ReadSourceInput create() => ReadSourceInput._();
+  static $pb.GeneratedMessage $_createMessage() => ReadSourceInput._();
+  @$core.override
+  ReadSourceInput createEmptyInstance() => ReadSourceInput._();
+  @$core.pragma('dart2js:noInline')
+  static ReadSourceInput getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ReadSourceInput>(
+          ReadSourceInput.$_createMessage);
+  static ReadSourceInput? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get generation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set generation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+}
+
+class SourceInputPrompt extends $pb.GeneratedMessage {
+  factory SourceInputPrompt({
+    $core.String? requestId,
+    $core.String? generation,
+    $core.String? buildId,
+    $core.String? promptId,
+    $core.String? sourceId,
+    $core.String? title,
+    $core.String? message,
+    $core.String? hint,
+    $core.String? initialValue,
+    $core.bool? password,
+    $core.bool? required,
+  }) {
+    final result = SourceInputPrompt._();
+    if (requestId != null) result.requestId = requestId;
+    if (generation != null) result.generation = generation;
+    if (buildId != null) result.buildId = buildId;
+    if (promptId != null) result.promptId = promptId;
+    if (sourceId != null) result.sourceId = sourceId;
+    if (title != null) result.title = title;
+    if (message != null) result.message = message;
+    if (hint != null) result.hint = hint;
+    if (initialValue != null) result.initialValue = initialValue;
+    if (password != null) result.password = password;
+    if (required != null) result.required = required;
+    return result;
+  }
+
+  SourceInputPrompt._();
+
+  factory SourceInputPrompt.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourceInputPrompt()..mergeFromBuffer(data, registry);
+  factory SourceInputPrompt.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourceInputPrompt()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SourceInputPrompt',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SourceInputPrompt.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOS(2, _omitFieldNames ? '' : 'generation')
+    ..aOS(3, _omitFieldNames ? '' : 'buildId')
+    ..aOS(4, _omitFieldNames ? '' : 'promptId')
+    ..aOS(5, _omitFieldNames ? '' : 'sourceId')
+    ..aOS(6, _omitFieldNames ? '' : 'title')
+    ..aOS(7, _omitFieldNames ? '' : 'message')
+    ..aOS(8, _omitFieldNames ? '' : 'hint')
+    ..aOS(9, _omitFieldNames ? '' : 'initialValue')
+    ..aOB(10, _omitFieldNames ? '' : 'password')
+    ..aOB(11, _omitFieldNames ? '' : 'required')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourceInputPrompt clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourceInputPrompt copyWith(void Function(SourceInputPrompt) updates) =>
+      super.copyWith((message) => updates(message as SourceInputPrompt))
+          as SourceInputPrompt;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SourceInputPrompt() / SourceInputPrompt.new instead')
+  static SourceInputPrompt create() => SourceInputPrompt._();
+  static $pb.GeneratedMessage $_createMessage() => SourceInputPrompt._();
+  @$core.override
+  SourceInputPrompt createEmptyInstance() => SourceInputPrompt._();
+  @$core.pragma('dart2js:noInline')
+  static SourceInputPrompt getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SourceInputPrompt>(
+          SourceInputPrompt.$_createMessage);
+  static SourceInputPrompt? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get generation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set generation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get buildId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set buildId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBuildId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBuildId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get promptId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set promptId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPromptId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPromptId() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get sourceId => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set sourceId($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSourceId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSourceId() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get title => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set title($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTitle() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTitle() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get message => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set message($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasMessage() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearMessage() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get hint => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set hint($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasHint() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearHint() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get initialValue => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set initialValue($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasInitialValue() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearInitialValue() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.bool get password => $_getBF(9);
+  @$pb.TagNumber(10)
+  set password($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasPassword() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearPassword() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.bool get required => $_getBF(10);
+  @$pb.TagNumber(11)
+  set required($core.bool value) => $_setBool(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasRequired() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearRequired() => $_clearField(11);
+}
+
+class SourceInputState extends $pb.GeneratedMessage {
+  factory SourceInputState({
+    SourceInputPrompt? prompt,
+  }) {
+    final result = SourceInputState._();
+    if (prompt != null) result.prompt = prompt;
+    return result;
+  }
+
+  SourceInputState._();
+
+  factory SourceInputState.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourceInputState()..mergeFromBuffer(data, registry);
+  factory SourceInputState.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourceInputState()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SourceInputState',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SourceInputState.$_createMessage)
+    ..aOM<SourceInputPrompt>(1, _omitFieldNames ? '' : 'prompt',
+        subBuilder: SourceInputPrompt.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourceInputState clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourceInputState copyWith(void Function(SourceInputState) updates) =>
+      super.copyWith((message) => updates(message as SourceInputState))
+          as SourceInputState;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SourceInputState() / SourceInputState.new instead')
+  static SourceInputState create() => SourceInputState._();
+  static $pb.GeneratedMessage $_createMessage() => SourceInputState._();
+  @$core.override
+  SourceInputState createEmptyInstance() => SourceInputState._();
+  @$core.pragma('dart2js:noInline')
+  static SourceInputState getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SourceInputState>(
+          SourceInputState.$_createMessage);
+  static SourceInputState? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  SourceInputPrompt get prompt => $_getN(0);
+  @$pb.TagNumber(1)
+  set prompt(SourceInputPrompt value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPrompt() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPrompt() => $_clearField(1);
+  @$pb.TagNumber(1)
+  SourceInputPrompt ensurePrompt() => $_ensure(0);
+}
+
+class SourceInputAnswer extends $pb.GeneratedMessage {
+  factory SourceInputAnswer({
+    $core.String? requestId,
+    $core.String? generation,
+    $core.String? promptId,
+    $core.String? text,
+  }) {
+    final result = SourceInputAnswer._();
+    if (requestId != null) result.requestId = requestId;
+    if (generation != null) result.generation = generation;
+    if (promptId != null) result.promptId = promptId;
+    if (text != null) result.text = text;
+    return result;
+  }
+
+  SourceInputAnswer._();
+
+  factory SourceInputAnswer.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourceInputAnswer()..mergeFromBuffer(data, registry);
+  factory SourceInputAnswer.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      SourceInputAnswer()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SourceInputAnswer',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: SourceInputAnswer.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOS(2, _omitFieldNames ? '' : 'generation')
+    ..aOS(3, _omitFieldNames ? '' : 'promptId')
+    ..aOS(4, _omitFieldNames ? '' : 'text')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourceInputAnswer clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SourceInputAnswer copyWith(void Function(SourceInputAnswer) updates) =>
+      super.copyWith((message) => updates(message as SourceInputAnswer))
+          as SourceInputAnswer;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use SourceInputAnswer() / SourceInputAnswer.new instead')
+  static SourceInputAnswer create() => SourceInputAnswer._();
+  static $pb.GeneratedMessage $_createMessage() => SourceInputAnswer._();
+  @$core.override
+  SourceInputAnswer createEmptyInstance() => SourceInputAnswer._();
+  @$core.pragma('dart2js:noInline')
+  static SourceInputAnswer getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SourceInputAnswer>(
+          SourceInputAnswer.$_createMessage);
+  static SourceInputAnswer? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get generation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set generation($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get promptId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set promptId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPromptId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPromptId() => $_clearField(3);
+
+  /// Absent on dismissal. An empty string is a distinct answer.
+  @$pb.TagNumber(4)
+  $core.String get text => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set text($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasText() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearText() => $_clearField(4);
 }
 
 class AcquireImage extends $pb.GeneratedMessage {
@@ -6262,6 +6826,7 @@ class BuildManifest extends $pb.GeneratedMessage {
     $core.Iterable<Artifact>? resources,
     $core.Iterable<CatalogSource>? sources,
     $core.Iterable<PreferenceSyncRule>? preferenceSyncRules,
+    $core.bool? supportsSourceInput,
   }) {
     final result = BuildManifest._();
     if (protocolVersion != null) result.protocolVersion = protocolVersion;
@@ -6280,6 +6845,8 @@ class BuildManifest extends $pb.GeneratedMessage {
     if (sources != null) result.sources.addAll(sources);
     if (preferenceSyncRules != null)
       result.preferenceSyncRules.addAll(preferenceSyncRules);
+    if (supportsSourceInput != null)
+      result.supportsSourceInput = supportsSourceInput;
     return result;
   }
 
@@ -6318,6 +6885,7 @@ class BuildManifest extends $pb.GeneratedMessage {
         subBuilder: CatalogSource.$_createMessage)
     ..pPM<PreferenceSyncRule>(15, _omitFieldNames ? '' : 'preferenceSyncRules',
         subBuilder: PreferenceSyncRule.$_createMessage)
+    ..aOB(16, _omitFieldNames ? '' : 'supportsSourceInput')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6449,6 +7017,15 @@ class BuildManifest extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(15)
   $pb.PbList<PreferenceSyncRule> get preferenceSyncRules => $_getList(14);
+
+  @$pb.TagNumber(16)
+  $core.bool get supportsSourceInput => $_getBF(15);
+  @$pb.TagNumber(16)
+  set supportsSourceInput($core.bool value) => $_setBool(15, value);
+  @$pb.TagNumber(16)
+  $core.bool hasSupportsSourceInput() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearSupportsSourceInput() => $_clearField(16);
 }
 
 class ExtensionBuildDescriptor extends $pb.GeneratedMessage {
@@ -7566,6 +8143,8 @@ enum ControlRequest_Command {
   extensionCache,
   forgetExtensionArtifact,
   closeBuild,
+  readSourceInput,
+  answerSourceInput,
   notSet
 }
 
@@ -7589,6 +8168,8 @@ class ControlRequest extends $pb.GeneratedMessage {
     Empty? extensionCache,
     ForgetExtensionArtifactRequest? forgetExtensionArtifact,
     CloseBuildRequest? closeBuild,
+    ReadSourceInput? readSourceInput,
+    SourceInputAnswer? answerSourceInput,
   }) {
     final result = ControlRequest._();
     if (requestId != null) result.requestId = requestId;
@@ -7610,6 +8191,8 @@ class ControlRequest extends $pb.GeneratedMessage {
     if (forgetExtensionArtifact != null)
       result.forgetExtensionArtifact = forgetExtensionArtifact;
     if (closeBuild != null) result.closeBuild = closeBuild;
+    if (readSourceInput != null) result.readSourceInput = readSourceInput;
+    if (answerSourceInput != null) result.answerSourceInput = answerSourceInput;
     return result;
   }
 
@@ -7640,13 +8223,34 @@ class ControlRequest extends $pb.GeneratedMessage {
     23: ControlRequest_Command.extensionCache,
     24: ControlRequest_Command.forgetExtensionArtifact,
     25: ControlRequest_Command.closeBuild,
+    26: ControlRequest_Command.readSourceInput,
+    27: ControlRequest_Command.answerSourceInput,
     0: ControlRequest_Command.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ControlRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: ControlRequest.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25])
+    ..oo(0, [
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27
+    ])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aE<RuntimeSlot>(2, _omitFieldNames ? '' : 'slotId',
         enumValues: RuntimeSlot.values)
@@ -7684,6 +8288,10 @@ class ControlRequest extends $pb.GeneratedMessage {
         subBuilder: ForgetExtensionArtifactRequest.$_createMessage)
     ..aOM<CloseBuildRequest>(25, _omitFieldNames ? '' : 'closeBuild',
         subBuilder: CloseBuildRequest.$_createMessage)
+    ..aOM<ReadSourceInput>(26, _omitFieldNames ? '' : 'readSourceInput',
+        subBuilder: ReadSourceInput.$_createMessage)
+    ..aOM<SourceInputAnswer>(27, _omitFieldNames ? '' : 'answerSourceInput',
+        subBuilder: SourceInputAnswer.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7724,6 +8332,8 @@ class ControlRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(23)
   @$pb.TagNumber(24)
   @$pb.TagNumber(25)
+  @$pb.TagNumber(26)
+  @$pb.TagNumber(27)
   ControlRequest_Command whichCommand() =>
       _ControlRequest_CommandByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -7742,6 +8352,8 @@ class ControlRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(23)
   @$pb.TagNumber(24)
   @$pb.TagNumber(25)
+  @$pb.TagNumber(26)
+  @$pb.TagNumber(27)
   void clearCommand() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -7940,6 +8552,28 @@ class ControlRequest extends $pb.GeneratedMessage {
   void clearCloseBuild() => $_clearField(25);
   @$pb.TagNumber(25)
   CloseBuildRequest ensureCloseBuild() => $_ensure(17);
+
+  @$pb.TagNumber(26)
+  ReadSourceInput get readSourceInput => $_getN(18);
+  @$pb.TagNumber(26)
+  set readSourceInput(ReadSourceInput value) => $_setField(26, value);
+  @$pb.TagNumber(26)
+  $core.bool hasReadSourceInput() => $_has(18);
+  @$pb.TagNumber(26)
+  void clearReadSourceInput() => $_clearField(26);
+  @$pb.TagNumber(26)
+  ReadSourceInput ensureReadSourceInput() => $_ensure(18);
+
+  @$pb.TagNumber(27)
+  SourceInputAnswer get answerSourceInput => $_getN(19);
+  @$pb.TagNumber(27)
+  set answerSourceInput(SourceInputAnswer value) => $_setField(27, value);
+  @$pb.TagNumber(27)
+  $core.bool hasAnswerSourceInput() => $_has(19);
+  @$pb.TagNumber(27)
+  void clearAnswerSourceInput() => $_clearField(27);
+  @$pb.TagNumber(27)
+  SourceInputAnswer ensureAnswerSourceInput() => $_ensure(19);
 }
 
 enum ControlResponse_Result {
@@ -7954,6 +8588,7 @@ enum ControlResponse_Result {
   error,
   preparedBuild,
   extensionCache,
+  sourceInput,
   notSet
 }
 
@@ -7972,6 +8607,7 @@ class ControlResponse extends $pb.GeneratedMessage {
     RuntimeError? error,
     PreparedBuild? preparedBuild,
     ExtensionCacheState? extensionCache,
+    SourceInputState? sourceInput,
   }) {
     final result = ControlResponse._();
     if (requestId != null) result.requestId = requestId;
@@ -7987,6 +8623,7 @@ class ControlResponse extends $pb.GeneratedMessage {
     if (error != null) result.error = error;
     if (preparedBuild != null) result.preparedBuild = preparedBuild;
     if (extensionCache != null) result.extensionCache = extensionCache;
+    if (sourceInput != null) result.sourceInput = sourceInput;
     return result;
   }
 
@@ -8012,13 +8649,14 @@ class ControlResponse extends $pb.GeneratedMessage {
     18: ControlResponse_Result.error,
     19: ControlResponse_Result.preparedBuild,
     20: ControlResponse_Result.extensionCache,
+    21: ControlResponse_Result.sourceInput,
     0: ControlResponse_Result.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ControlResponse',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: ControlResponse.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aE<RuntimeSlot>(2, _omitFieldNames ? '' : 'slotId',
         enumValues: RuntimeSlot.values)
@@ -8044,6 +8682,8 @@ class ControlResponse extends $pb.GeneratedMessage {
         subBuilder: PreparedBuild.$_createMessage)
     ..aOM<ExtensionCacheState>(20, _omitFieldNames ? '' : 'extensionCache',
         subBuilder: ExtensionCacheState.$_createMessage)
+    ..aOM<SourceInputState>(21, _omitFieldNames ? '' : 'sourceInput',
+        subBuilder: SourceInputState.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8079,6 +8719,7 @@ class ControlResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(18)
   @$pb.TagNumber(19)
   @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
   ControlResponse_Result whichResult() =>
       _ControlResponse_ResultByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -8092,6 +8733,7 @@ class ControlResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(18)
   @$pb.TagNumber(19)
   @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
   void clearResult() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -8232,6 +8874,17 @@ class ControlResponse extends $pb.GeneratedMessage {
   void clearExtensionCache() => $_clearField(20);
   @$pb.TagNumber(20)
   ExtensionCacheState ensureExtensionCache() => $_ensure(12);
+
+  @$pb.TagNumber(21)
+  SourceInputState get sourceInput => $_getN(13);
+  @$pb.TagNumber(21)
+  set sourceInput(SourceInputState value) => $_setField(21, value);
+  @$pb.TagNumber(21)
+  $core.bool hasSourceInput() => $_has(13);
+  @$pb.TagNumber(21)
+  void clearSourceInput() => $_clearField(21);
+  @$pb.TagNumber(21)
+  SourceInputState ensureSourceInput() => $_ensure(13);
 }
 
 class OpenWorker extends $pb.GeneratedMessage {
@@ -8413,6 +9066,7 @@ enum WorkerCommand_Command {
   acquireImage,
   closePageSession,
   shutdown,
+  answerSourceInput,
   notSet
 }
 
@@ -8424,6 +9078,7 @@ class WorkerCommand extends $pb.GeneratedMessage {
     AcquireImageWorker? acquireImage,
     ClosePageSession? closePageSession,
     Empty? shutdown,
+    SourceInputAnswer? answerSourceInput,
   }) {
     final result = WorkerCommand._();
     if (envelope != null) result.envelope = envelope;
@@ -8432,6 +9087,7 @@ class WorkerCommand extends $pb.GeneratedMessage {
     if (acquireImage != null) result.acquireImage = acquireImage;
     if (closePageSession != null) result.closePageSession = closePageSession;
     if (shutdown != null) result.shutdown = shutdown;
+    if (answerSourceInput != null) result.answerSourceInput = answerSourceInput;
     return result;
   }
 
@@ -8451,13 +9107,14 @@ class WorkerCommand extends $pb.GeneratedMessage {
     12: WorkerCommand_Command.acquireImage,
     13: WorkerCommand_Command.closePageSession,
     14: WorkerCommand_Command.shutdown,
+    15: WorkerCommand_Command.answerSourceInput,
     0: WorkerCommand_Command.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'WorkerCommand',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: WorkerCommand.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14])
+    ..oo(0, [10, 11, 12, 13, 14, 15])
     ..aOM<RpcEnvelope>(1, _omitFieldNames ? '' : 'envelope',
         subBuilder: RpcEnvelope.$_createMessage)
     ..aOM<OpenWorker>(10, _omitFieldNames ? '' : 'open',
@@ -8470,6 +9127,8 @@ class WorkerCommand extends $pb.GeneratedMessage {
         subBuilder: ClosePageSession.$_createMessage)
     ..aOM<Empty>(14, _omitFieldNames ? '' : 'shutdown',
         subBuilder: Empty.$_createMessage)
+    ..aOM<SourceInputAnswer>(15, _omitFieldNames ? '' : 'answerSourceInput',
+        subBuilder: SourceInputAnswer.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8499,6 +9158,7 @@ class WorkerCommand extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
   WorkerCommand_Command whichCommand() =>
       _WorkerCommand_CommandByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -8506,6 +9166,7 @@ class WorkerCommand extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
   void clearCommand() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -8573,9 +9234,28 @@ class WorkerCommand extends $pb.GeneratedMessage {
   void clearShutdown() => $_clearField(14);
   @$pb.TagNumber(14)
   Empty ensureShutdown() => $_ensure(5);
+
+  @$pb.TagNumber(15)
+  SourceInputAnswer get answerSourceInput => $_getN(6);
+  @$pb.TagNumber(15)
+  set answerSourceInput(SourceInputAnswer value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasAnswerSourceInput() => $_has(6);
+  @$pb.TagNumber(15)
+  void clearAnswerSourceInput() => $_clearField(15);
+  @$pb.TagNumber(15)
+  SourceInputAnswer ensureAnswerSourceInput() => $_ensure(6);
 }
 
-enum WorkerResponse_Result { session, source, image, closed, error, notSet }
+enum WorkerResponse_Result {
+  session,
+  source,
+  image,
+  closed,
+  error,
+  sourceInput,
+  notSet
+}
 
 class WorkerResponse extends $pb.GeneratedMessage {
   factory WorkerResponse({
@@ -8585,6 +9265,7 @@ class WorkerResponse extends $pb.GeneratedMessage {
     ProcessedImage? image,
     Closed? closed,
     RuntimeError? error,
+    SourceInputPrompt? sourceInput,
   }) {
     final result = WorkerResponse._();
     if (envelope != null) result.envelope = envelope;
@@ -8593,6 +9274,7 @@ class WorkerResponse extends $pb.GeneratedMessage {
     if (image != null) result.image = image;
     if (closed != null) result.closed = closed;
     if (error != null) result.error = error;
+    if (sourceInput != null) result.sourceInput = sourceInput;
     return result;
   }
 
@@ -8612,13 +9294,14 @@ class WorkerResponse extends $pb.GeneratedMessage {
     12: WorkerResponse_Result.image,
     13: WorkerResponse_Result.closed,
     14: WorkerResponse_Result.error,
+    15: WorkerResponse_Result.sourceInput,
     0: WorkerResponse_Result.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'WorkerResponse',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
       createEmptyInstance: WorkerResponse.$_createMessage)
-    ..oo(0, [10, 11, 12, 13, 14])
+    ..oo(0, [10, 11, 12, 13, 14, 15])
     ..aOM<RpcEnvelope>(1, _omitFieldNames ? '' : 'envelope',
         subBuilder: RpcEnvelope.$_createMessage)
     ..aOM<RuntimeSession>(10, _omitFieldNames ? '' : 'session',
@@ -8631,6 +9314,8 @@ class WorkerResponse extends $pb.GeneratedMessage {
         subBuilder: Closed.$_createMessage)
     ..aOM<RuntimeError>(14, _omitFieldNames ? '' : 'error',
         subBuilder: RuntimeError.$_createMessage)
+    ..aOM<SourceInputPrompt>(15, _omitFieldNames ? '' : 'sourceInput',
+        subBuilder: SourceInputPrompt.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8660,6 +9345,7 @@ class WorkerResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
   WorkerResponse_Result whichResult() =>
       _WorkerResponse_ResultByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -8667,6 +9353,7 @@ class WorkerResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
   void clearResult() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -8734,6 +9421,17 @@ class WorkerResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(14);
   @$pb.TagNumber(14)
   RuntimeError ensureError() => $_ensure(5);
+
+  @$pb.TagNumber(15)
+  SourceInputPrompt get sourceInput => $_getN(6);
+  @$pb.TagNumber(15)
+  set sourceInput(SourceInputPrompt value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasSourceInput() => $_has(6);
+  @$pb.TagNumber(15)
+  void clearSourceInput() => $_clearField(15);
+  @$pb.TagNumber(15)
+  SourceInputPrompt ensureSourceInput() => $_ensure(6);
 }
 
 const $core.bool _omitFieldNames =

@@ -1,5 +1,6 @@
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+import 'package:source_runtime/source_runtime.dart' show SourceInputHandler;
 
 import '../browse/catalog_controller.dart';
 import 'chapter_sequence.dart';
@@ -127,6 +128,7 @@ Future<RecoveredReader?> recoverReader(
   CatalogController catalog,
   ReaderRecoveryContext context, {
   bool Function()? isCurrent,
+  SourceInputHandler? onInput,
 }) async {
   if (catalog.status != ServiceStatus.ready ||
       catalog.subject != context.subject ||
@@ -174,6 +176,7 @@ Future<RecoveredReader?> recoverReader(
     ChapterEntry(chapter.snapshot),
     reference: details.source,
     logicalChapterKey: chapter.key,
+    onInput: onInput,
   );
   if (opened == null) return null;
   if (!current() || !catalog.isCurrentSource(details.source)) {

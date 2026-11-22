@@ -25,6 +25,7 @@ import { execa, execaSync } from 'execa';
 import stableStringify from 'json-stable-stringify';
 import writeFileAtomic from 'write-file-atomic';
 import isRecord from 'is-plain-obj';
+import { z } from 'zod';
 import type {
   BuildManifest,
   ExtensionIndex,
@@ -472,64 +473,73 @@ function baselineInventory(
 /** The frozen catalog supplies coverage; only selected successful supplements replace its inputs. */
 export function makeBaselinePlan(
   frozen: ExtensionPlan,
-  supplement: ExtensionPlan,
-  packages: readonly string[],
+  supplements: readonly BaselinePlanSupplement[],
 ): ExtensionPlan {
-  if (
-    frozen.baseRevision === null ||
-    frozen.baseRevision !== supplement.baseRevision
-  )
-    throw new Error('Baseline plans must use the same deployed parent');
-  if (
-    frozen.upstreamCommit !== supplement.upstreamCommit ||
-    !equal(frozen.discoveryFailures, supplement.discoveryFailures)
-  )
-    throw new Error('Baseline plans must use the same upstream catalog');
+  if (!supplements.length) throw new Error('Baseline requires a supplement');
   const original = baselineInventory(frozen);
-  const updated = baselineInventory(supplement);
-  if (original.size !== updated.size)
-    throw new Error('Baseline plans must cover the same source packages');
-  for (const [name, entry] of original) {
-    const replacement = updated.get(name);
+  const replacements = new Map<string, ExtensionDescriptor>();
+  for (const { plan: supplement, packages } of supplements) {
     if (
-      !replacement ||
-      !(
-        [
-          'sourcePath',
-          'versionName',
-          'versionCode',
-          'declaredVersionCode',
-          'effectiveVersionCode',
-          'sourceFingerprint',
-          'sourceInputs',
-          'sharedInputs',
-        ] as const
-      ).every((key) => equal(entry[key], replacement[key]))
+      frozen.baseRevision === null ||
+      frozen.baseRevision !== supplement.baseRevision
     )
-      throw new Error('Baseline plans differ in source identity for ' + name);
+      throw new Error('Baseline plans must use the same deployed parent');
+    if (
+      frozen.upstreamCommit !== supplement.upstreamCommit ||
+      !equal(frozen.discoveryFailures, supplement.discoveryFailures)
+    )
+      throw new Error('Baseline plans must use the same upstream catalog');
+    const updated = baselineInventory(supplement);
+    if (original.size !== updated.size)
+      throw new Error('Baseline plans must cover the same source packages');
+    for (const [name, entry] of original) {
+      const replacement = updated.get(name);
+      if (
+        !replacement ||
+        !(
+          [
+            'sourcePath',
+            'versionName',
+            'versionCode',
+            'declaredVersionCode',
+            'effectiveVersionCode',
+            'sourceFingerprint',
+            'sourceInputs',
+            'sharedInputs',
+          ] as const
+        ).every((key) => equal(entry[key], replacement[key]))
+      )
+        throw new Error('Baseline plans differ in source identity for ' + name);
+    }
+    if (!packages.length) throw new Error('Each supplement needs a package');
+    const selected = new Map(
+      supplement.selected.map((entry) => [entry.packageName, entry]),
+    );
+    for (const name of packages) {
+      if (replacements.has(name))
+        throw new Error(
+          'Baseline requires unique supplement packages: ' + name,
+        );
+      const replacement = selected.get(name);
+      if (!replacement)
+        throw new Error(
+          'Supplement package is not selected in its plan: ' + name,
+        );
+      if (original.get(name)?.inputFingerprint === replacement.inputFingerprint)
+        throw new Error(
+          'Supplement package must replace a different build input: ' + name,
+        );
+      replacements.set(name, replacement);
+    }
   }
-  const chosen = new Set(packages);
-  const selected = new Set(
-    supplement.selected.map((entry) => entry.packageName),
+  const entries = frozen.entries.map(
+    (entry) => replacements.get(entry.packageName) ?? entry,
   );
-  if (!chosen.size || chosen.size !== packages.length)
-    throw new Error('Baseline requires unique supplement packages');
-  const entries = frozen.entries.map((entry) => {
-    if (!chosen.delete(entry.packageName)) return entry;
-    const replacement = updated.get(entry.packageName);
-    if (!replacement || !selected.has(entry.packageName))
-      throw new Error(
-        'Supplement package is not selected in its plan: ' + entry.packageName,
-      );
-    if (entry.inputFingerprint === replacement.inputFingerprint)
-      throw new Error(
-        'Supplement package must replace a different build input: ' +
-          entry.packageName,
-      );
-    return replacement;
-  });
-  if (chosen.size)
-    throw new Error('Supplement package is missing from frozen catalog');
+  if (
+    new Set(entries.map((entry) => entry.inputFingerprint)).size !==
+    entries.length
+  )
+    throw new Error('Baseline supplements produce duplicate build inputs');
   return {
     ...frozen,
     catalogFingerprint: catalogDigest(entries, frozen.discoveryFailures),
@@ -796,14 +806,50 @@ function requireSeparateOutput(
   return output;
 }
 
+interface BaselinePlanSupplement {
+  plan: ExtensionPlan;
+  packages: readonly string[];
+}
+
+interface BaselineSupplement extends BaselinePlanSupplement {
+  results: string;
+  checkout?: string;
+}
+
+const baselineSupplementInputs = z
+  .array(
+    z.strictObject({
+      plan: z.string().min(1),
+      results: z.string().min(1),
+      checkout: z.string().min(1),
+      packages: z.array(z.string().min(1)).min(1),
+    }),
+  )
+  .min(1);
+
+function loadBaselineSupplementInputs(file: string) {
+  if (statSync(file).size > MAX_STATE_BYTES)
+    throw new Error('Oversized supplement metadata');
+  const bytes = readFileSync(file);
+  if (bytes.length > MAX_STATE_BYTES)
+    throw new Error('Oversized supplement metadata');
+  const directory = path.dirname(path.resolve(file));
+  return baselineSupplementInputs
+    .parse(JSON.parse(bytes.toString('utf8')))
+    .map(({ plan, results, checkout, packages }) => ({
+      plan: path.resolve(directory, plan),
+      results: path.resolve(directory, results),
+      checkout: path.resolve(directory, checkout),
+      packages,
+    }));
+}
+
 interface BaselineOptions {
   frozenPlan: ExtensionPlan;
   frozenResults: string;
   frozenRuntime: RuntimeIdentity;
-  supplementPlan: ExtensionPlan;
-  supplementResults: string;
-  supplementPackages: readonly string[];
-  supplementCheckout?: string;
+  frozenCheckout?: string;
+  supplements: readonly BaselineSupplement[];
   parentState: ExtensionState;
   assetsDirectory: string;
   origin?: string;
@@ -1135,19 +1181,21 @@ export class ExtensionPipeline {
       throw new Error('CI cannot assemble an initial baseline');
     const {
       frozenResults,
-      supplementResults,
-      supplementPackages,
-      supplementCheckout,
+      frozenCheckout,
+      supplements,
       origin = DEFAULT_ORIGIN,
       processes = new BuilderProcesses(),
     } = options;
     const assets = requireSeparateOutput(options.assetsDirectory, [
       frozenResults,
-      supplementResults,
+      ...supplements.map(({ results }) => results),
     ]);
     const frozen = extensionPlanSchema.parse(options.frozenPlan),
-      supplement = extensionPlanSchema.parse(options.supplementPlan),
-      plan = makeBaselinePlan(frozen, supplement, supplementPackages),
+      parsed = supplements.map((supplement) => ({
+        ...supplement,
+        plan: extensionPlanSchema.parse(supplement.plan),
+      })),
+      plan = makeBaselinePlan(frozen, parsed),
       parent = validateState(options.parentState);
     if (plan.baseRevision !== parent.revision)
       throw new Error('Baseline production parent changed');
@@ -1158,28 +1206,42 @@ export class ExtensionPipeline {
     const index = await this.download(origin, INDEX_PATH, 2 * 1024 * 1024);
     if (createHash('sha256').update(index).digest('hex') !== remote.indexSha256)
       throw new Error('Baseline production parent index does not match state');
-    if (
-      !equal(
-        runtimeIdentitySchema.parse(options.frozenRuntime),
-        await this.currentRuntime(supplementCheckout),
-      )
-    )
-      throw new Error('Baseline runtime materials differ');
+    const runtime = runtimeIdentitySchema.parse(options.frozenRuntime);
+    for (const { checkout } of parsed) {
+      processes.check();
+      if (!equal(runtime, await this.currentRuntime(checkout)))
+        throw new Error('Baseline runtime materials differ');
+    }
     processes.check();
     const base = readBuildResults(frozenResults),
-      overlays = readBuildResults(supplementResults),
-      effective = new Map<string, ResultReceipt>();
-    for (const entry of frozen.entries) {
-      const receipt = baselineResult(base, entry, 'frozen');
-      effective.set(entry.inputFingerprint, receipt);
+      effective = new Map<string, ResultReceipt>(),
+      selected = new Map(
+        plan.entries.map((entry) => [entry.packageName, entry]),
+      ),
+      replacedFailures: {
+        descriptor: ExtensionDescriptor;
+        receipt: ResultReceipt;
+      }[] = [];
+    for (const descriptor of frozen.entries) {
+      const receipt = baselineResult(base, descriptor, 'frozen');
+      effective.set(descriptor.inputFingerprint, receipt);
+      if (
+        selected.get(descriptor.packageName)?.inputFingerprint !==
+          descriptor.inputFingerprint &&
+        resultOf(receipt.outcome).status === 'failed'
+      )
+        replacedFailures.push({ descriptor, receipt });
     }
-    const packages = new Set(supplementPackages);
-    for (const entry of plan.entries) {
-      if (packages.has(entry.packageName))
+    for (const { results, packages } of parsed) {
+      const overlays = readBuildResults(results);
+      for (const name of packages) {
+        const entry = selected.get(name);
+        if (!entry) throw new Error('Missing baseline input for ' + name);
         effective.set(
           entry.inputFingerprint,
           baselineResult(overlays, entry, 'supplement'),
         );
+      }
     }
     return this.prepareSnapshot(plan, remote, effective, assets, {
       origin,
@@ -1187,7 +1249,8 @@ export class ExtensionPipeline {
       finalize: true,
       strictResults: true,
       preserveAvailable: true,
-      ...(supplementCheckout ? { checkout: supplementCheckout } : {}),
+      replacedFailures,
+      ...(frozenCheckout ? { checkout: frozenCheckout } : {}),
     });
   }
   async prepareSnapshot(
@@ -1203,9 +1266,14 @@ export class ExtensionPipeline {
       checkout?: string;
       processes?: BuilderProcesses;
       verifiedResults?: Map<string, ResultReceipt>;
+      replacedFailures?: readonly {
+        descriptor: ExtensionDescriptor;
+        receipt: ResultReceipt;
+      }[];
     } = {},
   ): Promise<ExtensionState> {
     const processes = options.processes ?? new BuilderProcesses();
+    const replacedFailures = options.replacedFailures ?? [];
     processes.check();
     if (plan.baseRevision !== state.revision)
       throw new Error('Plan was based on a different deployed snapshot');
@@ -1261,6 +1329,17 @@ export class ExtensionPipeline {
       if (recorded.content)
         verified.set(descriptor.packageName, recorded.content);
     }
+    for (const { descriptor, receipt } of replacedFailures) {
+      processes.check();
+      await this.recordResult(
+        candidate,
+        descriptor,
+        receipt.outcome,
+        receipt.directory,
+        options.checkout,
+        options.strictResults,
+      );
+    }
     candidate.active = Object.fromEntries(
       Object.entries(candidate.active).filter(
         ([packageName, key]) =>
@@ -1271,7 +1350,10 @@ export class ExtensionPipeline {
     const retained = new Set(
       [...current.values()]
         .map((entry) => entry.inputFingerprint)
-        .concat(Object.values(candidate.active)),
+        .concat(
+          Object.values(candidate.active),
+          replacedFailures.map(({ descriptor }) => descriptor.inputFingerprint),
+        ),
     );
     candidate.attempts = Object.fromEntries(
       Object.entries(candidate.attempts).filter(
@@ -1409,8 +1491,9 @@ export class ExtensionPipeline {
         unavailable: Object.values(candidate.active).filter(
           (key) => !candidate.attempts[key]?.available,
         ).length,
-        failed: Object.values(candidate.attempts).filter(
-          (record) => record.status === 'failed',
+        failed: [...current.values()].filter(
+          (entry) =>
+            candidate.attempts[entry.inputFingerprint]?.status === 'failed',
         ).length,
         pending: [...current.values()].filter(
           (entry) => !candidate.attempts[entry.inputFingerprint],
@@ -1704,10 +1787,7 @@ async function runPipeline(
       finalize: { type: 'boolean', default: false },
       plan: { type: 'string' },
       'build-checkout': { type: 'string' },
-      'supplement-checkout': { type: 'string' },
-      'supplement-plan': { type: 'string' },
-      'supplement-results': { type: 'string' },
-      'supplement-package': { type: 'string', multiple: true },
+      supplements: { type: 'string' },
       'assets-dir': { type: 'string' },
       origin: { type: 'string' },
       key: { type: 'string' },
@@ -1724,8 +1804,7 @@ async function runPipeline(
       | 'results'
       | 'key'
       | 'build-checkout'
-      | 'supplement-plan'
-      | 'supplement-results',
+      | 'supplements',
   ): string => {
     const value = values[name];
     if (!value) throw new Error('--' + name + ' is required');
@@ -1753,22 +1832,23 @@ async function runPipeline(
       if (values.ci || ciEnvironment())
         throw new Error('CI cannot assemble an initial baseline');
       const frozenFile = required('plan'),
-        supplementFile = required('supplement-plan'),
+        supplementFile = required('supplements'),
         stateFile = required('state'),
         frozenResults = required('results'),
-        supplementResults = required('supplement-results'),
         frozenCheckout = required('build-checkout'),
-        supplementCheckout = values['supplement-checkout'] ?? ROOT,
-        supplementPackages = values['supplement-package'] ?? [],
+        supplements = loadBaselineSupplementInputs(supplementFile),
         assets = requireSeparateOutput(assetsDirectory, [
           frozenFile,
           supplementFile,
           stateFile,
           frozenCheckout,
           frozenResults,
-          supplementResults,
+          ...supplements.flatMap(({ plan, results }) => [plan, results]),
         ]);
-      for (const checkout of [ROOT, supplementCheckout].map(canonicalPath)) {
+      for (const checkout of [
+        ROOT,
+        ...supplements.map(({ checkout }) => checkout),
+      ].map(canonicalPath)) {
         const local = path.join(checkout, '.local');
         if (
           pathContains(assets, checkout) ||
@@ -1778,23 +1858,29 @@ async function runPipeline(
           throw new Error('Baseline output must be outside checkout inputs');
       }
       const frozen = loadPlan(frozenFile),
-        supplement = loadPlan(supplementFile),
+        plans = supplements.map((supplement) => ({
+          ...supplement,
+          plan: loadPlan(supplement.plan),
+        })),
         parentState = loadState(stateFile);
-      makeBaselinePlan(frozen, supplement, supplementPackages);
-      // Git status must not refresh the on-disk index of either input checkout.
+      makeBaselinePlan(frozen, plans);
+      // Git status must not refresh the on-disk index of any input checkout.
       process.env.GIT_OPTIONAL_LOCKS = '0';
-      const original = validateBaselineCheckout(frozenCheckout, frozen),
-        updated = validateBaselineCheckout(supplementCheckout, supplement);
+      const original = validateBaselineCheckout(frozenCheckout, frozen);
       await new ExtensionPipeline({
         materials: async (checkout) => readRuntimeIdentity(checkout),
       }).prepareBaseline({
         frozenPlan: frozen,
         frozenResults,
         frozenRuntime: readRuntimeIdentity(original),
-        supplementPlan: supplement,
-        supplementResults,
-        supplementPackages,
-        supplementCheckout: updated,
+        frozenCheckout: original,
+        supplements: plans.map((supplement) => ({
+          ...supplement,
+          checkout: validateBaselineCheckout(
+            supplement.checkout,
+            supplement.plan,
+          ),
+        })),
         parentState,
         assetsDirectory: assets,
         origin,

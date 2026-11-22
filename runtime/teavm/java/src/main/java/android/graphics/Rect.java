@@ -32,6 +32,14 @@ public class Rect {
     return bottom - top;
   }
 
+  public final float exactCenterX() {
+    return (left + right) * 0.5f;
+  }
+
+  public final float exactCenterY() {
+    return (top + bottom) * 0.5f;
+  }
+
   public boolean isEmpty() {
     return left >= right || top >= bottom;
   }

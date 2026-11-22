@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。状态：**Web 0.1.0、API 与中文/全语言七材料首批已上线；其余语言基线及增量部署待验收，原生验证停止**。首次切换见[首发记录](../verification/first-web-release.md)，当前生产身份见[七材料发布](../verification/seven-material-release.md#首批生产发布与验收)。
+Static Assets 是所有客户端扩展分发的最终权威来源。每包只部署最新可用构建，由客户端或 Service Worker 检查索引、更新和清理旧缓存；不再向 GitHub Release 发布扩展，不经 R2/Worker 转发扩展正文。首次切换见[首发记录](../verification/first-web-release.md)。**Web、API 与带封面入口的完整扩展基线已上线，原生验证暂停。**
 
 Web/API 按[原型自动上线流程](../DEPLOYMENT.md)在主线 CI 成功后发布，复用同轮构建与现网扩展快照；[浏览 UI 已上线](../verification/browse-ui-flow.md#生产发布)。扩展操作入口见 [EXTENSIONS](../EXTENSIONS.md)，材料契约见 [RUNTIME-MATERIALS](../RUNTIME-MATERIALS.md)，包体方案见 [AOT-SIZE](../AOT-SIZE.md)。扩展 Release/R2 发布实现已删除。实际证据见 [VERIFICATION](../VERIFICATION.md)。
 
@@ -16,7 +16,7 @@ Web/API 按[原型自动上线流程](../DEPLOYMENT.md)在主线 CI 成功后发
 
 扩展网络登记已移除。[隔离 D1 切换演练](../verification/d1-relay-cutover.md)确认：`0009` 是新版 Source 设置前置条件，也会停止旧中继；需要短维护窗口先应用 `0009`、再切换 Worker/Static Assets，最后应用 `0010`。生产已按该顺序切换，`0010` 后的 xkcd 读图与保存通过。
 
-增量计划和候选组装都检查已部署可用扩展的运行时身份。协议、ABI 或材料字节有变化时，CI 要求先发布匹配的本地全量候选；输入指纹变化而材料与合同不变时，仍允许有界增量。定向回归覆盖宿主切换拒绝及旧快照不变，也验证同运行时的有界批次保留未选中的可用扩展。线上工作流仍待匹配的 baseline 部署后验收。
+增量计划和候选组装都检查已部署可用扩展的运行时身份。协议、ABI 或材料字节有变化时，CI 要求先发布匹配的本地全量候选；输入指纹变化而材料与合同不变时，仍允许有界增量。定向回归覆盖宿主切换拒绝及旧快照不变，也验证同运行时的有界批次保留未选中的可用扩展。已对生产基线完成只读有界计划验收，定时工作流及真实变化输入的发布仍待验收。
 
 [clab 在途失败抽样](../verification/aot-current-pilot.md#clab-在途失败抽样)显示主要是 TeaVM 宿主链接缺口。先完成并验收冻结批次；`Class.getResource` 的打包资源读取可作为下一轮隔离 AOT 验证的优先项。
 
@@ -29,6 +29,87 @@ clab 冻结全量与三个定向补编已结束；[六材料完整候选](../ver
 同日用户指定中文和全语言优先，完成这两类后即上线。原全量队列及其子进程已安全退出；全语言 138 包已有终态，中文 59 包使用相同冻结输入、正式逐包入口和状态锁在 clab 双并发构建。按[分批首发记录](../verification/seven-material-release.md#中文与全语言优先首发)先部署已有新材料结果，其余语言随后补齐；首批不能沿用六材料的完整基线标记，完整目录仍待本地完成并确认后再恢复增量 CI。
 
 2026-11-11 19:25（UTC+8），[中文与全语言首批](../verification/seven-material-release.md#首批生产发布与验收)已完成 197 包终态和生产发布；加入已完成的 7 个阿拉伯语包后，190 包进入七材料目录，14 个编译失败。新 Worker 全部流量、26 条匿名路径、D1 账本、真实 Access 下 xkcd 更新/两页保存/新标签续读与正式 checkpoint 均确认。候选保持 `bootstrap.complete=false`；其余 1,244 包已从新检查点在 clab 通过正式入口恢复，完整基线和真实有界增量仍待完成。
+
+### 封面宿主全量升级
+
+2026-11-22，生产父快照 `ddb5ac8f3b2a46cb8efc2dafc440b3d4` 的公开索引和状态已核对。现网 191 个构建中，Arknights Comics 1.6.2 已带有普通封面的宿主入口。随后在 `ssh macbook-pro-4` 固定检出主线 `af8c203` 和 Keiyoushi `efa93f5a`，按当前工具链准备[首次全量](../EXTENSIONS.md#首次本地全量与恢复)。[生产证据](../VERIFICATION.md)
+
+远端冻结计划覆盖 1,448 个包，发现失败为 0。现网 Arknights Comics 的构建输入与新计划一致。xkcd 试编通过后，远端以两路并发启动其余 1,447 个包的全量计划，并复用已验证的 xkcd 结果。两路测试时构建进程占用约 1.3 GiB，系统内存余量为 60%，未使用交换空间。原进程释放检查点锁后，以同一计划和检查点恢复为四路并发。
+
+远端已用同一主线的 CI 归档和生产父快照完成发布预演。发布后先读回完整索引与每份清单，再核对每个 gzip 的线上强 ETag 和 HTTP 交付合同。全量装配以冻结队列的实际终态和逐包封面入口检查为前置条件。[预演证据](../VERIFICATION.md)
+
+冻结批次的 MangaFire 缺少打包资源 URL 读取。独立 checkout 补齐该接口，用原扩展成功完成定向 AOT；共享运行材料一致。全量收尾按[定向补编流程](../EXTENSIONS.md#首次全量候选的定向补编)合入成功结果，并检查同类失败。[补编证据](../VERIFICATION.md)
+
+Komga、BookOrbit、LANraragi、Mango 已从同一 Keiyoushi 提交定向补编，四包的完整性和封面入口检查通过。包含系统 DNS 和同源鉴权的补编计划已核对 1,448 个冻结输入、当前生产父快照和共享运行材料。[补编证据](../VERIFICATION.md)
+
+BookWalker 与 J-Novel 的 Java 摘要兼容补编已通过正式完整性和封面入口检查。两包与此前的成功补编使用同一生产父快照和共享运行材料。[补编证据](../VERIFICATION.md)
+
+Read Berserk Manga 从已归档的 Gradle 共享目录缓存失败恢复，同一上游提交在独立 checkout 串行构建通过，已登记到完整候选。收尾时复核同类日志并按包串行复验一次，上游 KSP 继承校验失败保留诊断。[补编证据](../VERIFICATION.md)
+
+Coolmic、Manga Drama、Mgread.io 在独立 checkout 补齐 PBKDF2 后通过正式 AOT、产物完整性和封面入口检查。三包与此前八个补编结果已通过生产父快照、共享材料及候选装配前检查。[补编证据](../VERIFICATION.md)
+
+Read One Piece Manga Online 的 KSP 继承校验失败已在同一上游提交的独立 checkout 串行恢复。候选组装入口支持直接复用多个经过检查的独立补编批次。[补编证据](../VERIFICATION.md) · [组装命令](../EXTENSIONS.md#首次全量候选的定向补编)
+
+The Blank、TCB Scans、Webnex 已通过正式 AOT、产物完整性及封面入口检查。冻结批次中同一 MangaCatalog 主题的 12 个 KSP 继承校验失败全部从隔离串行复验恢复。P‑256 签名与资源适配批次随后恢复 ProComic、Capibara Traductor、Mangas.in 和 Mangas No Sekai，三个补编批次共 30 个成功结果通过装配预检。Lunar Manga 的字符串拼接和密钥接口已通过编译，仍依赖 Turnstile 的 Android Activity 和 WebView 交互。[补编证据](../VERIFICATION.md)
+
+Nexus Scanlation 使用 P‑256 密钥协商适配完成正式 AOT、完整性及封面入口检查，第四个补编批次已通过装配预检。[补编证据](../VERIFICATION.md)
+
+Emaqi 通过 RSA-OAEP 适配恢复，Epsilon Scan 和 Soft Epsilon Scan 通过时区与打包资源读取适配恢复。Falco Scan（`tenkaiscan`）的仿射位图绘制和颜色矩阵通过 Android 原生参考与生成代码的分项检查，正式 AOT、完整性和封面入口检查也通过。六个补编批次共 35 个结果进入全量候选。[补编证据](../VERIFICATION.md)
+
+U-Next 与 OneReader 都已通过独立补编、完整性及封面入口检查。原冻结回执到齐后，两包通过装配预检。Softkomik 的标准 DNS 异常类型兼容和 ebookjapan 的 `Rect` 精确中心接口也已通过正式补编，装配预检累计纳入 39 个补编结果。MoeTruyen 的 Android 对话框和视图依赖仍需真实宿主能力。[补编证据](../VERIFICATION.md)
+
+SoraRaw 所需的颜色数组位图构造已通过 Android API 35 原生参考验证。使用同一冻结图形材料完成正式补编、完整性及封面入口检查，成为第 40 个通过装配预检的补编结果。[补编证据](../VERIFICATION.md)
+
+Dragon Ball Multiverse 和 ManhuaRM 使用的 `StaticLayout.Builder` 已接入简单、高质量和平衡断行及连字符。Android API 35 原生参考与宿主定向测试均覆盖策略之间的差异，两包也已在 `macbook-pro-4` 通过正式补编和封面入口检查。两包使用新的共享图形材料，按其材料身份独立装配候选，实际绘制和阅读待验。[验收记录](../VERIFICATION.md)
+
+Gölge Bahçesi、Koreli Manga、Manga Ruhu 和 Merlin Scans 分别复用打包资源读取或 PBKDF2 适配，均通过正式补编、完整性和封面入口检查。整次 HTTP 调用超时适配恢复 AnimexNovel 和 ArgosComics，带支点缩放适配恢复 MangaTR，三包也通过相同检查。七包均匹配冻结批次的共享材料，等待全量装配及实际出图验收。[补编证据](../VERIFICATION.md)
+
+OriManga、Paradox Scans、Ragnar Scans 和 Siyah Melek 复用 PBKDF2 适配通过正式补编，装配预检累计纳入 51 个结果。HV2TComics 使用同一套有界位图解码补齐 Android 字节数组接口，正式 AOT、完整性和封面入口检查也通过。实际出图与 AVIF 浏览器解码待验。[补编证据](../VERIFICATION.md)
+
+冻结目录的 1,448 个输入均有回执。候选可分发 1,414 个扩展和 2,280 个 Source，其中 43 个扩展为新增，保留全部 1,371 个历史可用包。34 个 AOT 失败保留诊断。修正后的装配状态保留补编之前的 55 份原失败回执，同一主线的有界增量预检选择 0 项。[全量候选证据](../VERIFICATION.md)
+
+初次完整候选已发布到生产，1,414 个扩展的清单和安装包交付检查通过，34 个失败包保留诊断。正式检查点已在本机与构建机确认。从生产状态复验的有界增量计划选择 0 项。[生产证据](../VERIFICATION.md)
+
+漫画人 1.6.2 通过 X.509 RSA 公钥导入和 PKCS#1 v1.5 加密适配，在 `macbook-pro-4` 完成补编并发布。生产目录保留原有 1,414 个索引条目，现有 1,415 个扩展和 2,281 个 Source。新增清单与安装包、两地检查点及生产有界规划均已复验。33 个构建失败包与已发布包的实际出图待继续验收。[发布证据](../VERIFICATION.md)
+
+MangaDash 使用 Android `PdfRenderer` 从虚拟文件读入 PDF 并栅格化章节。PDFium 宿主与八份运行材料的产品构建、合成双页真实像素检查、内存限额和清理测试已通过。MangaDash、Dragon Ball Multiverse 和 ManhuaRM 已在 `macbook-pro-4` 用同一材料身份通过正式 AOT 和封面入口检查。四路全量重建已启动，覆盖 1,448 个冻结输入。[验证记录](../VERIFICATION.md)
+
+MangaDash 的正式 AOT 在隔离 HTTP 夹具读入双页 PDF，经原拦截器返回两张 JPEG。尺寸、红白蓝采样、PDFium 按需加载和资源释放均通过。Dragon Ball Multiverse 和 ManhuaRM 的正式 AOT 分别验证了对话文字在 JPEG 和 PNG 中的位置，Dragon Ball Multiverse 的英文目录和首张封面也完成真实读取。Monochrome Scans 在冻结批次遇到 KSP 处理错误，用同一上游和八份材料独立补编通过，已纳入装配输入，待随完整候选保留现网可用性。[验证记录](../VERIFICATION.md)
+
+MangaKakalot 1.6.28 通过 OkHttp 调度适配恢复，两套材料的正式 AOT、完整性和封面入口检查均通过。七材料构建已发布，生产目录现有 1,416 个扩展和 2,282 个 Source。八材料构建已纳入以新生产 revision 为父快照的装配计划，全量构建继续使用原冻结输入。已发布包的实际出图待验。[验证记录](../VERIFICATION.md)
+
+Mehgazone 1.6.1 在补齐文本设置弹窗说明后通过八材料正式 AOT、产物完整性和封面入口检查。该补编需要含新弹窗协议的客户端，随八材料候选交付。实际设置及出图待验。[设置计划](source-preferences.md)
+
+Doujin.io 1.6.5 补齐无填充的 AES 实现后通过两套材料的正式 AOT、完整性与封面入口检查。七材料构建已发布并读回，生产索引现有 1,417 个扩展，仍有 31 个失败输入。八材料构建已并入以新生产 revision 为父的装配计划，完整队列继续运行。实际出图待验。[验证记录](../VERIFICATION.md)
+
+MoeTruyen 通过 Keiyoushi 输入弹窗接收用户亲自填写的评论，MeDamTruyen、Panomic、SoaiCaComic 和 TeamLanhLung 通过同一辅助函数接收章节密码。`f00c680` 接入 Gradle 输入签名保留、TeaVM 调用转换及 Flutter 弹窗。五包均在 `macbook-pro-4` 通过八材料正式 AOT、完整性、封面入口和输入能力检查。真实 AOT 在隔离响应下通过 15 个用例，覆盖确认、取消和后台预取。发版输入已纳入五包和同提交的产品归档，连同 Monochrome Scans 和前三批补编共九个替换构建，待冻结队列收齐后装配。真实源站读章与生产发布待验。[验证记录](../VERIFICATION.md)
+
+MegaTokyo 1.6.1 通过定向 AOT 适配使用平台 TLS 校验，两套材料的正式构建、完整性和封面入口检查通过。两套原生 Worker 均经真实 Source 从公开首话取得并回传一页 GIF。七材料产物已上线，生产读回 1,418 个扩展和 2,284 个 Source，剩余 30 个失败输入。发布后的检查点修正恢复了 59 条历史失败回执，固定输入的有界计划选择 0 项。八材料装配仍有六批十个替换构建。生产认证后读图及实际封面显示待验。[验证记录](../VERIFICATION.md)
+
+八材料产品用固定归档和 13 个真实构建通过正式快照组装、Vite 和 Wrangler dry-run。回环服务核对了扩展清单、gzip 产物、PDFium 等八份材料及 55 个 Source 的索引身份。完整发布继续等待冻结队列收齐并保留现网包。[验证记录](../VERIFICATION.md)
+
+ToonLivre 1.6.90 保留原目录和普通读章路径，遇到站点验证要求时提示使用官方阅读器。真实目录及封面读取通过，隔离章页和验证分支通过，实际所选章节的章页请求返回 404。SpyFakku 1.6.2 通过平台 TLS 读取真实目录，隔离复验原图片路由、封面回传和镜像验证提示。两包已纳入八材料装配输入，累计八批十二个替换构建。真实读章、验证交互和生产发布待验。[验证记录](../VERIFICATION.md)
+
+上游 ToonLivre 1.6.91 调整了章页请求的章节上下文和验证分支。后续锁定该上游输入复验正式目录、直接读章及站点验证提示。八材料全量装配沿用已冻结的上游身份。[上游恢复提交](https://github.com/keiyoushi/extensions-source/commit/4b20a3fe77e29bca49af5454a06da65fdd09151e)
+
+爱看漫与 ReiManga 的固定构建使用中继的 HTTP 协商，保留原 Source 的 Cookie 和请求处理。爱看漫已从真实站点读回目录与封面，ReiManga 的正式目录返回 403，隔离封面交付通过。对调用已固定 Keiyoushi Android 验证助手的 Source，AOT 保留普通请求，并在调用验证助手时提示打开官方阅读器。TempleScan 已实测该提示，Cosmic Scans ID 与 CodeArc 已初始化并登记封面能力。[验证记录](../VERIFICATION.md)
+
+十四包定向补编已收齐。十三包取得匹配冻结材料的正式产物，覆盖十八个 Source，并通过独立 Worker 的初始化、封面能力和关闭检查。补齐后装配输入含九批二十五个替换构建，全部现网包均在完整计划内。WebtoonLib 已在独立字距材料下取得正式产物和隔离章节证据，随匹配的新材料进入后续发布。Scan-Manga、Japscan 的公开目录分别返回 404 和 403，Comix 的热门目录依赖 Android WebView。[补编验证](../VERIFICATION.md) · [WebtoonLib 字距实现](https://github.com/Wybxc/karuyomi/commit/3089367548b2b7b0873ffa6cdc4d73f4aaeb6698)
+
+读漫屋和如漫画用固定 MMLook AOT 适配接入平台 TLS，保留原扩展的重定向策略。两包已通过正式构建与隔离目录、封面检验，真实目录分别遇到连接重置和证书主机名不匹配。两份产物纳入匹配材料的候选，替换总数增至十批二十七个。固定 Web 归档已在构建机恢复并核对摘要，本机 Wrangler 已读回生产流量与 D1 迁移账本。完整装配等待原始回执收齐。[验证记录](../VERIFICATION.md)
+
+- [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
+- [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
+- [x] 先行发布原索引 191 个升级包，逐包读回生产资源并确认新的生产检查点。完整冻结队列继续构建后续目录。[生产证据](../VERIFICATION.md)
+- [x] 核对完整目录的逐包结果及失败诊断，复验可分发候选的所有构建均导出封面入口。
+- [ ] 在生产代表源核对实际封面读取。
+- [x] 用正式构建和 Wrangler 发布完整候选，核对流量、公开索引和状态字节，提交正式 checkpoint，并从生产状态复验有界规划。
+- [ ] 验证真实输入变化下的有界增量发布。
+- [ ] 推进生产中剩余 30 个构建失败包的宿主兼容与复编，按匹配的共享材料验收产物。
+- [x] 接入正式 AOT 的文本输入签名保留和 TeaVM 调用映射。
+- [x] 将输入请求绑定到前台阅读会话，覆盖显示来源、必填、密码遮蔽、取消和会话失效。
+- [x] 重编五个使用输入的扩展，并用真实 AOT 和隔离源站响应验证单次提交、取消及后台预取。
+- [ ] 随八材料候选正式装配这五个扩展，并复验产品界面、生产登录和读章。
 
 [首发六材料产品归档](../verification/aot-current-pilot.md#首发六材料产品归档)已带上本机服务地址、Native 登录与阅读恢复修复，回摘前后宿主指纹和六份材料完全一致。隔离 HTTP 回跳通过；原生正式签名和生产 Access 另验。
 

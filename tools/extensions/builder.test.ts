@@ -135,7 +135,7 @@ test('builder writes exactly the declared deterministic gzip artifact', () => {
       raw = Buffer.from("console.log('漫画');");
     writeFileSync(source, raw);
     mkdirSync(output);
-    const ref = put(output, source, 'text/javascript'),
+    const ref = put(output, readFileSync(source), 'text/javascript'),
       name = ref.sha256 + '.gz',
       encoded = readFileSync(path.join(output, 'artifacts', name));
     assert.deepEqual(readdirSync(path.join(output, 'artifacts')), [name]);

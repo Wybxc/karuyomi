@@ -80,6 +80,13 @@ async function fixture(t: TestContext) {
         sha256: 'd'.repeat(64),
         size: 1,
       },
+      pdfium: {
+        packageName: 'pdfium-fixture',
+        version: '1',
+        file: 'pdfium.wasm',
+        sha256: 'b'.repeat(64),
+        size: 1,
+      },
       webpEncoder: {
         version: '1',
         upstreamCommit: 'e'.repeat(40),

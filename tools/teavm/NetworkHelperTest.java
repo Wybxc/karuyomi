@@ -7,6 +7,7 @@ import eu.kanade.tachiyomi.network.OkHttpExtensionsKt;
 import java.io.File;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Field;
+import java.util.concurrent.TimeUnit;
 import okhttp3.*;
 
 /** Shared configuration checks. No upstream request or cache storage is simulated here. */
@@ -78,6 +79,21 @@ public final class NetworkHelperTest {
     check(copied.cache() == cache, "newBuilder retains cache");
     check(copied.cookieJar() == client.cookieJar(), "newBuilder retains cookie jar");
     check(copied.interceptors().equals(client.interceptors()), "newBuilder retains interceptors");
+    Authenticator authenticator = (route, response) -> null;
+    OkHttpClient authenticated =
+        client.newBuilder().dns(Dns.SYSTEM).authenticator(authenticator).build();
+    check(authenticated.dns() == Dns.SYSTEM, "relay uses system DNS");
+    check(
+        authenticated.newBuilder().build().authenticator() == authenticator,
+        "newBuilder preserves the Source authenticator");
+    check(
+        client.authenticator() == Authenticator.NONE, "shared client keeps its own authenticator");
+    try {
+      authenticated.newBuilder().dns(host -> java.util.List.of());
+      throw new AssertionError("A custom DNS policy was accepted by the public relay");
+    } catch (UnsupportedOperationException expected) {
+      checks++;
+    }
     OkHttpClient cacheless = client.newBuilder().cache(null).build();
     check(
         cacheless.cache() == null && client.cache() == cache,
@@ -140,6 +156,21 @@ public final class NetworkHelperTest {
               .getCanonicalFile()
               .equals(new File(java.net.URI.create(args[1])).getCanonicalFile()),
           "owned Cache CodeSource");
+      var app = new Application();
+      var accessor = Application.class.getMethod("getApplicationInfo");
+      Object applicationInfo = accessor.invoke(app);
+      Field dataDir = applicationInfo.getClass().getField("dataDir");
+      check("/files".equals(dataDir.get(applicationInfo)), "virtual application data directory");
+      var customApp =
+          new Application() {
+            @Override
+            public File getFilesDir() {
+              return new File("/private/source/files");
+            }
+          };
+      check(
+          "/private/source".equals(dataDir.get(accessor.invoke(customApp))),
+          "application data directory follows the context files directory");
       NetworkHelper network = new NetworkHelper(new Application());
       OkHttpClient client = network.getClient();
       Request request =
@@ -166,6 +197,27 @@ public final class NetworkHelperTest {
           call.request() == request
               && "SourceCustomUA/1".equals(call.request().header("User-Agent")),
           "actual image helper preserves Source request");
+      OkHttpClient.Builder timeoutBuilder = client.newBuilder();
+      OkHttpClient.Builder.class
+          .getMethod("callTimeoutDuration", long.class)
+          .invoke(timeoutBuilder, 180_000_000_000L << 1);
+      OkHttpClient limited = timeoutBuilder.build();
+      check(limited.callTimeoutMillis() == 180000, "the Kotlin nanosecond encoding is converted");
+      check(
+          limited.newBuilder().build().callTimeoutMillis() == 180000,
+          "client copies preserve timeout");
+      check(client.callTimeoutMillis() == 0, "the original client remains unmodified");
+      check(
+          limited.newCall(request).timeout().timeoutNanos() == 180_000_000_000L,
+          "the owned client's normal call entry point receives the timeout");
+      try {
+        timeoutBuilder.callTimeout(1, TimeUnit.NANOSECONDS);
+        throw new AssertionError("Sub-millisecond builder timeout was accepted");
+      } catch (IllegalArgumentException expected) {
+        check(
+            expected.getMessage().equals("Timeout too small"),
+            "builder validates its millisecond range");
+      }
       int abiChecks = checks;
       JsonObject result = run();
       result.addProperty("jvmAbiChecks", abiChecks);

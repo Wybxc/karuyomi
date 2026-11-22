@@ -214,6 +214,40 @@ void main() {
     }
   });
 
+  test('validates the original dialog text and each UTF-16 link range', () {
+    const url = 'https://help.fixture.invalid/profile';
+    const text = '🔐 Open $url.';
+    final start = text.indexOf(url);
+    final range = wire.PreferenceWebLink(start: start, end: start + url.length);
+    final snapshot = _snapshot();
+    void attach(String message, List<wire.PreferenceWebLink> links) {
+      snapshot.nodes[1].text.dialogMessage = wire.PreferenceDialogMessage(
+        text: message,
+        links: links,
+      );
+    }
+
+    attach(text, [range]);
+    wire.validatePreferenceSnapshot(snapshot);
+    final restored = wire.decodeProtoJson(
+      wire.PreferenceSnapshot(),
+      wire.encodeProtoJson(snapshot),
+    );
+    expect(restored.nodes[1].text.dialogMessage.links.single, range);
+    attach(text, [range, range]);
+    expect(
+      () => wire.validatePreferenceSnapshot(snapshot),
+      throwsFormatException,
+    );
+    for (final target in ['javascript:alert(1)', 'https://@invalid.example']) {
+      attach(target, [wire.PreferenceWebLink(end: target.length)]);
+      expect(
+        () => wire.validatePreferenceSnapshot(snapshot),
+        throwsFormatException,
+      );
+    }
+  });
+
   test('descriptions retain unknown selected values and empty options while rejecting invalid secret partitions, defaults and shape', () {
     final described = _snapshot();
     expect(() => wire.validatePreferenceSnapshot(described), returnsNormally);

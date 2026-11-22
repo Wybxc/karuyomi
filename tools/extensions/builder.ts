@@ -77,6 +77,21 @@ const reviewedPreferenceRules: ReadonlyMap<
   ],
 ]);
 
+const browserVerificationSources = new Set([
+  'src/all/lunaranime',
+  'src/all/schalenetwork',
+  'src/en/coffeemangaunoriginal',
+  'src/en/mangacloud',
+  'src/en/templescan',
+  'src/en/toonkotsu',
+  'src/en/webtoonlib',
+  'src/es/codearc',
+  'src/es/emperorscan',
+  'src/id/cosmicscansid',
+  'src/vi/hentaicube',
+  'src/vi/lxhentai',
+]);
+
 export function preferenceSyncRulesForBuild(packageName: string) {
   return reviewedPreferenceRules
     .get(packageName)
@@ -192,10 +207,10 @@ export function validateDescriptor(
 
 export function put(
   output: string,
-  file: string,
+  bytes: Uint8Array,
   contentType: 'application/javascript' | 'text/javascript',
 ) {
-  const { encoded, reference } = encodeBundle(readFileSync(file), contentType);
+  const { encoded, reference } = encodeBundle(bytes, contentType);
   mkdirSync(path.join(output, 'artifacts'), { recursive: true });
   writeFileSync(
     path.join(output, 'artifacts', reference.sha256 + '.gz'),
@@ -341,6 +356,35 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       throw new Error('JDK 25 required');
     const env = buildEnvironment(runtime, options);
     const module = ':' + descriptor.sourcePath.replaceAll('/', ':');
+    const megatokyoPlatformTls =
+      descriptor.packageName === 'eu.kanade.tachiyomi.extension.en.megatokyo' &&
+      descriptor.sourceFingerprint ===
+        '0ab0e0257567ea6f706f6079c8a414782db11504319071ee0da3e4790484f07a';
+    const spyfakkuPlatformTls =
+      descriptor.packageName === 'eu.kanade.tachiyomi.extension.en.spyfakku' &&
+      descriptor.sourceFingerprint ===
+        '1e3e54808038e599235e9e222c506497bd15698625299746cfaba2a7b5576a5d';
+    const mmlookPlatformTls =
+      (descriptor.sourcePath === 'src/zh/dumanwu' ||
+        descriptor.sourcePath === 'src/zh/rumanhua') &&
+      descriptor.sourceInputs['lib-multisrc/mmlook'] ===
+        '3c085bfd4af1eac83aa758668919feded623a9fcb42e74458d0331c9ae7c8119';
+    const toonlivreReaderVerification =
+      descriptor.packageName ===
+        'eu.kanade.tachiyomi.extension.pt.mangalivre' &&
+      descriptor.sourceFingerprint ===
+        '7d70c00514cfd6b9671e065da2d8f91d944d3d6cfc1593658282ecbf99711ff2';
+    const platformHttpNegotiation =
+      (descriptor.packageName === 'eu.kanade.tachiyomi.extension.en.reimanga' &&
+        descriptor.sourceFingerprint ===
+          '7930687aefd2cc578edc3aa1fabc9c5cc27da23207e1a7ece632bb1d7756d916') ||
+      (descriptor.packageName === 'eu.kanade.tachiyomi.extension.zh.ikmmh' &&
+        descriptor.sourceFingerprint ===
+          'facb3e75bb2d12fbf63940f0a93900370457e394ca116bf4939720c99239cef1');
+    const browserVerification =
+      browserVerificationSources.has(descriptor.sourcePath) &&
+      descriptor.sharedInputs['core'] ===
+        'e4ecdc0da836642e3991019abc63b65cb0585dcdfd473786627b2b1502f3883d';
     const wrapper = readFileSync(
       path.join(upstream, 'gradle/wrapper/gradle-wrapper.properties'),
       'utf8',
@@ -359,6 +403,74 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       path.join(launcher, 'gradle-wrapper.properties'),
       wrapper + '\ndistributionSha256Sum=' + LOCK.gradle.sha256 + '\n',
     );
+    const keepRules = path.join(launcher, 'source-adapters.pro');
+    // Keep the original JVM signatures used by the TeaVM transformations.
+    const rules = [
+      `-keep,allowshrinking class keiyoushi.utils.ui.DialogHelperKt {
+    public static java.lang.Object askInput(java.lang.String,java.lang.String,java.lang.String,java.lang.String,boolean,boolean,kotlin.coroutines.Continuation);
+}
+`,
+    ];
+    if (megatokyoPlatformTls) {
+      rules.push(`-keep,allowshrinking class eu.kanade.tachiyomi.extension.en.megatokyo.Megatokyo {
+    private okhttp3.OkHttpClient$Builder ignoreAllSSLErrors(okhttp3.OkHttpClient$Builder);
+}
+`);
+    }
+    if (spyfakkuPlatformTls) {
+      rules.push(`-keep,allowshrinking class eu.kanade.tachiyomi.extension.en.spyfakku.SpyFakku {
+    protected okhttp3.OkHttpClient$Builder configureClient(okhttp3.OkHttpClient$Builder);
+}
+-keep,allowshrinking class eu.kanade.tachiyomi.extension.en.spyfakku.AnibusInterceptor {
+    private boolean resolveInWebView(okhttp3.Request,okhttp3.Call);
+}
+`);
+    }
+    if (mmlookPlatformTls) {
+      rules.push(`-keep,allowshrinking class eu.kanade.tachiyomi.multisrc.mmlook.MMLook {
+    okhttp3.OkHttpClient$Builder configureClient(okhttp3.OkHttpClient$Builder);
+    java.lang.String certificateWorkaround(java.lang.String);
+}
+`);
+    }
+    if (toonlivreReaderVerification) {
+      rules.push(`-keep,allowshrinking class eu.kanade.tachiyomi.extension.pt.mangalivre.MangaLivre {
+    private java.lang.Object openVerificationWebView(java.lang.String,java.lang.String,java.lang.String,kotlin.coroutines.Continuation);
+}
+`);
+    }
+    if (platformHttpNegotiation) {
+      rules.push(`-keep,allowshrinking class eu.kanade.tachiyomi.extension.en.reimanga.Reimanga {
+    protected okhttp3.OkHttpClient$Builder configureClient(okhttp3.OkHttpClient$Builder);
+}
+-keep,allowshrinking class eu.kanade.tachiyomi.extension.zh.ikmmh.Ikmmh {
+    protected okhttp3.OkHttpClient$Builder configureClient(okhttp3.OkHttpClient$Builder);
+}
+`);
+    }
+    if (browserVerification) {
+      rules.push(`-keep,allowshrinking class keiyoushi.utils.TurnstileHelperKt {
+    public static java.lang.Object getTurnstileToken-x2RqbK4(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,long,kotlin.coroutines.Continuation);
+}
+`);
+    }
+    writeFileSync(keepRules, rules.join(''));
+    const sourceInit = path.join(launcher, 'source-adapters.init.gradle');
+    writeFileSync(
+      sourceInit,
+      `gradle.beforeProject { project ->
+    if (project.path == System.getProperty('karuyomi.aot.module')) {
+        project.pluginManager.withPlugin('com.android.application') {
+            project.extensions.getByName('androidComponents').finalizeDsl { extension ->
+                extension.buildTypes.getByName('release').proguardFiles(
+                    new File(System.getProperty('karuyomi.aot.keepRules'))
+                )
+            }
+        }
+    }
+}
+`,
+    );
     activeLog = path.join(logs, 'upstream.log');
     console.log(JSON.stringify({ stage, module, logPath: activeLog }));
     await execa(
@@ -370,6 +482,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
         '-p',
         upstream,
         module + ':assembleRelease',
+        '--init-script',
+        sourceInit,
+        `-Dkaruyomi.aot.module=${module}`,
+        `-Dkaruyomi.aot.keepRules=${keepRules}`,
         '--no-configuration-cache',
         '--no-watch-fs',
         `--max-workers=${options.workers ?? 3}`,
@@ -476,6 +592,30 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       symlinkSync(sharedM2, path.join(cache, 'm2'), 'dir');
     delete env['TEAVM_PROBE'];
     delete env['TEAVM_DEBUG'];
+    delete env['KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS'];
+    delete env['KARUYOMI_AOT_SPYFAKKU_PLATFORM_TLS'];
+    delete env['KARUYOMI_AOT_MMLOOK_PLATFORM_TLS'];
+    delete env['KARUYOMI_AOT_TOONLIVRE_READER_VERIFICATION'];
+    delete env['KARUYOMI_AOT_PLATFORM_HTTP_NEGOTIATION'];
+    delete env['KARUYOMI_AOT_BROWSER_VERIFICATION'];
+    if (megatokyoPlatformTls) {
+      env['KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS'] = '1';
+    }
+    if (spyfakkuPlatformTls) {
+      env['KARUYOMI_AOT_SPYFAKKU_PLATFORM_TLS'] = '1';
+    }
+    if (mmlookPlatformTls) {
+      env['KARUYOMI_AOT_MMLOOK_PLATFORM_TLS'] = '1';
+    }
+    if (toonlivreReaderVerification) {
+      env['KARUYOMI_AOT_TOONLIVRE_READER_VERIFICATION'] = '1';
+    }
+    if (platformHttpNegotiation) {
+      env['KARUYOMI_AOT_PLATFORM_HTTP_NEGOTIATION'] = '1';
+    }
+    if (browserVerification) {
+      env['KARUYOMI_AOT_BROWSER_VERIFICATION'] = '1';
+    }
     stage = 'aot';
     activeLog = path.join(logs, 'aot.log');
     console.log(
@@ -526,11 +666,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       throw new Error(
         'Host changed during AOT compilation; regenerate descriptor and retry',
       );
-    const bundle = put(
-      output,
+    const bundleBytes = readFileSync(
       path.join(work, 'public/teavm', key, 'app.js'),
-      'text/javascript',
     );
+    const bundle = put(output, bundleBytes, 'text/javascript');
     const manifest = buildManifestSchema.parse({
       buildId: publishedBuildId(descriptor, bundle.sha256),
       repoId: 'keiyoushi',
@@ -541,6 +680,9 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
         a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
       ),
       preferenceSyncRules: preferenceSyncRulesForBuild(descriptor.packageName),
+      ...(bundleBytes.includes('teaSourceInput')
+        ? { supportsSourceInput: true }
+        : {}),
       protocolVersion: materials.protocolVersion,
       hostAbi: materials.hostAbi,
       runtimeBaseline: materials.runtimeBaseline,

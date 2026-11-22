@@ -1,0 +1,29 @@
+===================================================================
+--- a/PatchedStringConcatFactorySubstitutor.java
++++ b/PatchedStringConcatFactorySubstitutor.java
+@@ -57,22 +57,21 @@
+         int charCount = recipe.length();
+         int constantIndex = 0;
+         int valueIndex = 0;
+-        int paramIndex = 0;
+         StringBuilder acc = new StringBuilder();
+         for (int i = 0; i < charCount; ++i) {
+             char c = recipe.charAt(i);
+             switch (c) {
+                 case VALUE_ARGUMENT: {
+                     sb = flushAcc(sb, acc);
+-                    ValueType type = callSite.getCalledMethod().parameterType(paramIndex++);
++                    ValueType type = callSite.getCalledMethod().parameterType(valueIndex);
+                     sb = appendArgument(sb, type, callSite.getArguments().get(valueIndex++));
+                     break;
+                 }
+                 case CONST_ARGUMENT: {
+                     sb = flushAcc(sb, acc);
+-                    ValueType type = callSite.getCalledMethod().parameterType(paramIndex++);
+                     RuntimeConstant poolConstant = callSite.getBootstrapArguments().get(1 + constantIndex++);
+-                    sb = appendArgument(sb, type, constant(sb.getProgramEmitter(), poolConstant));
++                    ValueEmitter argument = constant(sb.getProgramEmitter(), poolConstant);
++                    sb = appendArgument(sb, argument.getType(), argument);
+                     break;
+                 }
+                 default:

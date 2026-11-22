@@ -34,6 +34,18 @@ public class OkHttpClient implements Call.Factory {
     return b.cookieJar;
   }
 
+  public Dispatcher dispatcher() {
+    return b.dispatcher;
+  }
+
+  public Authenticator authenticator() {
+    return b.authenticator;
+  }
+
+  public Dns dns() {
+    return Dns.SYSTEM;
+  }
+
   public boolean followRedirects() {
     return b.followRedirects;
   }
@@ -48,6 +60,10 @@ public class OkHttpClient implements Call.Factory {
 
   public boolean retryOnConnectionFailure() {
     return b.retry;
+  }
+
+  public int callTimeoutMillis() {
+    return b.call;
   }
 
   public int connectTimeoutMillis() {
@@ -66,18 +82,25 @@ public class OkHttpClient implements Call.Factory {
     List<Interceptor> interceptors = new ArrayList<>(), networkInterceptors = new ArrayList<>();
     Cache cache;
     CookieJar cookieJar = prototype.Cookies.INSTANCE;
+    Authenticator authenticator = Authenticator.NONE;
+    Dispatcher dispatcher;
     boolean followRedirects = true, retry = true;
-    int connect = 10000, read = 10000, write = 10000;
+    int call, connect = 10000, read = 10000, write = 10000;
 
-    public Builder() {}
+    public Builder() {
+      dispatcher = new Dispatcher();
+    }
 
     Builder(Builder x) {
       interceptors.addAll(x.interceptors);
       networkInterceptors.addAll(x.networkInterceptors);
       cache = x.cache;
       cookieJar = x.cookieJar;
+      authenticator = x.authenticator;
+      dispatcher = x.dispatcher;
       followRedirects = x.followRedirects;
       retry = x.retry;
+      call = x.call;
       connect = x.connect;
       read = x.read;
       write = x.write;
@@ -110,6 +133,23 @@ public class OkHttpClient implements Call.Factory {
       return this;
     }
 
+    public Builder authenticator(Authenticator authenticator) {
+      this.authenticator = Objects.requireNonNull(authenticator);
+      return this;
+    }
+
+    public Builder dispatcher(Dispatcher dispatcher) {
+      this.dispatcher = Objects.requireNonNull(dispatcher);
+      return this;
+    }
+
+    public Builder dns(Dns dns) {
+      // The public HTTP relay resolves the original URL with its system resolver.
+      if (Objects.requireNonNull(dns) != Dns.SYSTEM)
+        throw new UnsupportedOperationException("Custom DNS is unavailable through the HTTP relay");
+      return this;
+    }
+
     public Builder followRedirects(boolean v) {
       followRedirects = v;
       return this;
@@ -123,6 +163,10 @@ public class OkHttpClient implements Call.Factory {
     public Builder cache(Cache cache) {
       this.cache = cache;
       return this;
+    }
+
+    public Builder callTimeoutDuration(long encoded) {
+      return callTimeout(durationMillis(encoded), TimeUnit.MILLISECONDS);
     }
 
     public Builder connectTimeoutDuration(long encoded) {
@@ -151,6 +195,15 @@ public class OkHttpClient implements Call.Factory {
 
     public Builder retryOnConnectionFailure(boolean v) {
       retry = v;
+      return this;
+    }
+
+    public Builder callTimeout(long value, TimeUnit unit) {
+      long millis = unit.toMillis(value);
+      if (value < 0) throw new IllegalArgumentException("Negative timeout");
+      if (millis > Integer.MAX_VALUE) throw new IllegalArgumentException("Timeout too large");
+      if (millis == 0 && value > 0) throw new IllegalArgumentException("Timeout too small");
+      call = (int) millis;
       return this;
     }
 

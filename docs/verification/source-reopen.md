@@ -112,7 +112,7 @@ B generation 为 `1b8e66fd-d912-4b2d-91b6-f4c9ea05c798`，超时截图为 `/priv
 
 两个精确上游补丁只在生成目录应用，由原始和输出 SHA-256 守门。`TeaTransformer` 只移植对应的两个 `parse` 方法：星期使用正确的 `DAY_OF_WEEK` 和数组索引；解析失败按 `ParsePosition` 合同返回 null、记录错误位置并保留初始索引，成功推进索引，允许 OkHttp 复用已记录错误的 position。未改 TeaVM submodule、原始 Source/JAR、缓存策略或默认时区；原 13 个 regex donor 的输出摘要保持不变。
 
-`node tools/teavm/check-date-format.ts` 通过锁定的 Maven / TeaVM 插件和产品 `TeaTransformer` 生成 JavaScript，同时运行同一 Java fixture 的 JDK oracle；正式入口 `pnpm teavm:check` 包含该回归。未改 parser 的真实生成代码解析周五日期时退出 1，JDK 对照通过；应用补丁后 JDK 和 Node 执行的生成代码均通过 80 项断言，覆盖七个星期的有效日期、准确 UTC 时间、完整消费、非法日期与时分秒、无效文本、非零起始索引和失败后重用。红绿生成产物分别保存在 `/private/tmp/karuyomi-date-format-red` 与 `/private/tmp/karuyomi-date-format-green`。
+`node tools/teavm/check-class-library.ts` 通过锁定的 Maven / TeaVM 插件和产品 `TeaTransformer` 生成 JavaScript，同时运行同一 Java fixture 的 JDK oracle；正式入口 `pnpm teavm:check` 包含该回归。未改 parser 的真实生成代码解析周五日期时退出 1，JDK 对照通过；应用补丁后 JDK 和 Node 执行的生成代码均通过 80 项断言，覆盖七个星期的有效日期、准确 UTC 时间、完整消费、非法日期与时分秒、无效文本、非零起始索引和失败后重用。
 
 这证明固定 TeaVM 的日期缺陷与补丁行为。仍需用包含补丁的正式无插桩扩展重复实际 Source A→B 重开，确认章节恢复及书签 A 添加、B 移除、新文档读回闭环。
 

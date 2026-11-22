@@ -1,6 +1,7 @@
 package android.graphics;
 
 import com.google.gson.*;
+import java.util.Locale;
 import prototype.Graphics;
 
 public class Paint {
@@ -37,7 +38,9 @@ public class Paint {
   Cap cap = Cap.BUTT;
   Align align = Align.LEFT;
   Typeface typeface;
+  private ColorFilter colorFilter;
   private int layoutDirection;
+  private Locale textLocale;
 
   public Paint() {
     flags = ANTI_ALIAS_FLAG | FILTER_BITMAP_FLAG;
@@ -63,7 +66,9 @@ public class Paint {
     cap = p.cap;
     align = p.align;
     typeface = p.typeface;
+    colorFilter = p.colorFilter;
     layoutDirection = p.layoutDirection;
+    textLocale = p.textLocale;
   }
 
   public void setColor(int c) {
@@ -82,6 +87,15 @@ public class Paint {
     return color >>> 24;
   }
 
+  public ColorFilter setColorFilter(ColorFilter filter) {
+    colorFilter = filter;
+    return filter;
+  }
+
+  public ColorFilter getColorFilter() {
+    return colorFilter;
+  }
+
   public void setTextSize(float v) {
     textSize = v;
   }
@@ -96,6 +110,14 @@ public class Paint {
 
   public float getTextScaleX() {
     return textScaleX;
+  }
+
+  public void setTextLocale(Locale locale) {
+    textLocale = java.util.Objects.requireNonNull(locale);
+  }
+
+  public Locale getTextLocale() {
+    return textLocale != null ? textLocale : Locale.getDefault();
   }
 
   public Typeface setTypeface(Typeface t) {
@@ -249,7 +271,7 @@ public class Paint {
 
   JsonObject json() {
     JsonObject j = Graphics.args();
-    j.addProperty("color", color);
+    j.addProperty("color", colorFilter == null ? color : colorFilter.filterColor(color));
     j.addProperty(
         "direction", layoutDirection == 0 ? "auto" : layoutDirection == 1 ? "ltr" : "rtl");
     j.addProperty("flags", flags);

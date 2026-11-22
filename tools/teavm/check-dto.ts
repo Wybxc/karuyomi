@@ -14,7 +14,8 @@ import { execa } from 'execa';
 import { checkFiles } from './check-files.ts';
 import { checkNetwork } from './check-network.ts';
 import { checkPlatform } from './check-platform.ts';
-import { checkDateFormat } from './check-date-format.ts';
+import { checkClassLibrary } from './check-class-library.ts';
+import { LOCK } from './runtime.ts';
 import { prepareAndroidJsonSources } from './upstream-sources.ts';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -137,9 +138,34 @@ export async function checkDto(root = ROOT): Promise<void> {
   ]);
   await oracle('java', ['-cp', androidJsonOutput, 'prototype.AndroidJsonTest']);
   // Preference ABI must resolve the real host Context before the Android SDK stubs.
+  const autolinkVersion = '0.12.0';
+  const cache = path.join(root, 'runtime/teavm/.local/build-cache');
+  const mavenRepository = path.join(cache, 'm2');
+  const autolink = path.join(
+    mavenRepository,
+    'org/nibor/autolink/autolink',
+    autolinkVersion,
+    `autolink-${autolinkVersion}.jar`,
+  );
+  if (!existsSync(autolink)) {
+    await oracle(
+      path.join(cache, `apache-maven-${LOCK.maven.version}/bin/mvn`),
+      [
+        '-q',
+        '--batch-mode',
+        '--no-transfer-progress',
+        `-Dmaven.repo.local=${mavenRepository}`,
+        'org.apache.maven.plugins:maven-dependency-plugin:3.7.0:get',
+        `-Dartifact=org.nibor.autolink:autolink:${autolinkVersion}`,
+        '-Dtransitive=false',
+      ],
+      { cwd: '/tmp', timeout: 120_000 },
+    );
+  }
   const preferenceClasspath = [
     ...jars.filter((file) => path.basename(file).startsWith('host-')),
     ...jars.filter((file) => !path.basename(file).startsWith('host-')),
+    autolink,
   ].join(path.delimiter);
   const preferenceSources = [
     'prototype/HostPreferences.java',
@@ -148,6 +174,8 @@ export async function checkDto(root = ROOT): Promise<void> {
     'android/widget/EditText.java',
     'android/widget/Button.java',
     'android/text/PreferenceTextValue.java',
+    'android/text/SpannableString.java',
+    'android/text/util/Linkify.java',
     'android/text/method/PasswordTransformationMethod.java',
     'androidx/preference/Preference.java',
     'androidx/preference/PreferenceGroup.java',
@@ -254,6 +282,8 @@ export async function checkDto(root = ROOT): Promise<void> {
     '-d',
     imageOutput,
     ...[
+      'runtime/teavm/java/src/main/java/okhttp3/Dispatcher.java',
+      'runtime/teavm/java/src/main/java/okhttp3/OkHttpClient.java',
       'runtime/teavm/java/src/main/java/prototype/HttpBodySource.java',
       'runtime/teavm/java/src/main/java/prototype/HttpRequestSink.java',
       'runtime/teavm/java/src/main/java/prototype/BrowserCall.java',
@@ -266,6 +296,7 @@ export async function checkDto(root = ROOT): Promise<void> {
       'tools/teavm/ImageTest.java',
       'tools/teavm/EnqueueTest.java',
       'tools/teavm/HttpAwaitTest.java',
+      'tools/teavm/HttpFollowUpTest.java',
     ].map((file) => path.join(root, file)),
   ]);
   await oracle('java', [
@@ -302,6 +333,11 @@ export async function checkDto(root = ROOT): Promise<void> {
     core,
     host,
   ]);
+  await oracle('java', [
+    '-cp',
+    imageOutput + path.delimiter + classpath,
+    'prototype.HttpFollowUpTest',
+  ]);
   // Check the product adapter as well as the original seed HttpSource. Java's
   // checked throws signature is absent from the original Kotlin bytecode.
   const ownedOutput = path.join(output, 'owned-http-source');
@@ -330,6 +366,6 @@ export async function checkDto(root = ROOT): Promise<void> {
   await checkFiles(root);
   await checkNetwork(root);
   await checkPlatform(root);
-  await checkDateFormat({ root });
+  await checkClassLibrary(root);
 }
 if (import.meta.main) await checkDto();

@@ -88,6 +88,43 @@ test('preferences preserve Android int/long/float widths, false, empty text/set 
     ).toThrow();
 });
 
+test('dialog messages retain ordered UTF-16 web links and reject unsafe ranges', () => {
+  const web = 'https://help.fixture.invalid/profile';
+  const text = `🔐 Open ${web}.`;
+  const start = text.indexOf(web);
+  const valid = { start, end: start + web.length };
+  const parse = (dialogMessage: unknown) =>
+    preferenceSnapshotSchema.parse(
+      snapshot({
+        nodes: [
+          {
+            key: 'password',
+            syncScope: scope,
+            text: { secret: true, dialogMessage },
+          },
+        ],
+      }),
+    );
+  const node = parse({ text, links: [valid] }).nodes[0]?.kind;
+  expect(
+    node?.case === 'text' && node.value.dialogMessage?.links[0],
+  ).toMatchObject(valid);
+  for (const links of [
+    [{ start: 0, end: valid.end }],
+    [{ start, end: text.length + 1 }],
+    [valid, valid],
+  ])
+    expect(() => parse({ text, links })).toThrow();
+  for (const url of [
+    'javascript:alert(1)',
+    'https://user@invalid.example',
+    'https://@invalid.example',
+  ]) {
+    expect(() => parse({ text: url, links: [{ end: url.length }] })).toThrow();
+  }
+  expect(() => parse({ text: '界'.repeat(683) })).toThrow();
+});
+
 test('preference partitions, secret scope, defaults and recursive descriptions are validated before use', () => {
   const group = (nodes: unknown[]) => ({ syncScope: scope, group: { nodes } });
   const leaf = { key: 'flag', syncScope: scope, toggle: {} };

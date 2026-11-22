@@ -82,6 +82,77 @@ test('open rejects AOT exports without the image ABI before initialization', asy
   expect(initialized).not.toHaveBeenCalled();
 });
 
+test('the Source input bridge accepts only the current Java owner', async () => {
+  const accepted = vi.fn(async () => 'fixture input');
+  const dismissed = vi.fn(async () => null);
+  const applied: string[] = [];
+  const { driver, build } = await setup((scope) => {
+    scope.hostAcquireImage = () => {};
+    scope.hostInvoke = (
+      _source,
+      _operation,
+      _args,
+      requestId,
+      generation,
+      token,
+    ) => {
+      void (async () => {
+        const ask = (owner: string) =>
+          scope.teaSourceInput!(
+            requestId,
+            generation,
+            owner,
+            'Prompt',
+            'Help',
+            null,
+            '',
+            false,
+            true,
+          );
+        await expect(ask('retired-token')).rejects.toBeInstanceOf(Error);
+        const input = await ask(token);
+        if (input === null) {
+          scope.teaFail!('java.io.IOException: cancelled by Source');
+        } else {
+          applied.push(input);
+          scope.teaDone!('{"pageSessionId":"pages","pages":[]}');
+        }
+      })().catch((failure: unknown) => scope.teaFail!(String(failure)));
+    };
+  });
+  await driver.open(build, 'test', new AbortController().signal, catalog);
+  const chapter = (requestId: string) =>
+    create(pb.SourceCallSchema, {
+      requestId,
+      generation: 'generation',
+      sourceId: build.sourceIds[0],
+      allowInput: true,
+      request: {
+        case: 'pages',
+        value: { chapter: { url: '/chapter', dateUpload: '0' } },
+      },
+    });
+  const context = (requestId: string) => ({
+    requestId,
+    generation: 'generation',
+  });
+  await expect(
+    driver.invoke(chapter('submitted'), context('submitted'), accepted),
+  ).resolves.toMatchObject({ case: 'pageList' });
+  await expect(
+    driver.invoke(chapter('dismissed'), context('dismissed'), dismissed),
+  ).rejects.toMatchObject({ code: 'cancelled' });
+  expect(accepted).toHaveBeenCalledExactlyOnceWith({
+    title: 'Prompt',
+    message: 'Help',
+    initialValue: '',
+    password: false,
+    required: true,
+  });
+  expect(dismissed).toHaveBeenCalledOnce();
+  expect(applied).toEqual(['fixture input']);
+});
+
 test('the installed image ABI sends typed bytes and survives HTTP operation cleanup', async () => {
   const refs: string[][] = [];
   const { driver, build } = await setup((scope) => {

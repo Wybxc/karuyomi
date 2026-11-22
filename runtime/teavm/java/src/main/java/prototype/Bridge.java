@@ -473,6 +473,9 @@ public final class Bridge {
     if ("cancelled".equals(code)) return new java.util.concurrent.CancellationException(message);
     if ("unsupported_capability".equals(code)) return new UnsupportedOperationException(message);
     if ("limit_exceeded".equals(code)) return new IllegalStateException(message);
+    if ("pdf_protected".equals(code)) return new SecurityException(message);
+    if ("pdf_file_error".equals(code))
+      return new java.io.UncheckedIOException(new IOException(message));
     return new RuntimeException(message);
   }
 

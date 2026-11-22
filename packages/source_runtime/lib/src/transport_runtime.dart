@@ -141,6 +141,10 @@ final class TransportSourceRuntime implements SourceRuntime {
     final requestGeneration = switch (command) {
       wire.ControlRequest_Command.invoke => request.invoke.generation,
       wire.ControlRequest_Command.cancel => request.cancel.generation,
+      wire.ControlRequest_Command.readSourceInput =>
+        request.readSourceInput.generation,
+      wire.ControlRequest_Command.answerSourceInput =>
+        request.answerSourceInput.generation,
       wire.ControlRequest_Command.acquireImage =>
         request.acquireImage.generation,
       wire.ControlRequest_Command.cancelImage => request.cancelImage.generation,
@@ -599,6 +603,18 @@ final class TransportSourceRuntime implements SourceRuntime {
         'Source request belongs to an expired or different runtime',
       );
     }
+    final onInput = session.capabilities.contains('source-input')
+        ? request.onInput
+        : null;
+    call.allowInput = onInput != null;
+    if (call.allowInput &&
+        (!call.hasPages() ||
+            slotId != wire.RuntimeSlot.RUNTIME_SLOT_FOREGROUND)) {
+      throw const RuntimeException(
+        RuntimeErrorCode.protocolError,
+        'Source input requires a foreground chapter request',
+      );
+    }
     try {
       if (call.hasEditPreference()) {
         wire.validatePreferenceEditRequest(call.editPreference);
@@ -634,10 +650,12 @@ final class TransportSourceRuntime implements SourceRuntime {
     // A dispatched callback can mutate storage even if its response is lost.
     // Only a fresh confirmed bootstrap and generation may resume Source work.
     if (call.hasEditPreference()) _preferencesEdited = true;
-    final response = (await _exchange(
-      wire.ControlRequest(invoke: call),
-      wire.ControlResponse_Result.source,
-    )).source;
+    final response = onInput == null
+        ? (await _exchange(
+            wire.ControlRequest(invoke: call),
+            wire.ControlResponse_Result.source,
+          )).source
+        : (await _invokeWithInput(call, session, onInput)).source;
     if (_disposed ||
         epoch != _epoch ||
         response.generation != session.generation ||
@@ -695,6 +713,118 @@ final class TransportSourceRuntime implements SourceRuntime {
     }
     response.freeze();
     return response;
+  }
+
+  Future<wire.ControlResponse> _invokeWithInput(
+    wire.SourceCall call,
+    RuntimeSession session,
+    SourceInputHandler onInput,
+  ) {
+    final ended = Completer<void>();
+    final result =
+        _exchange(
+          wire.ControlRequest(invoke: call),
+          wire.ControlResponse_Result.source,
+        ).whenComplete(() {
+          if (!ended.isCompleted) ended.complete();
+        });
+    final input = _serveSourceInput(call, session, onInput, ended).then(
+      (_) => result,
+      onError: (Object error, StackTrace stack) {
+        if (ended.isCompleted) return result;
+        ended.complete();
+        // A failed side exchange must not leave the original request waiting.
+        unawaited(_cancelSourceInputCall(call));
+        return Future<wire.ControlResponse>.error(error, stack);
+      },
+    );
+    return Future.any([result, input]);
+  }
+
+  Future<void> _serveSourceInput(
+    wire.SourceCall call,
+    RuntimeSession session,
+    SourceInputHandler onInput,
+    Completer<void> ended,
+  ) async {
+    final read = wire.ReadSourceInput(
+      requestId: call.requestId,
+      generation: call.generation,
+    );
+    final seen = <String>{};
+    while (!ended.isCompleted) {
+      final delay = Completer<void>();
+      final timer = Timer(const Duration(milliseconds: 250), delay.complete);
+      await Future.any([ended.future, delay.future]);
+      timer.cancel();
+      if (ended.isCompleted) return;
+      final state = (await _exchange(
+        wire.ControlRequest(readSourceInput: read),
+        wire.ControlResponse_Result.sourceInput,
+      )).sourceInput;
+      if (ended.isCompleted) return;
+      if (!state.hasPrompt()) continue;
+      final prompt = state.prompt;
+      if (prompt.requestId != call.requestId ||
+          prompt.generation != call.generation ||
+          prompt.buildId != session.buildId ||
+          prompt.sourceId != call.sourceId ||
+          !_extensionControlId.hasMatch(prompt.promptId) ||
+          !seen.add(prompt.promptId) ||
+          ![
+            prompt.title,
+            prompt.message,
+            prompt.hint,
+            prompt.initialValue,
+          ].every(wire.sourceInputTextFits)) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Invalid Source input prompt',
+        );
+      }
+      prompt.freeze();
+      final text = await Future.any([
+        onInput(prompt, ended.future),
+        ended.future.then<String?>((_) => null),
+      ]);
+      if (ended.isCompleted) return;
+      if (text != null &&
+          ((prompt.required && text.isEmpty) ||
+              !wire.sourceInputTextFits(text))) {
+        throw const RuntimeException(
+          RuntimeErrorCode.protocolError,
+          'Invalid Source input answer',
+        );
+      }
+      final response = await _exchange(
+        wire.ControlRequest(
+          answerSourceInput: wire.SourceInputAnswer(
+            requestId: call.requestId,
+            generation: call.generation,
+            promptId: prompt.promptId,
+            text: text,
+          ),
+        ),
+        wire.ControlResponse_Result.completed,
+      );
+      _requireAck(response.completed.completed);
+    }
+  }
+
+  Future<void> _cancelSourceInputCall(wire.SourceCall call) async {
+    try {
+      await _exchange(
+        wire.ControlRequest(
+          cancel: wire.CancelSourceRequest(
+            requestId: call.requestId,
+            generation: call.generation,
+          ),
+        ),
+        wire.ControlResponse_Result.completed,
+      );
+    } on RuntimeException {
+      // Cancelling active Java intentionally retires the original generation.
+    }
   }
 
   void _requireConfirmedPreferences() {

@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion>
   <groupId>cc.wybxc.karuyomi</groupId>
-  <artifactId>date-format-contract</artifactId>
+  <artifactId>class-library-contract</artifactId>
   <version>1</version>
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
@@ -9,6 +9,13 @@
     <teavm.version>0.16.0</teavm.version>
   </properties>
   <dependencies>
+    <dependency>
+      <groupId>com.google.code.gson</groupId>
+      <artifactId>gson</artifactId>
+      <version>2.13.2</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/java/libs/gson-2.13.2.jar</systemPath>
+    </dependency>
     <dependency>
       <groupId>org.teavm</groupId>
       <artifactId>teavm-core</artifactId>
@@ -19,6 +26,21 @@
       <groupId>org.teavm</groupId>
       <artifactId>teavm-classlib</artifactId>
       <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-extension-spi</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-jso-apis</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+      <version>1.87</version>
     </dependency>
   </dependencies>
   <build>
@@ -39,10 +61,10 @@
             <configuration>
               <transformers><param
                 >prototype.TeaTransformer</param></transformers>
-              <mainClass>prototype.DateFormatScenarios</mainClass>
+              <mainClass>prototype.ClassLibraryScenarios</mainClass>
               <targetDirectory
               >${project.basedir}/target/javascript</targetDirectory>
-              <targetFileName>date-format.cjs</targetFileName>
+              <targetFileName>class-library.cjs</targetFileName>
               <optimizationLevel>ADVANCED</optimizationLevel>
               <minifying>true</minifying>
             </configuration>
