@@ -50,6 +50,8 @@ Codex 内置浏览器 Chrome 156 实际通过最新 Canvas 5 组及 TeaVM 同场
 
 WebtoonLib 1.6.1 在同机使用这份材料通过正式构建和完整性检查，canonical SHA-256 为 `2a0285a97335e6f029ffc91269e78aaaf6f2032f6f72b8244d134223b0feaaea`。正式 Native Worker 用隔离 HTTP 响应取得同一章节的三页，经原扩展生成两张 360×220 JPEG，黑字宽度分别为 29 px 和 80 px。第三页无字幕 PNG 的 886 字节与输入完全一致。五次请求均为 GET，章节会话和 Worker 已确认关闭。另一次真实热门目录请求返回 HTTP 403。产物保持 `compiled_unverified`，生产发布及客户端显示待验。[正式构建入口](../EXTENSIONS.md#首次全量候选的定向补编)
 
+2026-11-23，在 `macbook-pro-4` 固定合并后的 `afbf310` 与同一上游提交重编 WebtoonLib 1.6.1。产物 canonical SHA-256 为 `43bcd97b5f13a3dd1b740e39402f37934e29f82cd37b8612835f8e9560165dbe`，材料版本与上述构建相同。固定 Node 24.15.0 和本提交正式 Native Worker 在隔离 HTTP 环境登记封面能力，取回三页及响应中的有效字节。两张 360×220 JPEG 的黑字宽度分别为 42 px 和 76 px，无字幕页的 886 字节与合成 PNG 原图一致。五次 GET、图片交付的长度和资源身份、章会话关闭和 Worker 关闭均通过。正式回执保持 `compiled_unverified`，真实站点与客户端显示待验。[构建输入](https://github.com/Wybxc/karuyomi/commit/afbf31033350355fd9b12fcea039d21fa850adb3)
+
 styled spans、Builder/ellipsize、复杂富文本/制表位、所有 HTML 容错分支、Native 应用与真机字体/性能尚未验收。库规则版本与系统字体差异会影响输出；受控场景不能替代生产 Access、实际阅读、取消和长章节负载门。
 
 依据：[linebreak 官方文档](https://github.com/foliojs/linebreak)、[bidi-js 官方 API](https://github.com/lojjic/bidi-js)、[Android 15 StaticLayout](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-15.0.0_r1/core/java/android/text/StaticLayout.java)、[Android 15 Layout](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-15.0.0_r1/core/java/android/text/Layout.java)、[Android 15 Html](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-15.0.0_r1/core/java/android/text/Html.java)、[Robolectric NATIVE 模式](https://robolectric.org/javadoc/4.17/org/robolectric/annotation/GraphicsMode.Mode.html)。
