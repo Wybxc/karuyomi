@@ -2,9 +2,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { Script } from 'node:vm';
+import { gzipSync } from 'node:zlib';
 import { z } from 'zod';
 import {
   buildManifestSchema,
+  pdfiumMaterialName,
   runtimeMaterialCatalogSchema,
   type RuntimeMaterialCatalog,
 } from '@karuyomi/contracts';
@@ -34,7 +36,7 @@ beforeAll(async () => {
 });
 
 describe('Vite runtime material output', () => {
-  it('contains the five classic bridges and both pinned WASM materials', () => {
+  it('contains the five classic bridges and the pinned WASM materials', () => {
     expect(catalog.hostScripts.map((item) => item.logicalName)).toEqual([
       'crypto-bridge.js',
       'zstd-bridge.js',
@@ -56,6 +58,12 @@ describe('Vite runtime material output', () => {
         size: catalog.sources.webpEncoder.size,
         contentType: 'application/wasm',
       }),
+      expect.objectContaining({
+        logicalName: pdfiumMaterialName,
+        sha256: catalog.sources.pdfium.sha256,
+        size: 5298237,
+        contentType: 'application/wasm',
+      }),
     ]);
     expect(catalog.sources.zstd).toEqual({
       packageName: '@bokuweb/zstd-wasm',
@@ -70,7 +78,15 @@ describe('Vite runtime material output', () => {
       upstreamCommit: '4fa21912338357f89e4fd51cf2368325b59e9bd9',
       compilerVersion: '0.17.0',
     });
-    expect(data.size).toBe(7);
+    expect(catalog.sources.pdfium).toEqual({
+      packageName: '@hyzyla/pdfium',
+      version: '3.0.0',
+      file: 'dist/pdfium.wasm',
+      sha256:
+        'beeaf5bbff216d555fecec7cd486072838c4632a2272d31b52ef1fd05008fe7c',
+      size: 5298237,
+    });
+    expect(data.size).toBe(8);
   });
 
   it('emits exactly the hash-addressed files whose bytes match the catalog', async () => {
@@ -130,6 +146,7 @@ describe('Vite runtime material output', () => {
         new URL('../dist/native/' + file.path, import.meta.url),
       );
       expect(bytes.length).toBe(file.size);
+      expect(file.size).toBeLessThanOrEqual(8 * 1024 * 1024);
       expect(createHash('sha256').update(bytes).digest('hex')).toBe(
         file.sha256,
       );
@@ -137,9 +154,16 @@ describe('Vite runtime material output', () => {
       expect(script).not.toContain('import.meta');
       expect(() => new Script(script)).not.toThrow();
       if (name === 'host') expect(script).toContain(catalog.materialVersion);
-      else
-        for (const material of data.values())
-          expect(script).toContain(material.toString('base64'));
+      else {
+        for (const [sha256, material] of data) {
+          if (sha256 === catalog.sources.pdfium.sha256) {
+            const packed = gzipSync(material, { level: 9 });
+            packed[9] = 255;
+            expect(script).toContain(packed.toString('base64'));
+            expect(script).not.toContain(material.toString('base64'));
+          } else expect(script).toContain(material.toString('base64'));
+        }
+      }
     }
   });
 
@@ -220,11 +244,13 @@ describe('native material resolver', () => {
       supported.map((artifact) => {
         const bytes = data.get(artifact.sha256);
         if (!bytes) throw new Error('Missing generated material');
+        const pdfium = artifact.logicalName === pdfiumMaterialName;
         return [
           artifact.sha256,
           {
-            base64: bytes.toString('base64'),
+            base64: (pdfium ? gzipSync(bytes) : bytes).toString('base64'),
             contentType: artifact.contentType,
+            ...(pdfium && { decodedSize: artifact.size }),
           },
         ];
       }),

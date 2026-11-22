@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+export const pdfiumMaterialName = 'pdfium.wasm';
 const sha256Schema = z.string().regex(/^[0-9a-f]{64}$/);
 const materialArtifactSchema = z
   .object({
@@ -17,6 +18,14 @@ const materialArtifactSchema = z
     },
   );
 
+const packageMaterialSource = z.object({
+  packageName: z.string().min(1),
+  version: z.string().min(1),
+  file: z.string().min(1),
+  sha256: sha256Schema,
+  size: z.number().int().positive(),
+});
+
 export const runtimeMaterialCatalogSchema = z.object({
   schemaVersion: z.literal(1),
   protocolVersion: z.number().int().positive(),
@@ -26,13 +35,8 @@ export const runtimeMaterialCatalogSchema = z.object({
   hostScripts: z.array(materialArtifactSchema),
   resources: z.array(materialArtifactSchema),
   sources: z.object({
-    zstd: z.object({
-      packageName: z.string().min(1),
-      version: z.string().min(1),
-      file: z.string().min(1),
-      sha256: sha256Schema,
-      size: z.number().int().positive(),
-    }),
+    zstd: packageMaterialSource,
+    pdfium: packageMaterialSource,
     webpEncoder: z.object({
       version: z.string().min(1),
       upstreamCommit: z.string().regex(/^[0-9a-f]{40}$/),

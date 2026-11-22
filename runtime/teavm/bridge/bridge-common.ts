@@ -8,6 +8,7 @@ export interface RuntimeWorkerContext {
 declare global {
   var karuyomiWorkerContext: RuntimeWorkerContext | undefined;
   var karuyomiResources: Record<string, string> | undefined;
+  var karuyomiLoadPdfium: (() => Promise<Uint8Array<ArrayBuffer>>) | undefined;
 }
 
 /** Project globals describe installed values without claiming a Worker subtype. */

@@ -72,6 +72,8 @@ OriManga、Paradox Scans、Ragnar Scans 和 Siyah Melek 复用 PBKDF2 适配通�
 
 漫画人 1.6.2 通过 X.509 RSA 公钥导入和 PKCS#1 v1.5 加密适配，在 `macbook-pro-4` 完成补编并发布。生产目录保留原有 1,414 个索引条目，现有 1,415 个扩展和 2,281 个 Source。新增清单与安装包、两地检查点及生产有界规划均已复验。33 个构建失败包与已发布包的实际出图待继续验收。[发布证据](../VERIFICATION.md)
 
+MangaDash 使用 Android `PdfRenderer` 从虚拟文件读入 PDF 并栅格化章节。PDFium 宿主与八份运行材料的产品构建、合成双页真实像素检查、内存限额和清理测试已通过。先在 `macbook-pro-4` 用同一身份补编 MangaDash、Dragon Ball Multiverse 和 ManhuaRM，再从当前生产父快照启动可恢复的完整目录重建。[验证记录](../VERIFICATION.md)
+
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
 - [x] 先行发布原索引 191 个升级包，逐包读回生产资源并确认新的生产检查点。完整冻结队列继续构建后续目录。[生产证据](../VERIFICATION.md)

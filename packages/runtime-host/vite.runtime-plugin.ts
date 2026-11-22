@@ -3,8 +3,10 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import {
   hostAbi,
+  pdfiumMaterialName,
   protocolVersion,
   runtimeBaseline,
   runtimeMaterialCatalogSchema,
@@ -29,6 +31,16 @@ const zstdSource = Object.freeze({
   sha256: '80260eee5795ee8072bb5821e203730c74dca3909938f5ac1128da67f96223df',
   size: 251806,
 });
+const pdfiumSource = Object.freeze({
+  packageName: '@hyzyla/pdfium',
+  version: '3.0.0',
+  file: 'dist/pdfium.wasm',
+  sha256: 'beeaf5bbff216d555fecec7cd486072838c4632a2272d31b52ef1fd05008fe7c',
+  size: 5298237,
+});
+const pdfiumDirectory = path.dirname(
+  require.resolve('@hyzyla/pdfium/package.json'),
+);
 const digest = (bytes: Uint8Array): string =>
   createHash('sha256').update(bytes).digest('hex');
 const bridgeEntry = 'virtual:karuyomi-runtime-bridge/';
@@ -105,12 +117,28 @@ async function packageBuiltMaterials(scripts: ReadonlyMap<string, Buffer>) {
   if (digest(wasm) !== zstdSource.sha256 || wasm.length !== zstdSource.size)
     throw new Error('Pinned zstd WASM digest/size mismatch');
   const webp = readPreparedWebpEncoder();
+  z.object({
+    name: z.literal(pdfiumSource.packageName),
+    version: z.literal(pdfiumSource.version),
+  }).parse(
+    JSON.parse(
+      await readFile(path.join(pdfiumDirectory, 'package.json'), 'utf8'),
+    ),
+  );
+  const pdfium = await readFile(path.join(pdfiumDirectory, pdfiumSource.file));
+  if (
+    digest(pdfium) !== pdfiumSource.sha256 ||
+    pdfium.length !== pdfiumSource.size
+  )
+    throw new Error('Pinned PDFium WASM digest/size mismatch');
   const resources = [
     wasmArtifact(zstdName, zstdSource),
     wasmArtifact(webpName, webp.source),
+    wasmArtifact(pdfiumMaterialName, pdfiumSource),
   ];
   data.set(zstdSource.sha256, { bytes: wasm, contentType: wasmMime });
   data.set(webp.source.sha256, { bytes: webp.bytes, contentType: wasmMime });
+  data.set(pdfiumSource.sha256, { bytes: pdfium, contentType: wasmMime });
   const identity = {
     protocolVersion,
     hostAbi,
@@ -126,7 +154,11 @@ async function packageBuiltMaterials(scripts: ReadonlyMap<string, Buffer>) {
     materialVersion: digest(Buffer.from(JSON.stringify(identity))),
     hostScripts,
     resources,
-    sources: { zstd: zstdSource, webpEncoder: webp.source },
+    sources: {
+      zstd: zstdSource,
+      pdfium: pdfiumSource,
+      webpEncoder: webp.source,
+    },
   });
   return { catalog, data };
 }
@@ -188,6 +220,18 @@ export function runtimeMaterialAssets(): Plugin {
         fileName: 'notices/libwebp.txt',
         source: `${license}\n${patents}`,
       });
+      const [pdfiumLicense, pdfiumNotices] = await Promise.all([
+        readFile(path.join(pdfiumDirectory, 'LICENSE.md'), 'utf8'),
+        readFile(
+          path.join(root, 'runtime/teavm/licenses/PDFium-Third-Party.txt'),
+          'utf8',
+        ),
+      ]);
+      this.emitFile({
+        type: 'asset',
+        fileName: 'notices/pdfium.txt',
+        source: `${pdfiumLicense}\n${pdfiumNotices}`,
+      });
     },
   };
 }
@@ -208,11 +252,13 @@ export async function nativeRuntimeAssets(): Promise<Plugin> {
     );
   }
   const source = catalog.sources.zstd;
+  const pdfium = catalog.sources.pdfium;
   const webp = readWebpEncoderSource();
   const webpSource = catalog.sources.webpEncoder;
   const expectedResources = [
     wasmArtifact(zstdName, zstdSource),
     wasmArtifact(webpName, webp),
+    wasmArtifact(pdfiumMaterialName, pdfiumSource),
   ];
   if (
     catalog.protocolVersion !== protocolVersion ||
@@ -236,6 +282,11 @@ export async function nativeRuntimeAssets(): Promise<Plugin> {
     source.file !== zstdSource.file ||
     source.sha256 !== zstdSource.sha256 ||
     source.size !== zstdSource.size ||
+    pdfium.packageName !== pdfiumSource.packageName ||
+    pdfium.version !== pdfiumSource.version ||
+    pdfium.file !== pdfiumSource.file ||
+    pdfium.sha256 !== pdfiumSource.sha256 ||
+    pdfium.size !== pdfiumSource.size ||
     webpSource.version !== webp.version ||
     webpSource.upstreamCommit !== webp.upstreamCommit ||
     webpSource.compilerVersion !== webp.compilerVersion ||
@@ -257,6 +308,18 @@ export async function nativeRuntimeAssets(): Promise<Plugin> {
             throw new Error(
               'Generated runtime material changed length: ' + logicalName,
             );
+          if (logicalName === pdfiumMaterialName) {
+            const encoded = gzipSync(bytes, { level: 9 });
+            encoded[9] = 255;
+            return [
+              sha256,
+              {
+                base64: encoded.toString('base64'),
+                contentType,
+                decodedSize: size,
+              },
+            ];
+          }
           return [sha256, { base64: bytes.toString('base64'), contentType }];
         },
       ),

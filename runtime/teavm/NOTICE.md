@@ -10,6 +10,7 @@
 - Bouncy Castle 1.87 由 Maven 精确固定。RSA PKCS#1 v1.5 公钥加密调用其轻量加密接口，随机数由 Worker 的 WebCrypto 提供。构建将 [JAR 内的原许可](java/BOUNCY-CASTLE-LICENSE.txt)随 AOT JavaScript 一同分发。
 - Zstandard 的 BSD 许可见 `licenses/Zstd-BSD.txt`；`@bokuweb/zstd-wasm` 0.0.27 来源为 [bokuweb/zstd-wasm](https://github.com/bokuweb/zstd-wasm)，包声明 MIT，由精确版本与 pnpm tarball integrity 固定。生成的 JS glue 和 WASM 均来自此 npm 依赖，项目只维护类型化的桥接与有界帧校验。WASM 在 Web 作为静态资源交付，在 Native 随应用打包，构建与加载均校验其摘要；客户端构建不从私有 JVM seed 提取 WASM。
 - libwebp 1.6.0 由 `vendor/libwebp` submodule 固定。WebP 编码 WASM 随 Web 和 Native 交付，原 `COPYING` 和 `PATENTS` 从该提交输出为 `libwebp.txt`。项目仅维护有界编码接口，Flutter 的阅读图片解码不使用此 WASM。
+- `@hyzyla/pdfium@3.0.0` 来自固定 npm tarball。Vite 将 npm 包的 MIT 许可和 PDFium 8046d 的[第三方许可清单](licenses/PDFium-Third-Party.txt)合并为 `pdfium.txt`，随 Web 和 Native 交付。该清单来自紧接发布提交的上游许可提交，WASM 使用 npm 包原始字节。[上游许可提交](https://github.com/hyzyla/pdfium/commit/ff2083e4109840ce4157ec59ccdb1b253271d0bf)
 - Gson、Jsoup、OkHttp、Okio、Kotlin、Android ABI 及其他 JVM 依赖的版本和文件摘要在 `toolchain-lock.json` 的 runtime seed 中固定，各库原许可见其 JAR 的 `META-INF`。同名 Java 文件是项目为 TeaVM 提供的适配；例如 Gson `Streams` 提供递归 JSON 读写，未复制完整原库源码。
 
 正式构建中的 `PatchLibraries.java` 仅适配宿主和依赖 JAR，不改写扩展输入 JAR。发布 provenance 记录实际上游提交、材料摘要、工具链和构建输出；编译或初始化通过不代表在线网站语义与图片功能通过。

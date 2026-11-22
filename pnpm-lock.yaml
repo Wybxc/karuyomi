@@ -184,6 +184,9 @@ importers:
       '@cloudflare/vitest-plugin':
         specifier: 1.6.0
         version: 1.6.0(@types/node@26.6.6)(vitest@4.1.12)
+      '@hyzyla/pdfium':
+        specifier: 3.0.0
+        version: 3.0.0
       '@j178/prek':
         specifier: 0.5.9
         version: 0.5.9
@@ -377,6 +380,9 @@ importers:
       '@karuyomi/protocol':
         specifier: workspace:*
         version: link:../protocol
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
       idb:
         specifier: 8.0.4
         version: 8.0.4
@@ -1034,6 +1040,10 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@hyzyla/pdfium@3.0.0':
+    resolution: {integrity: sha512-Hw7/Pc/y2f8ZYVNXxAvDiLAV0qJT4+e5HMwbMghra/s2RKXuuWYdR/8ohoD4YwQfTL5UzSNlTtP1LJHip7LiEQ==}
+    engines: {node: '>=22'}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -3263,6 +3273,8 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@hyzyla/pdfium@3.0.0': {}
 
   '@img/colour@1.1.0': {}
 

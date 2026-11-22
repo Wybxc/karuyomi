@@ -12,6 +12,7 @@ import type {
 import {
   sourceInfoSchema,
   catalogReferenceSchema,
+  pdfiumMaterialName,
   javaSourceInvocation,
   parseJavaSourcePayload,
   processedImageSchema,
@@ -141,6 +142,7 @@ export interface TeaVMGlobals {
   teaBrowser?: () => never;
   teaFileSystemClose?: () => Promise<void>;
   karuyomiResources?: Record<string, string>;
+  karuyomiLoadPdfium?: () => Promise<Uint8Array<ArrayBuffer>>;
 }
 
 /** Executes hash-checked release9-derived classic scripts from the selected catalog. */
@@ -160,6 +162,7 @@ export class TeaVMDriver implements RuntimeDriver {
   private imageSink: ImageSink | undefined;
   private imageFailure: RuntimeFailure | undefined;
   private graphicsContext: HttpCallContext | undefined;
+  private pdfiumLoad: AbortController | undefined;
   private readonly fallbackGeneration = crypto.randomUUID();
 
   constructor(
@@ -399,7 +402,25 @@ export class TeaVMDriver implements RuntimeDriver {
     this.binaryTransport?.dispose();
     this.binaryTransport = new BinaryHttpTransport(this.origin);
     this.scope.karuyomiResources = {};
+    delete this.scope.karuyomiLoadPdfium;
     for (const resource of manifest.resources) {
+      if (resource.logicalName === pdfiumMaterialName) {
+        this.scope.karuyomiLoadPdfium = async () => {
+          if (!this.graphicsContext || this.pdfiumLoad)
+            throw new RuntimeFailure(
+              'protocol_error',
+              'A live graphics operation must own the PDFium load',
+            );
+          const request = new AbortController();
+          this.pdfiumLoad = request;
+          try {
+            return await this.loader.sharedArtifact(resource, request.signal);
+          } finally {
+            this.pdfiumLoad = undefined;
+          }
+        };
+        continue;
+      }
       const bytes = await this.loader.sharedArtifact(resource, signal);
       const url = URL.createObjectURL(
         new Blob([bytes], {
@@ -612,6 +633,7 @@ export class TeaVMDriver implements RuntimeDriver {
     this.closed = true;
     this.binaryTransport?.dispose();
     this.cancelGraphics();
+    delete this.scope.karuyomiLoadPdfium;
     this.imageSink?.abort(
       new RuntimeFailure('runtime_lost', 'Image runtime was closed'),
     );
@@ -730,6 +752,7 @@ export class TeaVMDriver implements RuntimeDriver {
   }
 
   private cancelGraphics(): void {
+    this.pdfiumLoad?.abort();
     const owner = this.graphicsContext;
     if (owner)
       this.scope.teaGraphicsCancel?.(owner.requestId, owner.generation);
