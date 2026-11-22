@@ -17,6 +17,7 @@
 - `TimeZone.toZoneId` 复用 TeaVM 的时区规则和别名表，UTC 格式化、地区夏令时和显式偏移由 `pnpm teavm:check` 与 JDK 对照验证。[JDK 时区接口](<https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/TimeZone.html#toZoneId()>)
 - Android `ApplicationInfo.dataDir` 由当前 Context 的虚拟文件目录派生，访问范围由扩展的文件命名空间决定。[Android 应用信息](https://developer.android.com/reference/android/content/pm/ApplicationInfo#dataDir)
 - `PdfRenderer` 从 Source 的虚拟文件系统读取只读 PDF，查询页数和页面尺寸，并以默认变换将显示页面合成到可写 ARGB_8888 位图。文件按 ≤64 KiB 块经过图形桥，单份文件上限 64 MiB，PDFium 的 WASM 堆上限 128 MiB。打印和自定义仿射变换由接口明确拒绝。Java 页与文档关闭后释放对应句柄，请求结束时图形桥回收遗漏的 WASM 对象。扩展继续通过原有图片处理和二进制通道交付编码图片。[Android PdfRenderer](https://developer.android.com/reference/android/graphics/pdf/PdfRenderer)
+- OkHttp 的 `Dispatcher` 在 Source 宿主的异步调用队列中执行总并发及原请求域名的并发上限。客户端从 `newBuilder()` 派生后共享同一个调度器。异步名额覆盖到回调返回，同步请求可以直接执行，已取消的排队调用释放队列位置并按原操作归属交付错误。[OkHttp Dispatcher](https://github.com/square/okhttp/blob/parent-5.5.0/okhttp/src/commonJvmAndroid/kotlin/okhttp3/Dispatcher.kt)
 - `bridge/`：严格 TypeScript 产品浏览器桥。Zstd 只读取已校验的共享材料映射，Web 使用静态字节，Native 使用应用内字节。
 - `toolchain-lock.json`、`toolchain/`：工具版本、下载摘要、runtime seed 材料与 Android SDK 元数据。`toolchain/android-sdk-license` 是复制到 SDK `licenses/` 的协议接受摘要记录；协议正文在相邻 XML 元数据中。
 - [来源与许可](NOTICE.md)、`licenses/`：ABI 适配、上游来源与必须保留的许可说明。
