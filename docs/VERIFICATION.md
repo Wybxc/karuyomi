@@ -100,6 +100,12 @@
 
 2026-11-22，`08475d4` 补齐发布测试的 PDFium 材料元数据。macOS arm64 上的完整 `pnpm check` 和 `pnpm build` 通过。Web 和 Native 产物的材料身份相同。直接检查 Worker 静态目录确认 PDFium 的长度、SHA-256、`application/wasm` 与 immutable 缓存头，Web 随附上游许可。构建时扩展队列仍在运行，故本次产品构建使用空扩展目录。[运行材料](RUNTIME-MATERIALS.md)
 
+2026-11-22，`93202ca` 将 OkHttp 调度容量接入宿主的 HTTP 调用。完整 `pnpm teavm:check` 及工具类型检查通过，队列用例合计 97 项断言，覆盖总并发、按域名跨端口限额、配置调整、回调期间占用名额和排队取消。在 `macbook-pro-4` 固定 Keiyoushi `efa93f5a`，MangaKakalot 1.6.28 分别用现网材料 checkout `5a72a6f` 和新材料 checkout `65934a1` 完成正式 AOT、产物完整性和 `hostAcquireCover` 验证。两份产物均保留一个 Source。canonical SHA-256 分别为 `ab70100b7af58e91ecea5f7228f508c8c5acfaa1fb078d143a05f771cd82e66c` 和 `38259acb8dc747a1f594bdbe3a3817d8e16922071da220c45200540bc7879cf4`。[宿主实现](../runtime/teavm/README.md)
+
+2026-11-22，MangaKakalot 1.6.28 加入现网索引。Wrangler 4.156.1 更新 4 项静态资源，Worker `177a3744-ed76-48e9-9f37-47653d57fd7c` 接收全部流量。生产 revision `fd36b3a383664022934cf2f3f2abc47d` 的 1,416 个扩展包含 2,282 个 Source，32 个 AOT 失败保留诊断。原有 1,415 个索引条目逐项对照通过。公开索引、状态、MangaKakalot 清单和 gzip、46 项 Web 静态资源及匿名 Access 302 均已读回确认。两地检查点已更新，同一主线的有界规划选择 0 项。该扩展保持 `compiled_unverified`，实际出图待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-22，从生产 `fd36b3a383664022934cf2f3f2abc47d` 派生八材料装配计划，保留全部 1,448 个冻结输入并纳入同材料的 MangaKakalot 成功回执。构建过程仍使用原冻结 checkout。复核时全量进程存活，已记录 94 个成功和 1 个失败。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
