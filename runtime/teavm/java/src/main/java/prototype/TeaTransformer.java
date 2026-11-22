@@ -9,7 +9,7 @@ import org.teavm.model.emit.ProgramEmitter;
 import org.teavm.model.instructions.*;
 import prototype.jcl.PackagedResources;
 
-/** Supply absent JCL entry points in TeaVM IR; never rewrites the extension input JAR. */
+/** Apply compatibility transformations to TeaVM IR and leave the input JAR intact. */
 public class TeaTransformer implements ClassHolderTransformer {
   private static final MethodDescriptor SOURCE_INPUT =
       new MethodDescriptor(
@@ -24,6 +24,17 @@ public class TeaTransformer implements ClassHolderTransformer {
           ValueType.object("java.lang.Object"));
 
   public void transformClass(ClassHolder cls, ClassHolderTransformerContext context) {
+    if (cls.getName().equals("eu.kanade.tachiyomi.extension.en.megatokyo.Megatokyo")
+        && "1".equals(System.getenv("KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS"))) {
+      // For this pinned helper the sole effect is to install weaker TLS settings.
+      // Keep the ordinary builder so the relay can apply its platform TLS checks.
+      ValueType builder = ValueType.object("okhttp3.OkHttpClient$Builder");
+      var helper = cls.getMethod(new MethodDescriptor("ignoreAllSSLErrors", builder, builder));
+      if (helper == null || helper.getProgram() == null)
+        throw new IllegalStateException("Pinned MegaTokyo TLS helper is missing");
+      ProgramEmitter emitter = ProgramEmitter.create(helper, context.getHierarchy());
+      emitter.var(1, builder).returnValue();
+    }
     if (cls.getName().equals("java.lang.Class")) {
       MethodDescriptor descriptor = new MethodDescriptor("getResource", String.class, URL.class);
       if (cls.getMethod(descriptor) == null) {

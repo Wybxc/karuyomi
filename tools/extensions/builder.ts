@@ -341,6 +341,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       throw new Error('JDK 25 required');
     const env = buildEnvironment(runtime, options);
     const module = ':' + descriptor.sourcePath.replaceAll('/', ':');
+    const megatokyoPlatformTls =
+      descriptor.packageName === 'eu.kanade.tachiyomi.extension.en.megatokyo' &&
+      descriptor.sourceFingerprint ===
+        '0ab0e0257567ea6f706f6079c8a414782db11504319071ee0da3e4790484f07a';
     const wrapper = readFileSync(
       path.join(upstream, 'gradle/wrapper/gradle-wrapper.properties'),
       'utf8',
@@ -361,23 +365,29 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     );
     // Keep the Kotlin suspend boundary in the official JVM JAR so TeaVM can
     // bind calls to host input without pulling in the Android dialog classes.
-    const inputRules = path.join(launcher, 'source-input.pro');
+    const keepRules = path.join(launcher, 'source-adapters.pro');
     writeFileSync(
-      inputRules,
+      keepRules,
       `-keep,allowshrinking class keiyoushi.utils.ui.DialogHelperKt {
     public static java.lang.Object askInput(java.lang.String,java.lang.String,java.lang.String,java.lang.String,boolean,boolean,kotlin.coroutines.Continuation);
 }
-`,
+` +
+        (megatokyoPlatformTls
+          ? `-keep,allowshrinking class eu.kanade.tachiyomi.extension.en.megatokyo.Megatokyo {
+    private okhttp3.OkHttpClient$Builder ignoreAllSSLErrors(okhttp3.OkHttpClient$Builder);
+}
+`
+          : ''),
     );
-    const inputInit = path.join(launcher, 'source-input.init.gradle');
+    const sourceInit = path.join(launcher, 'source-adapters.init.gradle');
     writeFileSync(
-      inputInit,
+      sourceInit,
       `gradle.beforeProject { project ->
     if (project.path == System.getProperty('karuyomi.aot.module')) {
         project.pluginManager.withPlugin('com.android.application') {
             project.extensions.getByName('androidComponents').finalizeDsl { extension ->
                 extension.buildTypes.getByName('release').proguardFiles(
-                    new File(System.getProperty('karuyomi.aot.promptRules'))
+                    new File(System.getProperty('karuyomi.aot.keepRules'))
                 )
             }
         }
@@ -397,9 +407,9 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
         upstream,
         module + ':assembleRelease',
         '--init-script',
-        inputInit,
+        sourceInit,
         `-Dkaruyomi.aot.module=${module}`,
-        `-Dkaruyomi.aot.promptRules=${inputRules}`,
+        `-Dkaruyomi.aot.keepRules=${keepRules}`,
         '--no-configuration-cache',
         '--no-watch-fs',
         `--max-workers=${options.workers ?? 3}`,
@@ -506,6 +516,9 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       symlinkSync(sharedM2, path.join(cache, 'm2'), 'dir');
     delete env['TEAVM_PROBE'];
     delete env['TEAVM_DEBUG'];
+    if (megatokyoPlatformTls) {
+      env['KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS'] = '1';
+    }
     stage = 'aot';
     activeLog = path.join(logs, 'aot.log');
     console.log(
