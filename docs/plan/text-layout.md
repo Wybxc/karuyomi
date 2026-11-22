@@ -23,6 +23,6 @@
 1. 扩展HTTP/解码等阶段的原Source取消与Worker终态验收；本轮已覆盖受控的真实PNG编码等待阶段，返回cancelled、无迟到发布且同generation恢复获取。不能将该门推广到所有阶段或所有Source。
 2. 继续实际长章节和长期负载，分别记录活owner、reservation和进程/GPU实测。80次处理跨64成功且处理中自然回收，但空闲15秒未归零的原始观测已保留；有界普通JS对象分配后的回收也单独记录。标准GC没有固定触发时机，不能承诺外部画布内存及时回收或永不触及64-surface上限，不能逐出活owner。
 3. 推进生产Access、Native Bitmap生命周期和实际连续阅读；Android oracle与Web内部账本不等于Native应用生命周期或真机性能通过。
-4. 用匹配的新共享材料复验 Dragon Ball Multiverse 与 ManhuaRM 的正式 AOT、真实图片绘制和上线后的阅读。
+4. Dragon Ball Multiverse 与 ManhuaRM 已使用匹配的新共享材料通过正式 AOT 和封面入口检查。继续验收真实图片绘制和上线后的阅读。[补编记录](../VERIFICATION.md)
 
 当前支持普通文本及 HTML 字符串投影。styled spans、ellipsize、复杂制表位/富文本、所有 HTML 容错情形和各平台字体一致性未验收。系统默认字体可改变断行、尺寸和 PNG 字节；不能把不同字体的图片声称为像素等价，也不能用这一点掩盖接口契约错误。

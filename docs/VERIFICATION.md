@@ -58,6 +58,8 @@
 
 2026-11-22，宿主接入 `StaticLayout.Builder`、段落断行和按语言选用的连字符词表。布局与图形桥的 28 项定向测试通过，覆盖三种策略、硬换行、字素边界，以及补画连字符后的行宽和原始 UTF‑16 偏移。`pnpm teavm:check`、严格类型检查和正式 Web/Native 运行时构建通过。新图形材料 SHA‑256 为 `3df7d350c88ee9ed495d17df976534d1fdc00c51ed0ce5432bf34d2f263504f0`，须使用匹配的扩展构建。两个扩展的正式补编、实际绘制和生产发布待验。[文字布局计划](plan/text-layout.md)
 
+2026-11-22，在 `macbook-pro-4` 固定 `c549ae6` 和 Keiyoushi `efa93f5a` 后独立补编。Dragon Ball Multiverse 1.6.1 与 ManhuaRM 1.6.1 均通过正式 Gradle、TeaVM AOT、产物完整性和 `hostAcquireCover` 检查，共 44 个 Source。两包的 canonical SHA‑256 分别为 `0f24bf0ea7c2b3ae48a919379d57d5f3fe9a7584d16e0206a5e312b07fa06533` 与 `b5dba5b987116f30f1782832ba5eb4ba3b0435a6fd887560f5ce6de185215b8b`。补编使用与 CI Web 归档匹配的新图形材料，两包保持 `compiled_unverified`，实际绘制和生产发布待验。[GitHub CI](https://github.com/Wybxc/karuyomi/actions/runs/44962498253)
+
 2026-11-22，SoftKomik 冻结构建缺少 Java `UnknownHostException`。JDK 与生成的 TeaVM JavaScript 对照通过该异常的继承、捕获和消息保留，完整 `pnpm teavm:check` 通过。当前 HTTP 中继以通用网络错误表示请求失败，扩展在线遇到 DNS 错误时的分支仍待验证。[HTTP 传输边界](HTTP-BRIDGE.md)
 
 2026-11-22，在 `macbook-pro-4` 固定 `eac70b4` 补编 Softkomik 1.6.4，正式构建、产物完整性及 `hostAcquireCover` 检查通过，包含 1 个 Source。canonical SHA-256 为 `f0606f04683feb3e0d4cf56c5a21ad39eac08f3b4838259c54f1396806a16809`，共享材料逐字节一致，候选预检纳入第 36 个补编结果。生产仍为 revision `ef76d5d1952b4733a10704d8401748ad`，已读回的公开索引含 191 个扩展。在线出图与 DNS 错误情况待验。[生产扩展索引](https://karuyomi.wybxc.cc/extensions/index.json)
@@ -65,6 +67,10 @@
 2026-11-22，ebookjapan 冻结构建缺少 `Rect.exactCenterX`。宿主补齐双轴中心计算，JDK 与生成的 TeaVM JavaScript 共通过 54 项图形变换断言，其中 9 项覆盖半像素中心、平移、围绕中心旋转及 Android 整数算术。Android API 35 原生图形参考通过 6 项测试，使用 3×1 位图验证半像素中心旋转后的实际像素。完整 `pnpm teavm:check` 通过。[Android Rect](https://developer.android.com/reference/android/graphics/Rect)
 
 2026-11-22，在 `macbook-pro-4` 固定 `0472569` 和同一 Keiyoushi 提交补编 ebookjapan 1.6.5。正式 AOT、产物完整性和 `hostAcquireCover` 检查通过，包含 1 个 Source，canonical SHA-256 为 `abed0629eb3a43f00a36dc49bd1e95fda8b6cee59b54b8989a93bc4bb836ac11`。候选装配预检核对共享材料与生产父快照，累计纳入 37 个补编结果。该包保持 `compiled_unverified`，待生产发布和在线出图验收。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，原冻结队列收到 U-Next 和 OneReader 的 AOT 失败回执。装配预检按原输入及共享材料校验两份正式补编，累计纳入 39 个补编结果，生产父 revision 为 `ef76d5d1952b4733a10704d8401748ad`。[装配入口](EXTENSIONS.md#首次全量候选的定向补编)
+
+2026-11-22，SoraRaw 冻结构建缺少颜色数组版 `Bitmap.createBitmap`。宿主复用有界像素写入，按原 API 返回独立的不可变位图。Android API 35 原生参考共通过 7 项测试，新增用例核对逐像素复制、负 stride 与无效参数。`pnpm teavm:check` 通过。在 `macbook-pro-4` 固定同材料提交 `58f2d79` 与 Keiyoushi `efa93f5a`，SoraRaw 1.6.3 通过正式 Gradle、TeaVM、完整性和 `hostAcquireCover` 检查，包含 1 个 Source，canonical SHA‑256 为 `56f21ff078d2c80b1cd991603e4e8992f91f367ea373ff438b563a58379e8cc5`。装配预检将其纳入第 40 个补编结果，保持 `compiled_unverified`。[Android Bitmap](https://developer.android.com/reference/android/graphics/Bitmap)
 
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
