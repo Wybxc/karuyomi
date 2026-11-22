@@ -124,6 +124,8 @@
 
 2026-11-22，章节输入桥通过 TypeScript、`pnpm teavm:check`、89 项 Worker 与驱动测试、39 项 Dart 传输测试及两项 Flutter 弹窗测试。隔离夹具验证当前调用绑定、无效和重复答复拒绝、明确确认产生一次模拟写入及取消零次。Flutter 核对密码遮蔽、必填与请求失效后移除对应弹窗。异步桥的真实扩展 AOT 和读章仍待复验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
 
+2026-11-22，固定 `f00c680` 的 `pnpm check`、`pnpm flutter:check` 和 `pnpm build` 均通过。工程检查包含 611 项 Vitest 测试，Flutter 应用通过 1,031 项测试。含章节输入的产品归档传到 `macbook-pro-4` 后通过摘要校验，八份共享材料与原冻结队列逐字节一致。在同一构建机固定 Keiyoushi `efa93f5a` 补编 MoeTruyen 1.6.21，官方 Gradle、TeaVM、产物完整性、封面入口和输入能力标记均通过。canonical SHA-256 为 `2acde11ba8adc3759705713f003b884755138e8d3a11e3c55c64ea2a1f49a298`，回执保持 `compiled_unverified`。其余四包继续补编，实际读章待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)

@@ -80,7 +80,7 @@ Mehgazone 1.6.1 在补齐文本设置弹窗说明后通过八材料正式 AOT、
 
 Doujin.io 1.6.5 补齐无填充的 AES 实现后通过两套材料的正式 AOT、完整性与封面入口检查。七材料构建已发布并读回，生产索引现有 1,417 个扩展，仍有 31 个失败输入。八材料构建已并入以新生产 revision 为父的装配计划，完整队列继续运行。实际出图待验。[验证记录](../VERIFICATION.md)
 
-MoeTruyen 1.6.21 所需的流式 HMAC 已通过 JDK 和 TeaVM 对照。两套正式 AOT 随后均定位到 Keiyoushi 的输入弹窗。MoeTruyen 通过它接收用户亲自填写的评论，MeDamTruyen、Panomic、SoaiCaComic 和 TeamLanhLung 通过同一个辅助函数接收章节密码。读取章节时的输入签名保留、TeaVM 调用转换及 Flutter 弹窗已接入，五个扩展按同一上游输入定向重编。实际扩展的输入与阅读仍待验。[验证记录](../VERIFICATION.md)
+MoeTruyen 1.6.21 所需的流式 HMAC 已通过 JDK 和 TeaVM 对照。MoeTruyen 通过 Keiyoushi 输入弹窗接收用户亲自填写的评论，MeDamTruyen、Panomic、SoaiCaComic 和 TeamLanhLung 通过同一辅助函数接收章节密码。`f00c680` 接入 Gradle 输入签名保留、TeaVM 调用转换及 Flutter 弹窗，只有产物带输入能力时才启用交互。MoeTruyen 已在 `macbook-pro-4` 通过八材料正式 AOT、完整性、封面入口和输入能力检查。其余四个扩展继续定向重编，正式产品归档已在构建机校验保存。实际扩展的输入与阅读仍待验。[验证记录](../VERIFICATION.md)
 
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
