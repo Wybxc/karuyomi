@@ -44,6 +44,12 @@ Codex 内置浏览器 Chrome 156 实际通过最新 Canvas 5 组及 TeaVM 同场
 
 独立 Canvas/Java 场景显式 recycle 后的图形账本归零，不能推广为实际 Source 的内部账本归零：原 TextInterceptor 创建 Bitmap 后没有 recycle，该 `926b93d` bridge End 仅关闭 byte handles 和 scratch，surface Map 仍需显式回收或 Worker 销毁。Source probe 只验证产品图片资源释放/撤销，没有采集内部 graphics ledger；长时间重复文字页可能耗尽 surface/内存预算，后续 typed lease 已通过独立 [Bitmap 所有权门](bitmap-lifetime-runtime.md)，之后已固定 `5148c60` 新材料重建同SHA原JAR，正式两页、原TextInterceptor80次处理和受控PNG编码取消分项通过，内部账本的空闲未回收与有界测试分配后回收见[新Source记录](graphics-source-runtime.md#新生命周期材料的原-xkcd-source)。这不改变926b93d的历史局限；生产Access和长期负载须另外验收。
 
+## WebtoonLib 字距
+
+2026-11-23，在 `macbook-pro-4` 固定 `3089367` 与 Keiyoushi `efa93f5a`，使用 Node 24.15.0、Vite 构建的图形材料和 `@napi-rs/canvas@1.1.1` 验证真实 Skia 测量及栅格。旧材料对三个字距均测得 60.01 px。新材料的零、加宽、收紧字距分别测得 60.01、110.01、50.01 px，断行为一行、两行，恢复零字距后的末列像素回到第 25 列。横向缩放及图形预算释放通过。新 `materialVersion` 为 `82075df16ebee9db465f4d014e9e8be43f2060194d852dabd7dd332525d908f4`，八份材料中图形 bridge 的摘要变化。
+
+WebtoonLib 1.6.1 在同机使用这份材料通过正式构建和完整性检查，canonical SHA-256 为 `2a0285a97335e6f029ffc91269e78aaaf6f2032f6f72b8244d134223b0feaaea`。正式 Native Worker 用隔离 HTTP 响应取得同一章节的三页，经原扩展生成两张 360×220 JPEG，黑字宽度分别为 29 px 和 80 px。第三页无字幕 PNG 的 886 字节与输入完全一致。五次请求均为 GET，章节会话和 Worker 已确认关闭。另一次真实热门目录请求返回 HTTP 403。产物保持 `compiled_unverified`，生产发布及客户端显示待验。[正式构建入口](../EXTENSIONS.md#首次全量候选的定向补编)
+
 styled spans、Builder/ellipsize、复杂富文本/制表位、所有 HTML 容错分支、Native 应用与真机字体/性能尚未验收。库规则版本与系统字体差异会影响输出；受控场景不能替代生产 Access、实际阅读、取消和长章节负载门。
 
 依据：[linebreak 官方文档](https://github.com/foliojs/linebreak)、[bidi-js 官方 API](https://github.com/lojjic/bidi-js)、[Android 15 StaticLayout](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-15.0.0_r1/core/java/android/text/StaticLayout.java)、[Android 15 Layout](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-15.0.0_r1/core/java/android/text/Layout.java)、[Android 15 Html](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-15.0.0_r1/core/java/android/text/Html.java)、[Robolectric NATIVE 模式](https://robolectric.org/javadoc/4.17/org/robolectric/annotation/GraphicsMode.Mode.html)。

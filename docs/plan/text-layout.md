@@ -9,6 +9,7 @@
 - 已实现 `TextPaint`、`Layout.Alignment`、旧构造器 `StaticLayout` 和 `Paint.FontMetrics`，包括 UTF-16 范围偏移、padding、行距、原始/可见行宽、段落方向和普通文本绘制。
 - Unicode 换行使用 `linebreak@1.1.0`，段落方向使用 `bidi-js@1.0.3`；grapheme 边界交给 `Intl.Segmenter`。两库规则基于 Unicode 13，不声明与每版 Android Unicode 数据完全等价。
 - `StaticLayout.Builder` 提供布局对齐、行距、padding 和三种断行策略。高质量策略衡量整段的非末行，平衡策略也计入末行。`hyphen@1.14.1` 提供德语、英语（美式与英式）、西班牙语、法语、印尼语、意大利语和葡萄牙语的词表。其它语言继续使用 Unicode 换行点和原文软连字符。断行时补画的连字符计入可见行宽，原文 UTF-16 偏移保持完整。[Android 断行参考](https://developer.android.com/reference/android/graphics/text/LineBreaker)
+- Android Paint 的字距以 em 保存，宿主按字号转为 Canvas 字距。测量、断行和绘字共用这一换算。WebtoonLib 的正式 AOT 和隔离章节已经验证不同字距与无字幕原图，真实目录返回 403。新图形材料的生产发布与客户端显示待验。[验证记录](../verification/text-layout-runtime.md#webtoonlib-字距) · [Android Paint 字距](<https://developer.android.com/reference/android/graphics/Paint#setLetterSpacing(float)>) · [Canvas 字距](https://html.spec.whatwg.org/multipage/canvas.html#dom-context-2d-letterspacing)
 - `Html.fromHtml(...).toString()` 使用已有 Jsoup 解析器，补齐已激活 TextInterceptor 所需的换行、段落、实体和空白投影；不实现 styled spans 或完整 HTML 渲染器。
 - 每次布局/绘字检查 8192 UTF-16 units、512 行、16384px 尺寸、4096px 字号和 64 倍横向缩放；控制/结果保持 64KiB，布局临时工作区计入图形预算并在终态释放。HTML 输入/输出与嵌套深度另有上限。该预算不代表整个 Java 堆已有统一限额。
 - 正式 Android NATIVE oracle 与同份 TeaVM Java 场景覆盖 plain TextPaint 状态、范围构造、换行/emoji/RTL、padding、行宽和 HTML 投影，包含 xkcd 3319 的真实标题/alt。实际结果见 [验证记录](../verification/text-layout-runtime.md)。
