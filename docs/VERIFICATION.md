@@ -116,6 +116,10 @@
 
 2026-11-22，本机和 `macbook-pro-4` 已提交 revision `448797e3feaa477c8ea18f54c6b874bd` 的正式检查点。固定主线从生产状态运行的有界增量规划选择 0 项。八材料装配计划以该 revision 为父，纳入 MangaKakalot、Mehgazone 和 Doujin.io 的成功回执。原四路冻结队列复核时收到 228 个成功和 2 个失败回执。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
 
+2026-11-22，`943b348` 补齐流式 HMAC-SHA-512，并用同一固定库执行原有的 HMAC-SHA-256。`pnpm teavm:check` 与工具类型检查通过，固定 JDK 和生成的 JavaScript 均通过 17 项 HMAC 对照断言。用七材料 `3c21348` 与八材料 `943b348` 在 `macbook-pro-4` 重编 MoeTruyen 1.6.21，两份 JAR 均生成。两套 TeaVM 诊断均定位到 Keiyoushi `askInput` 所用的 Android 对话框、Activity 和输入控件。R8 映射确认原 `askInput` 已内联到调用者。正式 AOT 待终端输入交互接入后复验，当前没有可发布产物。[完整 CI 与 Web/Wasm 构建](https://github.com/Wybxc/karuyomi/actions/runs/45022438982)
+
+2026-11-22，在 `macbook-pro-4` 的临时 checkout 用固定 Keiyoushi `efa93f5a` 和官方 Gradle `assembleRelease` 验证 MoeTruyen 1.6.21 与 MeDamTruyen 1.6.12。通过 Gradle init 脚本给这两个模块的 release 加入 `-keep,allowshrinking`，保留 `keiyoushi.utils.ui.DialogHelperKt.askInput` 的公开静态签名。固定 ASM 9.9.1 在两份官方 JVM JAR 中分别找到一条该签名的直接调用及一条进入辅助类的外部调用。原 MoeTruyen JAR 的该签名与直接调用均为 0。已核对上游跟踪文件，弹窗消息与 Flutter 响应仍待接入。[Android keep 规则](https://developer.android.com/topic/performance/app-optimization/add-keep-rules)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
