@@ -394,6 +394,13 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
         'Unsupported upstream Gradle wrapper; update the toolchain lock explicitly',
       );
     const launcher = path.join(local, 'gradle-launcher', descriptor.buildId);
+    // Parallel extension builds can compile the same upstream library.
+    const gradleOutputs = path.join(launcher, 'projects');
+    const packageOutput = path.join(
+      gradleOutputs,
+      descriptor.sourcePath,
+      'build',
+    );
     mkdirSync(launcher, { recursive: true });
     cpSync(
       path.join(upstream, 'gradle/wrapper/gradle-wrapper.jar'),
@@ -458,7 +465,15 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     const sourceInit = path.join(launcher, 'source-adapters.init.gradle');
     writeFileSync(
       sourceInit,
-      `gradle.beforeProject { project ->
+      `def sourceRoot = new File(System.getProperty('karuyomi.aot.sourceRoot')).canonicalFile.toPath()
+def outputRoot = new File(System.getProperty('karuyomi.aot.outputRoot'))
+
+gradle.beforeProject { project ->
+    def projectDir = project.projectDir.canonicalFile.toPath()
+    if (projectDir.startsWith(sourceRoot)) {
+        def relativeDir = sourceRoot.relativize(projectDir).toString()
+        project.layout.buildDirectory.fileValue(new File(new File(outputRoot, relativeDir), 'build'))
+    }
     if (project.path == System.getProperty('karuyomi.aot.module')) {
         project.pluginManager.withPlugin('com.android.application') {
             project.extensions.getByName('androidComponents').finalizeDsl { extension ->
@@ -484,6 +499,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
         module + ':assembleRelease',
         '--init-script',
         sourceInit,
+        '--project-cache-dir',
+        path.join(launcher, 'project-cache'),
+        `-Dkaruyomi.aot.sourceRoot=${upstream}`,
+        `-Dkaruyomi.aot.outputRoot=${gradleOutputs}`,
         `-Dkaruyomi.aot.module=${module}`,
         `-Dkaruyomi.aot.keepRules=${keepRules}`,
         '--no-configuration-cache',
@@ -512,11 +531,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       );
     const metadata = parseOfficialMetadata(
       readFileSync(
-        path.join(
-          upstream,
-          descriptor.sourcePath,
-          'build/keiyoushi-source-info.json',
-        ),
+        path.join(packageOutput, 'keiyoushi-source-info.json'),
         'utf8',
       ),
     );
@@ -527,11 +542,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     ])
       if (expected !== actual)
         throw new Error('Official metadata disagrees with descriptor');
-    const jarDirectory = path.join(
-      upstream,
-      descriptor.sourcePath,
-      'build/outputs/jar/release',
-    );
+    const jarDirectory = path.join(packageOutput, 'outputs/jar/release');
     const jars = readdirSync(jarDirectory, {
       recursive: true,
       withFileTypes: true,
