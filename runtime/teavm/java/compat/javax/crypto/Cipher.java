@@ -5,20 +5,28 @@ import java.security.spec.*;
 import javax.crypto.spec.*;
 import java.util.*;
 import com.google.gson.*;
+import org.bouncycastle.crypto.DataLengthException;
+import org.bouncycastle.crypto.DefaultBufferedBlockCipher;
+import org.bouncycastle.crypto.InvalidCipherTextException;
+import org.bouncycastle.crypto.engines.AESEngine;
+import org.bouncycastle.crypto.params.KeyParameter;
 import prototype.Bridge;
 
-/** Java cipher calls backed by WebCrypto and Bouncy Castle's public RSA encryption. */
+/** Java cipher calls backed by WebCrypto and Bouncy Castle. */
 public class Cipher {
   public static final int ENCRYPT_MODE = 1, DECRYPT_MODE = 2, WRAP_MODE = 3, UNWRAP_MODE = 4;
   private static final String AES_GCM = "AES/GCM/NoPadding";
+  private static final String AES_ECB = "AES/ECB/NoPadding";
   private static final String RSA_OAEP = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
   private static final String RSA_PKCS1 = "RSA/ECB/PKCS1Padding";
   private final String transformation;
   private final boolean rsa;
   private final boolean pkcs1;
   private final boolean gcm;
+  private final boolean ecb;
   private byte[] key, iv, aad = new byte[0];
   private RsaCrypto.BlockCipher rsaKey;
+  private DefaultBufferedBlockCipher ecbCipher;
   private boolean rsaInputTooLong;
   private int mode, tag = 128;
   private final java.io.ByteArrayOutputStream pending = new java.io.ByteArrayOutputStream();
@@ -28,6 +36,7 @@ public class Cipher {
     pkcs1 = RSA_PKCS1.equalsIgnoreCase(t);
     rsa = pkcs1 || RSA_OAEP.equalsIgnoreCase(t);
     gcm = AES_GCM.equalsIgnoreCase(t);
+    ecb = AES_ECB.equalsIgnoreCase(t);
   }
 
   public static Cipher getInstance(String t)
@@ -36,6 +45,7 @@ public class Cipher {
     if (!t.equalsIgnoreCase("AES/CBC/PKCS5Padding")
         && !t.equalsIgnoreCase("AES/CBC/PKCS7Padding")
         && !AES_GCM.equalsIgnoreCase(t)
+        && !AES_ECB.equalsIgnoreCase(t)
         && !RSA_OAEP.equalsIgnoreCase(t)
         && !RSA_PKCS1.equalsIgnoreCase(t)) throw new NoSuchAlgorithmException(t);
     return new Cipher(t);
@@ -55,7 +65,7 @@ public class Cipher {
 
   public void init(int mode, Key key) throws InvalidKeyException {
     AlgorithmParameterSpec params = null;
-    if (!rsa && mode == ENCRYPT_MODE) {
+    if (!rsa && !ecb && mode == ENCRYPT_MODE) {
       byte[] nonce = new byte[gcm ? 12 : 16];
       new SecureRandom().nextBytes(nonce);
       params = gcm ? new GCMParameterSpec(128, nonce) : new IvParameterSpec(nonce);
@@ -71,6 +81,7 @@ public class Cipher {
       throws InvalidKeyException, InvalidAlgorithmParameterException {
     this.key = null;
     rsaKey = null;
+    ecbCipher = null;
     if (mode != ENCRYPT_MODE && mode != DECRYPT_MODE)
       throw new IllegalArgumentException("Unsupported cipher mode");
     if (rsa) {
@@ -92,6 +103,14 @@ public class Cipher {
     byte[] bytes = key.getEncoded();
     if (bytes.length != 16 && bytes.length != 24 && bytes.length != 32)
       throw new InvalidKeyException("AES key length");
+    if (ecb) {
+      if (params != null)
+        throw new InvalidAlgorithmParameterException("ECB does not use parameters");
+      DefaultBufferedBlockCipher cipher = new DefaultBufferedBlockCipher(AESEngine.newInstance());
+      cipher.init(mode == ENCRYPT_MODE, new KeyParameter(bytes));
+      ecbCipher = cipher;
+      return;
+    }
     byte[] nonce;
     int bits = 128;
     if (gcm) {
@@ -135,12 +154,14 @@ public class Cipher {
   }
 
   private void requireInitialized() {
-    if (key == null && rsaKey == null) throw new IllegalStateException("Cipher not initialized");
+    if (key == null && rsaKey == null && ecbCipher == null)
+      throw new IllegalStateException("Cipher not initialized");
   }
 
   public void updateAAD(byte[] bytes) {
     requireInitialized();
-    if (rsa) throw new UnsupportedOperationException("RSA does not use AES associated data");
+    if (rsa || ecb)
+      throw new UnsupportedOperationException("This transformation does not use associated data");
     byte[] n = Arrays.copyOf(aad, aad.length + bytes.length);
     System.arraycopy(bytes, 0, n, aad.length, bytes.length);
     aad = n;
@@ -154,6 +175,7 @@ public class Cipher {
     requireInitialized();
     if (len < 0) throw new IllegalArgumentException();
     if (rsa) return rsaKey.modulusBytes();
+    if (ecb) return Math.addExact(ecbCipher.getOutputSize(0), len);
     int total = Math.addExact(pending.size(), len);
     return mode == DECRYPT_MODE
         ? (gcm ? Math.max(0, total - tag / 8) : total)
@@ -165,6 +187,18 @@ public class Cipher {
     requireInitialized();
     Objects.checkFromIndexSize(offset, len, in.length);
     if (outOffset < 0 || outOffset > out.length) throw new ShortBufferException("Output offset");
+    if (ecb) {
+      int outputSize = ecbCipher.getUpdateOutputSize(len);
+      if (outputSize > out.length - outOffset) throw new ShortBufferException("Output too small");
+      if (in == out
+          && outputSize > 0
+          && outOffset < offset + len
+          && offset < outOffset + outputSize) {
+        in = Arrays.copyOfRange(in, offset, offset + len);
+        offset = 0;
+      }
+      return ecbCipher.processBytes(in, offset, len, out, outOffset);
+    }
     if (rsa && len > rsaKey.inputLimit() - pending.size()) {
       rsaInputTooLong = true;
       return 0;
@@ -176,6 +210,12 @@ public class Cipher {
   public int doFinal(byte[] out, int offset)
       throws IllegalBlockSizeException, BadPaddingException, ShortBufferException {
     if (offset < 0 || offset > out.length) throw new ShortBufferException("Output offset");
+    if (ecb) {
+      requireInitialized();
+      if (ecbCipher.getOutputSize(0) > out.length - offset)
+        throw new ShortBufferException("Output too small");
+      return finishEcb(out, offset);
+    }
     byte[] buffered = pending.toByteArray();
     byte[] result = doFinal(new byte[0]);
     if (result.length > out.length - offset) {
@@ -191,6 +231,15 @@ public class Cipher {
     requireInitialized();
     Objects.checkFromIndexSize(offset, len, input.length);
     if (rsa) return finishRsa(input, offset, len);
+    if (ecb) {
+      int outputSize = getOutputSize(len);
+      if (outputSize % getBlockSize() != 0)
+        throw new IllegalBlockSizeException("ECB input must contain complete blocks");
+      byte[] out = new byte[outputSize];
+      int written = ecbCipher.processBytes(input, offset, len, out, 0);
+      finishEcb(out, written);
+      return out;
+    }
     if (pending.size() > 0) {
       pending.write(input, offset, len);
       input = pending.toByteArray();
@@ -215,6 +264,17 @@ public class Cipher {
     aad = new byte[0];
     pending.reset();
     return Base64.getDecoder().decode(out.get("body").getAsString());
+  }
+
+  private int finishEcb(byte[] out, int offset)
+      throws IllegalBlockSizeException, BadPaddingException {
+    try {
+      return ecbCipher.doFinal(out, offset);
+    } catch (DataLengthException error) {
+      throw new IllegalBlockSizeException("ECB input must contain complete blocks");
+    } catch (InvalidCipherTextException error) {
+      throw new BadPaddingException(error.getMessage());
+    }
   }
 
   private byte[] finishRsa(byte[] input, int offset, int len)

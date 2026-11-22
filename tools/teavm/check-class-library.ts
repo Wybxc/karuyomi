@@ -82,6 +82,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     'DigestScenarios.java',
     'Pbkdf2Scenarios.java',
     'EcScenarios.java',
+    'AesScenarios.java',
     'RsaScenarios.java',
     'RsaPkcs1Oracle.java',
     'SequenceStreamScenarios.java',
@@ -219,6 +220,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     !oracle.stdout.includes('TIME_ZONE_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('STRING_CONCAT_SCENARIO_PASS') ||
     !oracle.stdout.includes('EC_SCENARIOS_PASS ') ||
+    !oracle.stdout.includes('AES_ECB_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('RSA_OAEP_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('RSA_PKCS1_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('SEQUENCE_STREAM_SCENARIOS_PASS ') ||
