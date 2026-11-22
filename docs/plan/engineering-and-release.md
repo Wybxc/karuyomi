@@ -92,9 +92,11 @@ ToonLivre 1.6.90 保留原目录和普通读章路径，遇到站点验证要求
 
 上游 ToonLivre 1.6.91 调整了章页请求的章节上下文和验证分支。后续锁定该上游输入复验正式目录、直接读章及站点验证提示。八材料全量装配沿用已冻结的上游身份。[上游恢复提交](https://github.com/keiyoushi/extensions-source/commit/4b20a3fe77e29bca49af5454a06da65fdd09151e)
 
-爱看漫与 ReiManga 的固定构建使用中继的 HTTP 协商，保留原 Source 的 Cookie 和请求处理。爱看漫已从真实站点读回目录与封面，ReiManga 的正式目录返回 403，隔离封面交付通过。对调用已固定 Keiyoushi Android 验证助手的 Source，AOT 保留普通请求，并在调用验证助手时提示打开官方阅读器。TempleScan 已实测该提示，Cosmic Scans ID 与 CodeArc 已初始化并登记封面能力。读漫屋与如漫画的上游桌面目录仍有 TLS 错误。[验证记录](../VERIFICATION.md)
+爱看漫与 ReiManga 的固定构建使用中继的 HTTP 协商，保留原 Source 的 Cookie 和请求处理。爱看漫已从真实站点读回目录与封面，ReiManga 的正式目录返回 403，隔离封面交付通过。对调用已固定 Keiyoushi Android 验证助手的 Source，AOT 保留普通请求，并在调用验证助手时提示打开官方阅读器。TempleScan 已实测该提示，Cosmic Scans ID 与 CodeArc 已初始化并登记封面能力。[验证记录](../VERIFICATION.md)
 
 十四包定向补编已收齐。十三包取得匹配冻结材料的正式产物，覆盖十八个 Source，并通过独立 Worker 的初始化、封面能力和关闭检查。补齐后装配输入含九批二十五个替换构建，全部现网包均在完整计划内。WebtoonLib 已在独立字距材料下取得正式产物和隔离章节证据，随匹配的新材料进入后续发布。Scan-Manga、Japscan 的公开目录分别返回 404 和 403，Comix 的热门目录依赖 Android WebView。[补编验证](../VERIFICATION.md) · [WebtoonLib 字距实现](https://github.com/Wybxc/karuyomi/commit/3089367548b2b7b0873ffa6cdc4d73f4aaeb6698)
+
+读漫屋和如漫画用固定 MMLook AOT 适配接入平台 TLS，保留原扩展的重定向策略。两包已通过正式构建与隔离目录、封面检验，真实目录分别遇到连接重置和证书主机名不匹配。两份产物纳入匹配材料的候选，替换总数增至十批二十七个。固定 Web 归档已在构建机恢复并核对摘要，本机 Wrangler 已读回生产流量与 D1 迁移账本。完整装配等待原始回执收齐。[验证记录](../VERIFICATION.md)
 
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
