@@ -28,6 +28,8 @@ change listener 返回 true 才执行该控件的标准持久化；返回 false 
 
 setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主仍使用有界 operation owner；描述和实际存储最终序列化放在 `owner.drain` 成功之后，避免保存回调尚未写完的值。headless bind 仅在建立描述时执行一次，drain 后不重复触发。设置专用 EditText 支持有界 bind post、全选、非秘密提示及原 TextWatcher；不为普通 Android 控件提供此行为。Flutter 通过 typed 提示和全选字段呈现元数据。
 
+文本编辑弹窗保留源的 `dialogMessage`。宿主将 `Linkify.WEB_URLS` 识别出的显式 HTTP(S) URL 表示为原文的 UTF-16 区间，TS 和 Dart 在使用前校验区间顺序、地址和大小。Flutter 将原文与链接显示在输入框前。用户点击才打开对应地址，打开失败时保留输入草稿和链接。弹窗说明属于显示元数据，密码值仍留在当前会话。
+
 提交文本时，对原存储值到候选值执行一轮 before/on/after，候选通过只读 Editable 提供。设置专用的 `android.R.id.button1` 只表示本次提交是否启用；任一 error、禁用或校验异常均拒绝候选，宿主不调用 change listener、不执行默认写入，原始异常与输入文本不作为错误回显。允许后仍执行原 change listener 一次，并重读实际存储，保留它在返回 false 之前自行写入的值。此边界不模拟逐键输入、IME、span 或其它 Android 对话框。
 
 一次 edit 发送后，即使 veto、异常、取消或响应丢失，该代都不得继续普通 Source/图片请求。TS manager、Worker 和 Dart transport 都执行此门；已有资源的 release、close 与 shutdown 仍可用。必须确认保存或显式放弃并读取 D1 后，通过平台 `rebuildRuntime` 清理旧阅读资源并构造新代；不能用命中缓存的同一 open 或只丢 session 替代。
@@ -53,6 +55,7 @@ setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主�
 | 单组选项 / 字符串集合               | 256，值唯一                                               |
 | key / title、label / summary / text | 200 / 512 / 2048 / 4096 UTF-16 单元                       |
 | 文本输入提示                        | 最多 512 UTF-8 字节，密码控件不发送                       |
+| 文本编辑弹窗说明                    | 最多 2,048 UTF-8 字节、8 个按原文排序的 HTTP(S) 链接      |
 | 每个文本 bind 的 post / watcher     | 各最多 16；仅 bind 阶段登记                               |
 | 每 Source 实际存储（两个分区合计）  | 128 entries、entries 数组 ProtoJSON 32KiB                 |
 | 整包存储 / bootstrap                | 最多 64 Sources，各 entries 数组 ProtoJSON 字节之和 64KiB |

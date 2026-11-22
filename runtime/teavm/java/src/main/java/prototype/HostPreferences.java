@@ -2,7 +2,9 @@ package prototype;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.text.Spanned;
 import android.text.method.PasswordTransformationMethod;
+import android.text.util.Linkify;
 import android.widget.EditText;
 import androidx.preference.*;
 import com.google.gson.*;
@@ -387,12 +389,14 @@ public final class HostPreferences {
           state.addProperty("value", ((TwoStatePreference) preference).isChecked());
           break;
         case "text":
-          if (((EditTextPreference) preference).getText() != null)
-            state.addProperty("value", text(((EditTextPreference) preference).getText()));
+          EditTextPreference input = (EditTextPreference) preference;
+          if (input.getText() != null) state.addProperty("value", text(input.getText()));
           state.addProperty("secret", node.secret);
           state.addProperty("inputType", node.inputType);
           if (node.hint != null) state.addProperty("hint", node.hint);
           state.addProperty("selectAllOnOpen", node.selectAllOnOpen);
+          JsonObject message = dialogMessage(input.getDialogMessage());
+          if (message != null) state.add("dialogMessage", message);
           break;
         case "choice":
           state.add("options", node.options);
@@ -415,6 +419,33 @@ public final class HostPreferences {
       result.add(description);
     }
     return result;
+  }
+
+  private static JsonObject dialogMessage(CharSequence source) {
+    if (source == null || source.length() == 0 || source.length() > Linkify.MAX_TEXT_BYTES)
+      return null;
+    String text = source.toString();
+    if (text.getBytes(StandardCharsets.UTF_8).length > Linkify.MAX_TEXT_BYTES) return null;
+    JsonObject message = new JsonObject();
+    message.addProperty("text", text);
+    if (source instanceof Spanned spans) {
+      var ordered = spans.getSpans(0, source.length(), Linkify.WebLink.class);
+      Arrays.sort(ordered, Comparator.comparingInt(spans::getSpanStart));
+      JsonArray links = new JsonArray();
+      int previousEnd = 0;
+      for (var span : ordered) {
+        int start = spans.getSpanStart(span), end = spans.getSpanEnd(span);
+        if (start < previousEnd || end <= start || end > text.length()) continue;
+        JsonObject link = new JsonObject();
+        link.addProperty("start", start);
+        link.addProperty("end", end);
+        links.add(link);
+        previousEnd = end;
+        if (links.size() == Linkify.MAX_LINKS) break;
+      }
+      if (!links.isEmpty()) message.add("links", links);
+    }
+    return message;
   }
 
   private static Object nodeValue(Preference preference) {

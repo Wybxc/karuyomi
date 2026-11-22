@@ -7,6 +7,7 @@ const preferenceKeyLimit = 200;
 const preferenceLabelLimit = 512;
 const preferenceSummaryLimit = 2048;
 const preferenceTextLimit = 4096;
+const _preferenceDialogLinkLimit = 8;
 const preferenceEntryLimit = 128;
 const preferenceValuesLimit = 32 * 1024;
 const preferenceBootstrapLimit = 128 * 1024;
@@ -178,6 +179,38 @@ void _preferenceOptions(List<PreferenceOption> values) {
   }
 }
 
+void _preferenceDialogMessage(PreferenceDialogMessage value) {
+  _preferenceRequire(
+    value.text.isNotEmpty &&
+        utf8.encode(value.text).length <= preferenceSummaryLimit &&
+        value.links.length <= _preferenceDialogLinkLimit,
+    'Preference dialog exceeds its budget',
+  );
+  var previousEnd = 0;
+  for (final link in value.links) {
+    _preferenceRequire(
+      link.start >= previousEnd &&
+          link.end > link.start &&
+          link.end <= value.text.length,
+      'Invalid preference dialog link range',
+    );
+    final destination = value.text.substring(link.start, link.end);
+    final uri = Uri.tryParse(destination);
+    _preferenceRequire(
+      RegExp(
+            r'^https?:\/\/[^@/\\?#\s]+(?:[/?#]|$)',
+            caseSensitive: false,
+          ).hasMatch(destination) &&
+          !RegExp(r'[\\\s\x00-\x1f\x7f]').hasMatch(destination) &&
+          uri != null &&
+          uri.host.isNotEmpty &&
+          uri.userInfo.isEmpty,
+      'Invalid preference dialog link URL',
+    );
+    previousEnd = link.end;
+  }
+}
+
 void validatePreferenceSnapshot(PreferenceSnapshot value) {
   _preferenceKey(value.snapshotId);
   validatePreferenceEntries([...value.syncValues, ...value.sessionValues]);
@@ -220,6 +253,9 @@ void validatePreferenceSnapshot(PreferenceSnapshot value) {
                   utf8.encode(node.text.hint).length <= preferenceLabelLimit,
               'Preference input hint is secret or exceeds its text budget',
             );
+          }
+          if (node.text.hasDialogMessage()) {
+            _preferenceDialogMessage(node.text.dialogMessage);
           }
           _preferenceRequire(
             !node.text.secret ||

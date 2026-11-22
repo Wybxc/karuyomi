@@ -3218,6 +3218,142 @@ class PreferenceToggle extends $pb.GeneratedMessage {
   void clearValue() => $_clearField(1);
 }
 
+class PreferenceWebLink extends $pb.GeneratedMessage {
+  factory PreferenceWebLink({
+    $core.int? start,
+    $core.int? end,
+  }) {
+    final result = PreferenceWebLink._();
+    if (start != null) result.start = start;
+    if (end != null) result.end = end;
+    return result;
+  }
+
+  PreferenceWebLink._();
+
+  factory PreferenceWebLink.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceWebLink()..mergeFromBuffer(data, registry);
+  factory PreferenceWebLink.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceWebLink()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceWebLink',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceWebLink.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'start', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'end', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceWebLink clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceWebLink copyWith(void Function(PreferenceWebLink) updates) =>
+      super.copyWith((message) => updates(message as PreferenceWebLink))
+          as PreferenceWebLink;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use PreferenceWebLink() / PreferenceWebLink.new instead')
+  static PreferenceWebLink create() => PreferenceWebLink._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceWebLink._();
+  @$core.override
+  PreferenceWebLink createEmptyInstance() => PreferenceWebLink._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceWebLink getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PreferenceWebLink>(
+          PreferenceWebLink.$_createMessage);
+  static PreferenceWebLink? _defaultInstance;
+
+  /// UTF-16 range in the original dialog message. The displayed substring is the URL.
+  @$pb.TagNumber(1)
+  $core.int get start => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set start($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStart() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStart() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get end => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set end($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEnd() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEnd() => $_clearField(2);
+}
+
+class PreferenceDialogMessage extends $pb.GeneratedMessage {
+  factory PreferenceDialogMessage({
+    $core.String? text,
+    $core.Iterable<PreferenceWebLink>? links,
+  }) {
+    final result = PreferenceDialogMessage._();
+    if (text != null) result.text = text;
+    if (links != null) result.links.addAll(links);
+    return result;
+  }
+
+  PreferenceDialogMessage._();
+
+  factory PreferenceDialogMessage.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceDialogMessage()..mergeFromBuffer(data, registry);
+  factory PreferenceDialogMessage.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      PreferenceDialogMessage()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PreferenceDialogMessage',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: PreferenceDialogMessage.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..pPM<PreferenceWebLink>(2, _omitFieldNames ? '' : 'links',
+        subBuilder: PreferenceWebLink.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceDialogMessage clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PreferenceDialogMessage copyWith(
+          void Function(PreferenceDialogMessage) updates) =>
+      super.copyWith((message) => updates(message as PreferenceDialogMessage))
+          as PreferenceDialogMessage;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use PreferenceDialogMessage() / PreferenceDialogMessage.new instead')
+  static PreferenceDialogMessage create() => PreferenceDialogMessage._();
+  static $pb.GeneratedMessage $_createMessage() => PreferenceDialogMessage._();
+  @$core.override
+  PreferenceDialogMessage createEmptyInstance() => PreferenceDialogMessage._();
+  @$core.pragma('dart2js:noInline')
+  static PreferenceDialogMessage getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PreferenceDialogMessage>(
+          PreferenceDialogMessage.$_createMessage);
+  static PreferenceDialogMessage? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get text => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set text($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasText() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearText() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<PreferenceWebLink> get links => $_getList(1);
+}
+
 class PreferenceText extends $pb.GeneratedMessage {
   factory PreferenceText({
     $core.String? value,
@@ -3225,6 +3361,7 @@ class PreferenceText extends $pb.GeneratedMessage {
     $core.int? inputType,
     $core.String? hint,
     $core.bool? selectAllOnOpen,
+    PreferenceDialogMessage? dialogMessage,
   }) {
     final result = PreferenceText._();
     if (value != null) result.value = value;
@@ -3232,6 +3369,7 @@ class PreferenceText extends $pb.GeneratedMessage {
     if (inputType != null) result.inputType = inputType;
     if (hint != null) result.hint = hint;
     if (selectAllOnOpen != null) result.selectAllOnOpen = selectAllOnOpen;
+    if (dialogMessage != null) result.dialogMessage = dialogMessage;
     return result;
   }
 
@@ -3253,6 +3391,8 @@ class PreferenceText extends $pb.GeneratedMessage {
     ..aI(3, _omitFieldNames ? '' : 'inputType')
     ..aOS(4, _omitFieldNames ? '' : 'hint')
     ..aOB(5, _omitFieldNames ? '' : 'selectAllOnOpen')
+    ..aOM<PreferenceDialogMessage>(6, _omitFieldNames ? '' : 'dialogMessage',
+        subBuilder: PreferenceDialogMessage.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3323,6 +3463,17 @@ class PreferenceText extends $pb.GeneratedMessage {
   $core.bool hasSelectAllOnOpen() => $_has(4);
   @$pb.TagNumber(5)
   void clearSelectAllOnOpen() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  PreferenceDialogMessage get dialogMessage => $_getN(5);
+  @$pb.TagNumber(6)
+  set dialogMessage(PreferenceDialogMessage value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasDialogMessage() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearDialogMessage() => $_clearField(6);
+  @$pb.TagNumber(6)
+  PreferenceDialogMessage ensureDialogMessage() => $_ensure(5);
 }
 
 class PreferenceChoice extends $pb.GeneratedMessage {

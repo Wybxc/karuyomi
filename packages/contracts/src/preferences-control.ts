@@ -17,6 +17,7 @@ export const PREFERENCE_KEY_LIMIT = 200;
 export const PREFERENCE_LABEL_LIMIT = 512;
 export const PREFERENCE_SUMMARY_LIMIT = 2048;
 export const PREFERENCE_TEXT_LIMIT = 4096;
+const PREFERENCE_DIALOG_LINK_LIMIT = 8;
 export const PREFERENCE_ENTRY_LIMIT = 128;
 export const PREFERENCE_VALUES_LIMIT = 32 * 1024;
 export const PREFERENCE_BOOTSTRAP_LIMIT = 128 * 1024;
@@ -219,6 +220,38 @@ function options(values: readonly pb.PreferenceOption[]): void {
     text(value.value);
   }
 }
+function dialogMessage(value: pb.PreferenceDialogMessage): void {
+  requireCondition(
+    value.text.length > 0 &&
+      new TextEncoder().encode(value.text).byteLength <=
+        PREFERENCE_SUMMARY_LIMIT &&
+      value.links.length <= PREFERENCE_DIALOG_LINK_LIMIT,
+    'Preference dialog exceeds its budget',
+  );
+  let previousEnd = 0;
+  for (const { start, end } of value.links) {
+    requireCondition(
+      Number.isInteger(start) &&
+        Number.isInteger(end) &&
+        start >= previousEnd &&
+        end > start &&
+        end <= value.text.length,
+      'Invalid preference dialog link range',
+    );
+    const destination = value.text.slice(start, end);
+    const url = URL.parse(destination);
+    requireCondition(
+      /^https?:\/\/[^@/\\?#\s]+(?:[/?#]|$)/iu.test(destination) &&
+        !/[\\\s\u0000-\u001f\u007f]/u.test(destination) &&
+        url !== null &&
+        url.hostname.length > 0 &&
+        url.username === '' &&
+        url.password === '',
+      'Invalid preference dialog link URL',
+    );
+    previousEnd = end;
+  }
+}
 export function validatePreferenceSnapshot(value: pb.PreferenceSnapshot): void {
   validId(value.snapshotId);
   validatePreferenceEntries([...value.syncValues, ...value.sessionValues]);
@@ -263,6 +296,8 @@ export function validatePreferenceSnapshot(value: pb.PreferenceSnapshot): void {
                   PREFERENCE_LABEL_LIMIT,
               'Preference input hint is secret or exceeds its text budget',
             );
+          if (node.kind.value.dialogMessage)
+            dialogMessage(node.kind.value.dialogMessage);
           requireCondition(
             !node.kind.value.secret ||
               node.syncScope === pb.PreferenceSyncScope.CLIENT_SESSION,

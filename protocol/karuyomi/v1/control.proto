@@ -263,6 +263,15 @@ message PreferenceOption {
 message PreferenceToggle {
   bool value = 1;
 }
+message PreferenceWebLink {
+  // UTF-16 range in the original dialog message. The displayed substring is the URL.
+  uint32 start = 1;
+  uint32 end = 2;
+}
+message PreferenceDialogMessage {
+  string text = 1;
+  repeated PreferenceWebLink links = 2;
+}
 message PreferenceText {
   // Missing is distinct from an explicitly stored empty string.
   optional string value = 1;
@@ -271,6 +280,7 @@ message PreferenceText {
   // Presentation metadata from the original input bind; never include a secret hint.
   optional string hint = 4;
   bool select_all_on_open = 5;
+  PreferenceDialogMessage dialog_message = 6;
 }
 message PreferenceChoice {
   repeated PreferenceOption options = 1;

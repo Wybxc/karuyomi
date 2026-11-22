@@ -1,6 +1,7 @@
 package android.widget;
 
 import android.content.Context;
+import android.text.method.MovementMethod;
 import android.text.method.TransformationMethod;
 import android.util.AttributeSet;
 import android.view.View;
@@ -9,6 +10,7 @@ import android.view.View;
 public class TextView extends View {
   private int inputType = 1;
   private TransformationMethod transformation;
+  private MovementMethod movement;
   private CharSequence text = "";
   private CharSequence hint;
 
@@ -42,6 +44,14 @@ public class TextView extends View {
 
   public final void setTransformationMethod(TransformationMethod transformation) {
     this.transformation = transformation;
+  }
+
+  public final MovementMethod getMovementMethod() {
+    return movement;
+  }
+
+  public final void setMovementMethod(MovementMethod movement) {
+    this.movement = movement;
   }
 
   public CharSequence getText() {

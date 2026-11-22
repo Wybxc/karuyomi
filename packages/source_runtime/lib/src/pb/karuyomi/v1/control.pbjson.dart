@@ -1119,6 +1119,42 @@ const PreferenceToggle$json = {
 final $typed_data.Uint8List preferenceToggleDescriptor = $convert
     .base64Decode('ChBQcmVmZXJlbmNlVG9nZ2xlEhQKBXZhbHVlGAEgASgIUgV2YWx1ZQ==');
 
+@$core.Deprecated('Use preferenceWebLinkDescriptor instead')
+const PreferenceWebLink$json = {
+  '1': 'PreferenceWebLink',
+  '2': [
+    {'1': 'start', '3': 1, '4': 1, '5': 13, '10': 'start'},
+    {'1': 'end', '3': 2, '4': 1, '5': 13, '10': 'end'},
+  ],
+};
+
+/// Descriptor for `PreferenceWebLink`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceWebLinkDescriptor = $convert.base64Decode(
+    'ChFQcmVmZXJlbmNlV2ViTGluaxIUCgVzdGFydBgBIAEoDVIFc3RhcnQSEAoDZW5kGAIgASgNUg'
+    'NlbmQ=');
+
+@$core.Deprecated('Use preferenceDialogMessageDescriptor instead')
+const PreferenceDialogMessage$json = {
+  '1': 'PreferenceDialogMessage',
+  '2': [
+    {'1': 'text', '3': 1, '4': 1, '5': 9, '10': 'text'},
+    {
+      '1': 'links',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceWebLink',
+      '10': 'links'
+    },
+  ],
+};
+
+/// Descriptor for `PreferenceDialogMessage`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List preferenceDialogMessageDescriptor =
+    $convert.base64Decode(
+        'ChdQcmVmZXJlbmNlRGlhbG9nTWVzc2FnZRISCgR0ZXh0GAEgASgJUgR0ZXh0EjQKBWxpbmtzGA'
+        'IgAygLMh4ua2FydXlvbWkudjEuUHJlZmVyZW5jZVdlYkxpbmtSBWxpbmtz');
+
 @$core.Deprecated('Use preferenceTextDescriptor instead')
 const PreferenceText$json = {
   '1': 'PreferenceText',
@@ -1134,6 +1170,14 @@ const PreferenceText$json = {
       '5': 8,
       '10': 'selectAllOnOpen'
     },
+    {
+      '1': 'dialog_message',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.PreferenceDialogMessage',
+      '10': 'dialogMessage'
+    },
   ],
   '8': [
     {'1': '_value'},
@@ -1146,7 +1190,8 @@ final $typed_data.Uint8List preferenceTextDescriptor = $convert.base64Decode(
     'Cg5QcmVmZXJlbmNlVGV4dBIZCgV2YWx1ZRgBIAEoCUgAUgV2YWx1ZYgBARIWCgZzZWNyZXQYAi'
     'ABKAhSBnNlY3JldBIdCgppbnB1dF90eXBlGAMgASgFUglpbnB1dFR5cGUSFwoEaGludBgEIAEo'
     'CUgBUgRoaW50iAEBEisKEnNlbGVjdF9hbGxfb25fb3BlbhgFIAEoCFIPc2VsZWN0QWxsT25PcG'
-    'VuQggKBl92YWx1ZUIHCgVfaGludA==');
+    'VuEksKDmRpYWxvZ19tZXNzYWdlGAYgASgLMiQua2FydXlvbWkudjEuUHJlZmVyZW5jZURpYWxv'
+    'Z01lc3NhZ2VSDWRpYWxvZ01lc3NhZ2VCCAoGX3ZhbHVlQgcKBV9oaW50');
 
 @$core.Deprecated('Use preferenceChoiceDescriptor instead')
 const PreferenceChoice$json = {
