@@ -1214,14 +1214,24 @@ export class ExtensionPipeline {
     }
     processes.check();
     const base = readBuildResults(frozenResults),
-      effective = new Map<string, ResultReceipt>();
-    for (const entry of frozen.entries) {
-      const receipt = baselineResult(base, entry, 'frozen');
-      effective.set(entry.inputFingerprint, receipt);
+      effective = new Map<string, ResultReceipt>(),
+      selected = new Map(
+        plan.entries.map((entry) => [entry.packageName, entry]),
+      ),
+      replacedFailures: {
+        descriptor: ExtensionDescriptor;
+        receipt: ResultReceipt;
+      }[] = [];
+    for (const descriptor of frozen.entries) {
+      const receipt = baselineResult(base, descriptor, 'frozen');
+      effective.set(descriptor.inputFingerprint, receipt);
+      if (
+        selected.get(descriptor.packageName)?.inputFingerprint !==
+          descriptor.inputFingerprint &&
+        resultOf(receipt.outcome).status === 'failed'
+      )
+        replacedFailures.push({ descriptor, receipt });
     }
-    const selected = new Map(
-      plan.entries.map((entry) => [entry.packageName, entry]),
-    );
     for (const { results, packages } of parsed) {
       const overlays = readBuildResults(results);
       for (const name of packages) {
@@ -1239,6 +1249,7 @@ export class ExtensionPipeline {
       finalize: true,
       strictResults: true,
       preserveAvailable: true,
+      replacedFailures,
       ...(frozenCheckout ? { checkout: frozenCheckout } : {}),
     });
   }
@@ -1255,9 +1266,14 @@ export class ExtensionPipeline {
       checkout?: string;
       processes?: BuilderProcesses;
       verifiedResults?: Map<string, ResultReceipt>;
+      replacedFailures?: readonly {
+        descriptor: ExtensionDescriptor;
+        receipt: ResultReceipt;
+      }[];
     } = {},
   ): Promise<ExtensionState> {
     const processes = options.processes ?? new BuilderProcesses();
+    const replacedFailures = options.replacedFailures ?? [];
     processes.check();
     if (plan.baseRevision !== state.revision)
       throw new Error('Plan was based on a different deployed snapshot');
@@ -1313,6 +1329,17 @@ export class ExtensionPipeline {
       if (recorded.content)
         verified.set(descriptor.packageName, recorded.content);
     }
+    for (const { descriptor, receipt } of replacedFailures) {
+      processes.check();
+      await this.recordResult(
+        candidate,
+        descriptor,
+        receipt.outcome,
+        receipt.directory,
+        options.checkout,
+        options.strictResults,
+      );
+    }
     candidate.active = Object.fromEntries(
       Object.entries(candidate.active).filter(
         ([packageName, key]) =>
@@ -1323,7 +1350,10 @@ export class ExtensionPipeline {
     const retained = new Set(
       [...current.values()]
         .map((entry) => entry.inputFingerprint)
-        .concat(Object.values(candidate.active)),
+        .concat(
+          Object.values(candidate.active),
+          replacedFailures.map(({ descriptor }) => descriptor.inputFingerprint),
+        ),
     );
     candidate.attempts = Object.fromEntries(
       Object.entries(candidate.attempts).filter(
@@ -1461,8 +1491,9 @@ export class ExtensionPipeline {
         unavailable: Object.values(candidate.active).filter(
           (key) => !candidate.attempts[key]?.available,
         ).length,
-        failed: Object.values(candidate.attempts).filter(
-          (record) => record.status === 'failed',
+        failed: [...current.values()].filter(
+          (entry) =>
+            candidate.attempts[entry.inputFingerprint]?.status === 'failed',
         ).length,
         pending: [...current.values()].filter(
           (entry) => !candidate.attempts[entry.inputFingerprint],

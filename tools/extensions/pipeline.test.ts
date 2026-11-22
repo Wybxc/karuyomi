@@ -1319,7 +1319,22 @@ test('a baseline reuses verified packages from independent supplements with shar
     [selected.packageName]: selected.inputFingerprint,
     [failed.packageName]: recovered.inputFingerprint,
   });
-  assert.equal(next.attempts[failed.inputFingerprint], undefined);
+  assert.equal(next.attempts[failed.inputFingerprint]?.status, 'failed');
+  assert.equal(
+    next.attempts[failed.inputFingerprint]?.failure?.code,
+    'source_failed',
+  );
+  assert.equal(next.bootstrap.failed, 0);
+  assert.equal(next.summary?.failed, 0);
+  const incremental = makePlan(options.frozenPlan, next, {
+    root: f.root,
+    ci: true,
+  });
+  assert(
+    incremental.selected.every(
+      (entry) => entry.inputFingerprint !== failed.inputFingerprint,
+    ),
+  );
   assert.equal((await f.index()).builds.length, 3);
 });
 
