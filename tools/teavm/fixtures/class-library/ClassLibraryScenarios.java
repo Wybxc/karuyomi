@@ -57,6 +57,7 @@ public final class ClassLibraryScenarios {
     System.out.println("STRING_CONCAT_SCENARIO_PASS");
     EcScenarios.run();
     AesScenarios.run();
+    HmacScenarios.run();
     RsaScenarios.run();
     SequenceStreamScenarios.run();
     unknownHost();
