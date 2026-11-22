@@ -182,6 +182,8 @@
 
 2026-11-23，复核 Keiyoushi `92906c0` 的 Comix 1.6.65、Japscan 1.6.3 和 Scan-Manga 1.6.4。M4 的普通 HTTPS 请求读到 Comix 目录 HTML 7,312 字节，其中作品详情链接和图像均为 0。上游热门目录仍通过 `runInWebView` 获取。Japscan 和 Scan-Manga 的同版公开热门路径分别返回 HTTP 403 和 404，两包的章节入口仍进入 Android WebView 流程。已有材料的三个 AOT 失败保持在生产账本中。[固定上游](https://github.com/keiyoushi/extensions-source/commit/92906c0382547f30a03b3176f2f2429be6b54dce)
 
+2026-11-23，下一版扩展并发构建中，Fansubs.cat 与 Bakkin 的上游 Gradle 任务均因共享 Kotlin 增量缓存重复注册失败。M4 固定 `1f17b74` 和同一 Keiyoushi `efa93f5a`，在独立 checkout 同时构建共用主题库的 Fansubs.cat 1.6.1 与 Hentai.cat 1.6.1，观察到两个各自独立的主题库 Kotlin 构建目录同时存在。两包及随后补编的 Bakkin 1.6.1 均通过正式 Gradle、TeaVM AOT、产物完整性和 `hostAcquireCover` 导出检查，各有 1 个 Source。八份共享材料逐字节匹配冻结批次。补编预检在父 revision `ac464cf6987d4e25a556bd7b695a7c2d` 的 1,448 项计划中选择 Fansubs.cat 和 Bakkin，原有成功的 Hentai.cat 回执可直接使用。三包均为 `compiled_unverified`。完整装配及生产显示待验。[构建隔离修复](https://github.com/Wybxc/karuyomi/commit/1f17b74c30181c90dbc2b96f61bbf8a63421c064)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
