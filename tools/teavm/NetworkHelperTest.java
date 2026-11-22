@@ -7,6 +7,7 @@ import eu.kanade.tachiyomi.network.OkHttpExtensionsKt;
 import java.io.File;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Field;
+import java.util.concurrent.TimeUnit;
 import okhttp3.*;
 
 /** Shared configuration checks. No upstream request or cache storage is simulated here. */
@@ -196,6 +197,27 @@ public final class NetworkHelperTest {
           call.request() == request
               && "SourceCustomUA/1".equals(call.request().header("User-Agent")),
           "actual image helper preserves Source request");
+      OkHttpClient.Builder timeoutBuilder = client.newBuilder();
+      OkHttpClient.Builder.class
+          .getMethod("callTimeoutDuration", long.class)
+          .invoke(timeoutBuilder, 180_000_000_000L << 1);
+      OkHttpClient limited = timeoutBuilder.build();
+      check(limited.callTimeoutMillis() == 180000, "the Kotlin nanosecond encoding is converted");
+      check(
+          limited.newBuilder().build().callTimeoutMillis() == 180000,
+          "client copies preserve timeout");
+      check(client.callTimeoutMillis() == 0, "the original client remains unmodified");
+      check(
+          limited.newCall(request).timeout().timeoutNanos() == 180_000_000_000L,
+          "the owned client's normal call entry point receives the timeout");
+      try {
+        timeoutBuilder.callTimeout(1, TimeUnit.NANOSECONDS);
+        throw new AssertionError("Sub-millisecond builder timeout was accepted");
+      } catch (IllegalArgumentException expected) {
+        check(
+            expected.getMessage().equals("Timeout too small"),
+            "builder validates its millisecond range");
+      }
       int abiChecks = checks;
       JsonObject result = run();
       result.addProperty("jvmAbiChecks", abiChecks);

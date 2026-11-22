@@ -439,7 +439,8 @@ public class TeaTransformer implements ClassHolderTransformer {
             if (ref.getClassName().equals("okhttp3.OkHttpClient$Builder")
                 && ref.getName().endsWith("-LRDsOJo")) {
               String name = ref.getName().substring(0, ref.getName().indexOf('-'));
-              if (name.equals("connectTimeout")
+              if (name.equals("callTimeout")
+                  || name.equals("connectTimeout")
                   || name.equals("readTimeout")
                   || name.equals("writeTimeout"))
                 invoke.setMethod(

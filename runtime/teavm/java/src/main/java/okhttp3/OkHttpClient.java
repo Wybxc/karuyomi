@@ -58,6 +58,10 @@ public class OkHttpClient implements Call.Factory {
     return b.retry;
   }
 
+  public int callTimeoutMillis() {
+    return b.call;
+  }
+
   public int connectTimeoutMillis() {
     return b.connect;
   }
@@ -76,7 +80,7 @@ public class OkHttpClient implements Call.Factory {
     CookieJar cookieJar = prototype.Cookies.INSTANCE;
     Authenticator authenticator = Authenticator.NONE;
     boolean followRedirects = true, retry = true;
-    int connect = 10000, read = 10000, write = 10000;
+    int call, connect = 10000, read = 10000, write = 10000;
 
     public Builder() {}
 
@@ -88,6 +92,7 @@ public class OkHttpClient implements Call.Factory {
       authenticator = x.authenticator;
       followRedirects = x.followRedirects;
       retry = x.retry;
+      call = x.call;
       connect = x.connect;
       read = x.read;
       write = x.write;
@@ -147,6 +152,10 @@ public class OkHttpClient implements Call.Factory {
       return this;
     }
 
+    public Builder callTimeoutDuration(long encoded) {
+      return callTimeout(durationMillis(encoded), TimeUnit.MILLISECONDS);
+    }
+
     public Builder connectTimeoutDuration(long encoded) {
       return connectTimeout(durationMillis(encoded), TimeUnit.MILLISECONDS);
     }
@@ -173,6 +182,15 @@ public class OkHttpClient implements Call.Factory {
 
     public Builder retryOnConnectionFailure(boolean v) {
       retry = v;
+      return this;
+    }
+
+    public Builder callTimeout(long value, TimeUnit unit) {
+      long millis = unit.toMillis(value);
+      if (value < 0) throw new IllegalArgumentException("Negative timeout");
+      if (millis > Integer.MAX_VALUE) throw new IllegalArgumentException("Timeout too large");
+      if (millis == 0 && value > 0) throw new IllegalArgumentException("Timeout too small");
+      call = (int) millis;
       return this;
     }
 

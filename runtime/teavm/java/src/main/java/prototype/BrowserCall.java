@@ -4,8 +4,11 @@ import com.google.gson.*;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import okhttp3.*;
+import okio.AsyncTimeout;
+import okio.Buffer;
 import okio.BufferedSink;
 import okio.Okio;
 import okio.Timeout;
@@ -277,9 +280,12 @@ public final class BrowserCall implements Call {
 
   private final OkHttpClient client;
   private final Request request;
+  private final AsyncTimeout callTimeout;
   private Operation owner;
   private volatile boolean executed;
   private volatile boolean cancelled;
+  private volatile boolean callTimedOut;
+  private volatile Long callDeadlineNanos;
   private final Set<String> httpHandles = new HashSet<>();
   private Call proxy;
   private OwnedResponseBody responseBody;
@@ -287,6 +293,14 @@ public final class BrowserCall implements Call {
   private BrowserCall(OkHttpClient c, Request r) {
     client = c;
     request = r;
+    callTimeout =
+        new AsyncTimeout() {
+          @Override
+          protected void timedOut() {
+            expireCall();
+          }
+        };
+    callTimeout.timeout(c.callTimeoutMillis(), TimeUnit.MILLISECONDS);
   }
 
   public static Call create(OkHttpClient c, Request r) {
@@ -392,6 +406,31 @@ public final class BrowserCall implements Call {
       source =
           Okio.buffer(
               new okio.ForwardingSource(original.source()) {
+                @Override
+                public long read(Buffer sink, long byteCount) throws IOException {
+                  checkCallTimeout();
+                  long count;
+                  try {
+                    count = super.read(sink, byteCount);
+                  } catch (IOException | RuntimeException failure) {
+                    if (finishCallTimeout()) {
+                      expireCall();
+                      throw callTimeoutError(failure);
+                    }
+                    throw failure;
+                  } catch (Error failure) {
+                    finishCallTimeout();
+                    throw failure;
+                  }
+                  checkCallTimeout();
+                  if (count == -1 && finishCallTimeout()) {
+                    expireCall();
+                    throw callTimeoutError(null);
+                  }
+                  return count;
+                }
+
+                @Override
                 public void close() {
                   release();
                 }
@@ -431,6 +470,7 @@ public final class BrowserCall implements Call {
             if (responseBody == this) responseBody = null;
           }
           if (owner != null) owner.releasedResponse(BrowserCall.this);
+          finishCallTimeout();
         }
       }
     }
@@ -440,8 +480,11 @@ public final class BrowserCall implements Call {
     Response response = null;
     OwnedResponseBody body = null;
     try {
+      startCallTimeout();
+      checkCallTimeout();
       response = executeOnce();
       body = new OwnedResponseBody(response.body());
+      checkCallTimeout();
       synchronized (this) {
         if (cancelled) throw new InterruptedIOException("Cancelled");
         if (owner != null) owner.retainResponse(this);
@@ -449,6 +492,7 @@ public final class BrowserCall implements Call {
       }
       return response.newBuilder().body(body).build();
     } catch (IOException | RuntimeException | Error error) {
+      boolean timedOut = finishCallTimeout();
       try {
         if (body != null) body.release();
         else if (response != null) response.close();
@@ -457,6 +501,7 @@ public final class BrowserCall implements Call {
       } finally {
         closeHandles();
       }
+      if (timedOut && error instanceof IOException failure) throw callTimeoutError(failure);
       throw error;
     }
   }
@@ -471,13 +516,20 @@ public final class BrowserCall implements Call {
   }
 
   public void cancel() {
+    cancelTransport(false);
+  }
+
+  private void cancelTransport(boolean timeout) {
     OwnedResponseBody body;
     synchronized (this) {
       cancelled = true;
       body = responseBody;
     }
     try {
-      if (body != null) body.close();
+      if (body != null) {
+        if (timeout) body.release();
+        else body.close();
+      }
     } finally {
       closeHandles();
     }
@@ -488,11 +540,57 @@ public final class BrowserCall implements Call {
   }
 
   public boolean isCanceled() {
-    return cancelled;
+    return cancelled || callTimedOut;
   }
 
   public Timeout timeout() {
-    return new Timeout();
+    return callTimeout;
+  }
+
+  private void startCallTimeout() {
+    long duration = callTimeout.timeoutNanos();
+    if (duration == 0 && !callTimeout.hasDeadline()) return;
+    long now = System.nanoTime();
+    if (callTimeout.hasDeadline()) {
+      long untilDeadline = callTimeout.deadlineNanoTime() - now;
+      duration = duration == 0 ? untilDeadline : Math.min(duration, untilDeadline);
+    }
+    callTimeout.enter();
+    callDeadlineNanos = now + duration;
+  }
+
+  private synchronized boolean finishCallTimeout() {
+    Long deadline = callDeadlineNanos;
+    if (deadline != null) {
+      callTimedOut = callTimeout.exit() || callTimedOut || deadline - System.nanoTime() <= 0;
+      callDeadlineNanos = null;
+    }
+    return callTimedOut;
+  }
+
+  private void checkCallTimeout() throws InterruptedIOException {
+    if (!callTimedOut) {
+      Long deadline = callDeadlineNanos;
+      if (deadline == null || deadline - System.nanoTime() > 0) return;
+      expireCall();
+    }
+    throw callTimeoutError(null);
+  }
+
+  private void expireCall() {
+    callTimedOut = true;
+    try {
+      // Release the transport before the next read observes the timeout.
+      cancelTransport(true);
+    } catch (RuntimeException | LinkageError failure) {
+      Bridge.trace("HTTP call timeout cleanup failed: " + failure);
+    }
+  }
+
+  private static InterruptedIOException callTimeoutError(Throwable cause) {
+    InterruptedIOException error = new InterruptedIOException("timeout");
+    if (cause != null) error.initCause(cause);
+    return error;
   }
 
   public Call clone() {
@@ -561,6 +659,7 @@ public final class BrowserCall implements Call {
       int writeMs,
       Cache cache)
       throws IOException {
+    checkCallTimeout();
     if (cancelled) throw new IOException("Cancelled");
     if (index == list.size()) return transport(r, readMs);
     return list.get(index).intercept(chain(list, index, r, connectMs, readMs, writeMs, cache));
@@ -859,9 +958,8 @@ public final class BrowserCall implements Call {
     metadata.addProperty("hasBody", body != null);
     if (bodyLength < 0) metadata.add("bodyLength", JsonNull.INSTANCE);
     else metadata.addProperty("bodyLength", bodyLength);
-    // The v2 host currently enforces one overall budget, not three separate
-    // connect/read/write idle timers. A zero OkHttp timeout uses its 5-minute cap.
-    metadata.addProperty("timeoutMs", readMs <= 0 ? 300000 : Math.min(readMs, 300000));
+    // Keep the relay inside the same absolute budget across redirects and retries.
+    metadata.addProperty("timeoutMs", requestTimeoutMillis(readMs));
     String json = metadata.toString();
     if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > HttpBodySource.MAX_CHUNK)
       throw new IOException("HTTP request metadata exceeds 64 KiB");
@@ -952,6 +1050,19 @@ public final class BrowserCall implements Call {
 
   private synchronized void forgetHandle(String handle) {
     httpHandles.remove(handle);
+  }
+
+  private int requestTimeoutMillis(int readMs) throws InterruptedIOException {
+    checkCallTimeout();
+    int transportLimit = readMs <= 0 ? 300000 : Math.min(readMs, 300000);
+    Long deadline = callDeadlineNanos;
+    if (deadline == null) return transportLimit;
+    long remaining = deadline - System.nanoTime();
+    if (remaining <= 0) {
+      expireCall();
+      throw callTimeoutError(null);
+    }
+    return (int) Math.min(transportLimit, TimeUnit.NANOSECONDS.toMillis(remaining - 1) + 1);
   }
 
   private static void cancelHandle(String handle) {
