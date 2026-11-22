@@ -11,7 +11,9 @@ import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class ClassLibraryScenarios {
   private static int checks;
@@ -61,7 +63,27 @@ public final class ClassLibraryScenarios {
     RsaScenarios.run();
     SequenceStreamScenarios.run();
     unknownHost();
+    missingPages();
     GraphicsTransformTest.main(args);
+  }
+
+  private static void missingPages() {
+    checks = 0;
+    Set<Integer> missed = new ChapterCapture().missed;
+    Set<Integer> otherChapter = new ChapterCapture().missed;
+    check(!missed.contains(2), "a new chapter has no missed pages");
+    check(missed.add(2) && !missed.add(2), "a miss is recorded once");
+    check(
+        missed.add(5) && missed.contains(2) && missed.contains(5), "page indexes are independent");
+    check(!otherChapter.contains(2), "chapters have separate sets");
+    check(missed.remove(2) && !missed.remove(2), "a retry consumes one miss");
+    check(!missed.contains(2) && missed.contains(5), "a retry preserves other misses");
+    check(missed.add(2) && missed.remove(2), "a retried page can miss again");
+    System.out.println("CAPTURE_SET_SCENARIOS_PASS " + checks);
+  }
+
+  private static final class ChapterCapture {
+    final Set<Integer> missed = ConcurrentHashMap.newKeySet();
   }
 
   private static void unknownHost() throws IOException {

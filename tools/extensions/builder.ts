@@ -385,6 +385,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       browserVerificationSources.has(descriptor.sourcePath) &&
       descriptor.sharedInputs['core'] ===
         'e4ecdc0da836642e3991019abc63b65cb0585dcdfd473786627b2b1502f3883d';
+    const comixCaptureSet =
+      descriptor.sourcePath === 'src/en/comix' &&
+      descriptor.sourceFingerprint ===
+        '8c484000fa5e101a6a17c60ff13593145182bb49d4e02d169494a35958507678';
     const wrapper = readFileSync(
       path.join(upstream, 'gradle/wrapper/gradle-wrapper.properties'),
       'utf8',
@@ -609,6 +613,7 @@ gradle.beforeProject { project ->
     delete env['KARUYOMI_AOT_TOONLIVRE_READER_VERIFICATION'];
     delete env['KARUYOMI_AOT_PLATFORM_HTTP_NEGOTIATION'];
     delete env['KARUYOMI_AOT_BROWSER_VERIFICATION'];
+    delete env['KARUYOMI_AOT_COMIX_CAPTURE_SET'];
     if (megatokyoPlatformTls) {
       env['KARUYOMI_AOT_MEGATOKYO_PLATFORM_TLS'] = '1';
     }
@@ -626,6 +631,9 @@ gradle.beforeProject { project ->
     }
     if (browserVerification) {
       env['KARUYOMI_AOT_BROWSER_VERIFICATION'] = '1';
+    }
+    if (comixCaptureSet) {
+      env['KARUYOMI_AOT_COMIX_CAPTURE_SET'] = '1';
     }
     stage = 'aot';
     activeLog = path.join(logs, 'aot.log');

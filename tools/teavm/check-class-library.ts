@@ -193,6 +193,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     ...securitySources,
   ]);
   await execute(maven, [...mavenArgs, 'process-classes'], {
+    env: { KARUYOMI_AOT_COMIX_CAPTURE_SET: '1' },
     stdout: 'inherit',
     stderr: 'inherit',
     buffer: false,
@@ -227,6 +228,7 @@ async function runContracts(root: string, output: string): Promise<void> {
     !oracle.stdout.includes('RSA_PKCS1_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('SEQUENCE_STREAM_SCENARIOS_PASS ') ||
     !oracle.stdout.includes('UNKNOWN_HOST_SCENARIO_PASS') ||
+    !oracle.stdout.includes('CAPTURE_SET_SCENARIOS_PASS 7') ||
     !oracle.stdout.includes('Graphics transform oracle: ') ||
     generated.stdout !== oracle.stdout
   )

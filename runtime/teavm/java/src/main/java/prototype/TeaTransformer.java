@@ -56,6 +56,12 @@ public class TeaTransformer implements ClassHolderTransformer {
           ValueType.object("java.lang.String"),
           ValueType.object("kotlin.coroutines.Continuation"),
           ValueType.object("java.lang.Object"));
+  private static final String CONCURRENT_MAP = "java.util.concurrent.ConcurrentHashMap";
+  private static final MethodReference CONCURRENT_KEY_SET =
+      new MethodReference(
+          CONCURRENT_MAP, "newKeySet", ValueType.object(CONCURRENT_MAP + "$KeySetView"));
+  private final boolean comixCaptureSet =
+      "1".equals(System.getenv("KARUYOMI_AOT_COMIX_CAPTURE_SET"));
 
   public void transformClass(ClassHolder cls, ClassHolderTransformerContext context) {
     if (cls.getName().equals("eu.kanade.tachiyomi.extension.en.megatokyo.Megatokyo")
@@ -499,6 +505,8 @@ public class TeaTransformer implements ClassHolderTransformer {
           if (ins instanceof InvokeInstruction) {
             InvokeInstruction invoke = (InvokeInstruction) ins;
             MethodReference ref = invoke.getMethod();
+            if (comixCaptureSet && ref.equals(CONCURRENT_KEY_SET))
+              replaceComixCaptureSet(p, invoke);
             if (ref.getClassName().equals("keiyoushi.utils.ui.DialogHelperKt")
                 && ref.getDescriptor().equals(SOURCE_INPUT))
               invoke.setMethod(new MethodReference("prototype.SourceInput", SOURCE_INPUT));
@@ -550,6 +558,29 @@ public class TeaTransformer implements ClassHolderTransformer {
                       "prototype.PlatformSupport", "localeForTag", ref.getSignature()));
           }
     }
+  }
+
+  private static void replaceComixCaptureSet(Program program, InvokeInstruction factory) {
+    // The pinned Comix capture uses a Set of non-null page indexes for membership, add and remove.
+    var map = program.createVariable();
+    var allocation = new ConstructInstruction();
+    allocation.setType(CONCURRENT_MAP);
+    allocation.setReceiver(map);
+    factory.insertPrevious(allocation);
+
+    var constructor = new InvokeInstruction();
+    constructor.setType(InvocationType.SPECIAL);
+    constructor.setInstance(map);
+    constructor.setMethod(new MethodReference(CONCURRENT_MAP, "<init>", ValueType.VOID));
+    factory.insertPrevious(constructor);
+
+    factory.setMethod(
+        new MethodReference(
+            "java.util.Collections",
+            "newSetFromMap",
+            ValueType.object("java.util.Map"),
+            ValueType.object("java.util.Set")));
+    factory.setArguments(map);
   }
 
   private static void replaceDateParse(
