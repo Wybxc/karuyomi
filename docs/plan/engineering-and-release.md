@@ -108,6 +108,8 @@ ToonLivre 1.6.90 保留原目录和普通读章路径，遇到站点验证要求
 
 包级 Gradle 输出隔离已在 M4 同时编译共用主题库的两个真实扩展。Fansubs.cat 和 Bakkin 的补编回执通过装配预检，可替换原冻结批次中因 Kotlin 增量缓存冲突失败的两个现网包。补编与冻结批次的八份共享材料一致，原四路队列继续生成完整目录回执。[补编验证](../VERIFICATION.md)
 
+现网的 VIZ Shonen Jump 在冻结队列中遇到 Maven Central TLS 握手中断。独立 checkout 复用上一轮已完成的正式 Gradle 依赖目录后，已取得匹配新材料的 AOT 产物，两个 Source 的初始化、封面能力和关闭检查通过。全量装配输入已纳入这一替换构建，共五个补编包。[补编验证](../VERIFICATION.md)
+
 Japscan 和 Scan-Manga 已在匹配材料的 checkout 取得正式 AOT，并通过隔离 Native Worker 初始化、封面能力登记和关闭。与此前两个 Gradle 补编产物合并预检通过，候选覆盖 1,448 个冻结输入。发布等待原队列回执收齐。用候选产物请求真实来源时，Japscan 的热门和最新返回 403，Scan-Manga 的热门、最新和搜索返回 404。实际封面和读章仍待验收。[两包补编验证](../VERIFICATION.md)
 
 PR #10 的正式 CI 归档与 WebtoonLib 和四个补编包通过隔离 Vite、Wrangler dry-run、Workerd 静态读回。全量候选仍按原冻结队列及补编回执检查现网包保留并确认生产交付。[五包预演](../VERIFICATION.md)
