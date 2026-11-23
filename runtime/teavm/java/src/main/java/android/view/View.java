@@ -1,19 +1,26 @@
 package android.view;
 
 import android.content.Context;
+import android.content.res.Resources;
 
 /** Layout state for the iframe host; WebView maps these dimensions to its viewport. */
 public class View {
   private final Context context;
+  private final Resources resources;
   private ViewGroup.LayoutParams layoutParams;
   private int measuredWidth, measuredHeight, left, top, right, bottom;
 
   public View(Context context) {
     this.context = context;
+    this.resources = context == null ? null : context.getResources();
   }
 
   public Context getContext() {
     return context;
+  }
+
+  public Resources getResources() {
+    return resources;
   }
 
   public ViewParent getParent() {

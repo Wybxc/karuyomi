@@ -2,6 +2,7 @@ package prototype;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.text.Editable;
 import android.text.SpannableString;
 import android.text.TextWatcher;
@@ -811,6 +812,26 @@ public final class HostPreferencesTest {
         () -> new EditText(source.context).post(() -> {}), "Ordinary EditText accepted posting");
   }
 
+  private static void viewResources() {
+    var context =
+        new Context() {
+          private Resources resources = new Resources();
+
+          @Override
+          public Resources getResources() {
+            return resources;
+          }
+        };
+    Resources first = context.getResources();
+    View view = new View(context);
+    context.resources = new Resources();
+    check(view.getResources() == first, "View lost its original context resources");
+    check(new View(context).getResources() == context.resources, "New View used stale resources");
+    first.getDisplayMetrics().widthPixels = 531;
+    check(
+        view.getResources().getDisplayMetrics().widthPixels == 531, "View copied display metrics");
+  }
+
   public static void main(String[] args) {
     bootstrap();
     descriptionsAndEdits();
@@ -821,6 +842,7 @@ public final class HostPreferencesTest {
     bootstrapBudgets();
     dependencyAndLayout();
     emptyDynamicOptionsAndDepth();
+    viewResources();
     System.out.println("HostPreferencesTest: " + assertions + " assertions passed");
   }
 
