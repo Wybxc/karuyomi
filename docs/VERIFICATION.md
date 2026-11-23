@@ -188,6 +188,8 @@
 
 2026-11-23，用 `fef3df5` 的正式 Native Worker 和 VIZ 1.6.31 补编包在 M4 执行两次源站热门目录查询。VIZ Shonen Jump 和 VIZ Manga 都由出版社返回 HTTP 302 跳转到各自服务首页，随后原 Source 报告地区不可用。四次请求为普通匿名 HTTPS GET，项目中继正常传回状态，两次 Worker 均确认关闭。该轮未取得作品目录和封面，扩展仍标记 `compiled_unverified`。[出版社公开目录](https://www.viz.com/manga-books/shonenjump/section/trending-manga)
 
+2026-11-23，冻结队列的 Mangas.in 1.6.4 在 Kotlin 编译时无法解析共享 `synchrony` 库及 `Deobfuscator` 类。M4 在固定 `1f17b74` 的独立 Gradle checkout 保留同一上游源码闭包，正式 Gradle、TeaVM AOT、完整性和封面导出通过。canonical SHA-256 为 `5dbc179cdeb3861d59c712d51e41a4257d4c37c9dfaff9b9b959d2b306c8b8bc`。使用 `fef3df5` 正式 Native Worker 初始化 1 个 Source，登记封面能力并确认关闭。预检确认第六个替换构建与冻结批次的八份运行材料完全一致，完整装配计划仍覆盖 1,448 项。源站行为未测，产物保持 `compiled_unverified`。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-23，M4 固定 `28a32ec` 与 Keiyoushi `efa93f5a` 补编 Japscan 1.6.2 和 Scan-Manga 1.6.1。AOT 兼容层对两项固定输入报告宿主无法启动原 Android 阅读器 Activity，并保留原扩展已有的验证提示。正式 Gradle、TeaVM AOT、产物完整性及封面导出均通过，canonical SHA-256 分别为 `d32b6cccebc3ff5eb6e33dd103658bd40c227c581bcff284cdbeb9df5e03a030` 与 `3588ccbc0a122fae4f4e9c3e781be1250e095233bef358142fa77c751bfe30b0`。八份共享材料与冻结批次逐字节匹配。M4 在 Node 24.15.0 中用同材料正式 Native Worker 归档加载两包，各登记 1 个 Source 和封面能力，并取得关闭回执。两包保持 `compiled_unverified`。本机普通 HTTPS 复验中，Japscan 的热门目录返回 403，Scan-Manga 的热门目录及移动站首页均返回 404，源站封面和读章仍待验。[宿主适配](https://github.com/Wybxc/karuyomi/commit/28a32ec78f35ed9bc8641c873f3381617bf8b49d)
 
 2026-11-23，在 M4 用 `fef3df5` 的正式 Native Worker、Node 24.15.0 和项目 HTTP v2 中继加载两份真实补编产物。Japscan 1.6.2 的热门和最新各收到源站 HTTP 403。Scan-Manga 1.6.1 的热门、最新和原站搜索均收到 HTTP 404。五次请求为普通匿名 HTTPS GET，中继完整传回源站状态，两次 Worker 初始化、封面能力登记和关闭通过。目录没有封面地址可交付，两包保持 `compiled_unverified`。[实施计划](plan/engineering-and-release.md#封面宿主全量升级)
