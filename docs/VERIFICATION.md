@@ -166,6 +166,26 @@
 
 2026-11-23，发布前从 `macbook-pro-4` 恢复固定 `f00c680` Web 和运行材料归档。归档实际 SHA-256 与已确认摘要一致，原八份共享材料逐字节一致。本机 Wrangler 4.156.1 的 OAuth 登录可用，只读核对 Worker `d2615968-2271-49ce-9110-29f703e15627` 承接 100% 流量，D1 已应用 13 个迁移至 `0012`，待应用列表为空。增量发布工作流处于停用状态，无执行中的增量任务。完整候选、切流和登录后读取待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
 
+2026-11-23，M4 冻结批次收齐 Keiyoushi `efa93f5a` 的 1,448 份正式回执。原 27 个精确替换产物和 26 份被替换的失败回执均经正式装配核对。八材料 revision `ac464cf6987d4e25a556bd7b695a7c2d` 包含 1,444 个扩展和 2,357 个 Source，保留原有 1,418 个扩展。逐包检查确认全部交付构建均导出封面入口。四个 AOT 失败保留诊断，分别是 Comix、WebtoonLib、Japscan 和 Scan-Manga。
+
+2026-11-23，固定 `f00c680` 的正式 Web 归档与八材料扩展通过 Vite 和 Wrangler 4.156.1 dry-run。最终生成的配置与前一版路由和绑定一致，D1 没有待应用迁移。上传版本后复核原流量，再将生产流量全部切到 `de1f87d0-4aae-4555-ad01-79aab4ca6d47`。公开状态和索引逐字节匹配候选，核对 47 项 Web 资源、匿名 Access 302，及 Arknights Comics、xkcd、爱看漫、ToonLivre、Dragon Ball Multiverse、读漫屋和如漫画的清单、gzip 传输合同与压缩前后摘要。本机和 M4 均保存了从生产读回确认的检查点。1,444 份公开清单逐字节匹配，所有 gzip 的强 ETag 与锁定 Wrangler 的上传指纹一致，MIME、编码和缓存头符合交付合同。已确认状态覆盖全部 1,448 个有效输入，有界重放选择 0 项。原冻结计划单独重放时仍选择被替换的 Doujin.io 原成功输入。生产登录后的封面显示及读章待验。[公开索引](https://karuyomi.wybxc.cc/extensions/index.json) · [合并 PR #9](https://github.com/Wybxc/karuyomi/pull/9)
+
+2026-11-23，从已确认的生产检查点在 M4 启动下一版图形材料的四路全量 AOT，冻结同一上游的 1,448 个输入，复用 WebtoonLib 1.6.1 的精确回执。该包的专题回归验证了隔离 HTTP 下的三页读章、字距和图片交付。下一版材料尚待完整装配及发布。[专题验收](https://github.com/Wybxc/karuyomi/blob/440fbf716595cff033606934884067560aab7f9b/docs/verification/text-layout-runtime.md#webtoonlib-字距)
+
+2026-11-23，主线 `193d1d8` 的工程检查、Wasm 与发布作业全过。自动发布保留 revision `ac464cf6987d4e25a556bd7b695a7c2d`，Worker `20bce439-01e8-40ba-b523-c700498a84a8` 接收全部流量。线上 47 项 Web 资源、匿名 Access 302 以及扩展状态与索引逐字节读回通过。[主线发布](https://github.com/Wybxc/karuyomi/actions/runs/45072299200)
+
+2026-11-23，在 M4 使用固定 `f00c680` 的原生 Worker 和 Node 24.15.0，直接载入生产公开索引内的实际清单与 AOT。爱看漫 1.6.2、英文 Dragon Ball Multiverse 1.6.1、ToonLivre 1.6.90 各从真实源站读回热门目录及一张封面。分别得到 48、25、24 条作品及 142,760 字节 JPEG、284,609 字节 JPEG、98,538 字节 WebP。图片通道回传字节与各源站一致，三个 Worker 均获关闭回执。Komiic 1.6.11 的默认站在公开目录查询中返回连接重置。隔离会话注入 Source 自带的已确认镜像值 `preferred_mirror=1` 后，原扩展从 `komiic.cc` 读到 30 项，并经原拦截器从 `public.komiic.cc` 取回 25,646 字节 JPEG，与响应逐字节一致。两次 Komiic Worker 均确认关闭。该轮用正常 HTTPS 和原 Source 请求，验收环境是 Node 隔离宿主。生产登录后的 Flutter 显示待验。[生产索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-23，将下一版 `afbf310` 的正式 CI Web 和 Native 归档保存到 M4。24,903,827 字节归档的 SHA-256 为 `d2c2eed0bfea81bf764b4d8b7f048886c99a577586e5c7ccaf3d84daa6ae591e`，本机下载及构建机接收两端均与官方归档摘要一致。归档包含正式 Web 入口、Native Worker 和八份运行材料，每份材料的大小和摘要均匹配活动队列的材料清单。下一版仍待 1,448 个输入的正式回执、全量装配与生产发布。[下一版 CI](https://github.com/Wybxc/karuyomi/actions/runs/45069123305)
+
+2026-11-23，在 M4 独立 checkout 还原 `afbf310` 正式归档，用冻结计划里的 WebtoonLib 1.6.1 精确回执完成隔离装配、Vite 和 Wrangler 4.156.1 dry-run。官方 Workerd 测试宿主核对 47 项实际静态资源、索引和状态字节、清单、gzip 传输头及压缩前后摘要，匿名 API 返回 `401 access_required`。隔离候选仅纳入一包，剩余 1,447 个输入待构建，1,444 个旧材料构建在该候选中标记为 `unavailable`。生产父状态读回与已确认检查点逐字节一致。完整目录发布及真实页面待验。[配套 CI](https://github.com/Wybxc/karuyomi/actions/runs/45069123305)
+
+2026-11-23，复核 Keiyoushi `92906c0` 的 Comix 1.6.65、Japscan 1.6.3 和 Scan-Manga 1.6.4。M4 的普通 HTTPS 请求读到 Comix 目录 HTML 7,312 字节，其中作品详情链接和图像均为 0。上游热门目录仍通过 `runInWebView` 获取。Japscan 和 Scan-Manga 的同版公开热门路径分别返回 HTTP 403 和 404，两包的章节入口仍进入 Android WebView 流程。已有材料的三个 AOT 失败保持在生产账本中。[固定上游](https://github.com/keiyoushi/extensions-source/commit/92906c0382547f30a03b3176f2f2429be6b54dce)
+
+2026-11-23，下一版扩展并发构建中，Fansubs.cat 与 Bakkin 的上游 Gradle 任务均因共享 Kotlin 增量缓存重复注册失败。M4 固定 `1f17b74` 和同一 Keiyoushi `efa93f5a`，在独立 checkout 同时构建共用主题库的 Fansubs.cat 1.6.1 与 Hentai.cat 1.6.1，观察到两个各自独立的主题库 Kotlin 构建目录同时存在。两包及随后补编的 Bakkin 1.6.1 均通过正式 Gradle、TeaVM AOT、产物完整性和 `hostAcquireCover` 导出检查，各有 1 个 Source。八份共享材料逐字节匹配冻结批次。补编预检在父 revision `ac464cf6987d4e25a556bd7b695a7c2d` 的 1,448 项计划中选择 Fansubs.cat 和 Bakkin，原有成功的 Hentai.cat 回执可直接使用。三包均为 `compiled_unverified`。完整装配及生产显示待验。[构建隔离修复](https://github.com/Wybxc/karuyomi/commit/1f17b74c30181c90dbc2b96f61bbf8a63421c064)
+
+2026-11-23，M4 固定 `28a32ec` 与 Keiyoushi `efa93f5a` 补编 Japscan 1.6.2 和 Scan-Manga 1.6.1。AOT 兼容层对两项固定输入报告宿主无法启动原 Android 阅读器 Activity，并保留原扩展已有的验证提示。正式 Gradle、TeaVM AOT、产物完整性及封面导出均通过，canonical SHA-256 分别为 `d32b6cccebc3ff5eb6e33dd103658bd40c227c581bcff284cdbeb9df5e03a030` 与 `3588ccbc0a122fae4f4e9c3e781be1250e095233bef358142fa77c751bfe30b0`。八份共享材料与冻结批次逐字节匹配。M4 在 Node 24.15.0 中用同材料正式 Native Worker 归档加载两包，各登记 1 个 Source 和封面能力，并取得关闭回执。两包保持 `compiled_unverified`。本机普通 HTTPS 复验中，Japscan 的热门目录返回 403，Scan-Manga 的热门目录及移动站首页均返回 404，源站封面和读章仍待验。[宿主适配](https://github.com/Wybxc/karuyomi/commit/28a32ec78f35ed9bc8641c873f3381617bf8b49d)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
