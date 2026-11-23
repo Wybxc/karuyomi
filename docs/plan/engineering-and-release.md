@@ -112,7 +112,7 @@ ToonLivre 1.6.90 保留原目录和普通读章路径，遇到站点验证要求
 
 现网的 Mangas.in 在冻结批次编译时无法解析共享库类。独立 Gradle 输出下正式补编成功，运行材料一致，初始化、封面能力和关闭检查通过。全量装配方案已纳入该产物，共六个经预检的补编构建。[补编验证](../VERIFICATION.md)
 
-Japscan 和 Scan-Manga 已在匹配材料的 checkout 取得正式 AOT，并通过隔离 Native Worker 初始化、封面能力登记和关闭。与此前两个 Gradle 补编产物合并预检通过，候选覆盖 1,448 个冻结输入。发布等待原队列回执收齐。用候选产物请求真实来源时，Japscan 的热门和最新返回 403，Scan-Manga 的热门、最新和搜索返回 404。实际封面和读章仍待验收。[两包补编验证](../VERIFICATION.md)
+Japscan 和 Scan-Manga 已在匹配材料的 checkout 取得正式 AOT，并通过隔离 Native Worker 初始化、封面能力登记和关闭。原队列已确认两包都缺少 `Application.startActivity(Intent)`。已核对补编与原始回执的源码闭包和共享材料，最终装配计划选择两份已验证的补编。发布等待原队列回执收齐。用候选产物请求真实来源时，Japscan 的热门和最新返回 403，Scan-Manga 的热门、最新和搜索返回 404。实际封面和读章仍待验收。[两包补编验证](../VERIFICATION.md)
 
 PR #10 的正式 CI 归档与 WebtoonLib 和四个补编包通过隔离 Vite、Wrangler dry-run、Workerd 静态读回。全量候选仍按原冻结队列及补编回执检查现网包保留并确认生产交付。[五包预演](../VERIFICATION.md)
 
