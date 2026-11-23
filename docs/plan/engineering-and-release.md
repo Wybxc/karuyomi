@@ -112,6 +112,8 @@ Japscan 和 Scan-Manga 已在匹配材料的 checkout 取得正式 AOT，并通�
 
 PR #10 的正式 CI 归档与 WebtoonLib 和四个补编包通过隔离 Vite、Wrangler dry-run、Workerd 静态读回。全量候选仍按原冻结队列及补编回执检查现网包保留并确认生产交付。[五包预演](../VERIFICATION.md)
 
+PR #10 的材料变更已在当前生产目录触发主线自动发布的快照兼容检查。全量回执收齐后先装配和预演候选，再复核合并后的主线文件树与所用产品归档。该次切流使用同时包含匹配 Web、运行材料和扩展快照的 Worker 版本，确认线上读回后写入检查点。[发布保护实测](../VERIFICATION.md)
+
 下一版的英文 MangaDex 和 xkcd 已通过真实目录与封面二进制交付的隔离验收。MANGA Plus 的源站热门接口返回应用错误，Webtoons.com 热门目录可读，封面 CDN 请求超时。生产登录和实际显示继续验收。[新版代表源](../VERIFICATION.md)
 
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。

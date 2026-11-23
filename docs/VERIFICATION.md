@@ -190,6 +190,8 @@
 
 2026-11-23，在 M4 用 `fef3df5` 的正式 Native Worker 归档、冻结批次的实际 AOT 和项目 HTTP v2 二进制中继验收英文源。隔离 Node 24.15.0 脚本起初误将 Worker 的 `trace` 消息当成重复握手，修正消息分发后重新验收。MangaDex 1.6.1 从源站读取 20 项热门作品并回传一张 1,887,651 字节 JPEG，与源站响应逐字节一致。xkcd 1.6.1 从源站读取热门目录，经原拦截器回传 15,307 字节的扩展内置 PNG。MANGA Plus 1.6.68 的热门接口两次返回 HTTP 200，复验正文为 4 字节 Protobuf，其中顶层字段 2 表示错误，原 Source 无目录结果。Webtoons.com 1.6.3 读回 30 项作品，两次封面请求都在 `webtoon-phinf.pstatic.net` 超时。四个扩展均获关闭回执并保持 `compiled_unverified`，生产登录后的 Flutter 显示待验。[配套 CI](https://github.com/Wybxc/karuyomi/actions/runs/45086073766)
 
+2026-11-23，用 PR #10 的 `fef3df5` 正式材料和当前生产 revision `ac464cf6987d4e25a556bd7b695a7c2d` 实测主线自动发布的快照复用入口。读取生产 index、构建状态和四份扩展清单后，在下载任何扩展包之前返回 `unknown_material`。归档中的材料版本为 `82075df16ebee9db465f4d014e9e8be43f2060194d852dabd7dd332525d908f4`，与当前冻结批次逐字节一致。GitHub 合并预览 `fe3d0a9` 的文件树摘要 `1f560d8f222e1acdd53cc4667a951f142ab214d7` 与通过 CI 的 PR 头一致。验证期间生产继续服务原快照。完整候选装配和生产切流待验。[PR #10](https://github.com/Wybxc/karuyomi/pull/10)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)
