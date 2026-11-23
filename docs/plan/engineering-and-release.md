@@ -110,6 +110,8 @@ ToonLivre 1.6.90 保留原目录和普通读章路径，遇到站点验证要求
 
 Comix 1.6.60 的固定 JAR 已在 M4 验证缺页集合的 AOT 适配。集合工厂的错误已消除，下一步需要补齐真实的 Android WebView 显示、触控与生命周期，再验收目录、封面和读章。[Comix 编译对照](../VERIFICATION.md)
 
+Android View 已提供 Context 的资源对象。Comix 的原样 JAR 复验通过资源接口解析，并显示阅读路径还要求 `ImageReader` 与 Android 虚拟显示。热门目录依赖 `runInWebView`，现有 Source Worker 的浏览器操作会返回 `unsupported_capability`。完整兼容需要实际页面导航、绘制、用户交互和关闭证据。[Comix 资源接口复验](../VERIFICATION.md)
+
 - [x] 在该主机冻结全部上游包的计划，以现网状态为父快照启动可恢复的 AOT 队列。
 - [x] 从同一检查点优先完成排在队列末尾的现网包，逐包核对原索引 191 个包的构建与封面入口，再接续完整目录。
 - [x] 先行发布原索引 191 个升级包，逐包读回生产资源并确认新的生产检查点。完整冻结队列继续构建后续目录。[生产证据](../VERIFICATION.md)
