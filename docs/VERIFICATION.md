@@ -202,6 +202,10 @@
 
 2026-11-23，用 PR #10 的 `fef3df5` 正式材料和当前生产 revision `ac464cf6987d4e25a556bd7b695a7c2d` 实测主线自动发布的快照复用入口。读取生产 index、构建状态和四份扩展清单后，在下载任何扩展包之前返回 `unknown_material`。归档中的材料版本为 `82075df16ebee9db465f4d014e9e8be43f2060194d852dabd7dd332525d908f4`，与当前冻结批次逐字节一致。GitHub 合并预览 `fe3d0a9` 的文件树摘要 `1f560d8f222e1acdd53cc4667a951f142ab214d7` 与通过 CI 的 PR 头一致。验证期间生产继续服务原快照。完整候选装配和生产切流待验。[PR #10](https://github.com/Wybxc/karuyomi/pull/10)
 
+2026-11-23，`macbook-pro-4` 收齐冻结 Keiyoushi `efa93f5a` 的 1,448 份正式回执，采用六份同材料补编替换原失败后，候选包含 1,447 个扩展和 2,360 个 Source，保留全部 1,444 个现网包。逐包核对了 1,447 个封面入口。固定 `fef3df5` 的正式归档通过 Vite、Wrangler 4.156.1 dry-run 和 Workerd 对全部清单及安装包路径的核验。合并 PR #10 后，主线 `2cc9bbe` 文件树与该归档源码一致。Worker `362cb66d-ce65-46e7-848f-d1ce55c83343` 接管 100% 生产流量，revision 为 `e9e23f4bbeea46f7b21807f25e18cf39`，索引 SHA-256 为 `b43e906bd8e3b23c1ef3147de255a3de00589472d75709cad6095ec744be2cc1`。公开索引和状态逐字节匹配，1,447 份清单、1,447 个 gzip 强 ETag、47 项 Web 资源及匿名 Access 302 全部通过。WebtoonLib、Japscan 和 Scan-Manga 的线上 gzip 与解码摘要均通过，三包保持 `compiled_unverified`。D1 待迁移为空。Comix 仍因 WebView 相关 AOT 兼容缺口无法分发，登录生产页面后的实际出图待验。[PR #10](https://github.com/Wybxc/karuyomi/pull/10) · [生产索引](https://karuyomi.wybxc.cc/extensions/index.json)
+
+2026-11-23，本机与 `macbook-pro-4` 均通过正式 `commit-snapshot` 写入 `e9e23f4bbeea46f7b21807f25e18cf39` 的已确认检查点。使用同一生产状态和固定上游，构建机以原冻结宿主运行有界规划时选择 0 项，采用合并代码的宿主输入时选择上限 12 项，另有 1,434 项等待按新指纹重编。定时增量工作流保持手动停用，本次只验证规划。[增量发布计划](plan/engineering-and-release.md#封面宿主全量升级)
+
 2026-11-21，固定 `92a0059` 的正式 Flutter Web 在 Codex 内置浏览器、隔离 Workerd 和 D1 验收。本机外观改浅色后重开仍为浅色，主题修改前后的 `/api/settings` 响应逐字节相同。关闭验收服务后，已加载页面仍可切换为深色。图像适配点选「适宽」后，界面自动显示服务端已确认，独立请求读回 `READER_FIT_WIDTH`，全局设置版本由 1 到 2。该轮使用一份浏览器资料，原生现场仍按已有安排暂停。[实施计划](plan/device-settings-adaptive-covers.md)
 
 2026-11-21，隔离 Web 以真实 Arknights Comics 1.6.2 显示 17 张热门封面。在 `dac2e7b` 打开《Prelude Suite: The Lone Walker》，1280×900 下显示列表与详情，将窗口缩到 390×800 后保留同一详情及三章列表。冷启动书架曾因宿主第二槽关闭图片交付而显示占位，`65c63fd` 修复后在新文档显示真实封面。该轮复用固定宿主输入重编的 671,269 字节 gzip，canonical SHA-256 为 `09528e68a34e3fe49030e5a0482081db119672d9852524688981f8164a55d0dc`。108 项 Flutter 定向回归及 95 项宿主与合同回归通过，包含 Native 受管文件和槽身份校验。扩展仍按原发布流程验证和分发。[实施计划](plan/device-settings-adaptive-covers.md)

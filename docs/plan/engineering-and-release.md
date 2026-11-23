@@ -112,11 +112,11 @@ ToonLivre 1.6.90 保留原目录和普通读章路径，遇到站点验证要求
 
 现网的 Mangas.in 在冻结批次编译时无法解析共享库类。独立 Gradle 输出下正式补编成功，运行材料一致，初始化、封面能力和关闭检查通过。全量装配方案已纳入该产物，共六个经预检的补编构建。[补编验证](../VERIFICATION.md)
 
-Japscan 和 Scan-Manga 已在匹配材料的 checkout 取得正式 AOT，并通过隔离 Native Worker 初始化、封面能力登记和关闭。原队列已确认两包都缺少 `Application.startActivity(Intent)`。已核对补编与原始回执的源码闭包和共享材料，最终装配计划选择两份已验证的补编。发布等待原队列回执收齐。用候选产物请求真实来源时，Japscan 的热门和最新返回 403，Scan-Manga 的热门、最新和搜索返回 404。实际封面和读章仍待验收。[两包补编验证](../VERIFICATION.md)
+Japscan 和 Scan-Manga 已在匹配材料的 checkout 取得正式 AOT，并通过隔离 Native Worker 初始化、封面能力登记和关闭。原队列已确认两包都缺少 `Application.startActivity(Intent)`。已核对补编与原始回执的源码闭包和共享材料，最终装配计划选择两份已验证的补编。两包已随匹配的生产快照发布。用候选产物请求真实来源时，Japscan 的热门和最新返回 403，Scan-Manga 的热门、最新和搜索返回 404。实际封面和读章仍待验收。[两包补编验证](../VERIFICATION.md)
 
 PR #10 的正式 CI 归档与 WebtoonLib 和四个补编包通过隔离 Vite、Wrangler dry-run、Workerd 静态读回。全量候选仍按原冻结队列及补编回执检查现网包保留并确认生产交付。[五包预演](../VERIFICATION.md)
 
-PR #10 的材料变更已在当前生产目录触发主线自动发布的快照兼容检查。全量回执收齐后先装配和预演候选，再复核合并后的主线文件树与所用产品归档。该次切流使用同时包含匹配 Web、运行材料和扩展快照的 Worker 版本，确认线上读回后写入检查点。[发布保护实测](../VERIFICATION.md)
+PR #10 已合并，匹配的 Web、运行材料和扩展快照已一起上线。生产 revision `e9e23f4bbeea46f7b21807f25e18cf39` 保留全部 1,444 个原有扩展，并新增 WebtoonLib、Japscan 和 Scan-Manga，合计 1,447 个扩展与 2,360 个 Source。公开索引、状态、清单、安装包强 ETag 和 Web 资源读回通过，两地检查点已确认。原冻结宿主的规划选择 0 项，合并后的宿主输入选择上限 12 项。Comix 仍待解决。[生产验证](../VERIFICATION.md)
 
 下一版的英文 MangaDex 和 xkcd 已通过真实目录与封面二进制交付的隔离验收。MANGA Plus 的源站热门接口返回应用错误，Webtoons.com 热门目录可读，封面 CDN 请求超时。生产登录和实际显示继续验收。[新版代表源](../VERIFICATION.md)
 
@@ -127,7 +127,8 @@ PR #10 的材料变更已在当前生产目录触发主线自动发布的快照�
 - [ ] 在生产代表源核对实际封面读取。
 - [x] 用正式构建和 Wrangler 发布完整候选，核对流量、公开索引和状态字节，提交正式 checkpoint，并从生产状态复验有界规划。
 - [ ] 验证真实输入变化下的有界增量发布。
-- [ ] 推进 Comix、WebtoonLib、Japscan 和 Scan-Manga 的宿主兼容与复编，按匹配的共享材料验收及上线。
+- [x] 用匹配的共享材料发布 WebtoonLib、Japscan 和 Scan-Manga，核对生产清单及安装包。
+- [ ] 补齐 Comix 的 WebView 相关宿主能力，正式复编并验收目录、封面和分发。
 - [x] 接入正式 AOT 的文本输入签名保留和 TeaVM 调用映射。
 - [x] 将输入请求绑定到前台阅读会话，覆盖显示来源、必填、密码遮蔽、取消和会话失效。
 - [x] 重编五个使用输入的扩展，并用真实 AOT 和隔离源站响应验证单次提交、取消及后台预取。
