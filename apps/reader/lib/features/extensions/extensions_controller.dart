@@ -17,6 +17,7 @@ import 'extension_listing.dart';
 enum ExtensionActivity { reading, previewing, preparing, saving, cleaning }
 
 typedef ExtensionLocalCopy = ({String sha256, String name});
+typedef ExtensionBatchFailure = ({String name, String reason});
 typedef ExtensionPreparationFailure = ({
   CatalogBuild build,
   String reason,
@@ -67,8 +68,10 @@ final class ExtensionsController extends ChangeNotifier {
   ExtensionActivity? activity;
   ({String name, String catalogUrl})? repositoryTarget;
   RuntimeErrorCode? operationFailure;
-  ExtensionLocalCopy? _cleanupTarget;
+  List<ExtensionLocalCopy> _cleanupCopies = [];
   String? _cleanupError;
+  ({int current, int total})? batchProgress;
+  List<ExtensionBatchFailure> batchFailures = const [];
   bool _busy = false;
   bool _disposed = false;
   bool _retired = false;
@@ -89,13 +92,49 @@ final class ExtensionsController extends ChangeNotifier {
       (build: build, reason: reason, localCopyOf: localCopyOf),
     _ => null,
   };
-  ExtensionLocalCopy? get cleanupTarget => available ? _cleanupTarget : null;
+  ExtensionLocalCopy? get cleanupTarget =>
+      available ? _cleanupCopies.firstOrNull : null;
   String? get cleanupError => available ? _cleanupError : null;
   List<wire.InstalledExtension> get installed =>
       settings.snapshot?.global.installedExtensions ?? const [];
+  Iterable<ExtensionListing> get updates => installed
+      .map(
+        (extension) => ExtensionListing(catalog: catalog, installed: extension),
+      )
+      .where((item) => item.needsUpdate && item.repositoryError == null);
 
   String _installedName(wire.InstalledExtension extension) =>
       ExtensionListing(catalog: catalog, installed: extension).name;
+
+  bool _hasPendingSourceSettings(wire.InstalledExtension extension) {
+    final reference = wire.CatalogReference(
+      catalogUrl: extension.catalogUrl,
+      repoId: extension.repoId,
+    );
+    return catalog.sourcePreferences?.hasPendingPackage(
+              extension.packageName,
+              catalog: reference,
+            ) ==
+            true ||
+        catalog.sourcePreferenceRecoveries.any(
+          (target) =>
+              target.build.packageName == extension.packageName &&
+              target.build.catalog == reference,
+        );
+  }
+
+  wire.InstalledExtension _selection(
+    CatalogBuild build,
+    wire.PreparedBuild prepared, {
+    required bool enabled,
+  }) => wire.InstalledExtension(
+    catalogUrl: build.catalogUrl,
+    repoId: build.repoId,
+    packageName: build.packageName,
+    buildId: prepared.build.buildId,
+    bundleSha256: prepared.bundleSha256,
+    enabled: enabled,
+  );
 
   String artifactName(String sha256) {
     final match = installed
@@ -179,14 +218,7 @@ final class ExtensionsController extends ChangeNotifier {
       _changed();
       return;
     }
-    if (previous != null &&
-        catalog.sourcePreferences!.hasPendingPackage(
-          build.packageName,
-          catalog: wire.CatalogReference(
-            catalogUrl: previous.catalogUrl,
-            repoId: previous.repoId,
-          ),
-        )) {
+    if (previous != null && _hasPendingSourceSettings(previous)) {
       error = '原仓库仍有未确认的漫画源设置，请先处理原请求。';
       _changed();
       return;
@@ -206,14 +238,7 @@ final class ExtensionsController extends ChangeNotifier {
         (value) => value.packageName == build.packageName,
       );
       values.installedExtensions.add(
-        wire.InstalledExtension(
-          catalogUrl: build.catalogUrl,
-          repoId: build.repoId,
-          packageName: build.packageName,
-          buildId: prepared.build.buildId,
-          bundleSha256: prepared.bundleSha256,
-          enabled: previous?.enabled ?? true,
-        ),
+        _selection(build, prepared, enabled: previous?.enabled ?? true),
       );
       activity = ExtensionActivity.saving;
       _changed();
@@ -224,7 +249,7 @@ final class ExtensionsController extends ChangeNotifier {
         if (previousCopy != null &&
             previousCopy.sha256 != prepared.bundleSha256) {
           message = '账户扩展选择已确认，本机产物已准备。';
-          await _cleanup(previousCopy, confirmed: confirmed);
+          await _cleanup([previousCopy], confirmed: confirmed);
           return;
         }
         activity = ExtensionActivity.reading;
@@ -236,6 +261,95 @@ final class ExtensionsController extends ChangeNotifier {
       if (saved && available) {
         message = '账户扩展选择已确认，本机产物已准备。';
       }
+    });
+  }
+
+  Future<void> updateAll() async {
+    final initial = settings.snapshot;
+    if (!canEdit || initial == null) return;
+    final candidates = updates.toList();
+    if (candidates.isEmpty) return;
+    await _run(() async {
+      final replacements = <String, wire.InstalledExtension>{};
+      final previousCopies = <String, ExtensionLocalCopy>{};
+      final failures = <ExtensionBatchFailure>[];
+      for (final (index, item) in candidates.indexed) {
+        if (!available) return;
+        final previous = item.installed!;
+        final build = item.latest;
+        final name = item.name;
+        if (build == null ||
+            build.id == previous.buildId ||
+            !item.registered ||
+            item.repositoryError != null) {
+          failures.add((name: name, reason: '目录已变化，请重新检查更新。'));
+          continue;
+        }
+        if (_hasPendingSourceSettings(previous)) {
+          failures.add((name: name, reason: '漫画源设置待确认。'));
+          continue;
+        }
+        batchProgress = (current: index + 1, total: candidates.length);
+        wire.PreparedBuild? prepared;
+        try {
+          prepared = await _prepare(build);
+        } catch (failure) {
+          _preparationId = null;
+          _preparationBuild = null;
+          failures.add((name: name, reason: _operationError(failure)));
+          continue;
+        }
+        if (prepared == null || !available) return;
+        replacements[previous.packageName] = _selection(
+          build,
+          prepared,
+          enabled: previous.enabled,
+        );
+        previousCopies[previous.bundleSha256] = (
+          sha256: previous.bundleSha256,
+          name: name,
+        );
+      }
+      if (!available) return;
+      for (final item in candidates) {
+        final previous = item.installed!;
+        if (replacements.containsKey(previous.packageName) &&
+            _hasPendingSourceSettings(previous)) {
+          replacements.remove(previous.packageName);
+          failures.add((name: item.name, reason: '漫画源设置待确认。'));
+        }
+      }
+      batchProgress = null;
+      batchFailures = List.unmodifiable(failures);
+      if (replacements.isEmpty) {
+        message = '没有扩展完成准备。';
+        return;
+      }
+      if (!settings.canEdit) {
+        throw StateError('另一个全局设置操作尚未确认，请先处理原请求。');
+      }
+      final values = initial.global.deepCopy();
+      for (var index = 0; index < values.installedExtensions.length; index++) {
+        final extension = values.installedExtensions[index];
+        if (replacements[extension.packageName] case final replacement?) {
+          values.installedExtensions[index] = replacement;
+        }
+      }
+      activity = ExtensionActivity.saving;
+      _changed();
+      if (!await _settingsCommands.saveGlobal(values, initial.globalRevision) ||
+          !available) {
+        return;
+      }
+      final confirmed = settings.snapshot!;
+      final keptHashes = confirmed.global.installedExtensions
+          .map((value) => value.bundleSha256)
+          .toSet();
+      message = '已更新 ${replacements.length} 个扩展。';
+      await _cleanup([
+        for (final copy in previousCopies.values)
+          if (!keptHashes.contains(copy.sha256)) copy,
+      ], confirmed: confirmed);
     });
   }
 
@@ -419,7 +533,7 @@ final class ExtensionsController extends ChangeNotifier {
         return;
       }
       message = '账户已确认卸载；书架、阅读进度和漫画源数据保留。';
-      await _cleanup(copy, confirmed: settings.snapshot!);
+      await _cleanup([copy], confirmed: settings.snapshot!);
     });
   }
 
@@ -499,15 +613,15 @@ final class ExtensionsController extends ChangeNotifier {
   Future<void> forget(String sha256) async {
     if (!available || busy || catalog.busy) return;
     final copy = (sha256: sha256, name: artifactName(sha256));
-    await _run(() => _cleanup(copy));
+    await _run(() => _cleanup([copy]));
   }
 
   Future<void> _cleanup(
-    ExtensionLocalCopy copy, {
+    List<ExtensionLocalCopy> copies, {
     SettingsSnapshot? confirmed,
   }) async {
     activity = ExtensionActivity.cleaning;
-    _cleanupTarget = copy;
+    _cleanupCopies = List.of(copies);
     _cleanupError = null;
     _changed();
     try {
@@ -516,13 +630,16 @@ final class ExtensionsController extends ChangeNotifier {
       } else {
         await catalog.applyConfirmedInstallations(confirmed);
       }
-      if (!available) return;
-      await catalog.closeManagedBuild(copy.sha256);
-      if (!available) return;
-      await catalog.runtime.forgetExtensionArtifact(copy.sha256);
+      while (_cleanupCopies.isNotEmpty && available) {
+        final copy = _cleanupCopies.first;
+        _changed();
+        await catalog.closeManagedBuild(copy.sha256);
+        if (!available) return;
+        await catalog.runtime.forgetExtensionArtifact(copy.sha256);
+        _cleanupCopies.removeAt(0);
+      }
       if (!available) return;
       cache = await catalog.runtime.extensionCache();
-      _cleanupTarget = null;
     } catch (failure) {
       if (!available) return;
       operationFailure = failure is RuntimeException ? failure.code : null;
@@ -539,9 +656,8 @@ final class ExtensionsController extends ChangeNotifier {
   Future<void> retryCleanup() async {
     if (!available || busy || catalog.busy) return;
     await _run(() async {
-      final copy = _cleanupTarget;
-      if (copy != null) {
-        await _cleanup(copy);
+      if (_cleanupCopies.isNotEmpty) {
+        await _cleanup(_cleanupCopies);
       } else {
         await catalog.retireUnavailableExtension();
         if (available) cache = await catalog.runtime.extensionCache();
@@ -582,6 +698,8 @@ final class ExtensionsController extends ChangeNotifier {
   }) async {
     _busy = true;
     activity = ExtensionActivity.reading;
+    batchProgress = null;
+    batchFailures = const [];
     repositoryTarget = null;
     operationFailure = null;
     error = null;
@@ -605,6 +723,7 @@ final class ExtensionsController extends ChangeNotifier {
       _preparationId = null;
       _preparationBuild = null;
       repositoryTarget = null;
+      batchProgress = null;
       if (!_disposed) {
         _busy = false;
         activity = null;

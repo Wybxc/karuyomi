@@ -60,6 +60,121 @@ void main() {
     await platform.dispose();
   });
 
+  Future<void> seedBatchCandidates() async {
+    final index = wire.decodeProtoJson(
+      wire.ExtensionIndex(),
+      platform.inventory,
+    );
+    final second = index.builds.single.deepCopy()
+      ..packageName = 'eu.kanade.source.batch'
+      ..buildId = 'batch-2'
+      ..manifestPath = '/extensions/builds/batch-2/manifest.json';
+    second.sources.single.name = 'Batch Source';
+    index.builds.add(second);
+    platform.inventory = wire.encodeProtoJson(index);
+    platform.businessServer.seedInstalledExtensions([
+      testInstalledExtension(buildId: 'previous-1', enabled: false)
+        ..bundleSha256 = 'b' * 64,
+      testInstalledExtension(
+        packageName: second.packageName,
+        buildId: 'previous-2',
+      )..bundleSha256 = 'c' * 64,
+    ], advanceRevision: true);
+    await manager.refresh(catalogToo: true);
+  }
+
+  test('batch publishes only verified same-repository updates in one account write', () async {
+    await seedBatchCandidates();
+    platform.beforePrepare = (request) async {
+      if (request.build.buildId == 'batch-2') {
+        platform.preparationFailure = wire.RuntimeError(
+          code: wire.RuntimeErrorCode.RUNTIME_ERROR_CODE_INTEGRITY_ERROR,
+          message: 'Fixture failed integrity',
+        );
+      }
+    };
+    final before = manager.settings.snapshot!.global.reader;
+    await manager.updateAll();
+
+    expect(platform.preparations, hasLength(2));
+    expect(platform.openedBuilds, isEmpty);
+    expect(platform.businessServer.appliedMutations, 1);
+    expect(
+      manager.installed.map((value) => (value.buildId, value.enabled)),
+      unorderedEquals([('build-1', false), ('previous-2', true)]),
+    );
+    expect(manager.settings.snapshot!.global.reader, before);
+    expect(manager.batchFailures.single.name, 'Batch Source');
+    expect(manager.batchFailures.single.reason, contains('校验失败'));
+    expect(manager.updates.single.latest!.id, 'batch-2');
+  });
+
+  test(
+    'cancelling the second preparation leaves the entire batch unsubmitted',
+    () async {
+      await seedBatchCandidates();
+      final secondStarted = Completer<void>();
+      final release = Completer<void>();
+      addTearDown(() {
+        if (!release.isCompleted) release.complete();
+      });
+      platform.beforePrepare = (request) async {
+        if (request.build.buildId == 'batch-2') {
+          secondStarted.complete();
+          await release.future;
+        }
+      };
+      final batch = manager.updateAll();
+      await secondStarted.future.timeout(const Duration(seconds: 5));
+      expect(manager.batchProgress, (current: 2, total: 2));
+      await manager.cancelPreparation();
+      release.complete();
+      await batch;
+
+      expect(platform.businessServer.appliedMutations, 0);
+      expect(manager.updates, hasLength(2));
+      expect(manager.message, contains('已取消'));
+    },
+  );
+
+  test(
+    'batch keeps its original account revision through another device edit',
+    () async {
+      await seedBatchCandidates();
+      final client = BusinessStateClient(
+        api: platform.businessServer,
+        identity: manager.repository.identity,
+      );
+      addTearDown(client.dispose);
+      final remote = SettingsRepository(client);
+      final baseline = await remote.loadGlobal();
+      platform.beforePrepare = (request) async {
+        if (request.build.buildId == 'batch-2') {
+          await remote.setGlobal(
+            values: baseline.global.deepCopy()
+              ..reader.fit = wire.ReaderFit.READER_FIT_WIDTH,
+            basedOnRevision: baseline.globalRevision,
+          );
+        }
+      };
+
+      await manager.updateAll();
+
+      expect(platform.businessServer.appliedMutations, 1);
+      expect(
+        manager.settings.pending!.basedOnRevision,
+        baseline.globalRevision,
+      );
+      expect(manager.settings.pending!.retryable, false);
+      final current = await remote.loadGlobal();
+      expect(current.global.reader.fit, wire.ReaderFit.READER_FIT_WIDTH);
+      expect(
+        current.global.installedExtensions.map((value) => value.buildId),
+        unorderedEquals(['previous-1', 'previous-2']),
+      );
+    },
+  );
+
   test('preparation installs only after confirmation, preserves global values, and does not execute a Source', () async {
     final before = manager.settings.snapshot!;
     await manager.install(catalog.builds.single);

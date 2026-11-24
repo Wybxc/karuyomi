@@ -206,6 +206,7 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
     final catalog = widget.catalog;
     final settings = _controller.settings;
     final all = extensionListings(catalog, _controller.installed);
+    final updateCount = _controller.updates.length;
     final languages = all.expand((item) => item.languages).toSet().toList()
       ..sort();
     if (_language != null && !languages.contains(_language)) {
@@ -342,6 +343,14 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
                           : null,
                       child: const Text('检查更新'),
                     ),
+                    if (updateCount > 0)
+                      CupertinoButton(
+                        key: const ValueKey('extensions-update-all'),
+                        onPressed: _controller.canEdit
+                            ? () => unawaited(_controller.updateAll())
+                            : null,
+                        child: Text('更新全部 ($updateCount)'),
+                      ),
                     if (filtered)
                       CupertinoButton(
                         onPressed: () => setState(() {
@@ -558,6 +567,18 @@ class const ExtensionOperationStatus({
           ),
         if (controller.message case final message?)
           Text(message, key: const ValueKey('extensions-message')),
+        if (controller.batchFailures.isNotEmpty)
+          CupertinoListSection.insetGrouped(
+            margin: EdgeInsets.zero,
+            header: const Text('未完成的更新'),
+            children: [
+              for (final failure in controller.batchFailures)
+                CupertinoListTile(
+                  title: Text(failure.name, maxLines: 2),
+                  subtitle: Text(failure.reason, maxLines: 3),
+                ),
+            ],
+          ),
         if (operationError != null)
           Semantics(
             container: true,
@@ -743,7 +764,15 @@ class const _ExtensionPreparationStatus({
               margin: EdgeInsets.zero,
               header: Semantics(
                 liveRegion: true,
-                child: Text(controller.preparing ? '正在准备扩展' : '正在取消准备'),
+                child: Text(
+                  !controller.preparing
+                      ? '正在取消准备'
+                      : switch (controller.batchProgress) {
+                          (current: final current, total: final total) =>
+                            '正在准备更新 $current/$total',
+                          null => '正在准备扩展',
+                        },
+                ),
               ),
               children: [
                 CupertinoListTile(
@@ -765,7 +794,7 @@ class const _ExtensionPreparationStatus({
             key: const ValueKey('extensions-cancel-prepare'),
             alignment: AlignmentDirectional.centerStart,
             onPressed: () => unawaited(controller.cancelPreparation()),
-            child: const Text('取消准备'),
+            child: Text(controller.batchProgress == null ? '取消准备' : '取消批量更新'),
           ),
       ],
     ),
