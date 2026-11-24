@@ -88,12 +88,15 @@ public final class NetworkHelperTest {
         "newBuilder preserves the Source authenticator");
     check(
         client.authenticator() == Authenticator.NONE, "shared client keeps its own authenticator");
-    try {
-      authenticated.newBuilder().dns(host -> java.util.List.of());
-      throw new AssertionError("A custom DNS policy was accepted by the public relay");
-    } catch (UnsupportedOperationException expected) {
-      checks++;
-    }
+    OkHttpClient systemResolved =
+        authenticated
+            .newBuilder()
+            .dns(host -> {
+              throw new AssertionError("The relay must resolve the destination");
+            })
+            .build();
+    check(systemResolved.dns() == Dns.SYSTEM, "custom settings use the relay resolver");
+    check(systemResolved.authenticator() == authenticator, "Source authenticator stays active");
     OkHttpClient cacheless = client.newBuilder().cache(null).build();
     check(
         cacheless.cache() == null && client.cache() == cache,

@@ -145,8 +145,7 @@ public class OkHttpClient implements Call.Factory {
 
     public Builder dns(Dns dns) {
       // The public HTTP relay resolves the original URL with its system resolver.
-      if (Objects.requireNonNull(dns) != Dns.SYSTEM)
-        throw new UnsupportedOperationException("Custom DNS is unavailable through the HTTP relay");
+      Objects.requireNonNull(dns);
       return this;
     }
 
