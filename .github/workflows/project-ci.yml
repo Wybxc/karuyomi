@@ -137,11 +137,11 @@ jobs:
         id: publish
         if: steps.latest.outputs.current == 'true'
         run: node scripts/release-web.ts check
-      - name: Publish production and apply pending database migrations
+      - name: Publish only with the matching production database
         if: steps.publish.outputs.current == 'true'
         run: |
+          node scripts/release-web.ts check-schema
           pnpm --filter @karuyomi/api exec wrangler deploy --config dist/karuyomi/wrangler.json
-          pnpm --filter @karuyomi/api exec wrangler d1 migrations apply DB --remote
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

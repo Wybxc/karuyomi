@@ -5,6 +5,11 @@ import { parseArgs } from 'node:util';
 import { execa } from 'execa';
 import { runtimeMaterialCatalogSchema } from '../packages/contracts/src/index.ts';
 import {
+  assertMaintenanceActive,
+  checkProductionSchema,
+  stageMaintenanceConfig,
+} from '../tools/cloudflare/production-release.ts';
+import {
   assertWebSnapshotCurrent,
   prepareWebSnapshot,
   recordWebRelease,
@@ -13,12 +18,19 @@ import {
 
 const { positionals, values } = parseArgs({
   allowPositionals: true,
-  options: { 'require-latest': { type: 'boolean', default: false } },
+  options: {
+    'require-latest': { type: 'boolean', default: false },
+    config: { type: 'string' },
+    'maintenance-dir': { type: 'string' },
+  },
 });
 const command = positionals[0];
 const root = process.cwd();
 const directory = path.join(root, '.local/web-release');
 const origin = 'https://karuyomi.wybxc.cc';
+const config = path.resolve(
+  values.config ?? 'apps/api/dist/karuyomi/wrangler.json',
+);
 async function isLatest(): Promise<boolean> {
   const expected = process.env.GITHUB_SHA;
   assert(
@@ -75,6 +87,23 @@ if (command === 'latest') {
     await assertWebSnapshotCurrent(origin, path.join(directory, 'assets'));
     await recordWebRelease(root, directory, process.env.GITHUB_SHA ?? '');
   }
+} else if (command === 'check-schema') {
+  await checkProductionSchema(config);
+} else if (command === 'check-maintenance') {
+  await assertMaintenanceActive(origin);
+} else if (command === 'stage-maintenance') {
+  const target = values['maintenance-dir'];
+  assert(
+    target && path.isAbsolute(target),
+    '--maintenance-dir is required and must be absolute',
+  );
+  console.log(
+    await stageMaintenanceConfig(
+      config,
+      path.join(root, 'apps/api/src/maintenance.ts'),
+      target,
+    ),
+  );
 } else if (command === 'verify') {
   await assertWebSnapshotCurrent(origin, path.join(directory, 'assets'));
   const verified = await verifyWebRelease(directory);
@@ -87,6 +116,6 @@ if (command === 'latest') {
   }
 } else {
   throw new Error(
-    'Usage: node scripts/release-web.ts latest|prepare|check|verify [--require-latest]',
+    'Usage: node scripts/release-web.ts latest|prepare|check|check-schema|check-maintenance|stage-maintenance|verify [--require-latest] [--config PATH] [--maintenance-dir DIR]',
   );
 }

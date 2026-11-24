@@ -6,6 +6,8 @@
 
 同轮 `pnpm acceptance:build` 与 `pnpm acceptance:serve` 成功，本机 HTTP 请求取得 Flutter 页面。内置浏览器打开页面与查询连接状态的两次控制请求均超时。真实浏览器交互、Web 与原生独立设备的读回，以及生产部署效果仍待验。[隔离验收入口](../apps/api/test/README.md)
 
+2026-11-24，PR #14 的停机发布流程在 macOS 使用 Wrangler 4.156.1 验证。只读生产账本确认当前连续应用至 `0012`，候选的 `0013` 触发发布拦截。公开首页正常服务，迁移前维护检查如预期拒绝继续。隔离 Worker 的首页、扩展索引、引导 API 和业务写入路径均返回不可缓存的 503，维护检查通过。开发机用模拟账户演练 `0012 → 0013`，浏览记录表建立且账户 revision 保持原值。维护版试构建、两项 TypeScript 检查、依赖分层和 25 项 Cloudflare 工具测试通过。未执行生产切流和迁移。[维护流程](PRODUCTION.md)
+
 2026-11-22，主线 `af8c203` 的生产 Worker `70948d0b-ac41-4e03-a68a-d7912c0c6829` 接收全部流量。公开状态与索引逐字节匹配 revision `ddb5ac8f3b2a46cb8efc2dafc440b3d4`，46 项 Web 静态资源和匿名 Access 302 通过。Arknights Comics 1.6.2 的清单、gzip 与解码后摘要通过。逐包检查与生产索引一致的 191 个产物，只有该包导出 `hostAcquireCover`。生产登录后的普通封面显示待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
 
 2026-11-22，在 `macbook-pro-4` 固定 `af8c203`、Keiyoushi `efa93f5a` 和生产父快照试编 xkcd。Gradle 构建、TeaVM AOT、正式产物校验及 `hostAcquireCover` 导出检查通过，canonical SHA-256 为 `4ef740416ad8976e9870e161ce5c7edff8b60f7261e71f3648f03edee10d5f89`。该包仍标记 `compiled_unverified`。随后在同一台机器启动两并发冻结队列。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)

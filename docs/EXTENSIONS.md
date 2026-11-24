@@ -93,14 +93,16 @@ node tools/extensions/pipeline.ts prepare-snapshot \
 EXTENSION_ASSETS_DIR="$AOT_DIR/assets" pnpm build
 node tools/extensions/pipeline.ts check-base \
   --assets-dir "$AOT_DIR/assets"
-pnpm --filter @karuyomi/api exec wrangler deploy
-pnpm --filter @karuyomi/api exec wrangler d1 migrations apply DB --remote
+node scripts/release-web.ts check-schema
+pnpm --filter @karuyomi/api exec wrangler deploy --config dist/karuyomi/wrangler.json
 node tools/extensions/pipeline.ts commit-snapshot \
   --state "$AOT_DIR/state.json" \
   --assets-dir "$AOT_DIR/assets"
 ```
 
 `bootstrap` 已生成候选时可跳过上面的 `prepare-snapshot`。`check-base` 应紧邻部署，确认远端 revision 仍为计划基线；首次替换已知旧 SPA 时可在本地显式增加 `--initialize`，它不接受任意错误响应，也不能在 CI 使用。网络命令默认 origin 为 `https://karuyomi.wybxc.cc`，可用 `--origin` 明确指定。
+
+数据库结构或其他不兼容变更使用[开发机停机迁移流程](PRODUCTION.md)。快照确认仍在正式服务恢复并完成读回后执行。
 
 用户指定优先包时，可以先发布本地分批候选。保留原完整冻结计划及其 `entries`、目录指纹、输入身份和父 revision；按原 descriptor 调用 `build --key`，只调整构建顺序。组装时派生一份 `selected` 仅含已有正式终态的计划，未尝试输入仍保留在完整目录中并计入 pending。使用普通 `prepare-snapshot`，不使用 `--finalize`；原计划和生产父状态不手工修改。
 
@@ -146,24 +148,7 @@ node tools/extensions/pipeline.ts prepare-baseline \
 
 ### 旧网络登记部署切换
 
-从仍读取旧网络登记的部署切换到通用中继时，使用以下顺序。原因与本地复验见[切换演练](verification/d1-relay-cutover.md)。上面的常规部署顺序不适用于这次切换。
-
-1. 备齐完整候选并固定 Worker、客户端、共享材料和快照。保留现网仍可用的包，使用当前 ABI/材料的实际构建；不要部署验收用的 xkcd 单包快照。完成 `pnpm build` 和 Wrangler `deploy --dry-run`，读回生产 Worker 版本和 D1 待应用列表，核对私有 `COVERS` 绑定及当前 Access 配置。
-2. 暂停其它发布器。确认路由保持不变、没有待应用的 Durable Object 迁移后，在获准发布时用生成配置执行 `wrangler versions upload --config dist/karuyomi/wrangler.json`，记录新 version ID，并确认生产仍由原版本服务。Worker 和完整 Static Assets 在这一步上传，[版本上传不会切换流量](https://developers.cloudflare.com/workers/wrangler/commands/workers/#versions-upload)。上传失败或不能核实旧版仍在服务时，停止在 `0009` 之前。
-3. 安排 Source 短维护窗口。如果待应用列表仍包含 `0004–0008`，可先在旧 Worker 运行时应用这段新增表和列的迁移。Wrangler 没有指定截止版本的参数；分段时用只含原始 SQL 前缀的独立目录和临时 Wrangler 配置，绑定同一个生产 `DB` 并保留同一迁移账本。目录内不得改写文件内容、名称或顺序。先检查该配置列出的确切待应用文件，再执行对应的迁移。紧邻切换运行 `check-base` 并确认生产 Worker 仍是预检版本，使用 `wrangler d1 time-travel info DB --json` 留存恢复点。然后应用截至 `0009` 的前缀，立即执行 `wrangler versions deploy "$version_id@100%" --config dist/karuyomi/wrangler.json --yes`。自 `0009` 清空网络登记和旧 Source 设置起，旧中继停止工作，单独回退 Worker 不会恢复它；该次迁移不清空书架和阅读进度。[D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) 恢复会撤回恢复点之后的业务写入，不自动执行。
-4. 在重新打开的正式客户端检查 Access、书架及实际 Source 后，用正式配置执行 `wrangler d1 migrations apply DB --remote` 收尾 `0010`。再次检查待应用列表为空和中继可用，远端 index/state 与候选一致后才执行 `commit-snapshot`。生产阅读和 Native 同步仍按原验收计划分别记录。
-
-生产预检用以下只读命令。将 SQL 结果的迁移名称按顺序与 `apps/api/migrations/` 下已固定的文件比对，确认已应用的恰好是连续前缀。锁定版本的 `d1 migrations list` 会先执行 `CREATE TABLE IF NOT EXISTS`，严格只读阶段直接查询迁移账本。找不到账本、顺序异常或出现候选未知的迁移时停止切换。
-
-```sh
-pnpm --filter @karuyomi/api exec wrangler deployments list --json
-pnpm --filter @karuyomi/api exec wrangler d1 execute DB --remote \
-  --command 'SELECT name FROM d1_migrations ORDER BY id' --json
-pnpm --filter @karuyomi/api exec wrangler r2 bucket dev-url get karuyomi-covers
-pnpm --filter @karuyomi/api exec wrangler r2 bucket domain list karuyomi-covers
-```
-
-核对 `COVERS` 的 r2.dev 访问关闭、无公开自定义域名，生产 Access 保护 `/api` 和 `/api/*` 且应用 Audience 与候选 Worker 配置一致。命令成功只证明管理面可读；生产客户端登录、详情和图片仍须用正式入口验收。
+迁移 `0009` 和 `0010` 的旧网络登记切换保留在[历史演练记录](verification/d1-relay-cutover.md)。当前生产使用统一的[停机迁移流程](PRODUCTION.md)。
 
 ## Source 网络和设置
 
@@ -171,7 +156,7 @@ pnpm --filter @karuyomi/api exec wrangler r2 bucket domain list karuyomi-covers
 
 具体扩展的适配由 AOT 提供。AOT 可将已审核的非敏感设置键写入当前构建的 `preferenceSyncRules`。正式装配从当前官方清单投影精简的 `/extensions/preference-rules.json`，供 Worker 读取。缺规则的键只在当前客户端会话生效。额外仓库不获得官方清单的设置规则。
 
-历史 `0009` 迁移保留，当前 Source 设置表依赖其来源主键。新增 `0010` 只删除退役的网络登记表。切换时按上一节安排两者与 Worker 的顺序。
+当前 Source 设置表依赖历史 `0009` 的来源主键。迁移 `0010` 删除退役的网络登记表。
 
 ## 增量 CI 与验证层级
 
@@ -210,6 +195,6 @@ pnpm test:extension-integrity
 
 ## CI 凭据检查
 
-仓库 Actions secrets 使用 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。Workers Editor 用于更新现有 Worker，D1 Edit 用于数据库迁移，`wybxc.cc` 的 Workers Routes Edit 用于域名连接。正常部署不要求创建/删除 Worker 的 Admin 权限。
+仓库 Actions secrets 使用 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。Workers Editor 用于更新现有 Worker，D1 查询权限用于只读迁移账本，`wybxc.cc` 的 Workers Routes Edit 用于域名连接。正常部署不要求创建或删除 Worker 的 Admin 权限。生产迁移使用开发机的 Wrangler 会话。
 
 手动工作流 `cloudflare-permissions.yml` 在预先建立、无 `workers.dev`/preview URL 的 `karuyomi-ci-permission-check` 上实际上传 Worker 和静态文件，再恢复空白配置；另创建并删除独立 D1 和唯一测试路由。该 Worker 缺失时应由本地管理员预先创建，检查不会自行申请扩权或新建 Worker。它不修改生产 Worker 或 D1。实际结果见 [验证记录](VERIFICATION.md#ci-凭据权限)。
