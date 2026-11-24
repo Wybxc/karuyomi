@@ -18,6 +18,7 @@ import '../../theme/app_theme.dart';
 import '../browse/catalog_controller.dart';
 import '../sources/source_error_details.dart';
 import '../browse/manga_cover_tile.dart';
+import '../browse/manga_details_destination.dart';
 import '../browse/manga_details_page.dart';
 import '../browse/source_manga_cover.dart';
 import '../reader/reader_recovery.dart';
@@ -132,22 +133,39 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     if (_opening ||
         _retryingMetadata != null ||
         controller == null ||
+        controller.busy ||
         repository == null) {
       return;
     }
     final route = ModalRoute.of(context);
     final identityKey = repository.identity.key;
-    bool isCurrent() =>
+    bool sameLibrary() =>
         mounted &&
         !_disposing &&
         identical(widget.controller, controller) &&
         identical(_repository, repository) &&
         identical(controller.library, repository) &&
         repository.identity.key == identityKey &&
-        controller.status == ServiceStatus.ready &&
-        route?.isCurrent == true &&
-        route?.isActive == true;
+        controller.status == ServiceStatus.ready;
+    bool isCurrent() =>
+        sameLibrary() && route?.isCurrent == true && route?.isActive == true;
     if (!isCurrent()) return;
+    if (!continueReading) {
+      setState(() => _openError = null);
+      await openMangaDetails(
+        context,
+        title: entry.title,
+        catalog: controller,
+        onAuthenticateReader: widget.onAuthenticateReader,
+        load: (isCurrent) => controller.openLibraryEntry(
+          entry,
+          identityKey: identityKey,
+          shouldContinue: () => sameLibrary() && isCurrent(),
+        ),
+      );
+      if (isCurrent()) await _refresh();
+      return;
+    }
     setState(() {
       _opening = true;
       _openError = null;
@@ -158,7 +176,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         identityKey: identityKey,
         shouldContinue: isCurrent,
       );
-      if (details == null || !isCurrent()) return;
+      if (!isCurrent()) return;
+      if (details == null) {
+        setState(() => _openError = controller.error ?? '未能打开继续阅读，请重试。');
+        return;
+      }
       Future<void> showDetails({String? notice}) async {
         if (!isCurrent() || !controller.isCurrentSource(details.source)) return;
         await openAdaptiveDetail(
@@ -175,10 +197,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         );
       }
 
-      if (!continueReading) {
-        await showDetails();
-        return;
-      }
       final progress = controller.readingProgress;
       if (progress == null || progress.identity.key != identityKey) return;
       // The shelf projects confirmed state. An explicit resume uses this
@@ -524,11 +542,15 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     sliver: SliverList.list(
                       children: [
-                        if (_opening || widget.controller?.busy == true) ...[
+                        if (_opening ||
+                            widget.controller?.status ==
+                                ServiceStatus.connecting) ...[
                           const CupertinoActivityIndicator(),
                           const SizedBox(height: 12),
                         ],
-                        if (widget.controller?.error case final error?)
+                        if (widget.controller?.error case final error?
+                            when widget.controller?.status !=
+                                ServiceStatus.ready)
                           Text(
                             error,
                             style: TextStyle(

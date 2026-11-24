@@ -6,13 +6,11 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/business_state_client.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/adaptive_detail_layout.dart';
 import '../../widgets/app_empty_state.dart';
 import '../../widgets/app_routes.dart';
 import '../browse/catalog_controller.dart';
-import '../browse/manga_details_page.dart';
+import '../browse/manga_details_destination.dart';
 import '../reader/reader_recovery.dart';
-import '../sources/source_error_details.dart';
 
 class const BrowsingHistoryPage({
   super.key,
@@ -82,43 +80,34 @@ class const _HistoryList({
     });
 
     Future<void> open(wire.BrowsingHistoryEntry entry) async {
-      if (!current() || busy.value || catalog.busy) return;
-      busy.value = true;
-      error.value = null;
-      try {
-        final metadata = await client.readBrowsingVisit(entry.mangaKey);
-        if (!current()) return;
-        if (metadata == null) {
-          reload.value++;
-          error.value = '这条浏览记录已被移除。';
-          return;
-        }
-        final details = await catalog.openBrowsingVisit(
-          metadata,
-          client: client,
-          shouldContinue: current,
-        );
-        if (!context.mounted || !current()) return;
-        if (details == null) {
-          error.value = catalog.error ?? '无法打开这部漫画，请重试。';
-          return;
-        }
-        await openAdaptiveDetail(
-          context,
-          (_, close) => MangaDetailsPage(
-            controller: catalog,
-            manga: details.manga,
-            chapters: details.chapters,
-            source: details.source,
-            onClose: close,
-            onAuthenticateReader: onAuthenticateReader,
-          ),
-        );
-      } catch (_) {
-        if (current()) error.value = '无法打开这部漫画，请重试。';
-      } finally {
-        if (current()) busy.value = false;
+      if (!current() ||
+          busy.value ||
+          catalog.busy ||
+          ModalRoute.isCurrentOf(context) != true) {
+        return;
       }
+      error.value = null;
+      await openMangaDetails(
+        context,
+        title: entry.title,
+        catalog: catalog,
+        onAuthenticateReader: onAuthenticateReader,
+        load: (isCurrent) async {
+          bool active() => current() && isCurrent();
+          if (!active()) return null;
+          final metadata = await client.readBrowsingVisit(entry.mangaKey);
+          if (!active()) return null;
+          if (metadata == null) {
+            reload.value++;
+            throw const FormatException('这条浏览记录已被移除。');
+          }
+          return catalog.openBrowsingVisit(
+            metadata,
+            client: client,
+            shouldContinue: active,
+          );
+        },
+      );
     }
 
     Future<void> remove([String? key]) async {
@@ -191,12 +180,6 @@ class const _HistoryList({
                 ),
               ),
             ),
-          ),
-        if (error.value != null &&
-            error.value == catalog.error &&
-            catalog.errorDetails != null)
-          SliverToBoxAdapter(
-            child: SourceErrorDetailsButton(details: catalog.errorDetails!),
           ),
         if (entries.isEmpty)
           const SliverFillRemaining(

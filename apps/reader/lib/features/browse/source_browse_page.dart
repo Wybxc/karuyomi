@@ -18,7 +18,7 @@ import '../sources/source_filters.dart';
 import '../sources/source_error_details.dart';
 import '../sources/source_preferences.dart';
 import 'catalog_controller.dart';
-import 'manga_details_page.dart';
+import 'manga_details_destination.dart';
 import 'source_manga_cover.dart';
 import 'manga_cover_tile.dart';
 
@@ -77,7 +77,6 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
   String? _requestedListing;
   bool _leaving = false;
   bool _allowPop = false;
-  bool _openingDetails = false;
   bool _loadingLibrary = false;
   String? _libraryError;
   Future<void> _refreshLibrary() async {
@@ -255,32 +254,31 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
   }
 
   Future<void> _details(MangaEntry entry) async {
-    if (!_current || !_sourceCurrent || catalog.busy || _openingDetails) return;
-    setState(() => _openingDetails = true);
-    final request = catalog.details(
-      entry,
-      shouldContinue: () => _current && _sourceCurrent,
-    );
-    _work = request.then<void>((_) {});
-    final details = await request;
-    if (!mounted) return;
-    setState(() => _openingDetails = false);
-    if (details == null || !_current || !_sourceCurrent) {
-      setState(() => _error = catalog.error);
+    if (!_current ||
+        !_sourceCurrent ||
+        catalog.busy ||
+        ModalRoute.isCurrentOf(context) != true) {
       return;
     }
-    await openAdaptiveDetail(
+    final reference = _reference!;
+    await openMangaDetails(
       context,
-      (_, close) => MangaDetailsPage(
-        controller: catalog,
-        manga: details.manga,
-        chapters: details.chapters,
-        source: details.source,
-        onClose: close,
-        onAuthenticateReader: widget.onAuthenticateReader,
-      ),
+      title: entry.title,
+      catalog: catalog,
+      onAuthenticateReader: widget.onAuthenticateReader,
+      load: (isCurrent) {
+        if (!_current || !catalog.isCurrentSource(reference)) {
+          throw const FormatException('漫画源会话已变化，请返回浏览后重试。');
+        }
+        final request = catalog.details(
+          entry,
+          shouldContinue: () =>
+              isCurrent() && _current && catalog.isCurrentSource(reference),
+        );
+        _work = request.then<void>((_) {});
+        return request;
+      },
     );
-    if (mounted) setState(() {});
   }
 
   Future<void> _filters() async {
@@ -497,8 +495,7 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
             entry.sourceId == widget.source.id)
           entry.url: entry,
     };
-    final busy =
-        catalog.busy || _loading != null || _leaving || _openingDetails;
+    final busy = catalog.busy || _loading != null || _leaving;
     final showOld = _loading != _ListingWork.query;
     final appending = _loading == _ListingWork.more;
     final listingProgress = switch (_loading) {
@@ -512,8 +509,6 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
     };
     final activity = _leaving
         ? '正在停止并收尾'
-        : _openingDetails
-        ? '正在打开作品详情'
         : _loading == _ListingWork.refresh
         ? '正在刷新，原作品仍可查看'
         : null;

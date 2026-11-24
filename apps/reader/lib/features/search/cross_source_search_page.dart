@@ -8,19 +8,15 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../browse/catalog_controller.dart';
+import '../browse/manga_details_destination.dart';
 import '../browse/source_manga_cover.dart';
 import '../extensions/extension_listing.dart';
 import 'cross_source_search_controller.dart';
 
-typedef OpenSourceSearchDetails = Future<void> Function(
-  ({MangaEntry manga, List<ChapterEntry> chapters, CatalogSourceRef source})
-  details,
-);
-
 class const CrossSourceSearchPage({
   super.key,
   required final CatalogSourceSearch service,
-  required final OpenSourceSearchDetails onOpen,
+  required final Widget Function(MangaDetails details) buildDetails,
   final CatalogController? coverCatalog,
 }) extends StatefulHookWidget {
   @override
@@ -94,14 +90,37 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
   }
 
   Future<void> _open(SourceSearchGroup group, MangaEntry manga) async {
-    final details = await controller.open(group, manga);
-    if (!mounted ||
-        !_foreground ||
-        ModalRoute.of(context)?.isCurrent != true ||
-        details == null) {
+    final route = ModalRoute.of(context);
+    if (!_foreground || route?.isCurrent != true || !controller.canSearch) {
       return;
     }
-    await widget.onOpen(details);
+    await Navigator.of(context).push<void>(
+      AppPageRoute(
+        builder: (_) => MangaDetailsDestination(
+          title: manga.title,
+          buildDetails: widget.buildDetails,
+          load: (isCurrent) => controller.open(
+            group,
+            manga,
+            shouldContinue: () =>
+                mounted &&
+                _foreground &&
+                route?.isActive == true &&
+                isCurrent(),
+          ),
+          failure: () {
+            final message = controller.cleanupNotice ?? controller.error;
+            final catalog = widget.coverCatalog;
+            return (
+              message: message,
+              diagnostics: message == catalog?.error
+                  ? catalog?.errorDetails
+                  : null,
+            );
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _start(String query) async {
@@ -687,29 +706,6 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (controller.openingTarget case final target?)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Semantics(
-              key: const ValueKey('cross-search-opening'),
-              container: true,
-              explicitChildNodes: true,
-              child: CupertinoFormSection.insetGrouped(
-                margin: EdgeInsets.zero,
-                header: Semantics(
-                  liveRegion: true,
-                  child: const Text('正在打开作品详情'),
-                ),
-                children: [
-                  CupertinoListTile(
-                    title: Text(target.title, maxLines: 2),
-                    subtitle: Text(target.sourceName, maxLines: 2),
-                    trailing: const CupertinoActivityIndicator(),
-                  ),
-                ],
-              ),
-            ),
-          ),
         if (retired == null) _searchControls(),
         Expanded(
           child:

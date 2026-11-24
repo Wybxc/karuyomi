@@ -64,7 +64,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
   String? cleanupError;
   bool loadingTargets = false;
   bool transitioning = false;
-  ({String title, String sourceName})? _openingTarget;
+  bool _opening = false;
   bool _retired = false;
   bool _disposed = false;
   bool _closed = false;
@@ -88,9 +88,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
         group.status == SourceSearchStatus.cancellationFailed,
   );
   bool get hasActive => groups.any((group) => group.active);
-  bool get opening => _openingTarget != null;
-  ({String title, String sourceName})? get openingTarget =>
-      available ? _openingTarget : null;
+  bool get opening => _opening;
   int get resultCount =>
       groups.fold(0, (count, group) => count + group.mangas.length);
   bool get canChange =>
@@ -375,32 +373,36 @@ final class CrossSourceSearchController extends ChangeNotifier {
   Future<
     ({MangaEntry manga, List<ChapterEntry> chapters, CatalogSourceRef source})?
   >
-  open(SourceSearchGroup group, MangaEntry manga) async {
-    if (!canSearch ||
+  open(
+    SourceSearchGroup group,
+    MangaEntry manga, {
+    bool Function()? shouldContinue,
+  }) async {
+    final acceptsResult = shouldContinue ?? isCurrent;
+    if (!canChange ||
         !groups.contains(group) ||
         !group.mangas.contains(manga) ||
-        !isCurrent()) {
+        !acceptsResult()) {
       return null;
     }
-    _openingTarget = (title: manga.title, sourceName: group.target.source.name);
+    _opening = true;
     final stopped = stop();
     final epoch = _epoch;
+    bool current() => _ownsEpoch(epoch) && acceptsResult();
     try {
-      if (!await stopped || !_current(epoch)) return null;
+      if (!await stopped || !current()) return null;
       final details = await service.openResult(
         group.target,
         manga,
-        shouldContinue: () => _current(epoch),
+        shouldContinue: current,
       );
-      if (!_current(epoch)) return null;
-      if (details == null) error = '作品详情未能打开，请重试。';
-      return details;
+      return current() ? details : null;
     } catch (failure) {
-      if (_current(epoch)) error = _message(failure);
+      if (current()) error = _message(failure);
       return null;
     } finally {
       if (!_disposed) {
-        _openingTarget = null;
+        _opening = false;
         notifyListeners();
       }
     }

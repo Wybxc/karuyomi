@@ -310,11 +310,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
-      await tester.runAsync(() async {
-        await tester.tap(find.byType(CupertinoNavigationBarBackButton));
-        await Future<void>.delayed(Duration.zero);
-      });
+      await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
+      expect(find.byType(CatalogPage), findsOneWidget);
       await tester.tap(find.text('设置').last);
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('服务连接'));

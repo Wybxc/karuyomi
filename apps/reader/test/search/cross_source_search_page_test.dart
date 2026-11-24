@@ -36,7 +36,6 @@ void main() {
   Future<void> openPage(
     WidgetTester tester,
     FakeSourceSearch service, {
-    OpenSourceSearchDetails? onOpen,
     ValueChanged<bool?>? onExit,
     Brightness? brightness,
     TextScaler textScaler = TextScaler.noScaling,
@@ -56,7 +55,17 @@ void main() {
                   AppPageRoute<bool>(
                     builder: (_) => CrossSourceSearchPage(
                       service: service,
-                      onOpen: onOpen ?? (_) async {},
+                      buildDetails: (details) => CupertinoPageScaffold(
+                        navigationBar: CupertinoNavigationBar(
+                          middle: Text(details.manga.title),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            '详情已加载',
+                            key: ValueKey('test-source-detail'),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 );
@@ -581,23 +590,19 @@ void main() {
     );
 
     testWidgets(
-      'opening keeps the exact work above the results until ready in $brightness',
+      'opening shows the detail destination while search cleanup and Source are pending in $brightness',
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(360, 800));
         addTearDown(() => tester.binding.setSurfaceSize(null));
         final service = FakeSourceSearch();
         final releaseStop = Completer<void>();
         final releaseOpen = Completer<void>();
-        MangaEntry? opened;
         try {
           await openPage(
             tester,
             service,
             brightness: brightness,
             textScaler: const _NonlinearTextScaler(),
-            onOpen: (details) async {
-              opened = details.manga;
-            },
           );
           await chooseAndSearch(tester, service);
           final task = service.tasks.single;
@@ -612,40 +617,38 @@ void main() {
           await tester.ensureVisible(result);
           await tester.tap(result);
           await tester.pump();
+          await tester.pump(const Duration(milliseconds: 400));
 
-          final status = find.byKey(const ValueKey('cross-search-opening'));
+          final page = find.byKey(const ValueKey('manga-details-destination'));
+          final status = find.byKey(const ValueKey('manga-details-loading'));
           expect(status.hitTestable(), findsOneWidget);
+          expect(find.descendant(of: page, matching: status), findsOneWidget);
           expect(
-            find.ancestor(of: status, matching: find.byType(Scrollable)),
-            findsNothing,
-          );
-          expect(
-            find.descendant(of: status, matching: find.text(work.title)),
+            find.descendant(of: page, matching: find.text(work.title)),
             findsOneWidget,
           );
-          expect(
-            find.descendant(
-              of: status,
-              matching: find.text(task.target.source.name),
-            ),
-            findsOneWidget,
-          );
-          expect(tester.widget<CupertinoButton>(result).enabled, isFalse);
-          final disabledResult = tester.getSemantics(result).getSemanticsData();
-          expect(disabledResult.flagsCollection.isEnabled, Tristate.isFalse);
-          expect(disabledResult.label, work.title);
-          expect(opened, isNull);
+          expect(result.hitTestable(), findsNothing);
+          expect(service.openedTarget, isNull);
 
           releaseStop.complete();
           await tester.pump();
           expect(status, findsOneWidget);
           expect(service.openedTarget, same(task.target));
-          expect(opened, isNull);
+          expect(
+            find.byKey(const ValueKey('test-source-detail')),
+            findsNothing,
+          );
 
           releaseOpen.complete();
           await tester.pumpAndSettle();
           expect(status, findsNothing);
-          expect(opened, same(work));
+          expect(
+            find.byKey(const ValueKey('test-source-detail')),
+            findsOneWidget,
+          );
+          expect(service.openedManga, same(work));
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
           expect(result, findsOneWidget);
           expect(
             tester
@@ -917,6 +920,8 @@ void main() {
         await tester.tap(result);
         await tester.pumpAndSettle();
         expect(service.openedManga?.title, title);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
         final empty = find.text('此漫画源没有找到漫画。');
         await tester.ensureVisible(empty);
         await tester.pumpAndSettle();
@@ -947,16 +952,7 @@ void main() {
     'explicit selection, per-Source paging and exact result opening',
     (tester) async {
       final service = FakeSourceSearch();
-      var opened = 0;
-      await openPage(
-        tester,
-        service,
-        onOpen: (details) async {
-          ++opened;
-          expect(details.source.sourceId, service.targets.first.source.id);
-          expect(details.manga.title, '第一页作品');
-        },
-      );
+      await openPage(tester, service);
       expect(service.loads, 1);
       expect(service.tasks, isEmpty);
       expect(find.text('选择漫画源（已选 0 / 32）'), findsOneWidget);
@@ -994,7 +990,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(result);
       await tester.pumpAndSettle();
-      expect(opened, 1);
+      expect(find.byKey(const ValueKey('test-source-detail')), findsOneWidget);
+      expect(service.openedManga?.title, '第一页作品');
       expect(service.openedTarget, same(service.targets.first));
       await tester.pumpApp(const SizedBox());
       await tester.pump();

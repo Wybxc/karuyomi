@@ -20,10 +20,12 @@ import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/library/library_page.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
+import 'package:source_runtime/source_runtime.dart'
+    show RuntimeErrorCode, RuntimeException;
 
 import 'browse/fakes.dart';
 
-Future<void> _browseDetails(WidgetTester tester) async {
+Future<void> _browseSource(WidgetTester tester) async {
   await tester.tap(find.text('去浏览'));
   await tester.pumpAndSettle();
   await tester.tap(
@@ -36,11 +38,82 @@ Future<void> _browseDetails(WidgetTester tester) async {
     ),
   );
   await tester.pumpAndSettle();
+}
+
+Future<void> _browseDetails(WidgetTester tester) async {
+  await _browseSource(tester);
   await tester.tap(find.text('真实源 DTO 测试'));
   await tester.pumpAndSettle();
 }
 
 void main() {
+  for (final size in [const Size(390, 844), const Size(1280, 900)]) {
+    testWidgets('a source opens the details before the request in $size', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final platform = TestPlatform();
+      await tester.pumpApp(KaruyomiApp(platform: platform));
+      await tester.pumpAndSettle();
+      await _browseSource(tester);
+      final first = Completer<wire.SourceResult>();
+      addTearDown(() {
+        if (!first.isCompleted) {
+          first.complete(wire.SourceResult(manga: testManga));
+        }
+      });
+      var attempts = 0;
+      platform.invokeHandler = (call) async => call.hasDetails()
+          ? (++attempts == 1
+                ? await first.future
+                : wire.SourceResult(manga: testManga))
+          : wire.SourceResult(chapters: wire.ChapterList());
+
+      await tester.tap(find.text(testManga.title));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      final page = find.byKey(const ValueKey('manga-details-destination'));
+      final loading = find.byKey(const ValueKey('manga-details-loading'));
+      final source = find.byType(SourceBrowsePage, skipOffstage: false);
+      expect(attempts, 1);
+      expect(find.descendant(of: page, matching: loading), findsOneWidget);
+      expect(
+        find.descendant(of: page, matching: find.text(testManga.title)),
+        findsOneWidget,
+      );
+      expect(find.descendant(of: source, matching: loading), findsNothing);
+      if (size.width > 1000) {
+        final pane = find.byKey(const ValueKey('adaptive-detail'));
+        expect(find.descendant(of: pane, matching: page), findsOneWidget);
+        expect(tester.getRect(source).right, tester.getRect(page).left);
+      }
+      first.completeError(
+        const RuntimeException(
+          RuntimeErrorCode.sourceError,
+          'fixture detail fetch failed',
+          javaClass: 'java.io.IOException',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: page, matching: find.text('未能打开作品详情')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: page, matching: find.text('查看错误详情')),
+        findsOneWidget,
+      );
+      await tester.tap(find.descendant(of: page, matching: find.text('重试')));
+      await tester.pumpAndSettle();
+      expect(attempts, 2);
+      expect(find.byType(MangaDetailsPage), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'wide source and shelf details keep their page across window changes',
     (tester) async {
@@ -106,8 +179,34 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey(('app-destination', 0))));
       await tester.pumpAndSettle();
+      final shelfRequest = Completer<wire.SourceResult>();
+      addTearDown(() {
+        if (!shelfRequest.isCompleted) {
+          shelfRequest.complete(wire.SourceResult(manga: testManga));
+        }
+      });
+      platform.invokeHandler = (call) => call.hasDetails()
+          ? shelfRequest.future
+          : Future.value(wire.SourceResult(chapters: wire.ChapterList()));
       await tester.tap(
         find.descendant(of: shelf, matching: find.text(testManga.title)),
+      );
+      await tester.pump();
+      final loading = find.byKey(const ValueKey('manga-details-loading'));
+      expect(find.descendant(of: pane, matching: loading), findsOneWidget);
+      expect(
+        find.descendant(
+          of: shelf,
+          matching: find.byType(CupertinoActivityIndicator),
+        ),
+        findsNothing,
+      );
+      shelfRequest.complete(
+        wire.SourceResult(
+          manga: testManga
+            ..description = '漫画源返回的完整简介'
+            ..initialized = true,
+        ),
       );
       await tester.pumpAndSettle();
       await resizeWhileSelected(shelf);
@@ -139,7 +238,26 @@ void main() {
       await tester.tap(find.byKey(const ValueKey(('app-destination', 3))));
       await tester.pumpAndSettle();
       expect(find.text(testManga.title), findsOneWidget);
+      final historyRequest = Completer<void>();
+      addTearDown(() {
+        if (!historyRequest.isCompleted) historyRequest.complete();
+      });
+      platform.businessServer.beforeRequest = (request) async {
+        if (request.method == 'GET' &&
+            request.uri.path.startsWith('/api/history/')) {
+          await historyRequest.future;
+        }
+        return null;
+      };
       await tester.tap(find.text(testManga.title));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        find.byKey(const ValueKey('manga-details-loading')),
+        findsOneWidget,
+      );
+      expect(find.byType(MangaDetailsPage), findsNothing);
+      historyRequest.complete();
       await tester.pumpAndSettle();
       expect(find.byType(MangaDetailsPage), findsOneWidget);
       expect(platform.businessServer.appliedMutations, 0);
