@@ -121,6 +121,12 @@ export interface TeaVMGlobals {
   ) => Promise<Uint8Array | null>;
   teaHttpClose?: (handle: string) => void;
   teaHttpCancel?: (handle: string) => void;
+  teaDnsResolve?: (
+    host: string,
+    requestId: string,
+    generation: string,
+    operationToken: string,
+  ) => Promise<string>;
   teaImageOpen?: () => string;
   teaImageWrite?: (handle: string, bytes: Uint8Array) => Promise<void>;
   teaImageClose?: (handle: string) => Promise<string>;
@@ -244,6 +250,10 @@ export class TeaVMDriver implements RuntimeDriver {
       this.captureAsync(() => this.binary().read(handle, maxBytes));
     scope.teaHttpClose = (handle) => this.binaryTransport?.close(handle);
     scope.teaHttpCancel = scope.teaHttpClose;
+    scope.teaDnsResolve = (host, requestId, generation, token) =>
+      this.captureAsync(() =>
+        this.binary().resolveDns(host, requestId, generation, token),
+      );
     scope.teaImageOpen = () => this.capture(() => this.images().open());
     scope.teaImageWrite = (handle, bytes) =>
       this.captureAsync(() => this.images().write(handle, bytes));

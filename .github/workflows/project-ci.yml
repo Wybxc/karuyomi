@@ -39,6 +39,8 @@ jobs:
       - run: pnpm build
         env:
           CLOUDFLARE_SEND_METRICS: 'false'
+      - name: Build the Source DNS egress image
+        run: docker build apps/api/source-egress
       - run: pnpm db:migrate:local
         env:
           CLOUDFLARE_SEND_METRICS: 'false'

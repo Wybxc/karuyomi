@@ -4,6 +4,9 @@ import android.graphics.GraphicsTransformTest;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
@@ -61,6 +64,7 @@ public final class ClassLibraryScenarios {
     RsaScenarios.run();
     SequenceStreamScenarios.run();
     unknownHost();
+    inetAddresses();
     GraphicsTransformTest.main(args);
   }
 
@@ -78,6 +82,25 @@ public final class ClassLibraryScenarios {
 
   private static void throwUnknownHost(String message) throws IOException {
     throw new UnknownHostException(message);
+  }
+
+  private static void inetAddresses() throws UnknownHostException {
+    byte[] address = {8, 8, 4, 4};
+    InetAddress ipv4 = InetAddress.getByAddress("dns.fixture", address);
+    address[0] = 0;
+    check(ipv4 instanceof Inet4Address, "IPv4 address type is retained");
+    check(ipv4.getHostAddress().equals("8.8.4.4"), "address bytes are copied and formatted");
+    check(ipv4.getHostName().equals("dns.fixture"), "supplied hostname is retained");
+    byte[] ipv6Bytes = {32, 1, 72, 96, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (byte) 0x88, (byte) 0x88};
+    InetAddress ipv6 = InetAddress.getByAddress(ipv6Bytes);
+    check(ipv6 instanceof Inet6Address, "IPv6 address type is retained");
+    check(ipv6.getHostAddress().equals("2001:4860:0:0:0:0:0:8888"), "IPv6 text is canonical");
+    check(
+        ipv6.equals(InetAddress.getByAddress(ipv6Bytes)), "identical address bytes compare equal");
+    byte[] mapped = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (byte) 255, (byte) 255, 8, 8, 4, 4};
+    check(
+        InetAddress.getByAddress(mapped).equals(ipv4), "mapped IPv4 has the native IPv4 identity");
+    System.out.println("INET_ADDRESS_SCENARIOS_PASS");
   }
 
   private static String concat(String title, int count, boolean enabled) {

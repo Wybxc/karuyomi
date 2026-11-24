@@ -42,6 +42,7 @@ The exported `httpRequestMetaSchema` validates these required fields:
   hasBody: boolean;
   bodyLength: number | null;
   timeoutMs: number;
+  dnsAddresses?: string[];
 }
 ```
 
@@ -163,6 +164,22 @@ cancellation uses `cancelled`, and a valid terminal ERROR exposes its code and
 message with `remote: true`. Other source exception messages are not reflected.
 
 ## Runtime and local adapter configuration
+
+For a named HTTPS destination, an OkHttp custom resolver may supply up to
+16 public unicast addresses in `dnsAddresses`. Each redirect or retry
+resolves the effective hostname again. The runtime associates DNS queries
+with the same private operation token as HTTP requests.
+
+The Worker sends these requests to a private Source egress container. The
+container validates the candidates and uses the original URL hostname for TLS
+certificate verification and HTTP authority. The existing Worker fetch path
+handles standard requests. The Access-authenticated `GET /api/bridge/dns`
+route provides bounded public address results for Java hostname lookups.
+
+The API build bundles the egress server before Vite assembles the Worker.
+Use the generated Wrangler configuration for the container image and the
+SQLite Durable Object migration. A Docker-compatible engine is required for
+container development and deployment.
 
 Host ABI v4 binds each Java entry to `requestId`, `generation` and a fresh opaque
 operation token. Java HTTP metadata carries these three private owner fields;

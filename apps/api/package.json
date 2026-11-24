@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --config vite.source-egress.config.ts && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json && tsc -p test/tsconfig.json",
     "types": "wrangler types",
@@ -14,12 +14,14 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.16.0",
+    "@cloudflare/containers": "0.3.7",
     "@karuyomi/contracts": "workspace:*",
     "@karuyomi/protocol": "workspace:*",
     "drizzle-orm": "0.45.4",
     "hono": "4.13.16",
+    "image-dimensions": "2.6.0",
     "jose": "6.2.15",
-    "image-dimensions": "2.6.0"
+    "undici": "7.30.1"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.67.0",

@@ -139,6 +139,16 @@ public class TeaHost {
   }
 
   public static String init(String userAgent) {
+    Bridge.dnsResolver =
+        host -> {
+          BrowserCall.Operation owner = BrowserCall.currentOperation();
+          if (owner == null)
+            throw new java.io.IOException("Source DNS requires an active operation");
+          owner.checkOpen();
+          String result = Bridge.resolveDns(host, owner.requestId, owner.generation, owner.token);
+          owner.checkOpen();
+          return result;
+        };
     pageSessions.clear();
     filters.clear();
     preferences.clear();

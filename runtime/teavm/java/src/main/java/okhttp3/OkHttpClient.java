@@ -43,7 +43,7 @@ public class OkHttpClient implements Call.Factory {
   }
 
   public Dns dns() {
-    return Dns.SYSTEM;
+    return b.dns;
   }
 
   public boolean followRedirects() {
@@ -83,6 +83,7 @@ public class OkHttpClient implements Call.Factory {
     Cache cache;
     CookieJar cookieJar = prototype.Cookies.INSTANCE;
     Authenticator authenticator = Authenticator.NONE;
+    Dns dns = Dns.SYSTEM;
     Dispatcher dispatcher;
     boolean followRedirects = true, retry = true;
     int call, connect = 10000, read = 10000, write = 10000;
@@ -97,6 +98,7 @@ public class OkHttpClient implements Call.Factory {
       cache = x.cache;
       cookieJar = x.cookieJar;
       authenticator = x.authenticator;
+      dns = x.dns;
       dispatcher = x.dispatcher;
       followRedirects = x.followRedirects;
       retry = x.retry;
@@ -144,9 +146,7 @@ public class OkHttpClient implements Call.Factory {
     }
 
     public Builder dns(Dns dns) {
-      // The public HTTP relay resolves the original URL with its system resolver.
-      if (Objects.requireNonNull(dns) != Dns.SYSTEM)
-        throw new UnsupportedOperationException("Custom DNS is unavailable through the HTTP relay");
+      this.dns = Objects.requireNonNull(dns);
       return this;
     }
 

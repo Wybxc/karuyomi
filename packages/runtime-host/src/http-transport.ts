@@ -13,6 +13,10 @@ import {
   type HttpRequestMeta,
   type HttpResponseMeta,
   HttpFrameError,
+  dnsHostnameSchema,
+  ipAddressBytes,
+  ipAddressSchema,
+  publicDnsAddressesSchema,
 } from '@karuyomi/contracts';
 import { RuntimeFailure } from './errors.js';
 import {
@@ -57,6 +61,7 @@ export class BinaryHttpTransport {
   private context: HttpCallContext | undefined;
   private token: string | undefined;
   private readonly sessions = new Map<string, HttpSession>();
+  private readonly dnsRequests = new Set<AbortController>();
   // Keep only small failure causes until the owning operation ends, never bodies.
   private readonly terminalFailures = new Map<string, RuntimeFailure>();
   private closed = false;
@@ -81,6 +86,9 @@ export class BinaryHttpTransport {
 
   end(): void {
     for (const handle of this.sessions.keys()) this.close(handle);
+    for (const request of this.dnsRequests)
+      request.abort(cancelledFailure(false));
+    this.dnsRequests.clear();
     this.terminalFailures.clear();
     this.context = undefined;
     this.token = undefined;
@@ -89,6 +97,68 @@ export class BinaryHttpTransport {
   dispose(): void {
     this.end();
     this.closed = true;
+  }
+
+  async resolveDns(
+    host: string,
+    requestId: string,
+    generation: string,
+    token: string,
+  ): Promise<string> {
+    const isOwner = () =>
+      !this.closed &&
+      this.context?.requestId === requestId &&
+      this.context.generation === generation &&
+      this.token === token;
+    if (!isOwner()) throw new HttpOwnerFailure();
+    const literal = ipAddressSchema.safeParse(
+      host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host,
+    );
+    if (literal.success) return JSON.stringify([ipAddressBytes(literal.data)]);
+    const name = dnsHostnameSchema.safeParse(host);
+    if (!name.success)
+      throw new RuntimeFailure('source_error', 'Invalid DNS hostname');
+    if (this.dnsRequests.size >= HTTP_HANDLE_LIMIT)
+      throw new RuntimeFailure('limit_exceeded', 'Too many DNS lookups');
+    const controller = new AbortController();
+    this.dnsRequests.add(controller);
+    const timer = setTimeout(
+      () => controller.abort(cancelledFailure(true)),
+      HTTP_HARD_DEADLINE_MS,
+    );
+    try {
+      const url = new URL('/api/bridge/dns', this.origin);
+      url.searchParams.set('host', name.data);
+      const response = await responseUntilAbort(
+        this.fetcher(url, {
+          credentials: 'same-origin',
+          redirect: 'manual',
+          cache: 'no-store',
+          signal: controller.signal,
+        }),
+        controller.signal,
+      );
+      try {
+        assertBridgeResponse(response);
+        const value = await readSmallBridgeJson(response, controller.signal);
+        if (!isOwner()) throw new HttpOwnerFailure();
+        const addresses = publicDnsAddressesSchema.safeParse(value);
+        if (!addresses.success)
+          throw new RuntimeFailure(
+            'source_error',
+            'DNS returned no eligible public address',
+          );
+        return JSON.stringify(addresses.data.map(ipAddressBytes));
+      } finally {
+        void response.body?.cancel().catch(() => {});
+      }
+    } catch (error) {
+      if (!isOwner()) throw new HttpOwnerFailure();
+      throw transportFailure(controller.signal.reason ?? error);
+    } finally {
+      clearTimeout(timer);
+      this.dnsRequests.delete(controller);
+    }
   }
 
   open(json: string): string {
@@ -420,11 +490,10 @@ function responseUntilAbort(
   });
 }
 
-/** Only the API's small, fixed pre-header error can authorize a connection retry. */
-async function preResponseNetworkFailure(
+async function readSmallBridgeJson(
   response: Response,
   signal: AbortSignal,
-): Promise<boolean> {
+): Promise<unknown> {
   if (
     response.headers
       .get('content-type')
@@ -433,7 +502,10 @@ async function preResponseNetworkFailure(
       .toLowerCase() !== 'application/json' ||
     !response.body
   )
-    return false;
+    throw new RuntimeFailure(
+      'protocol_error',
+      'Expected a small JSON bridge response',
+    );
   const reader = response.body.getReader();
   const abort = () => {
     void reader.cancel().catch(() => {});
@@ -442,18 +514,36 @@ async function preResponseNetworkFailure(
   const bytes = new Uint8Array(4096);
   let size = 0;
   try {
-    if (signal.aborted) return false;
+    signal.throwIfAborted();
     for (;;) {
       const chunk = await reader.read();
-      if (signal.aborted) return false;
+      signal.throwIfAborted();
       if (chunk.done) break;
-      if (size + chunk.value.byteLength > bytes.byteLength) return false;
+      if (size + chunk.value.byteLength > bytes.byteLength)
+        throw new RuntimeFailure(
+          'limit_exceeded',
+          'JSON bridge response exceeds 4 KiB',
+        );
       bytes.set(chunk.value, size);
       size += chunk.value.byteLength;
     }
-    const error: unknown = JSON.parse(
+    return JSON.parse(
       new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, size)),
     );
+  } finally {
+    signal.removeEventListener('abort', abort);
+    void reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
+}
+
+/** Only the API's small, fixed pre-header error can authorize a connection retry. */
+async function preResponseNetworkFailure(
+  response: Response,
+  signal: AbortSignal,
+): Promise<boolean> {
+  try {
+    const error = await readSmallBridgeJson(response, signal);
     return (
       !!error &&
       typeof error === 'object' &&
@@ -464,10 +554,6 @@ async function preResponseNetworkFailure(
     );
   } catch {
     return false;
-  } finally {
-    signal.removeEventListener('abort', abort);
-    void reader.cancel().catch(() => {});
-    reader.releaseLock();
   }
 }
 

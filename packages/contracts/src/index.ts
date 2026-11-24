@@ -4,6 +4,7 @@ export * from './static-control.ts';
 export * from './runtime-control.ts';
 export * from './wire-control.ts';
 export * from './http-frames.ts';
+export * from './source-dns.ts';
 export * from './image-control.ts';
 export * from './image-frames.ts';
 export * from './business-state.ts';

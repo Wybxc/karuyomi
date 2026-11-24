@@ -30,10 +30,23 @@
     },
   ],
   "r2_buckets": [{ "binding": "COVERS", "bucket_name": "karuyomi-covers" }],
+  "containers": [
+    {
+      "class_name": "SourceDnsEgress",
+      "image": "./source-egress/Dockerfile",
+      "image_build_context": "./source-egress",
+      "instance_type": "lite",
+      "max_instances": 1,
+    },
+  ],
   "durable_objects": {
     "bindings": [
       { "name": "RUNTIME_SESSIONS", "class_name": "RuntimeSession" },
+      { "name": "SOURCE_DNS_EGRESS", "class_name": "SourceDnsEgress" },
     ],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RuntimeSession"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RuntimeSession"] },
+    { "tag": "v2", "new_sqlite_classes": ["SourceDnsEgress"] },
+  ],
 }

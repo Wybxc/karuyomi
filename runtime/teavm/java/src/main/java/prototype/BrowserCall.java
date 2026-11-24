@@ -3,6 +3,8 @@ package prototype;
 import com.google.gson.*;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -952,6 +954,21 @@ public final class BrowserCall implements Call {
       metadata.addProperty("operationToken", owner.token);
     }
     metadata.addProperty("url", request.url().toString());
+    Dns dns = client.dns();
+    if (dns != Dns.SYSTEM) {
+      if (!request.url().isHttps()) throw new IOException("Custom DNS requires HTTPS");
+      List<InetAddress> addresses = dns.lookup(request.url().host());
+      if (addresses == null || addresses.isEmpty() || addresses.size() > 16)
+        throw new UnknownHostException("Custom DNS must return 1 to 16 addresses");
+      JsonArray candidates = new JsonArray();
+      for (InetAddress address : addresses) {
+        if (address == null) throw new UnknownHostException("Custom DNS returned a null address");
+        candidates.add(address.getHostAddress());
+      }
+      metadata.add("dnsAddresses", candidates);
+      if (cancelled) throw new InterruptedIOException("Cancelled");
+      if (owner != null) owner.checkOpen();
+    }
     metadata.addProperty("method", request.method());
     JsonArray headers = new JsonArray();
     for (int index = 0; index < request.headers().size(); index++) {

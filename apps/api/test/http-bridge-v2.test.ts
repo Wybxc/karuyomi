@@ -127,6 +127,69 @@ async function readUpload(init: RequestInit): Promise<Uint8Array | undefined> {
 }
 
 describe('HTTP bridge v2 request validation', () => {
+  it('sends a named HTTPS request and its candidates through the resolved transport', async () => {
+    const candidates = ['8.8.8.8', '2001:4860:4860::8888'];
+    const meta = metadata({
+      dnsAddresses: candidates,
+      method: 'POST',
+      headers: [['Cookie', 'source=private']],
+      bodyLength: 3,
+      hasBody: true,
+    });
+    const bytes = new Uint8Array([17, 0, 255]);
+    const ordinary = vi.fn<typeof fetch>();
+    const resolved = vi.fn(
+      async (url: URL, init: RequestInit, addresses: string[]) => {
+        expect(url.href).toBe(meta.url);
+        expect(addresses).toEqual(candidates);
+        expect(new Headers(init.headers).get('cookie')).toBe('source=private');
+        expect(init.redirect).toBe('manual');
+        expect(await readUpload(init)).toEqual(bytes);
+        return new Response(null, {
+          status: 307,
+          headers: { Location: '/next' },
+        });
+      },
+    );
+    const reader = responseReader(
+      await forwardBinary(request(meta, [bytes]), ordinary, resolved),
+    );
+    expect(await reader.meta()).toMatchObject({
+      upstreamStatus: 307,
+      url: meta.url,
+    });
+    expect(await readAll(reader)).toEqual(new Uint8Array());
+    expect(ordinary).not.toHaveBeenCalled();
+    expect(resolved).toHaveBeenCalledOnce();
+  });
+
+  it.each(['127.0.0.1', '::ffff:127.0.0.1', 'fd00::1', '192.168.0.1'])(
+    'rejects non-public DNS candidate %s before transmission',
+    async (address) => {
+      const ordinary = vi.fn<typeof fetch>();
+      const resolved = vi.fn(async () => new Response(null));
+      const response = await forwardBinary(
+        request(metadata({ dnsAddresses: [address] })),
+        ordinary,
+        resolved,
+      );
+      expect(response.status).toBe(400);
+      expect(ordinary).not.toHaveBeenCalled();
+      expect(resolved).not.toHaveBeenCalled();
+    },
+  );
+
+  it('fails explicitly if resolved transport is unavailable', async () => {
+    const ordinary = vi.fn<typeof fetch>();
+    const response = await forwardBinary(
+      request(metadata({ dnsAddresses: ['8.8.8.8'] })),
+      ordinary,
+    );
+    expect(response.status).toBe(501);
+    expect(await response.json()).toEqual({ error: 'custom_dns_unavailable' });
+    expect(ordinary).not.toHaveBeenCalled();
+  });
+
   it('preserves binary request bytes, an empty body, and an absent body across fragmented transport', async () => {
     const bytes = new Uint8Array([0, 255, 128, 0, 13, 10]);
     const meta = metadata({ method: 'POST', hasBody: true, bodyLength: null });

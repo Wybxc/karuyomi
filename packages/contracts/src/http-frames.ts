@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { customDnsUrlSchema, publicDnsAddressesSchema } from './source-dns.ts';
 
 export const HTTP_BRIDGE_MEDIA_TYPE = 'application/vnd.karuyomi.http.v2';
 export const HTTP_FRAME_LIMIT = 65_536;
@@ -50,6 +51,7 @@ export const httpRequestMetaSchema = z
       'OPTIONS',
     ]),
     headers: headersSchema,
+    dnsAddresses: publicDnsAddressesSchema.optional(),
     hasBody: z.boolean(),
     bodyLength: z
       .number()
@@ -63,7 +65,15 @@ export const httpRequestMetaSchema = z
   .refine((meta) => meta.hasBody || meta.bodyLength === 0, {
     message: 'A missing body must have length zero',
     path: ['bodyLength'],
-  });
+  })
+  .refine(
+    (meta) =>
+      !meta.dnsAddresses || customDnsUrlSchema.safeParse(meta.url).success,
+    {
+      message: 'Custom DNS requires a named HTTPS destination',
+      path: ['dnsAddresses'],
+    },
+  );
 
 export const httpResponseMetaSchema = z
   .object({

@@ -88,12 +88,12 @@ public final class NetworkHelperTest {
         "newBuilder preserves the Source authenticator");
     check(
         client.authenticator() == Authenticator.NONE, "shared client keeps its own authenticator");
-    try {
-      authenticated.newBuilder().dns(host -> java.util.List.of());
-      throw new AssertionError("A custom DNS policy was accepted by the public relay");
-    } catch (UnsupportedOperationException expected) {
-      checks++;
-    }
+    Dns resolver =
+        host -> java.util.List.of(java.net.InetAddress.getByAddress(new byte[] {8, 8, 8, 8}));
+    OkHttpClient customDns = authenticated.newBuilder().dns(resolver).build();
+    check(customDns.dns() == resolver, "custom DNS is retained for the Source client");
+    check(customDns.newBuilder().build().dns() == resolver, "client copies preserve custom DNS");
+    check(authenticated.dns() == Dns.SYSTEM, "the default client continues to use system DNS");
     OkHttpClient cacheless = client.newBuilder().cache(null).build();
     check(
         cacheless.cache() == null && client.cache() == cache,

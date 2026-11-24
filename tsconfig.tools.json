@@ -13,6 +13,7 @@
     "packages/runtime-host/*.ts",
     "tools/extensions/*.ts",
     "apps/api/*.config.ts",
+    "apps/api/source-egress/*.ts",
     "vitest.config.ts"
   ]
 }

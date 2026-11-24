@@ -9,6 +9,46 @@ import org.teavm.jso.*;
 import org.teavm.jso.typedarrays.Uint8Array;
 
 public final class Bridge {
+  @FunctionalInterface
+  interface DnsResolver {
+    String resolve(String host) throws IOException;
+  }
+
+  static DnsResolver dnsResolver;
+
+  public static String resolveDns(String host) throws IOException {
+    if (dnsResolver == null) throw new IOException("Source DNS is unavailable");
+    return dnsResolver.resolve(host);
+  }
+
+  @Async
+  static native String resolveDns(String host, String requestId, String generation, String token)
+      throws IOException;
+
+  private static void resolveDns(
+      String host,
+      String requestId,
+      String generation,
+      String token,
+      AsyncCallback<String> callback) {
+    resolveDns(
+        host,
+        requestId,
+        generation,
+        token,
+        callback::complete,
+        (message, name, code) -> callback.error(httpError(message, name, code)));
+  }
+
+  @JSBody(
+      params = {"host", "requestId", "generation", "token", "ok", "fail"},
+      script =
+          "Promise.resolve().then(() => self.teaDnsResolve(host, requestId, generation, token))"
+              + ".then(ok, error => fail(String(error.message || error), String(error.name || 'Error'),"
+              + " String(error.code || '')));")
+  private static native void resolveDns(
+      String host, String requestId, String generation, String token, Reply ok, HttpFailure fail);
+
   @Async
   public static native String file(String request) throws java.io.IOException;
 

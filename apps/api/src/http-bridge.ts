@@ -13,6 +13,11 @@ import {
   encodeErrorFrame,
   httpRequestMetaSchema,
   httpResponseMetaSchema,
+  dnsHostnameSchema,
+  SOURCE_DNS_ADDRESSES_HEADER,
+  SOURCE_DNS_DECODED_HEADER,
+  SOURCE_DNS_ERROR_HEADER,
+  SOURCE_DNS_TARGET_HEADER,
   type HttpRequestMeta,
 } from '@karuyomi/contracts';
 
@@ -29,6 +34,13 @@ const methods = new Set([
 ]);
 const HTTP_META_DEADLINE_MS = 30_000;
 const HTTP_HARD_DEADLINE_MS = 300_000;
+const sourceDnsOrigin = 'http://source-egress.internal';
+
+type ResolvedFetch = (
+  url: URL,
+  init: RequestInit,
+  addresses: string[],
+) => Promise<Response>;
 
 class BinaryBridgeError extends Error {
   constructor(
@@ -63,6 +75,7 @@ function connectionHeaders(headers: Iterable<[string, string]>): Set<string> {
 export async function forwardBinary(
   request: Request,
   fetcher: typeof fetch = (...args) => fetch(...args),
+  fetchResolved?: ResolvedFetch,
 ): Promise<Response> {
   const started = Date.now();
   const abort = new AbortController();
@@ -377,7 +390,17 @@ export async function forwardBinary(
     else startReadIdle(descriptor.timeoutMs);
     let upstream: Response;
     try {
-      const fetching = fetcher(url, init).then((response) => {
+      if (descriptor.dnsAddresses && !fetchResolved)
+        throw new BinaryBridgeError(
+          'custom_dns_unavailable',
+          'Custom DNS egress is unavailable',
+          501,
+        );
+      const pending =
+        descriptor.dnsAddresses && fetchResolved
+          ? fetchResolved(url, init, descriptor.dnsAddresses)
+          : fetcher(url, init);
+      const fetching = pending.then((response) => {
         // A fetch implementation may resolve after it was aborted. Such a body
         // must never escape into this or a later runtime generation.
         if (failure) {
@@ -400,11 +423,16 @@ export async function forwardBinary(
       descriptor.method !== 'HEAD' &&
       ![204, 205, 304].includes(upstream.status) &&
       upstream.body !== null;
-    const encoded = Boolean(
-      upstream.headers.get('content-encoding')?.trim() &&
-      upstream.headers.get('content-encoding')?.trim().toLowerCase() !==
-        'identity',
-    );
+    const encoded =
+      Boolean(
+        descriptor.dnsAddresses &&
+        upstream.headers.get(SOURCE_DNS_DECODED_HEADER) === '1',
+      ) ||
+      Boolean(
+        upstream.headers.get('content-encoding')?.trim() &&
+        upstream.headers.get('content-encoding')?.trim().toLowerCase() !==
+          'identity',
+      );
     const declaredLength = upstream.headers.get('content-length');
     const bodyLength = !hasBody
       ? 0
@@ -430,6 +458,7 @@ export async function forwardBinary(
       const lower = name.toLowerCase();
       if (
         lower === 'set-cookie' ||
+        lower === SOURCE_DNS_DECODED_HEADER ||
         hopByHopHeaders.test(name) ||
         nominated.has(lower)
       )
@@ -593,6 +622,33 @@ export async function forwardBinary(
 
 export function createHttpBridge(fetchUpstream?: typeof fetch) {
   const app = new Hono<AppEnv>();
+  app.get('/dns', async (c) => {
+    const host = dnsHostnameSchema.safeParse(c.req.query('host'));
+    if (!host.success) return c.json({ error: 'invalid_dns_hostname' }, 400);
+    const namespace = c.env.SOURCE_DNS_EGRESS;
+    if (!namespace) return c.json({ error: 'custom_dns_unavailable' }, 501);
+    const url = new URL('/resolve', sourceDnsOrigin);
+    url.searchParams.set('host', host.data);
+    try {
+      const result = await namespace
+        .getByName('source-egress')
+        .fetch(url.toString(), {
+          signal: c.req.raw.signal,
+        });
+      if (!result.ok) {
+        await result.body?.cancel();
+        return c.json({ error: 'dns_lookup_failed' }, 502);
+      }
+      return new Response(result.body, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'private, no-store',
+        },
+      });
+    } catch {
+      return c.json({ error: 'dns_lookup_failed' }, 502);
+    }
+  });
   app.post('/http', async (c) => {
     const contentType = c.req.header('content-type')?.trim().toLowerCase();
     const accept = c.req.header('accept')?.trim().toLowerCase();
@@ -600,7 +656,26 @@ export function createHttpBridge(fetchUpstream?: typeof fetch) {
       return c.json({ error: 'unsupported_bridge_protocol' }, 415);
     if (accept !== HTTP_BRIDGE_MEDIA_TYPE)
       return c.json({ error: 'unsupported_bridge_response_protocol' }, 406);
-    return forwardBinary(c.req.raw, fetchUpstream);
+    const namespace = c.env.SOURCE_DNS_EGRESS;
+    const fetchResolved: ResolvedFetch | undefined = namespace
+      ? async (url, init, addresses) => {
+          const headers = new Headers(init.headers);
+          headers.set(SOURCE_DNS_TARGET_HEADER, url.href);
+          headers.set(SOURCE_DNS_ADDRESSES_HEADER, addresses.join(','));
+          const response = await namespace
+            .getByName('source-egress')
+            .fetch(sourceDnsOrigin + '/request', { ...init, headers });
+          if (response.headers.has(SOURCE_DNS_ERROR_HEADER)) {
+            await response.body?.cancel();
+            throw new BinaryBridgeError(
+              'upstream_network_error',
+              'Unable to connect to the resolved HTTPS destination',
+            );
+          }
+          return new Response(response.body, response);
+        }
+      : undefined;
+    return forwardBinary(c.req.raw, fetchUpstream, fetchResolved);
   });
   return app;
 }

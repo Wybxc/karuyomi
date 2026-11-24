@@ -48,6 +48,63 @@ function setup(fetcher?: typeof fetch) {
   return transport;
 }
 
+test('Source DNS parses literals locally and resolves named hosts within the current owner', async () => {
+  const fetcher = vi.fn<typeof fetch>(async (url, options) => {
+    expect(String(url)).toBe(
+      'https://read.example/api/bridge/dns?host=source.example',
+    );
+    expect(options?.credentials).toBe('same-origin');
+    return Response.json(['8.8.4.4']);
+  });
+  const transport = setup(fetcher);
+  const token = transport.operationToken!;
+  await expect(
+    transport.resolveDns('8.8.8.8', 'operation-1', 'generation-1', token),
+  ).resolves.toBe('[[8,8,8,8]]');
+  expect(fetcher).not.toHaveBeenCalled();
+  await expect(
+    transport.resolveDns(
+      'source.example',
+      'operation-1',
+      'generation-1',
+      token,
+    ),
+  ).resolves.toBe('[[8,8,4,4]]');
+  transport.begin({ requestId: 'operation-1', generation: 'generation-1' });
+  await expect(
+    transport.resolveDns(
+      'source.example',
+      'operation-1',
+      'generation-1',
+      token,
+    ),
+  ).rejects.toBeInstanceOf(HttpOwnerFailure);
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+
+test('ending a Source operation aborts DNS and discards its late response', async () => {
+  let resolve!: (value: Response) => void;
+  let signal: AbortSignal | null | undefined;
+  const transport = setup(async (_url, options) => {
+    signal = options?.signal;
+    return new Promise<Response>((complete) => {
+      resolve = complete;
+    });
+  });
+  const lookup = transport.resolveDns(
+    'source.example',
+    'operation-1',
+    'generation-1',
+    transport.operationToken!,
+  );
+  transport.end();
+  await expect(lookup).rejects.toBeInstanceOf(HttpOwnerFailure);
+  expect(signal?.aborted).toBe(true);
+  const cancel = vi.fn();
+  resolve(new Response(new ReadableStream({ cancel })));
+  await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+});
+
 function framedResponse(
   request: HttpRequestMeta,
   chunks: Uint8Array[],
