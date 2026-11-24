@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-24，基于 `ec61759` 的 Karuyomi 标志接入在 macOS 27.0.1 上通过 `pnpm build`、Flutter 静态分析及 60 项设置与应用组件测试。检查了 Worker 构建产物中的标签页 SVG 和 PNG、Apple 添加到主屏幕图标、四个 Web 安装图标及「关于」使用的 Flutter 资源。两种可裁切安装图标的图案均落在内切安全区内。[标志矢量源](../apps/reader/web/karuyomi-logo.svg)
+
 2026-11-24，基于 `a9b2ee6` 的阅读布局和设置改动在 macOS 27.0.1 上通过 `pnpm flutter:check --reporter expanded --concurrency=3` 和 `pnpm build`。Flutter 应用通过 1,043 项，阅读核心和 Source Runtime 共通过 112 项。组件回归核对分页及横纵连续在工具显隐时的画布边界、缩放矩阵、滚动偏移和已解码图像锚点，核对短屏与大字号下的操作，以及分维度保存和回到分页后的原布局。[分项计划](plan/browsing-and-reader-experience.md)
 
 2026-11-24，基于 `97f9c0a` 的详情导航改动在 macOS 上通过 `pnpm flutter:check --reporter expanded --concurrency=2`。Flutter 应用通过 1,040 项，阅读核心和 Source Runtime 共通过 112 项。组件测试用延迟请求覆盖宽窄屏布局及漫画源列表、书架、历史和跨源搜索入口，确认详情框架先出现，加载、错误详情和重试留在详情内。返回或打开其他路由后，迟到的详情响应不会继续发起章节请求。[分项计划](plan/browsing-and-reader-experience.md)

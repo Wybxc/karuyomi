@@ -426,10 +426,20 @@ class const _SettingsEditor({
         if (section == _SettingsSection.input)
           const ReaderDeviceControls(display: false, input: true),
         if (section == _SettingsSection.about)
-          const CupertinoListTile(
-            title: Text('Karuyomi'),
-            subtitle: Text('轻松翻开下一页'),
-            trailing: Text('0.1.0'),
+          CupertinoListTile(
+            leadingSize: 36,
+            leading: ClipRRect(
+              borderRadius: const BorderRadius.all(Radius.circular(8)),
+              child: Image.asset(
+                'web/icons/karuyomi-192.png',
+                width: 36,
+                height: 36,
+                excludeFromSemantics: true,
+              ),
+            ),
+            title: const Text('Karuyomi'),
+            subtitle: const Text('轻松翻开下一页'),
+            trailing: const Text('0.1.0'),
           ),
         if (draft == null &&
             !state.available &&
