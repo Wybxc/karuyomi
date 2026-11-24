@@ -254,10 +254,8 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
-          expect(
-            tester.getSize(find.byType(InteractiveViewer).first).height,
-            greaterThan(scale == 1 ? 640 : 240),
-          );
+          final canvas = tester.getRect(find.byType(InteractiveViewer).first);
+          expect(canvas, const Rect.fromLTWH(0, 0, 360, 800));
           final nav = tester.getRect(find.byType(CupertinoNavigationBar));
           final workTitle = tester.getRect(find.text(manga.title));
           final chapterTitle = tester.getRect(
@@ -277,12 +275,9 @@ void main() {
           expect(nav.contains(tester.getCenter(bookmark)), isTrue);
           final settings = iconButton('阅读设置');
           expect(settings.hitTestable(), findsOneWidget);
-          expect(
-            tester.getCenter(settings).dy,
-            greaterThan(
-              tester.getRect(find.byType(InteractiveViewer).first).bottom,
-            ),
-          );
+          final settingsCenter = tester.getCenter(settings);
+          expect(canvas.contains(settingsCenter), isTrue);
+          expect(settingsCenter.dy, greaterThan(canvas.center.dy));
           for (final label in ['上一页', '下一页']) {
             final icon = find.byWidgetPredicate(
               (widget) => widget is Icon && widget.semanticLabel == label,

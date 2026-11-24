@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/settings_repository.dart';
+import 'package:karuyomi/features/reader/reader_mode_fields.dart';
 import 'package:karuyomi/features/settings/settings_controller.dart';
 import 'package:karuyomi/features/settings/settings_widgets.dart';
 import 'package:karuyomi/theme/app_theme.dart';
@@ -284,7 +285,7 @@ void main() {
           );
           expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsNothing);
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
-          expect(find.byType(ChoiceField<wire.ReaderMode>), findsNothing);
+          expect(find.byType(ChoiceField<Axis>), findsNothing);
           expect(enabled(refresh), Tristate.isFalse);
           expect(writes(), isEmpty);
 
@@ -301,10 +302,7 @@ void main() {
           failRead = false;
           await tap(tester, find.text('重新读取设置'));
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
-          expect(
-            find.byType(ChoiceField<wire.ReaderMode>).hitTestable(),
-            findsOneWidget,
-          );
+          expect(find.byType(ChoiceField<Axis>).hitTestable(), findsOneWidget);
           expect(find.text(_target.title).hitTestable(), findsOneWidget);
           expect(find.text('zh · 测试漫画源').hitTestable(), findsOneWidget);
           final inheritance = find.text('选择“跟随全局”时，之后的账户默认值会应用到此漫画。');
@@ -315,7 +313,7 @@ void main() {
             ),
             findsOneWidget,
           );
-          await select<wire.ReaderMode>(tester, '横向分页 · 从右到左', settle: false);
+          await select<TextDirection>(tester, '从右到左', settle: false);
           await tester.runAsync(() => saving.future);
           await tester.pump();
           expect(
@@ -413,7 +411,7 @@ void main() {
               basedOnRevision: 1,
             ),
           );
-          await select<wire.ReaderMode>(tester, '纵向连续');
+          await select<Axis>(tester, '纵向');
           expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
           expect(find.text('重试原设置操作'), findsNothing);
           expect(state(manga: true).canEdit, false);
@@ -430,7 +428,7 @@ void main() {
           await tester.runAsync(fixture.catalog.connect);
           await tester.pumpAndSettle();
           expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
-          expect(find.byType(ChoiceField<wire.ReaderMode>), findsNothing);
+          expect(find.byType(ChoiceField<Axis>), findsNothing);
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
           expect(enabled(refresh), Tristate.isFalse);
           expect(writes(), hasLength(writesBeforeRead));
@@ -461,7 +459,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 60));
         final detail = find
             .ancestor(
-              of: find.byKey(const ValueKey('global-mode')),
+              of: find.byKey(const ValueKey('global-axis')),
               matching: find.byType(CupertinoPageScaffold),
             )
             .first;
@@ -478,12 +476,12 @@ void main() {
         await tester.pump();
         if (disabled) {
           expect(
-            find.byKey(const ValueKey('global-mode'), skipOffstage: false),
+            find.byKey(const ValueKey('global-axis'), skipOffstage: false),
             findsNothing,
           );
         }
         await tester.pumpAndSettle();
-        expect(find.byKey(const ValueKey('global-mode')), findsNothing);
+        expect(find.byKey(const ValueKey('global-axis')), findsNothing);
         expect(
           find.byKey(const ValueKey('settings-section-reading')),
           findsOneWidget,
@@ -591,7 +589,7 @@ void main() {
           find.byKey(const ValueKey('settings-directory')),
           findsOneWidget,
         );
-        expect(find.byKey(const ValueKey('global-mode')), findsNothing);
+        expect(find.byKey(const ValueKey('global-axis')), findsNothing);
         final row = find.byKey(const ValueKey('settings-section-appearance'));
         expect(
           tester.widget<CupertinoListTile>(row).backgroundColor,
@@ -720,6 +718,54 @@ void main() {
         1,
       );
       expect(state().snapshot!.globalRevision, 2);
+      expect(tester.takeException(), isNull);
+      await hide(tester);
+    },
+  );
+
+  testWidgets(
+    'reading dimensions save supported combinations and retain the paging layout',
+    (tester) async {
+      final controller = editor();
+      await tester.runAsync(controller.refresh);
+      await show(tester, controller);
+      wire.ReaderMode currentMode() => state().snapshot!.global.reader.mode;
+      final layout = find.byKey(const ValueKey('global-layout'));
+      final direction = find.byKey(const ValueKey('global-direction'));
+      final spacing = find.byKey(const ValueKey('global-spacing'));
+      final advance = find.byKey(const ValueKey('global-advance'));
+
+      await select<wire.ReaderPageLayout>(tester, '双页');
+      await select<TextDirection>(tester, '从右到左');
+      expect(currentMode(), wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT);
+      await select<ReadingAdvance>(tester, '连续滚动');
+      expect(
+        currentMode(),
+        wire.ReaderMode.READER_MODE_HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT,
+      );
+      expect(layout, findsNothing);
+      expect(direction, findsOneWidget);
+      expect(spacing, findsNothing);
+
+      await select<Axis>(tester, '纵向');
+      expect(currentMode(), wire.ReaderMode.READER_MODE_CONTINUOUS);
+      expect(direction, findsNothing);
+      expect(advance, findsNothing);
+      expect(find.text('连续滚动'), findsOneWidget);
+      await select<ReadingSpacing>(tester, '无间距');
+      expect(currentMode(), wire.ReaderMode.READER_MODE_WEBTOON);
+
+      await select<Axis>(tester, '横向');
+      expect(
+        currentMode(),
+        wire.ReaderMode.READER_MODE_HORIZONTAL_CONTINUOUS_LEFT_TO_RIGHT,
+      );
+      await select<ReadingAdvance>(tester, '分页');
+      expect(currentMode(), wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT);
+      expect(
+        tester.widget<ChoiceField<wire.ReaderPageLayout>>(layout).value,
+        wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE,
+      );
       expect(tester.takeException(), isNull);
       await hide(tester);
     },

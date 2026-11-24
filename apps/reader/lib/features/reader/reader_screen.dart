@@ -16,6 +16,7 @@ import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/source_runtime.dart';
 
 import '../../diagnostics/reader_baseline.dart';
+import 'reader_mode_fields.dart';
 import 'reader_page_navigation.dart';
 import 'reader_preferences.dart';
 import 'resource_image.dart';
@@ -320,7 +321,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
       : null;
   double _viewportWidth = 0;
   double _viewportHeight = 0;
-  double? _pageCenterY;
   Size? _windowSize;
   int _restoreEpoch = 0;
   ReadingPosition? _pendingRestorePosition;
@@ -792,7 +792,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _reader.spreads[_reader.spreadIndex].displayPages(_reader.mode),
     _viewport,
     widget.fit,
-    centerY: _pageCenterY,
   );
 
   double _crossScrollOffset(String key) {
@@ -899,10 +898,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
-  void _confirmViewportAnchor(
-    ReadingPosition anchor, {
-    bool preservePlacement = false,
-  }) {
+  void _confirmViewportAnchor(ReadingPosition anchor) {
     if (!_hasDecodedGeometry(anchor.pageIndexHint)) return;
     final image = _visibleImages
         .where((image) => image.index == anchor.pageIndexHint)
@@ -926,13 +922,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
     final preferred = _preferredPlacement;
     final keepPreferred = preferred != null && _sameAnchor(anchor, preferred);
-    if ((preservePlacement || keepPreferred) &&
+    if (keepPreferred &&
         anchor.normalizedX >= crop.left &&
         anchor.normalizedX <= crop.right &&
         anchor.normalizedOffset >= crop.top &&
         anchor.normalizedOffset <= crop.bottom) {
-      // Layout can clamp the same original point while resuming, turning
-      // a page, or changing internal controls. Keep the chosen placement;
+      // Layout can clamp the same original point while resuming or turning
+      // a page. Keep the chosen placement;
       // a gesture or explicit 2D jump will publish a new point.
       return;
     }
@@ -1060,7 +1056,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     _scheduleViewport();
   }
 
-  void _scheduleRestore({bool preservePlacement = false}) {
+  void _scheduleRestore() {
     _pendingRestorePosition = _reader.position;
     _restoring = true;
     final epoch = ++_restoreEpoch;
@@ -1119,7 +1115,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         _restoring = false;
         // Preserve the original image point, updating only where layout
         // constraints place it in the viewport. Placeholder ratios never save.
-        _confirmViewportAnchor(anchor, preservePlacement: preservePlacement);
+        _confirmViewportAnchor(anchor);
         _syncWindow();
         _scheduleViewport();
       });
@@ -1756,68 +1752,50 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
-  Widget _readingCanvas(double centerY, Color canvas) {
-    final needsPositionNotice = _reader.requiresPositionNotice;
-    return _ReaderCanvas(
-      color: canvas,
-      child: Column(
-        children: [
-          if (needsPositionNotice) const Text('页面清单发生变化，已定位到最接近的页码。'),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final window = MediaQuery.sizeOf(context);
-                final sameWindow = _windowSize == window;
-                if (_windowSize != null && !sameWindow) {
-                  _preferredPlacement = null;
-                }
-                _windowSize = window;
-                final pageCenterY = needsPositionNotice ? null : centerY;
-                if (_viewportWidth != constraints.maxWidth ||
-                    _viewportHeight != constraints.maxHeight ||
-                    _pageCenterY != pageCenterY) {
-                  final chromeOnly =
-                      sameWindow && _viewportWidth == constraints.maxWidth;
-                  _viewportWidth = constraints.maxWidth;
-                  _viewportHeight = constraints.maxHeight;
-                  _pageCenterY = pageCenterY;
-                  _scheduleRestore(preservePlacement: chromeOnly);
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!mounted) return;
-                    _applyDoublePagePreference();
-                    _scheduleRestore(preservePlacement: chromeOnly);
-                  });
-                }
-                if (_reader.manifest.pages.isEmpty) {
-                  return const Center(child: Text('这一章没有页面'));
-                }
-                final transition = widget.chapterTransition;
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ExcludeSemantics(
-                      excluding: transition != null,
-                      child: ExcludeFocus(
-                        excluding: transition != null,
-                        child: IgnorePointer(
-                          ignoring: transition != null,
-                          child: _reader.isContinuous
-                              ? _continuous()
-                              : _paged(context),
-                        ),
-                      ),
-                    ),
-                    if (widget.onChapterEdge != null)
-                      _chapterTransitionLayer(transition),
-                  ],
-                );
-              },
+  Widget _readingCanvas(Color canvas) => _ReaderCanvas(
+    color: canvas,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final window = MediaQuery.sizeOf(context);
+        if (_windowSize != null && _windowSize != window) {
+          _preferredPlacement = null;
+        }
+        _windowSize = window;
+        if (_viewportWidth != constraints.maxWidth ||
+            _viewportHeight != constraints.maxHeight) {
+          _viewportWidth = constraints.maxWidth;
+          _viewportHeight = constraints.maxHeight;
+          _scheduleRestore();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _applyDoublePagePreference();
+            _scheduleRestore();
+          });
+        }
+        if (_reader.manifest.pages.isEmpty) {
+          return const Center(child: Text('这一章没有页面'));
+        }
+        final transition = widget.chapterTransition;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            ExcludeSemantics(
+              excluding: transition != null,
+              child: ExcludeFocus(
+                excluding: transition != null,
+                child: IgnorePointer(
+                  ignoring: transition != null,
+                  child: _reader.isContinuous ? _continuous() : _paged(context),
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+            if (widget.onChapterEdge != null)
+              _chapterTransitionLayer(transition),
+          ],
+        );
+      },
+    ),
+  );
 
   Widget _chapterTransitionLayer(ReaderChapterTransition? transition) {
     final reduceMotion =
@@ -1905,7 +1883,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     useOnListenableChange(_scroll, _onScroll);
     useOnListenableChange(_transform, _onTransform);
     useOnListenableChange(widget.positionRequest, _applyPositionRequest);
-    // Keep the canvas constraints steady while painting the exit transition.
     final toolbarMounted = _toolbar || !_toolbarAnimation.isDismissed;
     final toolbarInteractive = _toolbar && _toolbarAnimation.isCompleted;
     final toolbarProgress = _toolbarAnimation.drive(
@@ -1917,27 +1894,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
       widget.background,
       widget.dimPercent,
     );
-    final navigationBar = toolbarMounted
-        ? _ReaderNavigationBar(
-            progress: toolbarProgress,
-            interactive: toolbarInteractive,
-            bar: CupertinoNavigationBar(
-              automaticBackgroundVisibility: false,
-              automaticallyImplyLeading: chapterTransition == null,
-              backgroundColor: AppColors.toolbar.resolveFrom(context),
-              leading:
-                  widget.onExit == null ||
-                      (chapterTransition != null &&
-                          chapterTransition.onReturn == null)
-                  ? null
-                  : CupertinoNavigationBarBackButton(onPressed: widget.onExit),
-              middle: _title(),
-              trailing: chapterTransition == null
-                  ? widget.chapterActions
-                  : null,
-            ),
-          )
-        : null;
+    final navigationBar = CupertinoNavigationBar(
+      automaticBackgroundVisibility: false,
+      automaticallyImplyLeading: chapterTransition == null,
+      backgroundColor: AppColors.toolbar.resolveFrom(context),
+      leading:
+          widget.onExit == null ||
+              (chapterTransition != null && chapterTransition.onReturn == null)
+          ? null
+          : CupertinoNavigationBarBackButton(onPressed: widget.onExit),
+      middle: _title(),
+      trailing: chapterTransition == null ? widget.chapterActions : null,
+    );
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
@@ -1964,42 +1932,75 @@ class _ReaderScreenState extends State<ReaderScreen> {
         autofocus: true,
         child: CupertinoPageScaffold(
           backgroundColor: canvas,
-          navigationBar: navigationBar,
-          child: SafeArea(
-            child: LayoutBuilder(
-              builder: (context, bounds) {
-                // The scaffold already consumed the navigation bar's height.
-                // Express the full safe area's center in the canvas's coordinates.
-                final barHeight = navigationBar?.preferredSize.height ?? 0;
-                final centerY = (bounds.maxHeight - barHeight) / 2;
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Column(
-                      children: [
-                        Expanded(child: _readingCanvas(centerY, canvas)),
-                        if (toolbarMounted)
-                          _ReaderToolbarTransition(
-                            progress: toolbarProgress,
-                            interactive:
-                                toolbarInteractive && chapterTransition == null,
-                            slideFrom: const Offset(0, 1),
-                            child: Opacity(
-                              opacity: chapterTransition == null ? 1 : .5,
-                              child: _controls(),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // The reader always uses the same safe area. The toolbars paint
+              // over it without resizing or restoring the image viewport.
+              SafeArea(child: _readingCanvas(canvas)),
+              if (toolbarMounted) ...[
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: _ReaderToolbarTransition(
+                    progress: toolbarProgress,
+                    interactive: toolbarInteractive,
+                    slideFrom: const Offset(0, -1),
+                    child: MediaQuery.withNoTextScaling(child: navigationBar),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: _ReaderToolbarTransition(
+                    progress: toolbarProgress,
+                    interactive:
+                        toolbarInteractive && chapterTransition == null,
+                    slideFrom: const Offset(0, 1),
+                    child: Opacity(
+                      opacity: chapterTransition == null ? 1 : .5,
+                      child: _controls(),
+                    ),
+                  ),
+                ),
+              ] else if (_reader.position != null)
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: SafeArea(top: false, child: _pageIndicator()),
+                ),
+              if (_reader.requiresPositionNotice)
+                Positioned(
+                  top:
+                      MediaQuery.paddingOf(context).top +
+                      navigationBar.preferredSize.height,
+                  left: 0,
+                  right: 0,
+                  child: IgnorePointer(
+                    child: SafeArea(
+                      top: false,
+                      bottom: false,
+                      child: ColoredBox(
+                        color: AppColors.toolbar.resolveFrom(context),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          child: Semantics(
+                            liveRegion: true,
+                            child: const Text(
+                              '页面清单发生变化，已定位到最接近的页码。',
+                              textAlign: TextAlign.center,
                             ),
                           ),
-                      ],
-                    ),
-                    if (!toolbarMounted && _reader.position != null)
-                      Align(
-                        alignment: Alignment.bottomCenter,
-                        child: _pageIndicator(),
+                        ),
                       ),
-                  ],
-                );
-              },
-            ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -2007,18 +2008,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Widget _controls() {
-    final available = math.max(
+    final safeHeight =
+        MediaQuery.sizeOf(context).height -
+        MediaQuery.paddingOf(context).vertical;
+    // Keep the center tap target available when the controls need to scroll.
+    final controlsHeight = math.max(
       0.0,
-      MediaQuery.sizeOf(context).height -
-          MediaQuery.paddingOf(context).vertical -
-          kMinInteractiveDimensionCupertino,
+      (safeHeight - kMinInteractiveDimensionCupertino) / 2,
     );
-    // Keep space for the page even when the full set of controls cannot fit.
-    final readingHeight = math.min(
-      3 * kMinInteractiveDimensionCupertino,
-      available / 2,
-    );
-    final controlsHeight = available - readingHeight;
     return ColoredBox(
       color: AppColors.toolbar.resolveFrom(context),
       child: SafeArea(
@@ -2080,6 +2077,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final rtl = direction == TextDirection.rtl;
     return Row(
       textDirection: direction,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _pageStep(
           enabled: _reader.canGoBack,
@@ -2092,36 +2090,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
             alignment: WrapAlignment.center,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              ChoiceField<ReadingMode>(
-                label: '阅读模式',
-                value: _reader.mode,
-                icon: switch (_reader.mode) {
-                  ReadingMode.leftToRight => CupertinoIcons.arrow_right,
-                  ReadingMode.rightToLeft => CupertinoIcons.arrow_left,
-                  ReadingMode.horizontalContinuousLeftToRight =>
-                    CupertinoIcons.arrow_right,
-                  ReadingMode.horizontalContinuousRightToLeft =>
-                    CupertinoIcons.arrow_left,
-                  ReadingMode.continuous => CupertinoIcons.arrow_down,
-                  ReadingMode.webtoon => CupertinoIcons.rectangle_grid_1x2,
-                },
-                options: readingModeLabels,
-                onChanged: widget.layoutSettingsEnabled
-                    ? (mode) {
-                        if (mode != null) _selectMode(mode);
-                      }
-                    : null,
+              ...readerModeFields(
+                scope: 'reader',
+                mode: _reader.mode,
+                compact: true,
+                onChanged: widget.layoutSettingsEnabled ? _selectMode : null,
               ),
               if (!_reader.isContinuous)
                 ChoiceField<bool>(
                   key: const ValueKey('reader-page-layout'),
                   label: '分页布局',
                   value: _doublePagePreference,
-                  icon: switch (_doublePagePreference) {
-                    null => CupertinoIcons.rectangle,
-                    false => CupertinoIcons.doc,
-                    true => CupertinoIcons.book,
-                  },
+                  showInlineLabel: false,
                   options: const {null: '自动', false: '单页', true: '双页'},
                   onChanged: widget.layoutSettingsEnabled
                       ? _selectDoublePage
@@ -2293,24 +2273,6 @@ class _ReaderToolbarTransition extends StatelessWidget {
   );
 }
 
-class _ReaderNavigationBar extends _ReaderToolbarTransition
-    implements ObstructingPreferredSizeWidget {
-  const _ReaderNavigationBar({
-    required this.bar,
-    required super.progress,
-    required super.interactive,
-  }) : super(slideFrom: const Offset(0, -1), child: bar);
-
-  final CupertinoNavigationBar bar;
-
-  @override
-  Size get preferredSize => bar.preferredSize;
-
-  @override
-  bool shouldFullyObstruct(BuildContext context) =>
-      bar.shouldFullyObstruct(context);
-}
-
 /// Each lazily built page owns its cross-axis position and disposes it when
 /// leaving the list; the Reader only borrows live controllers for restoration.
 class const _ContinuousImage({
@@ -2433,9 +2395,8 @@ Size _fitImageSize(double aspectRatio, Size cell, ReaderFit fit) {
 _ReaderScene _spreadScene(
   List<ReaderPage> pages,
   Size viewport,
-  ReaderFit fit, {
-  double? centerY,
-}) {
+  ReaderFit fit,
+) {
   final cellWidth = viewport.width / pages.length;
   final sizes = [
     for (final page in pages)
@@ -2452,12 +2413,6 @@ _ReaderScene _spreadScene(
     math.max(viewport.width, contentWidth),
     math.max(viewport.height, tallest),
   );
-  final containedCenter = fit == ReaderFit.contain
-      ? (centerY ?? viewport.height / 2).clamp(
-          tallest / 2,
-          viewport.height - tallest / 2,
-        )
-      : null;
   final images = <String, Rect>{};
   var left = (scene.width - contentWidth) / 2;
   for (var index = 0; index < pages.length; index++) {
@@ -2465,9 +2420,7 @@ _ReaderScene _spreadScene(
     final width = fit == ReaderFit.height ? size.width : cellWidth;
     images[pages[index].key] = Rect.fromLTWH(
       left + (width - size.width) / 2,
-      containedCenter == null
-          ? math.max(0, (viewport.height - size.height) / 2)
-          : containedCenter - size.height / 2,
+      math.max(0, (viewport.height - size.height) / 2),
       size.width,
       size.height,
     );

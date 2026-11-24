@@ -435,10 +435,10 @@ void main() {
         await tester.tap(find.text('重新阅读本章'));
         await tester.pumpAndSettle();
         tester
-            .widget<ChoiceField<ReadingMode>>(
-              find.byType(ChoiceField<ReadingMode>),
+            .widget<ChoiceField<TextDirection>>(
+              find.byType(ChoiceField<TextDirection>),
             )
-            .onChanged!(ReadingMode.rightToLeft);
+            .onChanged!(TextDirection.rtl);
         await tester.pumpAndSettle();
         tester
             .widget<ChoiceField<bool>>(
