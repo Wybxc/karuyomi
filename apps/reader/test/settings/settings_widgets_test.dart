@@ -145,6 +145,21 @@ void main() {
   List<TestBusinessRequest> writes() =>
       server.requests.where((request) => request.method == 'POST').toList();
 
+  testWidgets('About displays the bundled Karuyomi logo', (tester) async {
+    await show(tester, editor(), openReading: false);
+    await openSettingsSection(tester, 'about');
+    final logo = find.byType(Image);
+    expect(logo, findsOneWidget);
+    expect(tester.getSize(logo), const Size(36, 36));
+    final asset = tester.widget<Image>(logo).image as AssetImage;
+    expect(asset.assetName, 'web/icons/karuyomi-192.png');
+    final png = await tester.runAsync(() => rootBundle.load(asset.assetName));
+    expect(png!.getUint32(16), 192);
+    expect(png.getUint32(20), 192);
+    expect(tester.takeException(), isNull);
+    await hide(tester);
+  });
+
   for (final appearance in Brightness.values) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(
