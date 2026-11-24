@@ -509,7 +509,8 @@ void main() {
         find.byKey(const ValueKey('chapter-open-failure')),
         findsOneWidget,
       );
-      expect(find.text('未能打开「第二版」：漫画源请求失败，请重试'), findsOneWidget);
+      expect(find.text('未能打开「第二版」：未能加载章节页面，请重试'), findsOneWidget);
+      expect(find.text('查看错误详情'), findsOneWidget);
       await tester.pump(const Duration(seconds: 3));
       expect(pageCalls, 1);
       await _reveal(tester, find.byKey(const ValueKey('chapter-search')));

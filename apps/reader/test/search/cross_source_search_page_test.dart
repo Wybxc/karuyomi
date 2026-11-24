@@ -722,7 +722,7 @@ void main() {
       service.tasks.last.completion.completeError(failure);
       await tester.pumpAndSettle();
       final retry = find.byKey(ValueKey(('cross-search-more', second.key)));
-      expect(find.text('漫画源请求失败，请重试。'), findsOneWidget);
+      expect(find.text('搜索未完成，请查看错误详情。'), findsOneWidget);
       expect(find.text(failure.toString()), findsNothing);
       expect(tester.getBottomRight(retry).dy, lessThanOrEqualTo(800));
       expect(tester.getSemantics(retry).getSemanticsData().label, '重试此源');
@@ -731,7 +731,10 @@ void main() {
       );
       await tester.tap(details);
       await tester.pumpAndSettle();
-      expect(find.text(failure.toString()), findsOneWidget);
+      expect(
+        find.textContaining('错误码 sourceError\nHTTP error 500'),
+        findsOneWidget,
+      );
       await tester.tap(find.text('关闭'));
       await tester.pumpAndSettle();
       expect(service.tasks, hasLength(2));

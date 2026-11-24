@@ -475,6 +475,36 @@ class const SourceDirectory({
                       ),
                     ),
                   ),
+                  if (row.extension?.exact case final build?
+                      when row.extension?.installed?.enabled == true &&
+                          row.extension?.repositoryError == null &&
+                          build.sources.any(
+                            (source) => source.id == row.source.id,
+                          ))
+                    CupertinoButton(
+                      key: ValueKey((
+                        'configure-source',
+                        row.packageName,
+                        row.source.id,
+                      )),
+                      padding: const EdgeInsets.all(8),
+                      onPressed: catalog.busy
+                          ? null
+                          : () => onPreferences(
+                              SourcePreferencesTarget(
+                                build: build,
+                                source: wire.SourceInfo(
+                                  id: row.source.id,
+                                  name: row.source.name,
+                                  lang: row.source.lang,
+                                ),
+                              ),
+                            ),
+                      child: const Icon(
+                        CupertinoIcons.gear_alt,
+                        semanticLabel: '配置漫画源',
+                      ),
+                    ),
                   if (saving.value == (row.packageName, row.source.id))
                     const CupertinoButton(
                       onPressed: null,

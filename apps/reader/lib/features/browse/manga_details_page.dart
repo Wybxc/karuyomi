@@ -23,6 +23,7 @@ import '../covers/custom_cover_editor.dart';
 import '../../data/business_state_client.dart';
 import '../../diagnostics/reader_baseline.dart';
 import 'catalog_controller.dart';
+import '../sources/source_error_details.dart';
 import 'source_manga_cover.dart';
 import '../bookmarks/chapter_bookmarks_controller.dart';
 import '../bookmarks/bookmark_status.dart';
@@ -126,6 +127,7 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
   void _initialize() {
     final build = controller.activeBuild;
     if (build != null) {
+      unawaited(controller.recordBrowsingVisit(manga, source));
       _rebuildSequence(build.packageName);
       _library = controller.library;
       if (_library != null) _covers = CoverRepository(_library!.client);
@@ -1165,6 +1167,12 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
                         ),
                       ),
               ),
+              if (error != null &&
+                  error == widget.controller.error &&
+                  widget.controller.errorDetails != null)
+                SourceErrorDetailsButton(
+                  details: widget.controller.errorDetails!,
+                ),
               if (error != null) _sourceRefreshButton(retry: true),
             ],
           ),
@@ -1710,6 +1718,11 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
                                 '未能打开「${chapter.name}」：$_chapterOpenError',
                                 key: const ValueKey('chapter-open-failure'),
                               ),
+                              if (_chapterOpenError == controller.error &&
+                                  controller.errorDetails != null)
+                                SourceErrorDetailsButton(
+                                  details: controller.errorDetails!,
+                                ),
                               CupertinoButton(
                                 key: const ValueKey('retry-open-chapter'),
                                 onPressed:

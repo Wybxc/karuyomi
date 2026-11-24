@@ -306,13 +306,17 @@ void main() {
     () async {
       platform.invokeHandler = (_) async => throw const RuntimeException(
         RuntimeErrorCode.sourceError,
-        'Source failure',
+        'HTTP error 503 from https://example.invalid/api?token=hidden-token',
+        javaClass: 'java.io.IOException',
       );
       expect(
         await catalog.openFavoriteSource(_favorite, identityKey: identity()),
         false,
       );
-      expect(catalog.error, '漫画源请求失败，请重试');
+      expect(catalog.error, '漫画源处理出错，请查看错误详情');
+      expect(catalog.errorDetails, contains('HTTP error 503'));
+      expect(catalog.errorDetails, contains('java.io.IOException'));
+      expect(catalog.errorDetails, isNot(contains('hidden-token')));
       expect(catalog.status, ServiceStatus.ready);
       expect(catalog.activeSource!.id, sourceId);
       expect(catalog.page, 0);

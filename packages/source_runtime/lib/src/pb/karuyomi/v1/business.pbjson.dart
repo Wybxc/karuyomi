@@ -48,6 +48,8 @@ const ReaderMode$json = {
     {'1': 'READER_MODE_RIGHT_TO_LEFT', '2': 2},
     {'1': 'READER_MODE_CONTINUOUS', '2': 3},
     {'1': 'READER_MODE_WEBTOON', '2': 4},
+    {'1': 'READER_MODE_HORIZONTAL_CONTINUOUS_LEFT_TO_RIGHT', '2': 5},
+    {'1': 'READER_MODE_HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT', '2': 6},
   ],
 };
 
@@ -55,7 +57,9 @@ const ReaderMode$json = {
 final $typed_data.Uint8List readerModeDescriptor = $convert.base64Decode(
     'CgpSZWFkZXJNb2RlEhsKF1JFQURFUl9NT0RFX1VOU1BFQ0lGSUVEEAASHQoZUkVBREVSX01PRE'
     'VfTEVGVF9UT19SSUdIVBABEh0KGVJFQURFUl9NT0RFX1JJR0hUX1RPX0xFRlQQAhIaChZSRUFE'
-    'RVJfTU9ERV9DT05USU5VT1VTEAMSFwoTUkVBREVSX01PREVfV0VCVE9PThAE');
+    'RVJfTU9ERV9DT05USU5VT1VTEAMSFwoTUkVBREVSX01PREVfV0VCVE9PThAEEjMKL1JFQURFUl'
+    '9NT0RFX0hPUklaT05UQUxfQ09OVElOVU9VU19MRUZUX1RPX1JJR0hUEAUSMwovUkVBREVSX01P'
+    'REVfSE9SSVpPTlRBTF9DT05USU5VT1VTX1JJR0hUX1RPX0xFRlQQBg==');
 
 @$core.Deprecated('Use readerPageLayoutDescriptor instead')
 const ReaderPageLayout$json = {
@@ -1071,6 +1075,85 @@ final $typed_data.Uint8List libraryPageResponseDescriptor = $convert.base64Decod
     'gEIAEoCVIHbmV4dEtleRI1CgVlcnJvchgFIAEoCzIfLmthcnV5b21pLnYxLkJ1c2luZXNzU3Rh'
     'dGVFcnJvclIFZXJyb3ISRwoQY2F0ZWdvcnlfY2F0YWxvZxgGIAEoCzIcLmthcnV5b21pLnYxLk'
     'NhdGVnb3J5Q2F0YWxvZ1IPY2F0ZWdvcnlDYXRhbG9n');
+
+@$core.Deprecated('Use recordBrowsingVisitDescriptor instead')
+const RecordBrowsingVisit$json = {
+  '1': 'RecordBrowsingVisit',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {
+      '1': 'metadata',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.LibraryMetadata',
+      '10': 'metadata'
+    },
+  ],
+};
+
+/// Descriptor for `RecordBrowsingVisit`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List recordBrowsingVisitDescriptor = $convert.base64Decode(
+    'ChNSZWNvcmRCcm93c2luZ1Zpc2l0EiUKDnNjaGVtYV92ZXJzaW9uGAEgASgNUg1zY2hlbWFWZX'
+    'JzaW9uEjgKCG1ldGFkYXRhGAIgASgLMhwua2FydXlvbWkudjEuTGlicmFyeU1ldGFkYXRhUght'
+    'ZXRhZGF0YQ==');
+
+@$core.Deprecated('Use browsingHistoryEntryDescriptor instead')
+const BrowsingHistoryEntry$json = {
+  '1': 'BrowsingHistoryEntry',
+  '2': [
+    {'1': 'manga_key', '3': 1, '4': 1, '5': 9, '10': 'mangaKey'},
+    {'1': 'title', '3': 2, '4': 1, '5': 9, '10': 'title'},
+    {'1': 'source_name', '3': 3, '4': 1, '5': 9, '10': 'sourceName'},
+    {'1': 'visited_at_ms', '3': 4, '4': 1, '5': 4, '10': 'visitedAtMs'},
+  ],
+};
+
+/// Descriptor for `BrowsingHistoryEntry`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List browsingHistoryEntryDescriptor = $convert.base64Decode(
+    'ChRCcm93c2luZ0hpc3RvcnlFbnRyeRIbCgltYW5nYV9rZXkYASABKAlSCG1hbmdhS2V5EhQKBX'
+    'RpdGxlGAIgASgJUgV0aXRsZRIfCgtzb3VyY2VfbmFtZRgDIAEoCVIKc291cmNlTmFtZRIiCg12'
+    'aXNpdGVkX2F0X21zGAQgASgEUgt2aXNpdGVkQXRNcw==');
+
+@$core.Deprecated('Use browsingHistoryResponseDescriptor instead')
+const BrowsingHistoryResponse$json = {
+  '1': 'BrowsingHistoryResponse',
+  '2': [
+    {'1': 'schema_version', '3': 1, '4': 1, '5': 13, '10': 'schemaVersion'},
+    {
+      '1': 'entries',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.karuyomi.v1.BrowsingHistoryEntry',
+      '10': 'entries'
+    },
+    {
+      '1': 'metadata',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.LibraryMetadata',
+      '10': 'metadata'
+    },
+    {
+      '1': 'error',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.karuyomi.v1.BusinessStateError',
+      '10': 'error'
+    },
+  ],
+};
+
+/// Descriptor for `BrowsingHistoryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List browsingHistoryResponseDescriptor = $convert.base64Decode(
+    'ChdCcm93c2luZ0hpc3RvcnlSZXNwb25zZRIlCg5zY2hlbWFfdmVyc2lvbhgBIAEoDVINc2NoZW'
+    '1hVmVyc2lvbhI7CgdlbnRyaWVzGAIgAygLMiEua2FydXlvbWkudjEuQnJvd3NpbmdIaXN0b3J5'
+    'RW50cnlSB2VudHJpZXMSOAoIbWV0YWRhdGEYAyABKAsyHC5rYXJ1eW9taS52MS5MaWJyYXJ5TW'
+    'V0YWRhdGFSCG1ldGFkYXRhEjUKBWVycm9yGAQgASgLMh8ua2FydXlvbWkudjEuQnVzaW5lc3NT'
+    'dGF0ZUVycm9yUgVlcnJvcg==');
 
 @$core.Deprecated('Use categoryMutationResponseDescriptor instead')
 const CategoryMutationResponse$json = {

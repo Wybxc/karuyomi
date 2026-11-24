@@ -2720,7 +2720,7 @@ void main() {
       expect(pagePolicies, isEmpty);
       await tester.tap(find.byType(ChoiceField<ReadingMode>));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('从右到左').last);
+      await tester.tap(find.text('横向分页 · 从右到左').last);
       await tester.pumpAndSettle();
       expect(modes, [ReadingMode.rightToLeft]);
       expect(viewports.last.current.pageKey, 'page-5');
@@ -3145,6 +3145,72 @@ void main() {
     expect(viewports.last.current, rotated);
   });
 
+  for (final mode in [
+    ReadingMode.horizontalContinuousLeftToRight,
+    ReadingMode.horizontalContinuousRightToLeft,
+  ]) {
+    testWidgets('continuous reading advances horizontally in ${mode.name}', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(540, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final provider = FixturePageProvider();
+      final manifest = fixtureChapter();
+      final positions = <ReadingPosition>[];
+      final edges = <ReaderChapterEdge>[];
+      final rtl = mode.isRightToLeft;
+      final initial = manifest.positionAt(
+        5,
+        offset: 0.6,
+        normalizedX: rtl ? 0.7 : 0.3,
+        viewportX: rtl ? 0.7 : 0.3,
+        viewportY: 0.6,
+      );
+      await tester.pumpWidget(
+        screen(
+          provider: provider,
+          manifest: manifest,
+          position: initial,
+          preserveInitialPlacement: true,
+          mode: mode,
+          fit: ReaderFit.width,
+          imageBuilder: decodedImage(),
+          onPosition: positions.add,
+          onChapterEdge: edges.add,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final reader = find.byKey(const ValueKey('continuous-reader'));
+      final list = tester.widget<ListView>(reader);
+      expect(list.scrollDirection, Axis.horizontal);
+      expect(list.reverse, rtl);
+      expectRenderedAnchor(tester, initial, reader);
+
+      await tester.drag(
+        find.byKey(const ValueKey('vertical-page-5')),
+        const Offset(0, -110),
+      );
+      await tester.pumpAndSettle();
+      expect(positions.last.pageIndexHint, 5);
+      expectRenderedAnchor(tester, positions.last, reader);
+
+      await tester.drag(reader, Offset(rtl ? 500 : -500, 0));
+      await tester.pumpAndSettle();
+      await tester.drag(reader, Offset(rtl ? 500 : -500, 0));
+      await tester.pumpAndSettle();
+      expect(positions.last.pageIndexHint, greaterThan(5));
+      expectRenderedAnchor(tester, positions.last, reader);
+      list.controller!.jumpTo(list.controller!.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      await tester.drag(reader, Offset(rtl ? 230 : -230, 0));
+      await tester.pumpAndSettle();
+      expect(edges, [ReaderChapterEdge.next]);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('continuous position survives resize and Webtoon layout switch', (
     tester,
   ) async {
@@ -3186,7 +3252,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byType(ChoiceField<ReadingMode>));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('条漫').last);
+    await tester.tap(find.text('条漫（无间距）').last);
     await tester.pumpAndSettle();
     await tester.drag(
       find.byKey(const ValueKey('continuous-reader')),

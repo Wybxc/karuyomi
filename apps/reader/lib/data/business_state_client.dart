@@ -15,6 +15,7 @@ import 'source_preferences_validation.dart';
 part 'business_state_migration.dart';
 
 const _schemaVersion = 1;
+const _requestLimit = 128 * 1024;
 const _responseLimit = 2 * 1024 * 1024;
 
 final class BusinessStateException implements Exception {
@@ -1889,6 +1890,90 @@ final class BusinessStateClient {
     _ensureOpen();
     _budget(reply);
     return reply;
+  }
+
+  Future<List<wire.BrowsingHistoryEntry>> readBrowsingHistory() => _serial(
+    'browsing-history',
+    () async {
+      final result = await _history();
+      if (result.hasMetadata()) {
+        throw const FormatException('Unexpected history metadata');
+      }
+      validateBusinessHistoryEntries(result.entries);
+      return List.unmodifiable(result.entries.map((entry) => entry..freeze()));
+    },
+  );
+
+  Future<wire.LibraryMetadata?> readBrowsingVisit(String key) async {
+    validateBusinessMangaKey(key);
+    final result = await _history(key: key);
+    if (result.entries.isNotEmpty) {
+      throw const FormatException('Unexpected history list');
+    }
+    if (!result.hasMetadata()) return null;
+    final metadata = result.metadata;
+    validateBusinessMetadata(metadata);
+    if (businessMetadataKey(metadata) != key) {
+      throw const FormatException(
+        'History metadata does not match manga identity',
+      );
+    }
+    return metadata..freeze();
+  }
+
+  Future<void> recordBrowsingVisit(wire.LibraryMetadata metadata) =>
+      _serial('browsing-history', () async {
+        validateBusinessMetadata(metadata);
+        await _history(
+          method: 'POST',
+          visit: wire.RecordBrowsingVisit(
+            schemaVersion: _schemaVersion,
+            metadata: metadata,
+          ),
+        );
+      });
+
+  Future<void> removeBrowsingHistory({String? key}) =>
+      _serial('browsing-history', () async {
+        if (key != null) validateBusinessMangaKey(key);
+        await _history(method: 'DELETE', key: key);
+      });
+
+  Future<wire.BrowsingHistoryResponse> _history({
+    String? key,
+    String method = 'GET',
+    wire.RecordBrowsingVisit? visit,
+  }) async {
+    _ensureOpen();
+    final reply = await api.fetchApi(
+      key == null ? '/api/history' : '/api/history/$key',
+      method: method,
+      headers: {
+        ..._headers,
+        if (visit != null) 'Content-Type': 'application/json',
+      },
+      body: visit == null
+          ? null
+          : jsonEncode(wire.encodeProtoJson(visit, maxBytes: _requestLimit)),
+    );
+    _ensureOpen();
+    _budget(reply);
+    final result = wire.decodeProtoJson(
+      wire.BrowsingHistoryResponse(),
+      jsonDecode(reply.body),
+      maxBytes: _responseLimit,
+    );
+    _version(result.schemaVersion);
+    if (result.hasError()) {
+      validateBusinessError(result.error);
+      throw BusinessStateException(result.error);
+    }
+    _success(reply);
+    if (method != 'GET' &&
+        (result.hasMetadata() || result.entries.isNotEmpty)) {
+      throw const FormatException('Invalid history write acknowledgement');
+    }
+    return result;
   }
 
   void _accept(wire.MangaState value, {bool local = false}) {

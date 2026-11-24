@@ -21,6 +21,10 @@ ReadingMode readerMode(wire.ReaderMode mode) => switch (mode) {
   wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT => ReadingMode.rightToLeft,
   wire.ReaderMode.READER_MODE_CONTINUOUS => ReadingMode.continuous,
   wire.ReaderMode.READER_MODE_WEBTOON => ReadingMode.webtoon,
+  wire.ReaderMode.READER_MODE_HORIZONTAL_CONTINUOUS_LEFT_TO_RIGHT =>
+    ReadingMode.horizontalContinuousLeftToRight,
+  wire.ReaderMode.READER_MODE_HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT =>
+    ReadingMode.horizontalContinuousRightToLeft,
   _ => throw const FormatException('Unsupported reader settings mode'),
 };
 wire.ReaderMode wireReaderMode(ReadingMode mode) => switch (mode) {
@@ -28,6 +32,10 @@ wire.ReaderMode wireReaderMode(ReadingMode mode) => switch (mode) {
   ReadingMode.rightToLeft => wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
   ReadingMode.continuous => wire.ReaderMode.READER_MODE_CONTINUOUS,
   ReadingMode.webtoon => wire.ReaderMode.READER_MODE_WEBTOON,
+  ReadingMode.horizontalContinuousLeftToRight =>
+    wire.ReaderMode.READER_MODE_HORIZONTAL_CONTINUOUS_LEFT_TO_RIGHT,
+  ReadingMode.horizontalContinuousRightToLeft =>
+    wire.ReaderMode.READER_MODE_HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT,
 };
 bool? doublePage(wire.ReaderPageLayout layout) => switch (layout) {
   wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO => null,
@@ -46,11 +54,9 @@ ReaderFit readerFit(wire.ReaderFit value) => switch (value) {
   wire.ReaderFit.READER_FIT_HEIGHT => ReaderFit.height,
   _ => throw const FormatException('Unsupported reader fit'),
 };
-const _modes = <wire.ReaderMode, String>{
-  wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT: '从左到右',
-  wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT: '从右到左',
-  wire.ReaderMode.READER_MODE_CONTINUOUS: '竖向连续',
-  wire.ReaderMode.READER_MODE_WEBTOON: '条漫',
+final readerModeOptions = <wire.ReaderMode, String>{
+  for (final entry in readingModeLabels.entries)
+    wireReaderMode(entry.key): entry.value,
 };
 const _layouts = <wire.ReaderPageLayout, String>{
   wire.ReaderPageLayout.READER_PAGE_LAYOUT_AUTO: '自动',
@@ -106,29 +112,14 @@ class const SettingsStatus({
       children: [
         if (state.activity case final activity?)
           Semantics(
+            key: ValueKey(('settings-activity', activity.name)),
             container: true,
             liveRegion: true,
-            child: Row(
-              children: [
-                const CupertinoActivityIndicator(),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    switch (activity) {
-                      SettingsActivity.reading =>
-                        state.pending?.acknowledged == true
-                            ? '原设置已确认，正在读取最新状态'
-                            : '正在读取服务端设置',
-                      SettingsActivity.saving => '正在等待服务端确认设置修改',
-                    },
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.secondaryLabel.resolveFrom(context),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            label: switch (activity) {
+              SettingsActivity.reading => '正在读取设置',
+              SettingsActivity.saving => '正在保存设置',
+            },
+            child: const CupertinoActivityIndicator(),
           ),
         if (state.error case final error? when !(compact && unknown))
           Semantics(
@@ -227,7 +218,7 @@ class const DeviceAppearanceSettings({
 
 enum _SettingsSection {
   appearance('appearance', '外观与主题', '跟随系统、浅色与深色', CupertinoIcons.paintbrush),
-  reading('reading', '账户阅读偏好', '阅读模式、页组、图像适配和裁白', CupertinoIcons.book),
+  reading('reading', '账户阅读偏好', '阅读模式、分页布局、图像适配和裁白', CupertinoIcons.book),
   input('input', '翻页与快捷键', '点击区与键盘操作', CupertinoIcons.keyboard),
   connection('connection', '服务连接', '服务地址与登录', CupertinoIcons.cloud),
   about('about', '关于', 'Karuyomi', CupertinoIcons.info);
@@ -376,6 +367,10 @@ class const _SettingsEditor({
         ? null
         : _FormDraft(state, manga);
     final r = draft?.reader;
+    final effectiveMode = r?.hasMode() == true
+        ? r!.mode
+        : state.snapshot?.global.reader.mode ??
+              wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT;
     final canClose =
         state.activity != SettingsActivity.saving || state.submitting != null;
     Widget group(String title, List<Widget> fields, {String? footer}) =>
@@ -390,14 +385,8 @@ class const _SettingsEditor({
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (state.unsent != null)
-          const Text('有修改等待发送。')
-        else if (state.snapshot != null &&
-            !state.busy &&
-            state.submitting == null &&
-            state.error == null &&
-            state.pending == null)
-          const Text('当前设置已获服务端确认。'),
+        if (state.unsent != null && state.error != null)
+          const Text('部分修改尚未保存。'),
         if (controller != null)
           SettingsStatus(controller: controller, state: state),
       ],
@@ -450,18 +439,19 @@ class const _SettingsEditor({
                 'mode',
                 '阅读模式',
                 r.hasMode() ? r.mode : null,
-                _modes,
+                readerModeOptions,
                 (reader, value) => reader.mode = value,
                 (reader) => reader.clearMode(),
               ),
-              choice(
-                'layout',
-                '页组',
-                r.hasPageLayout() ? r.pageLayout : null,
-                _layouts,
-                (reader, value) => reader.pageLayout = value,
-                (reader) => reader.clearPageLayout(),
-              ),
+              if (!readerMode(effectiveMode).isContinuous)
+                choice(
+                  'layout',
+                  '分页布局',
+                  r.hasPageLayout() ? r.pageLayout : null,
+                  _layouts,
+                  (reader, value) => reader.pageLayout = value,
+                  (reader) => reader.clearPageLayout(),
+                ),
               choice(
                 'fit',
                 '图像适配',
@@ -633,10 +623,12 @@ class const _SettingsEditor({
                               ),
                         ],
                       ),
-                      if (!showDetail && state.unsent != null)
+                      if (!showDetail &&
+                          state.unsent != null &&
+                          state.error != null)
                         const Padding(
                           padding: EdgeInsets.all(16),
-                          child: Text('有修改等待发送。'),
+                          child: Text('部分修改尚未保存。'),
                         ),
                       if (!showDetail &&
                           controller != null &&

@@ -10,6 +10,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:karuyomi/features/browse/catalog_page.dart';
 import 'package:karuyomi/features/browse/source_browse_page.dart';
 import 'package:karuyomi/features/sources/source_preferences.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
@@ -83,6 +84,72 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('source directory saves settings before requesting a listing', (
+    tester,
+  ) async {
+    final beforeBrowsing = PreferenceFixture();
+    await tester.runAsync(() => beforeBrowsing.open(selectSource: false));
+    addTearDown(beforeBrowsing.close);
+    await tester.pumpApp(
+      CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: CatalogPage(
+            controller: beforeBrowsing.catalog,
+            onConnect: () {},
+            onAuthenticate: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final catalog = beforeBrowsing.catalog;
+    final source = catalog.builds.single.sources.single;
+    await tester.tap(
+      find.byKey(ValueKey(('configure-source', preferencePackage, source.id))),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(SourcePreferencesSheet), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey(('source-preference', '0'))));
+    await tester.pumpAndSettle();
+    expect(beforeBrowsing.postedBodies, hasLength(1));
+    final preference = beforeBrowsing
+        .platform
+        .preferenceBootstraps
+        .last
+        .sources
+        .single
+        .entries
+        .singleWhere((entry) => entry.key == 'alias');
+    expect(preference.value.boolean, isTrue);
+    expect(
+      beforeBrowsing.platform.invocations.where(
+        (call) => call.hasPopular() || call.hasLatest(),
+      ),
+      isEmpty,
+    );
+    await tester.tap(iconLabel('关闭设置'));
+    await tester.pumpAndSettle();
+    expect(
+      beforeBrowsing.platform.invocations.where(
+        (call) => call.hasPopular() || call.hasLatest(),
+      ),
+      isEmpty,
+    );
+    await tester.tap(
+      find.byKey(
+        ValueKey(('source-directory-row', preferencePackage, source.id)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(SourceBrowsePage), findsOneWidget);
+    expect(
+      beforeBrowsing.platform.invocations.where((call) => call.hasPopular()),
+      hasLength(1),
+    );
+    expect(find.text('真实源 DTO 测试'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final appearance in Brightness.values) {
     testWidgets(
       'an account choice shows a repeated option label once and keeps distinct help in $appearance',
@@ -106,7 +173,7 @@ void main() {
           find.descendant(of: choice, matching: find.text('服务器乙')),
           findsOneWidget,
         );
-        expect(find.text('优先使用该镜像浏览\n服务端确认后同步'), findsOneWidget);
+        expect(find.text('优先使用该镜像浏览'), findsOneWidget);
         expect(fixture.callbacks, 1);
         expect(fixture.postedBodies, hasLength(1));
         expect(tester.takeException(), isNull);
@@ -176,14 +243,9 @@ void main() {
             '已修正的会话备注',
           );
           await apply(tester);
-          await tester.scrollUntilVisible(
-            find.text('设置已确认。'),
-            -250,
-            scrollable: scrollable,
-          );
           await tester.pumpAndSettle();
           expect(rejection, findsNothing);
-          expect(find.text('设置已确认。'), findsOneWidget);
+          expect(find.text('设置已确认。'), findsNothing);
           expect(fixture.values['note']!.value.text, '已修正的会话备注');
           expect(fixture.callbacks, 2);
           expect(fixture.postedBodies, isEmpty);
@@ -379,12 +441,7 @@ void main() {
           const ValueKey(('source-preference', '0.1.0')),
         );
         expect(tester.widget<CupertinoSwitch>(toggle).onChanged, isNull);
-        final footer = tester.element(find.textContaining('每次修改只执行一次漫画源操作。'));
-        expect(DefaultTextStyle.of(footer).style.fontSize, 13);
-        expect(
-          DefaultTextStyle.of(footer).style.color,
-          CupertinoColors.secondaryLabel.resolveFrom(footer),
-        );
+        expect(find.textContaining('每次修改只执行一次漫画源操作。'), findsNothing);
         empty = true;
         final refresh = find.byKey(
           const ValueKey('source-preferences-refresh'),
@@ -417,20 +474,11 @@ void main() {
           expect(label, contains('隐藏付费章节'));
           expect(label, isNot(contains('登录密码')));
           expect(label, isNot(contains('服务器')));
-          final help = tester.element(find.text('显示全部章节\n服务端确认后同步'));
+          final help = tester.element(find.text('显示全部章节'));
+          expect(tester.widget<Text>(find.text('显示全部章节')).style!.fontSize, 13);
           expect(
-            tester.widget<Text>(find.text('显示全部章节\n服务端确认后同步')).style!.fontSize,
-            13,
-          );
-          expect(
-            tester.widget<Text>(find.text('显示全部章节\n服务端确认后同步')).style!.color,
+            tester.widget<Text>(find.text('显示全部章节')).style!.color,
             CupertinoColors.secondaryLabel.resolveFrom(help),
-          );
-          final footer = tester.element(find.textContaining('每次修改只执行一次漫画源操作。'));
-          expect(DefaultTextStyle.of(footer).style.fontSize, 13);
-          expect(
-            DefaultTextStyle.of(footer).style.color,
-            CupertinoColors.secondaryLabel.resolveFrom(footer),
           );
           expect(fixture.postedBodies, isEmpty);
           expect(tester.takeException(), isNull);
@@ -660,7 +708,7 @@ void main() {
         await tester.pump();
         try {
           expect(entered.isCompleted, true);
-          expect(find.text('保存已确认，正在读取最新设置。'), findsOneWidget);
+          expect(find.byType(CupertinoActivityIndicator), findsWidgets);
           expect(find.text('未确认的原保存请求 · 基于版本 0'), findsNothing);
           expect(fixture.postedBodies, hasLength(1));
         } finally {

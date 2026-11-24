@@ -260,6 +260,25 @@ message LibraryPageResponse {
   CategoryCatalog category_catalog = 6;
 }
 
+message RecordBrowsingVisit {
+  uint32 schema_version = 1;
+  LibraryMetadata metadata = 2;
+}
+
+message BrowsingHistoryEntry {
+  string manga_key = 1;
+  string title = 2;
+  string source_name = 3;
+  uint64 visited_at_ms = 4;
+}
+
+message BrowsingHistoryResponse {
+  uint32 schema_version = 1;
+  repeated BrowsingHistoryEntry entries = 2;
+  LibraryMetadata metadata = 3;
+  BusinessStateError error = 4;
+}
+
 message CategoryMutationResponse {
   uint32 schema_version = 1;
   string mutation_id = 2;
@@ -281,6 +300,8 @@ enum ReaderMode {
   READER_MODE_RIGHT_TO_LEFT = 2;
   READER_MODE_CONTINUOUS = 3;
   READER_MODE_WEBTOON = 4;
+  READER_MODE_HORIZONTAL_CONTINUOUS_LEFT_TO_RIGHT = 5;
+  READER_MODE_HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT = 6;
 }
 
 enum ReaderPageLayout {

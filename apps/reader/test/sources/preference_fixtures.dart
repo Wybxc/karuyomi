@@ -29,7 +29,7 @@ final class PreferenceFixture {
   Map<String, wire.PreferenceEntry> values = {};
   int _opened = 0;
 
-  Future<void> open() async {
+  Future<void> open({bool selectSource = true}) async {
     platform.invokeHandler = _invoke;
     catalog = CatalogController(
       api: platform,
@@ -38,8 +38,10 @@ final class PreferenceFixture {
       deploymentOrigin: platform.origin,
     );
     await catalog.connect();
-    await catalog.openBuild(catalog.builds.single);
-    await catalog.selectSource(catalog.session!.sources.single);
+    if (selectSource) {
+      await catalog.openBuild(catalog.builds.single);
+      await catalog.selectSource(catalog.session!.sources.single);
+    }
   }
 
   void _readBootstrap() {

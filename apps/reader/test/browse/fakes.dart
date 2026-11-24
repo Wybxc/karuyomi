@@ -200,6 +200,7 @@ final class TestPlatform extends PlatformRuntime
         await beforeApiFetch?.call(request.fetchApi.path);
         if (request.fetchApi.path.startsWith('/api/library') ||
             request.fetchApi.path.startsWith('/api/categories') ||
+            request.fetchApi.path.startsWith('/api/history') ||
             request.fetchApi.path.startsWith('/api/settings') ||
             request.fetchApi.path.startsWith('/api/source-preferences/') ||
             request.fetchApi.path.startsWith('/api/state/')) {

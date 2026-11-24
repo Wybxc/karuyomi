@@ -309,7 +309,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   late ScrollController _scroll;
   late TransformationController _transform;
   late AnimationController _toolbarAnimation;
-  final _horizontal = <String, ScrollController>{};
+  final _crossScrolls = <String, ScrollController>{};
   final _pointers = <int>{};
   Offset? _dragStart;
   double _edgePull = 0;
@@ -757,19 +757,33 @@ class _ReaderScreenState extends State<ReaderScreen> {
     setState(() {});
   }
 
-  double get _leadingX => _reader.mode == ReadingMode.rightToLeft ? 1 : 0;
+  double get _leadingX => _reader.mode.isRightToLeft ? 1 : 0;
   double get _gap => _reader.mode == ReadingMode.webtoon ? 0 : 12;
   Size get _viewport => Size(_viewportWidth, _viewportHeight);
+  Axis get _scrollAxis =>
+      _reader.mode.isVertical ? Axis.vertical : Axis.horizontal;
+  Axis get _crossAxis =>
+      _reader.mode.isVertical ? Axis.horizontal : Axis.vertical;
+  double _mainExtent(Size size) =>
+      _reader.mode.isVertical ? size.height : size.width;
+  double _crossExtent(Size size) =>
+      _reader.mode.isVertical ? size.width : size.height;
+  double _mainFraction(Offset point) => _reader.mode.isVertical
+      ? point.dy
+      : _reader.mode.isRightToLeft
+      ? 1 - point.dx
+      : point.dx;
+  double _crossFraction(Offset point) =>
+      _reader.mode.isVertical ? point.dx : point.dy;
   Size _pageSize(ReaderPage page, {double? width}) => _fitImageSize(
     page.aspectRatio,
     Size(width ?? _viewportWidth, _viewportHeight),
     widget.fit,
   );
-  double _pageHeight(ReaderPage page) => _pageSize(page).height;
   List<double> get _offsets {
     final offsets = <double>[0];
     for (final page in _reader.manifest.pages) {
-      offsets.add(offsets.last + _pageHeight(page) + _gap);
+      offsets.add(offsets.last + _mainExtent(_pageSize(page)) + _gap);
     }
     return offsets;
   }
@@ -781,8 +795,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
     centerY: _pageCenterY,
   );
 
-  double _horizontalOffset(String key) {
-    final controller = _horizontal[key];
+  double _crossScrollOffset(String key) {
+    final controller = _crossScrolls[key];
     return controller != null && controller.hasClients ? controller.offset : 0;
   }
 
@@ -796,13 +810,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
       for (var index = 0; index < _reader.manifest.pages.length; index++) {
         final page = _reader.manifest.pages[index];
         final size = _pageSize(page);
-        final rect = Rect.fromLTWH(
-          math.max(0, (_viewportWidth - size.width) / 2) -
-              _horizontalOffset(page.key),
-          offsets[index] - _scroll.offset,
-          size.width,
-          size.height,
-        );
+        final along = offsets[index] - _scroll.offset;
+        final across =
+            math.max(0, (_crossExtent(_viewport) - _crossExtent(size)) / 2) -
+            _crossScrollOffset(page.key);
+        final origin = _reader.mode.isVertical
+            ? Offset(across, along)
+            : Offset(
+                _reader.mode.isRightToLeft
+                    ? _viewportWidth - along - size.width
+                    : along,
+                across,
+              );
+        final rect = origin & size;
         if (rect.overlaps(viewport)) rects[page.key] = rect;
       }
     } else {
@@ -936,10 +956,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
       leading.dx.clamp(image.visible.left, image.visible.right),
       image.visible.top,
     );
+    double distance(_VisibleImage image) {
+      final delta = nearest(image) - leading;
+      return _reader.isContinuous && !_reader.mode.isVertical
+          ? delta.dx.abs()
+          : delta.distanceSquared;
+    }
+
     var selected = images.first;
     for (final image in images.skip(1)) {
-      if ((nearest(image) - leading).distanceSquared <
-          (nearest(selected) - leading).distanceSquared) {
+      if (distance(image) < distance(selected)) {
         selected = image;
       }
     }
@@ -958,13 +984,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
-  double _restoreTop(ReadingPosition anchor) =>
+  double _restoreScrollOffset(ReadingPosition anchor) =>
       _offsets[anchor.pageIndexHint] +
-      _pageHeight(_reader.manifest.pages[anchor.pageIndexHint]) *
-          _pointWithinCrop(anchor).dy -
-      _viewportHeight * anchor.viewportY;
+      _mainExtent(_pageSize(_reader.manifest.pages[anchor.pageIndexHint])) *
+          _mainFraction(_pointWithinCrop(anchor)) -
+      _mainExtent(_viewport) *
+          _mainFraction(Offset(anchor.viewportX, anchor.viewportY));
 
-  void _onHorizontalScroll() {
+  void _onCrossScroll() {
     if (!mounted || _restoring) return;
     _captureViewportAnchor();
     _scheduleViewport();
@@ -975,23 +1002,24 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (_reader.isContinuous && _viewportWidth > 0 && _viewportHeight > 0) {
       final offsets = _offsets;
       final anchor = _pendingRestorePosition ?? _reader.position;
-      final top = _restoring && anchor != null
-          ? _restoreTop(anchor)
+      final startOfViewport = _restoring && anchor != null
+          ? _restoreScrollOffset(anchor)
           : _scroll.hasClients
           ? _scroll.offset
           : 0.0;
+      final extent = _mainExtent(_viewport);
       final visible = <ReaderPage>[];
       final forward = <ReaderPage>[];
       final backward = <ReaderPage>[];
       for (var i = 0; i < _reader.manifest.pages.length; i++) {
         final start = offsets[i];
         final end = offsets[i + 1];
-        if (end > top && start < top + _viewportHeight) {
+        if (end > startOfViewport && start < startOfViewport + extent) {
           visible.add(_reader.manifest.pages[i]);
-        } else if (start >= top + _viewportHeight &&
-            start < top + _viewportHeight * 2) {
+        } else if (start >= startOfViewport + extent &&
+            start < startOfViewport + extent * 2) {
           forward.add(_reader.manifest.pages[i]);
-        } else if (end <= top && end > top - _viewportHeight) {
+        } else if (end <= startOfViewport && end > startOfViewport - extent) {
           backward.add(_reader.manifest.pages[i]);
         }
       }
@@ -1045,7 +1073,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
       }
       if (_reader.isContinuous && _scroll.hasClients) {
         _scroll.jumpTo(
-          _restoreTop(anchor).clamp(0.0, _scroll.position.maxScrollExtent),
+          _restoreScrollOffset(anchor)
+              .clamp(0.0, _scroll.position.maxScrollExtent),
         );
       } else if (!_reader.isContinuous) {
         final scene = _pagedScene;
@@ -1066,22 +1095,24 @@ class _ReaderScreenState extends State<ReaderScreen> {
           );
         }
       }
-      // A vertical jump may build the target page's horizontal ScrollPosition
+      // A list jump may build the target page's cross-axis ScrollPosition
       // in the next layout. Keep observations blocked until that position exists.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || epoch != _restoreEpoch) return;
         if (_reader.isContinuous) {
           final page = _reader.manifest.pages[anchor.pageIndexHint];
           final size = _pageSize(page);
-          final horizontal = _horizontal[page.key];
-          if (horizontal != null && horizontal.hasClients) {
+          final cross = _crossScrolls[page.key];
+          if (cross != null && cross.hasClients) {
             final target =
-                math.max(0, (_viewportWidth - size.width) / 2) +
-                size.width * _pointWithinCrop(anchor).dx -
-                _viewportWidth * anchor.viewportX;
-            horizontal.jumpTo(
-              target.clamp(0.0, horizontal.position.maxScrollExtent),
-            );
+                math.max(
+                  0,
+                  (_crossExtent(_viewport) - _crossExtent(size)) / 2,
+                ) +
+                _crossExtent(size) * _crossFraction(_pointWithinCrop(anchor)) -
+                _crossExtent(_viewport) *
+                    _crossFraction(Offset(anchor.viewportX, anchor.viewportY));
+            cross.jumpTo(target.clamp(0.0, cross.position.maxScrollExtent));
           }
         }
         _pendingRestorePosition = null;
@@ -1514,7 +1545,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     } else if (!_reader.isContinuous &&
         !_zoomed &&
         widget.tapZones != ReaderInputPreset.disabled) {
-      final forward = _reader.mode == ReadingMode.rightToLeft
+      final forward = _reader.mode.isRightToLeft
           ? fraction < 1 / 3
           : fraction > 2 / 3;
       final advance = widget.tapZones == ReaderInputPreset.reversed
@@ -1533,30 +1564,40 @@ class _ReaderScreenState extends State<ReaderScreen> {
       child: ListView.builder(
         key: const ValueKey('continuous-reader'),
         controller: _scroll,
+        scrollDirection: _scrollAxis,
+        reverse:
+            !_reader.mode.isVertical &&
+            (_reader.mode.isRightToLeft !=
+                (Directionality.of(context) == TextDirection.rtl)),
         physics: widget.onChapterEdge == null
             ? null
             : const AlwaysScrollableScrollPhysics(),
         scrollCacheExtent: const ScrollCacheExtent.viewport(1),
         itemCount: _reader.manifest.pages.length,
         itemExtentBuilder: (index, dimensions) =>
-            _pageHeight(_reader.manifest.pages[index]) + _gap,
+            _mainExtent(_pageSize(_reader.manifest.pages[index])) + _gap,
         itemBuilder: (context, index) {
           final page = _reader.manifest.pages[index];
           final size = _pageSize(page);
           return Padding(
-            padding: EdgeInsets.only(bottom: _gap),
+            padding: _reader.mode.isVertical
+                ? EdgeInsets.only(bottom: _gap)
+                : _reader.mode.isRightToLeft
+                ? EdgeInsets.only(left: _gap)
+                : EdgeInsets.only(right: _gap),
             child: _ContinuousImage(
               key: ValueKey('continuous-image-${page.key}'),
               pageKey: page.key,
-              viewportWidth: _viewportWidth,
+              crossAxis: _crossAxis,
+              viewportCrossExtent: _crossExtent(_viewport),
               imageSize: size,
-              onAttached: (controller) => _horizontal[page.key] = controller,
+              onAttached: (controller) => _crossScrolls[page.key] = controller,
               onDetached: (controller) {
-                if (identical(_horizontal[page.key], controller)) {
-                  _horizontal.remove(page.key);
+                if (identical(_crossScrolls[page.key], controller)) {
+                  _crossScrolls.remove(page.key);
                 }
               },
-              onMoved: _onHorizontalScroll,
+              onMoved: _onCrossScroll,
               onDoubleTap: () => _openZoom(page),
               child: _image(context, page),
             ),
@@ -1585,7 +1626,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         if (start == null || pannable) return;
         final delta = event.position - start;
         if (delta.dx.abs() < 60 || delta.dx.abs() < delta.dy.abs()) return;
-        final forward = _reader.mode == ReadingMode.rightToLeft
+        final forward = _reader.mode.isRightToLeft
             ? delta.dx > 0
             : delta.dx < 0;
         _turn(forward);
@@ -1799,19 +1840,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     behavior: HitTestBehavior.opaque,
                     excludeFromSemantics: true,
                     onTapUp: _onCanvasTap,
-                    onHorizontalDragEnd: !_reader.isContinuous
+                    onHorizontalDragEnd: !_reader.mode.isVertical
                         ? (details) {
                             final velocity = details.primaryVelocity;
                             if (velocity != null && velocity != 0) {
                               _turn(
-                                _reader.mode == ReadingMode.rightToLeft
+                                _reader.mode.isRightToLeft
                                     ? velocity > 0
                                     : velocity < 0,
                               );
                             }
                           }
                         : null,
-                    onVerticalDragEnd: _reader.isContinuous
+                    onVerticalDragEnd: _reader.mode.isVertical
                         ? (details) {
                             final velocity = details.primaryVelocity;
                             if (velocity != null && velocity != 0) {
@@ -1900,9 +1941,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-            _keyboardTurn(_reader.mode != ReadingMode.rightToLeft),
+            _keyboardTurn(!_reader.mode.isRightToLeft),
         const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-            _keyboardTurn(_reader.mode == ReadingMode.rightToLeft),
+            _keyboardTurn(_reader.mode.isRightToLeft),
         const SingleActivator(LogicalKeyboardKey.pageDown): () =>
             _keyboardTurn(true),
         const SingleActivator(LogicalKeyboardKey.space): () =>
@@ -2057,15 +2098,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 icon: switch (_reader.mode) {
                   ReadingMode.leftToRight => CupertinoIcons.arrow_right,
                   ReadingMode.rightToLeft => CupertinoIcons.arrow_left,
+                  ReadingMode.horizontalContinuousLeftToRight =>
+                    CupertinoIcons.arrow_right,
+                  ReadingMode.horizontalContinuousRightToLeft =>
+                    CupertinoIcons.arrow_left,
                   ReadingMode.continuous => CupertinoIcons.arrow_down,
                   ReadingMode.webtoon => CupertinoIcons.rectangle_grid_1x2,
                 },
-                options: const {
-                  ReadingMode.leftToRight: '从左到右',
-                  ReadingMode.rightToLeft: '从右到左',
-                  ReadingMode.continuous: '竖向连续',
-                  ReadingMode.webtoon: '条漫',
-                },
+                options: readingModeLabels,
                 onChanged: widget.layoutSettingsEnabled
                     ? (mode) {
                         if (mode != null) _selectMode(mode);
@@ -2139,7 +2179,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Widget _scrollableControls() {
-    final direction = _reader.mode == ReadingMode.rightToLeft
+    final direction = _reader.mode.isRightToLeft
         ? TextDirection.rtl
         : TextDirection.ltr;
     return SingleChildScrollView(
@@ -2271,12 +2311,13 @@ class _ReaderNavigationBar extends _ReaderToolbarTransition
       bar.shouldFullyObstruct(context);
 }
 
-/// Each lazily built page owns its horizontal position and disposes it when
+/// Each lazily built page owns its cross-axis position and disposes it when
 /// leaving the list; the Reader only borrows live controllers for restoration.
 class const _ContinuousImage({
   super.key,
   required final String pageKey,
-  required final double viewportWidth,
+  required final Axis crossAxis,
+  required final double viewportCrossExtent,
   required final Size imageSize,
   required final ValueChanged<ScrollController> onAttached,
   required final ValueChanged<ScrollController> onDetached,
@@ -2287,20 +2328,26 @@ class const _ContinuousImage({
   @override
   Widget build(BuildContext context) {
     final controller = useScrollController();
+    final horizontal = crossAxis == Axis.horizontal;
     useOnListenableChange(controller, onMoved);
     useEffect(() {
       onAttached(controller);
       return () => onDetached(controller);
     }, [controller]);
     return SingleChildScrollView(
-      key: ValueKey('horizontal-$pageKey'),
+      key: ValueKey('${crossAxis.name}-$pageKey'),
       controller: controller,
-      scrollDirection: Axis.horizontal,
+      scrollDirection: crossAxis,
+      reverse: horizontal && Directionality.of(context) == TextDirection.rtl,
       child: GestureDetector(
         onDoubleTap: onDoubleTap,
         child: SizedBox(
-          width: math.max(viewportWidth, imageSize.width),
-          height: imageSize.height,
+          width: horizontal
+              ? math.max(viewportCrossExtent, imageSize.width)
+              : imageSize.width,
+          height: horizontal
+              ? imageSize.height
+              : math.max(viewportCrossExtent, imageSize.height),
           child: Center(
             child: SizedBox(
               key: ValueKey('image-rect-$pageKey'),

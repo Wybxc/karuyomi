@@ -105,7 +105,7 @@ void main() {
     expect(editor.snapshot!.nodes[1].text.value, 'session-password');
     expect(fixture.catalog.sourcePreferencesBlocked, false);
     expect(fixture.catalog.sourceFilterSnapshot, isNull);
-    expect(fixture.catalog.page, 1);
+    expect(fixture.catalog.page, 0);
   });
 
   test('fresh remote revision triggers reconstruction before editing rather than pairing old runtime values with new CAS', () async {

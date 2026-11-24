@@ -211,7 +211,7 @@ void main() {
             panel,
             'manga-mode',
             set ? null : _overrideMode,
-            set ? '从右到左' : '跟随全局',
+            set ? '横向分页 · 从右到左' : '跟随全局',
           );
           await confirmChoice();
           await _choose<wire.ReaderPageLayout>(
@@ -531,7 +531,11 @@ Future<void> _waitForSavedFurthest(WidgetTester tester) => _wait(
   tester,
   '服务端已确认第 2 页最远进度',
   () =>
-      find.text('阅读进度已保存到服务端').evaluate().length == 1 &&
+      find
+              .byKey(const ValueKey('reader-progress-confirmed'))
+              .evaluate()
+              .length ==
+          1 &&
       find.textContaining(RegExp(r'^最远：第 2 页')).evaluate().length == 1,
 );
 

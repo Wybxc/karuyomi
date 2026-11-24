@@ -261,7 +261,10 @@ void main() {
       await tester.tap(find.text('刷新进度'));
       await tester.pumpAndSettle();
       expect(find.text('未能刷新服务器进度，当前阅读位置保持不变，可重试。'), findsNothing);
-      expect(find.text('阅读进度已保存到服务端'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('reader-progress-confirmed')),
+        findsOneWidget,
+      );
       await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();
       await catalog.closeReadingProgress();
@@ -530,8 +533,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('第一章'));
       await tester.pumpAndSettle();
-      expect(find.text('阅读进度待服务端确认'), findsOneWidget);
-      expect(find.text('阅读进度已保存到服务端'), findsNothing);
+      expect(find.text('阅读进度待服务端确认'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('reader-progress-confirmed')),
+        findsNothing,
+      );
       await catalog.flushReadingProgress();
       platform.businessServer.failWrites = true;
       final leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
@@ -548,7 +554,10 @@ void main() {
       expect(find.byType(ReaderScreen), findsOneWidget);
       expect(find.text('进度尚未获服务器确认，可重试；草稿仅保留在当前会话。'), findsOneWidget);
       expect(find.text('重试保存'), findsOneWidget);
-      expect(find.text('阅读进度已保存到服务端'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('reader-progress-confirmed')),
+        findsNothing,
+      );
       platform.businessServer.failWrites = false;
       await tester.tap(find.text('重试保存'));
       await tester.pumpAndSettle();
@@ -557,7 +566,10 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
       expect(catalog.hasUnsavedReadingProgress, false);
-      expect(find.text('阅读进度已保存到服务端'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('reader-progress-confirmed')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
       await tester.pumpApp(const SizedBox.shrink());
       await tester.pumpAndSettle();

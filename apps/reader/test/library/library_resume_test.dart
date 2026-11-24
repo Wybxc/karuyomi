@@ -409,7 +409,7 @@ void main() {
 
   for (final brightness in Brightness.values) {
     testWidgets(
-      'lost metadata acknowledgement keeps its confirmed $brightness message separate from a failed shelf read',
+      'a confirmed metadata retry leaves only the failed shelf read visible in $brightness',
       (tester) async {
         detailManga = testManga..title = 'Source refreshed metadata';
         var loseAck = true;
@@ -493,23 +493,13 @@ void main() {
           false,
         );
         expect(retry, findsNothing);
-        expect(find.text('书架资料已获服务器确认。'), findsOneWidget);
-        final confirmation = find.text('书架资料已获服务器确认。');
-        final context = tester.element(confirmation);
-        expect(
-          DefaultTextStyle.of(context).style
-              .merge(tester.widget<Text>(confirmation).style)
-              .color,
-          AppColors.label.resolveFrom(context),
-          reason:
-              'a confirmed write must not inherit the later read error color',
-        );
+        expect(find.text('书架资料已获服务器确认。'), findsNothing);
         final readError = find.text('未能刷新服务端书架，当前显示上次确认的结果。');
+        expect(readError, findsOneWidget);
         expect(
           tester.widget<Text>(readError).style!.color,
-          AppColors.error.resolveFrom(context),
+          AppColors.error.resolveFrom(tester.element(readError)),
         );
-        expect(find.text('未能刷新服务端书架，当前显示上次确认的结果。'), findsOneWidget);
         expect(find.text('书架资料仍未获确认，原操作已保留，请明确重试保存。'), findsNothing);
         expect(find.text('书架资料尚未确认，仍可继续阅读；请返回书架处理未确认操作。'), findsNothing);
         expect(bodies, hasLength(2));

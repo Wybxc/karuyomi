@@ -92,6 +92,13 @@
       "when": 1795257674695,
       "tag": "0012_local-reader-device-preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1795499836595,
+      "tag": "0013_browsing-history",
+      "breakpoints": true
     }
   ]
 }

@@ -34,8 +34,7 @@ final class ReaderController {
   ReadingPosition? get position => _resolution.position;
   PositionResolutionKind get resolutionKind => _resolution.kind;
   bool get requiresPositionNotice => _resolution.requiresNotice;
-  bool get isContinuous =>
-      _mode == ReadingMode.continuous || _mode == ReadingMode.webtoon;
+  bool get isContinuous => _mode.isContinuous;
   Stream<void> get changes => _changes.stream;
   List<PageSpread> get spreads => groupPages(
     _manifest,

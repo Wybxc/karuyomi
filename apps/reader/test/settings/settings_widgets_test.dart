@@ -200,7 +200,12 @@ void main() {
           await tester.pump();
           await tester.runAsync(() => reading.future);
           await tester.pump(const Duration(milliseconds: 600));
-          expect(find.text('正在读取服务端设置').hitTestable(), findsOneWidget);
+          expect(
+            find
+                .byKey(const ValueKey(('settings-activity', 'reading')))
+                .hitTestable(),
+            findsOneWidget,
+          );
           final pop = find.descendant(
             of: find.byType(MangaSettingsEditor),
             matching: find.byType(PopScope),
@@ -273,7 +278,10 @@ void main() {
             size: const Size(360, 800),
             settle: false,
           );
-          expect(find.text('正在读取服务端设置'), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey(('settings-activity', 'reading'))),
+            findsOneWidget,
+          );
           expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsNothing);
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
           expect(find.byType(ChoiceField<wire.ReaderMode>), findsNothing);
@@ -284,13 +292,19 @@ void main() {
           await tester.runAsync(() => Future<void>.delayed(Duration.zero));
           await tester.pumpAndSettle();
           expect(find.text('未能读取服务端设置；当前阅读仍可继续。'), findsOneWidget);
-          expect(find.text('正在读取服务端设置'), findsNothing);
+          expect(
+            find.byKey(const ValueKey(('settings-activity', 'reading'))),
+            findsNothing,
+          );
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
           expect(enabled(refresh), Tristate.isTrue);
           failRead = false;
           await tap(tester, find.text('重新读取设置'));
-          expect(find.text('当前设置已获服务端确认。'), findsOneWidget);
-          expect(find.text('当前设置已获服务端确认。').hitTestable(), findsOneWidget);
+          expect(find.text('当前设置已获服务端确认。'), findsNothing);
+          expect(
+            find.byType(ChoiceField<wire.ReaderMode>).hitTestable(),
+            findsOneWidget,
+          );
           expect(find.text(_target.title).hitTestable(), findsOneWidget);
           expect(find.text('zh · 测试漫画源').hitTestable(), findsOneWidget);
           final inheritance = find.text('选择“跟随全局”时，之后的账户默认值会应用到此漫画。');
@@ -301,12 +315,23 @@ void main() {
             ),
             findsOneWidget,
           );
-          await select<wire.ReaderMode>(tester, '从右到左', settle: false);
+          await select<wire.ReaderMode>(tester, '横向分页 · 从右到左', settle: false);
           await tester.runAsync(() => saving.future);
           await tester.pump();
-          expect(find.text('正在等待服务端确认设置修改'), findsOneWidget);
-          expect(find.text('正在等待服务端确认设置修改').hitTestable(), findsOneWidget);
-          expect(find.text('正在读取服务端设置'), findsNothing);
+          expect(
+            find.byKey(const ValueKey(('settings-activity', 'saving'))),
+            findsOneWidget,
+          );
+          expect(
+            find
+                .byKey(const ValueKey(('settings-activity', 'saving')))
+                .hitTestable(),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey(('settings-activity', 'reading'))),
+            findsNothing,
+          );
           expect(find.text('有修改等待发送。'), findsNothing);
           expect(find.text('当前设置已获服务端确认。'), findsNothing);
           expect(
@@ -342,17 +367,28 @@ void main() {
             state(manga: true).snapshot!.overrides!.mode,
             wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
           );
-          expect(find.text('当前设置已获服务端确认。'), findsOneWidget);
+          expect(find.text('当前设置已获服务端确认。'), findsNothing);
 
           reloadGate = Completer<void>();
           await tester.ensureVisible(find.text('重新读取设置'));
           await tester.tap(find.text('重新读取设置'));
           await tester.pump();
-          expect(find.text('正在读取服务端设置'), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey(('settings-activity', 'reading'))),
+            findsOneWidget,
+          );
           expect(find.text('有修改等待发送。'), findsNothing);
-          expect(find.text('正在读取服务端设置').hitTestable(), findsOneWidget);
+          expect(
+            find
+                .byKey(const ValueKey(('settings-activity', 'reading')))
+                .hitTestable(),
+            findsOneWidget,
+          );
           expect(tester.widget<PopScope>(find.byType(PopScope)).canPop, true);
-          expect(find.text('正在等待服务端确认设置修改'), findsNothing);
+          expect(
+            find.byKey(const ValueKey(('settings-activity', 'saving'))),
+            findsNothing,
+          );
           expect(writes(), hasLength(2));
           reloadGate.complete();
           reloadGate = null;
@@ -377,7 +413,7 @@ void main() {
               basedOnRevision: 1,
             ),
           );
-          await select<wire.ReaderMode>(tester, '竖向连续');
+          await select<wire.ReaderMode>(tester, '纵向连续');
           expect(find.text('设置已在其他设备修改，请重新读取后确认。'), findsOneWidget);
           expect(find.text('重试原设置操作'), findsNothing);
           expect(state(manga: true).canEdit, false);

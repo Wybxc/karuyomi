@@ -32,6 +32,7 @@ final class SourcePreferencesController extends ChangeNotifier {
   wire.PreferenceSnapshot? snapshot;
   wire.SourcePreferences? confirmed;
   String? error;
+  String? errorDetails;
   String? message;
   String? _requestId;
   SourcePreferencesActivity? activity;
@@ -49,6 +50,7 @@ final class SourcePreferencesController extends ChangeNotifier {
     activity = null;
     needsRecovery = false;
     message = null;
+    errorDetails = null;
     error = '身份或服务已改变，请关闭后重新打开漫画源设置。';
   }
 
@@ -119,6 +121,10 @@ final class SourcePreferencesController extends ChangeNotifier {
               shouldContinue: () => available,
             ) ||
             !available) {
+          if (available) {
+            error = catalog.error ?? '未能打开漫画源设置，请重试。';
+            errorDetails = catalog.errorDetails;
+          }
           return false;
         }
       }
@@ -132,6 +138,7 @@ final class SourcePreferencesController extends ChangeNotifier {
       if (!available) return false;
       if (value == null) {
         error = catalog.error ?? '未能读取漫画源设置，可明确重试；默认浏览仍可继续。';
+        errorDetails = catalog.errorDetails;
         snapshot = null;
         return false;
       }
@@ -182,6 +189,7 @@ final class SourcePreferencesController extends ChangeNotifier {
       snapshot = null;
       if (result == null) {
         error = '设置操作的运行结果未知，请读取服务端状态后重新打开；不会自动重跑原操作。';
+        errorDetails = catalog.errorDetails;
         return false;
       }
       catalog.retainSourceSessionPreferences(
@@ -205,11 +213,9 @@ final class SourcePreferencesController extends ChangeNotifier {
         );
         if (!available) return false;
       }
-      if (result.accepted) {
-        message = '设置已确认。';
-      } else if (request.hasClick()) {
+      if (!result.accepted && request.hasClick()) {
         message = result.clickHandled ? '操作已处理。' : '漫画源未处理此操作；实际设置已重新读取。';
-      } else {
+      } else if (!result.accepted) {
         final changed =
             !samePreferenceEntries(
               before.syncValues,
@@ -246,7 +252,6 @@ final class SourcePreferencesController extends ChangeNotifier {
               _setActivity(SourcePreferencesActivity.readingConfirmed),
         );
         if (!available) return false;
-        message = '原设置操作已确认。';
         return _reopenAndDescribe();
       },
     );
@@ -272,7 +277,10 @@ final class SourcePreferencesController extends ChangeNotifier {
           shouldContinue: () => available,
         ) ||
         !available) {
-      if (available) error = catalog.error ?? '设置已处理，但漫画源尚未重新打开，请重试读取。';
+      if (available) {
+        error = catalog.error ?? '设置已处理，但漫画源尚未重新打开，请重试读取。';
+        errorDetails = catalog.errorDetails;
+      }
       return false;
     }
     confirmed = catalog.loadedSourcePreferences!.source(target.source.id);
@@ -285,6 +293,7 @@ final class SourcePreferencesController extends ChangeNotifier {
     if (!available) return false;
     if (value == null) {
       error = catalog.error ?? '漫画源已重新打开，设置描述未能读取。';
+      errorDetails = catalog.errorDetails;
       return false;
     }
     snapshot = value;
@@ -307,6 +316,7 @@ final class SourcePreferencesController extends ChangeNotifier {
     if (!available || busy || catalog.busy) return false;
     activity = phase;
     error = null;
+    errorDetails = null;
     message = null;
     notifyListeners();
     try {

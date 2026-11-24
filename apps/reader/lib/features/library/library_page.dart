@@ -16,6 +16,7 @@ import '../../data/business_state_client.dart';
 import '../../data/cover_repository.dart';
 import '../../theme/app_theme.dart';
 import '../browse/catalog_controller.dart';
+import '../sources/source_error_details.dart';
 import '../browse/manga_cover_tile.dart';
 import '../browse/manga_details_page.dart';
 import '../browse/source_manga_cover.dart';
@@ -56,7 +57,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   bool _catalogChangeScheduled = false;
   String? _refreshError;
   String? _openError;
-  bool _metadataConfirmed = false;
   String? _retryingMetadata;
   Object? _metadataAttempt;
   final _selection = <String>{};
@@ -100,7 +100,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     _selecting = false;
     _refreshError = null;
     _openError = null;
-    _metadataConfirmed = false;
     _retryingMetadata = null;
     _metadataAttempt = null;
     _categoryFilter = null;
@@ -152,7 +151,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     setState(() {
       _opening = true;
       _openError = null;
-      _metadataConfirmed = false;
     });
     try {
       final details = await controller.openLibraryEntry(
@@ -226,6 +224,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       }
       try {
         if (!mounted || !sourceCurrent()) return;
+        unawaited(
+          controller.recordBrowsingVisit(details.manga, details.source),
+        );
         final readerRoute = AppPageRoute<void>(
           builder: (_) => ChapterReaderRoute(
             catalog: controller,
@@ -334,15 +335,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       _metadataAttempt = attempt;
       _retryingMetadata = entry.mangaKey;
       _openError = null;
-      _metadataConfirmed = false;
     });
     try {
       await repository.client.retryMetadata(entry.mangaKey);
       if (!isCurrent()) return;
-      setState(() {
-        if (controller.error == originalCatalogError) controller.error = null;
-        _metadataConfirmed = true;
-      });
+      if (controller.error == originalCatalogError) controller.error = null;
       // A failed read after the ACK cannot make the completed write pending.
       // Refresh has its own read-failure state and never resends the command.
       await _refresh();
@@ -552,7 +549,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                               color: AppColors.error.resolveFrom(context),
                             ),
                           ),
-                        if (_metadataConfirmed) const Text('书架资料已获服务器确认。'),
+                        if (_openError != null &&
+                            _openError == widget.controller?.error)
+                          if (widget.controller?.errorDetails
+                              case final details?)
+                            SourceErrorDetailsButton(details: details),
                         if (widget.controller case final controller?)
                           if (controller.status != ServiceStatus.ready)
                             _connection(controller),

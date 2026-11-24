@@ -24,6 +24,7 @@ export const BUSINESS_REQUEST_LIMIT = 128 * 1024;
 export const BUSINESS_RESPONSE_LIMIT = 2 * 1024 * 1024;
 export const LIBRARY_METADATA_LIMIT = 96 * 1024;
 export const LIBRARY_PAGE_SIZE = 8;
+export const BROWSING_HISTORY_LIMIT = 100;
 export const BOOKMARK_PAGE_SIZE = 64;
 export const CHAPTER_PROGRESS_PAGE_SIZE = 64;
 export const CHAPTER_PAGE_LIMIT = 2048;
@@ -39,6 +40,21 @@ export const COVER_DIMENSION_LIMIT = 4096;
 const mutationId = z.uuid();
 const mangaKey = z.string().regex(/^[a-f0-9]{64}$/);
 const canonicalUuidV4 = z.uuidv4().lowercase();
+
+export const recordBrowsingVisitSchema = codec((input) => {
+  const value = parseMessage(
+    pb.RecordBrowsingVisitSchema,
+    input,
+    BUSINESS_REQUEST_LIMIT,
+  );
+  requireCondition(
+    value.schemaVersion === businessSchemaVersion &&
+      value.metadata !== undefined,
+    'Browsing visit requires current metadata',
+  );
+  validateLibraryMetadata(value.metadata);
+  return value.metadata;
+});
 
 function categoryIds(values: string[]): void {
   requireCondition(
@@ -621,7 +637,7 @@ export function validateReaderSettings(value: pb.ReaderSettings): void {
   requireCondition(
     Number.isInteger(value.mode) &&
       value.mode >= pb.ReaderMode.LEFT_TO_RIGHT &&
-      value.mode <= pb.ReaderMode.WEBTOON,
+      value.mode <= pb.ReaderMode.HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT,
     'Unknown reader mode',
   );
   requireCondition(
@@ -645,7 +661,7 @@ export function validateReaderSettingsOverride(
     requireCondition(
       Number.isInteger(value.mode) &&
         value.mode >= pb.ReaderMode.LEFT_TO_RIGHT &&
-        value.mode <= pb.ReaderMode.WEBTOON,
+        value.mode <= pb.ReaderMode.HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT,
       'Unknown reader mode override',
     );
   if (value.pageLayout !== undefined)

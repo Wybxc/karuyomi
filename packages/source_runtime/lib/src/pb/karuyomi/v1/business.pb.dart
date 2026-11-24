@@ -12,6 +12,7 @@
 
 import 'dart:core' as $core;
 
+import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'business.pbenum.dart';
@@ -3209,6 +3210,273 @@ class LibraryPageResponse extends $pb.GeneratedMessage {
   void clearCategoryCatalog() => $_clearField(6);
   @$pb.TagNumber(6)
   CategoryCatalog ensureCategoryCatalog() => $_ensure(5);
+}
+
+class RecordBrowsingVisit extends $pb.GeneratedMessage {
+  factory RecordBrowsingVisit({
+    $core.int? schemaVersion,
+    LibraryMetadata? metadata,
+  }) {
+    final result = RecordBrowsingVisit._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (metadata != null) result.metadata = metadata;
+    return result;
+  }
+
+  RecordBrowsingVisit._();
+
+  factory RecordBrowsingVisit.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RecordBrowsingVisit()..mergeFromBuffer(data, registry);
+  factory RecordBrowsingVisit.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      RecordBrowsingVisit()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RecordBrowsingVisit',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: RecordBrowsingVisit.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<LibraryMetadata>(2, _omitFieldNames ? '' : 'metadata',
+        subBuilder: LibraryMetadata.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RecordBrowsingVisit clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RecordBrowsingVisit copyWith(void Function(RecordBrowsingVisit) updates) =>
+      super.copyWith((message) => updates(message as RecordBrowsingVisit))
+          as RecordBrowsingVisit;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core
+      .Deprecated('Use RecordBrowsingVisit() / RecordBrowsingVisit.new instead')
+  static RecordBrowsingVisit create() => RecordBrowsingVisit._();
+  static $pb.GeneratedMessage $_createMessage() => RecordBrowsingVisit._();
+  @$core.override
+  RecordBrowsingVisit createEmptyInstance() => RecordBrowsingVisit._();
+  @$core.pragma('dart2js:noInline')
+  static RecordBrowsingVisit getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RecordBrowsingVisit>(
+          RecordBrowsingVisit.$_createMessage);
+  static RecordBrowsingVisit? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  LibraryMetadata get metadata => $_getN(1);
+  @$pb.TagNumber(2)
+  set metadata(LibraryMetadata value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMetadata() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMetadata() => $_clearField(2);
+  @$pb.TagNumber(2)
+  LibraryMetadata ensureMetadata() => $_ensure(1);
+}
+
+class BrowsingHistoryEntry extends $pb.GeneratedMessage {
+  factory BrowsingHistoryEntry({
+    $core.String? mangaKey,
+    $core.String? title,
+    $core.String? sourceName,
+    $fixnum.Int64? visitedAtMs,
+  }) {
+    final result = BrowsingHistoryEntry._();
+    if (mangaKey != null) result.mangaKey = mangaKey;
+    if (title != null) result.title = title;
+    if (sourceName != null) result.sourceName = sourceName;
+    if (visitedAtMs != null) result.visitedAtMs = visitedAtMs;
+    return result;
+  }
+
+  BrowsingHistoryEntry._();
+
+  factory BrowsingHistoryEntry.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BrowsingHistoryEntry()..mergeFromBuffer(data, registry);
+  factory BrowsingHistoryEntry.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BrowsingHistoryEntry()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BrowsingHistoryEntry',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: BrowsingHistoryEntry.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'mangaKey')
+    ..aOS(2, _omitFieldNames ? '' : 'title')
+    ..aOS(3, _omitFieldNames ? '' : 'sourceName')
+    ..a<$fixnum.Int64>(
+        4, _omitFieldNames ? '' : 'visitedAtMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BrowsingHistoryEntry clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BrowsingHistoryEntry copyWith(void Function(BrowsingHistoryEntry) updates) =>
+      super.copyWith((message) => updates(message as BrowsingHistoryEntry))
+          as BrowsingHistoryEntry;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use BrowsingHistoryEntry() / BrowsingHistoryEntry.new instead')
+  static BrowsingHistoryEntry create() => BrowsingHistoryEntry._();
+  static $pb.GeneratedMessage $_createMessage() => BrowsingHistoryEntry._();
+  @$core.override
+  BrowsingHistoryEntry createEmptyInstance() => BrowsingHistoryEntry._();
+  @$core.pragma('dart2js:noInline')
+  static BrowsingHistoryEntry getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BrowsingHistoryEntry>(
+          BrowsingHistoryEntry.$_createMessage);
+  static BrowsingHistoryEntry? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get mangaKey => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set mangaKey($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMangaKey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMangaKey() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get title => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set title($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTitle() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTitle() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get sourceName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set sourceName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSourceName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSourceName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get visitedAtMs => $_getI64(3);
+  @$pb.TagNumber(4)
+  set visitedAtMs($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasVisitedAtMs() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearVisitedAtMs() => $_clearField(4);
+}
+
+class BrowsingHistoryResponse extends $pb.GeneratedMessage {
+  factory BrowsingHistoryResponse({
+    $core.int? schemaVersion,
+    $core.Iterable<BrowsingHistoryEntry>? entries,
+    LibraryMetadata? metadata,
+    BusinessStateError? error,
+  }) {
+    final result = BrowsingHistoryResponse._();
+    if (schemaVersion != null) result.schemaVersion = schemaVersion;
+    if (entries != null) result.entries.addAll(entries);
+    if (metadata != null) result.metadata = metadata;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  BrowsingHistoryResponse._();
+
+  factory BrowsingHistoryResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BrowsingHistoryResponse()..mergeFromBuffer(data, registry);
+  factory BrowsingHistoryResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BrowsingHistoryResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BrowsingHistoryResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'karuyomi.v1'),
+      createEmptyInstance: BrowsingHistoryResponse.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'schemaVersion',
+        fieldType: $pb.PbFieldType.OU3)
+    ..pPM<BrowsingHistoryEntry>(2, _omitFieldNames ? '' : 'entries',
+        subBuilder: BrowsingHistoryEntry.$_createMessage)
+    ..aOM<LibraryMetadata>(3, _omitFieldNames ? '' : 'metadata',
+        subBuilder: LibraryMetadata.$_createMessage)
+    ..aOM<BusinessStateError>(4, _omitFieldNames ? '' : 'error',
+        subBuilder: BusinessStateError.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BrowsingHistoryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BrowsingHistoryResponse copyWith(
+          void Function(BrowsingHistoryResponse) updates) =>
+      super.copyWith((message) => updates(message as BrowsingHistoryResponse))
+          as BrowsingHistoryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use BrowsingHistoryResponse() / BrowsingHistoryResponse.new instead')
+  static BrowsingHistoryResponse create() => BrowsingHistoryResponse._();
+  static $pb.GeneratedMessage $_createMessage() => BrowsingHistoryResponse._();
+  @$core.override
+  BrowsingHistoryResponse createEmptyInstance() => BrowsingHistoryResponse._();
+  @$core.pragma('dart2js:noInline')
+  static BrowsingHistoryResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BrowsingHistoryResponse>(
+          BrowsingHistoryResponse.$_createMessage);
+  static BrowsingHistoryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get schemaVersion => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set schemaVersion($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSchemaVersion() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSchemaVersion() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<BrowsingHistoryEntry> get entries => $_getList(1);
+
+  @$pb.TagNumber(3)
+  LibraryMetadata get metadata => $_getN(2);
+  @$pb.TagNumber(3)
+  set metadata(LibraryMetadata value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMetadata() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMetadata() => $_clearField(3);
+  @$pb.TagNumber(3)
+  LibraryMetadata ensureMetadata() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  BusinessStateError get error => $_getN(3);
+  @$pb.TagNumber(4)
+  set error(BusinessStateError value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasError() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearError() => $_clearField(4);
+  @$pb.TagNumber(4)
+  BusinessStateError ensureError() => $_ensure(3);
 }
 
 class CategoryMutationResponse extends $pb.GeneratedMessage {

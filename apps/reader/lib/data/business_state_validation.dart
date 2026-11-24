@@ -8,6 +8,7 @@ const _responseLimit = 2 * 1024 * 1024;
 const _pageLimit = 2048;
 const _libraryPageSize = 8;
 const _bookmarkPageSize = 64;
+const businessBrowsingHistoryLimit = 100;
 const businessFavoriteSourceLimit = 128;
 const businessInstalledExtensionLimit = 128;
 const businessRepositoryLimit = 16;
@@ -223,6 +224,46 @@ void validateBusinessMetadata(wire.LibraryMetadata value) {
   wire.encodeProtoJson(value, maxBytes: _metadataLimit);
 }
 
+String businessMetadataKey(wire.LibraryMetadata value) => sha256
+    .convert(
+      utf8.encode(
+        jsonEncode([value.packageName, value.sourceId, value.manga.url]),
+      ),
+    )
+    .toString();
+
+void validateBusinessHistoryEntries(List<wire.BrowsingHistoryEntry> entries) {
+  _require(
+    entries.length <= businessBrowsingHistoryLimit,
+    'History exceeds its entry budget',
+  );
+  final seen = <String>{};
+  wire.BrowsingHistoryEntry? previous;
+  for (final entry in entries) {
+    _key(entry.mangaKey);
+    final visited = entry.visitedAtMs.toInt();
+    _require(
+      seen.add(entry.mangaKey) &&
+          entry.title.isNotEmpty &&
+          entry.title.runes.length <= 256 &&
+          entry.sourceName.isNotEmpty &&
+          entry.sourceName.length <= 256 &&
+          visited > 0 &&
+          visited <= 8640000000000000,
+      'Invalid browsing history entry',
+    );
+    if (previous != null) {
+      final order = previous.visitedAtMs.compareTo(entry.visitedAtMs);
+      _require(
+        order > 0 ||
+            (order == 0 && previous.mangaKey.compareTo(entry.mangaKey) < 0),
+        'Browsing history is not ordered',
+      );
+    }
+    previous = entry;
+  }
+}
+
 void validateBusinessAnchor(wire.ReadingAnchor value) {
   _identity(value.chapterKey);
   _identity(value.pageKey);
@@ -297,17 +338,7 @@ void validateBusinessManga(wire.MangaState value) {
   if (value.hasCustomCover()) validateBusinessCustomCover(value.customCover);
   if (value.hasMetadata()) {
     validateBusinessMetadata(value.metadata);
-    final expectedKey = sha256
-        .convert(
-          utf8.encode(
-            jsonEncode([
-              value.metadata.packageName,
-              value.metadata.sourceId,
-              value.metadata.manga.url,
-            ]),
-          ),
-        )
-        .toString();
+    final expectedKey = businessMetadataKey(value.metadata);
     _require(
       value.mangaKey == expectedKey,
       'Metadata does not match manga identity',
@@ -390,7 +421,7 @@ void validateBusinessMangaKey(String value) => _key(value);
 
 void validateBusinessReaderSettings(wire.ReaderSettings value) {
   _require(
-    value.mode.value >= 1 && value.mode.value <= 4,
+    value.mode != wire.ReaderMode.READER_MODE_UNSPECIFIED,
     'Invalid reader mode',
   );
   _require(
@@ -403,7 +434,7 @@ void validateBusinessReaderSettings(wire.ReaderSettings value) {
 void validateBusinessReaderOverrides(wire.ReaderSettingsOverride value) {
   if (value.hasMode()) {
     _require(
-      value.mode.value >= 1 && value.mode.value <= 4,
+      value.mode != wire.ReaderMode.READER_MODE_UNSPECIFIED,
       'Invalid reader mode override',
     );
   }

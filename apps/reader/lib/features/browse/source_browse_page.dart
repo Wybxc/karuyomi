@@ -15,6 +15,7 @@ import '../../data/library_repository.dart';
 import '../library/library_providers.dart';
 import '../reader/reader_recovery.dart';
 import '../sources/source_filters.dart';
+import '../sources/source_error_details.dart';
 import '../sources/source_preferences.dart';
 import 'catalog_controller.dart';
 import 'manga_details_page.dart';
@@ -319,6 +320,13 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
         _error = catalog.error;
         if (_sourceCurrent && catalog.page > 0) _adoptResults();
       });
+      if (catalog.page == 0 && !catalog.sourcePreferencesBlocked) {
+        await _load(
+          _ListingWork.refresh,
+          query: _displayQuery,
+          listing: _displayListing,
+        );
+      }
     }
   }
 
@@ -341,6 +349,9 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
         ),
         const SizedBox(height: 8),
         Text(_error ?? catalog.error ?? '请返回后重新选择漫画源。'),
+        if ((_error == null || _error == catalog.error) &&
+            catalog.errorDetails != null)
+          SourceErrorDetailsButton(details: catalog.errorDetails!),
         for (final recovery in catalog.sourcePreferenceRecoveries.where(
           (target) =>
               target.build.packageName == widget.build.packageName &&
@@ -445,6 +456,9 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
                                     ),
                                   ),
                                 ),
+                              if (catalog.errorDetails case final details?
+                                  when _error == catalog.error)
+                                SourceErrorDetailsButton(details: details),
                             ],
                           ),
                         ),

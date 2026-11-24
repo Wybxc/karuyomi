@@ -13,6 +13,7 @@ import '../../diagnostics/reader_baseline.dart';
 import '../../widgets/app_routes.dart';
 import '../../widgets/edit_sheet.dart';
 import '../browse/catalog_controller.dart';
+import '../sources/source_error_details.dart';
 import '../bookmarks/chapter_bookmarks_controller.dart';
 import '../bookmarks/bookmark_status.dart';
 import '../settings/reader_device_settings.dart';
@@ -462,7 +463,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
           widget.catalog.isCurrentSource(_source)) {
         _viewport = null;
         final first = reset.current;
-        final leadingX = _mode == ReadingMode.rightToLeft ? 1.0 : 0.0;
+        final leadingX = _mode.isRightToLeft ? 1.0 : 0.0;
         // Reset is confirmed by the server before the explicit local jump;
         // only this new navigation uses the current direction's leading edge.
         _positionRequest.value = ReadingPosition(
@@ -887,7 +888,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
       );
     }
 
-    final rtl = _mode == ReadingMode.rightToLeft;
+    final rtl = _mode.isRightToLeft;
     return (
       previous: button(
         ReaderChapterEdge.previous,
@@ -920,6 +921,9 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
                 style: TextStyle(color: AppColors.error.resolveFrom(context)),
               ),
             ),
+        if ((_error ?? _preparationError) == widget.catalog.error &&
+            widget.catalog.errorDetails != null)
+          SourceErrorDetailsButton(details: widget.catalog.errorDetails!),
         if (progress != null) _progressControls(progress),
         if (bookmarks != null &&
             (!bookmarks.loaded ||
@@ -1057,31 +1061,30 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
     final needsReopen = progress.needsReopen(_chapter.key);
     final disabled =
         _busy || _recovering || _accessPaused || _refreshingProgress;
-    final status =
-        progress.error ??
-        switch (progress.storageMode) {
-          ProgressStorageMode.serverConfirmed =>
-            progress.unsaved || progress.awaitingViewport
-                ? '阅读进度待服务端确认'
-                : '阅读进度已保存到服务端',
-          null => '正在读取服务端进度',
-        };
+    final error = progress.error;
+    final confirmed =
+        error == null &&
+        progress.storageMode == ProgressStorageMode.serverConfirmed &&
+        !progress.unsaved &&
+        !progress.awaitingViewport;
+    final key = confirmed ? const ValueKey('reader-progress-confirmed') : null;
+    if (error == null && !unresolved && !needsReopen) {
+      return SizedBox.shrink(key: key);
+    }
     return Padding(
+      key: key,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            status,
-            style: TextStyle(
-              fontSize: 13,
-              color:
-                  (progress.error == null
-                          ? AppColors.secondaryLabel
-                          : AppColors.error)
-                      .resolveFrom(context),
+          if (error != null)
+            Text(
+              error,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.error.resolveFrom(context),
+              ),
             ),
-          ),
           if (unresolved) const Text('旧最远页已不在当前清单中；保留原记录，未按旧页码猜测'),
           Wrap(
             alignment: WrapAlignment.center,

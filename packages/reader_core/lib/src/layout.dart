@@ -70,7 +70,7 @@ final class PageSpread(Iterable<ReaderPage> pages) {
 
   /// RTL changes the spread's presentation order, never the source page order.
   List<ReaderPage> displayPages(ReadingMode mode) =>
-      mode == ReadingMode.rightToLeft ? pages.reversed.toList() : pages;
+      mode.isRightToLeft ? pages.reversed.toList() : pages;
 }
 
 List<PageSpread> groupPages(
