@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:source_runtime/source_runtime.dart';
 
 import '../browse/catalog_controller.dart';
+import '../sources/source_error_details.dart';
 
 const crossSourceSelectionLimit = 32;
 const crossSourceQueryLimit = 500;
@@ -224,7 +225,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       if (!_ownsEpoch(epoch) || request != group._request) return;
       group.status = SourceSearchStatus.error;
       group.error = _message(failure);
-      group.errorDetails = failure.toString();
+      group.errorDetails = sourceErrorDetails(failure, operation: '准备跨源搜索');
     }
   }
 
@@ -260,7 +261,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       group._task = null;
       group.status = SourceSearchStatus.error;
       group.error = _message(failure);
-      group.errorDetails = failure.toString();
+      group.errorDetails = sourceErrorDetails(failure, operation: '搜索');
     } finally {
       if (!_disposed) notifyListeners();
     }
@@ -311,7 +312,7 @@ final class CrossSourceSearchController extends ChangeNotifier {
       if (_disposed || epoch != _epoch || request != group._request) return;
       group.status = SourceSearchStatus.cancellationFailed;
       group.error = '停止尚未确认：${_message(failure)}';
-      group.errorDetails = failure.toString();
+      group.errorDetails = sourceErrorDetails(failure, operation: '停止搜索');
     } finally {
       if (!_disposed) notifyListeners();
     }
@@ -435,14 +436,14 @@ final class CrossSourceSearchController extends ChangeNotifier {
     RuntimeException() => switch (error.code) {
       RuntimeErrorCode.accessRequired => '访问验证已失效，请重新登录。',
       RuntimeErrorCode.accessDenied => '当前身份没有访问权限。',
-      RuntimeErrorCode.timeout => '漫画源响应超时，请重试。',
-      RuntimeErrorCode.runtimeLost => '漫画源连接已失效，请重试。',
+      RuntimeErrorCode.timeout => '搜索操作超时，请重试。',
+      RuntimeErrorCode.runtimeLost => '运行环境已中断，请重新连接。',
       RuntimeErrorCode.unsupportedCapability => '漫画源暂不支持这个操作。',
       RuntimeErrorCode.integrityError => '扩展文件校验失败，请重新加载。',
       RuntimeErrorCode.extensionAssetUnavailable => '无法从仓库读取扩展材料，请重试。',
-      RuntimeErrorCode.sourceError => '漫画源请求失败，请重试。',
+      RuntimeErrorCode.sourceError => '搜索未完成，请查看错误详情。',
       RuntimeErrorCode.storageBusy => '漫画源正在其他标签页或窗口运行，请关闭后重试。',
-      RuntimeErrorCode.protocolError => '漫画源返回的数据无法读取，请重新加载。',
+      RuntimeErrorCode.protocolError => '返回的数据无法读取，请重新加载。',
       RuntimeErrorCode.limitExceeded => '漫画源返回内容超出限额，请缩小搜索范围。',
       RuntimeErrorCode.cancelled => '请求已取消，可重新搜索。',
     },

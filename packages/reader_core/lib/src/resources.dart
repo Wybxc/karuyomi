@@ -1,7 +1,24 @@
 /// Reading state independent of Flutter, TeaVM and cloud storage.
 library;
 
-enum ReadingMode { leftToRight, rightToLeft, continuous, webtoon }
+enum ReadingMode {
+  leftToRight(),
+  rightToLeft(isRightToLeft: true),
+  horizontalContinuousLeftToRight(isContinuous: true),
+  horizontalContinuousRightToLeft(isContinuous: true, isRightToLeft: true),
+  continuous(isContinuous: true, isVertical: true),
+  webtoon(isContinuous: true, isVertical: true);
+
+  const ReadingMode({
+    this.isContinuous = false,
+    this.isVertical = false,
+    this.isRightToLeft = false,
+  });
+
+  final bool isContinuous;
+  final bool isVertical;
+  final bool isRightToLeft;
+}
 
 /// A logical anchor, preserved across rotation and layout changes.
 final class ReadingPosition({

@@ -627,10 +627,10 @@ Future<ProgressSnapshot> _confirmedProgress(
   bool Function()? ready,
 }) async {
   final elapsed = Stopwatch()..start();
-  const saved = '阅读进度已保存到服务端';
+  const saved = ValueKey('reader-progress-confirmed');
   while (elapsed.elapsed < _operationBudget) {
     if ((ready?.call() ?? true) &&
-        find.text(saved).evaluate().length == 1 &&
+        find.byKey(saved).evaluate().length == 1 &&
         (minimumFurthest == null ||
             (_displayedFurthestPage(tester) ?? 0) >= minimumFurthest)) {
       // Inspection does not advance the mounted reader's write CAS baseline.
@@ -644,7 +644,7 @@ Future<ProgressSnapshot> _confirmedProgress(
           (minimumFurthest == null ||
               (progress.furthest?.pageIndexHint ?? -1) >=
                   minimumFurthest - 1) &&
-          find.text(saved).evaluate().length == 1 &&
+          find.byKey(saved).evaluate().length == 1 &&
           (ready?.call() ?? true)) {
         _expectProgress(state, manifest, page);
         return state;

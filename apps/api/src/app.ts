@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { createHttpBridge } from './http-bridge.js';
 import { createCoverRoutes } from './cover-routes.js';
 import { createStateRoutes } from './state-routes.js';
+import { createHistoryRoutes } from './history-routes.js';
 import { createSettingsRoutes } from './settings-routes.js';
 import { createSourcePreferencesRoutes } from './source-preferences-routes.js';
 import {
@@ -123,6 +124,7 @@ export function createApp(
   });
   app.route('/api/bridge', createHttpBridge(fetchUpstream));
   app.route('/api', createStateRoutes());
+  app.route('/api/history', createHistoryRoutes());
   app.route('/api/settings', createSettingsRoutes());
   app.route('/api/source-preferences', createSourcePreferencesRoutes());
   app.route('/api/covers', createCoverRoutes());

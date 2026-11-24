@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:karuyomi/data/business_state_validation.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -38,6 +39,7 @@ final class _Account {
     ),
   );
   final mangaSettings = <String, wire.MangaReaderSettings>{};
+  final browsing = <String, (wire.LibraryMetadata, DateTime)>{};
   final sourcePreferences =
       <(String, String, String, String), wire.SourcePreferences>{};
   final mutations = <String, (String, ApiReply)>{};
@@ -141,6 +143,47 @@ final class TestBusinessServer implements ApiFetch {
       );
     }
     final account = _account(trustedSubject);
+    if (request.uri.path == '/api/history' ||
+        request.uri.path.startsWith('/api/history/')) {
+      final key = request.uri.pathSegments.skip(2).firstOrNull;
+      final response = wire.BrowsingHistoryResponse(schemaVersion: 1);
+      switch (request.method) {
+        case 'GET' when key != null:
+          final visit = account.browsing[key];
+          if (visit != null) response.metadata = visit.$1.deepCopy();
+        case 'GET':
+          final visits = account.browsing.entries.toList()
+            ..sort((a, b) {
+              final newestFirst = b.value.$2.compareTo(a.value.$2);
+              return newestFirst != 0 ? newestFirst : a.key.compareTo(b.key);
+            });
+          response.entries.addAll(
+            visits.map((entry) {
+              final (metadata, date) = entry.value;
+              return wire.decodeProtoJson(wire.BrowsingHistoryEntry(), {
+                'mangaKey': entry.key,
+                'title': metadata.manga.title,
+                'sourceName': metadata.sourceName,
+                'visitedAtMs': date.millisecondsSinceEpoch.toString(),
+              });
+            }),
+          );
+        case 'POST':
+          final visit = wire.decodeProtoJson(
+            wire.RecordBrowsingVisit(),
+            jsonDecode(request.body!),
+          );
+          final metadata = visit.metadata;
+          account.browsing[businessMetadataKey(metadata)] = (metadata, _now());
+        case 'DELETE' when key != null:
+          account.browsing.remove(key);
+        case 'DELETE':
+          account.browsing.clear();
+        default:
+          throw StateError('Unexpected browsing history method');
+      }
+      return _reply(response);
+    }
     if (request.method == 'GET' &&
         request.uri.path.startsWith('/api/source-preferences/packages/')) {
       final packageName = request.uri.pathSegments.last;
@@ -1084,6 +1127,12 @@ final class TestBusinessServer implements ApiFetch {
     String mutationId = '',
   }) {
     final error = _error(code, message);
+    if (request.uri.pathSegments.take(2).join('/') == 'api/history') {
+      return _reply(
+        wire.BrowsingHistoryResponse(schemaVersion: 1, error: error),
+        status: status,
+      );
+    }
     if (request.uri.path == '/api/source-preferences/mutations') {
       return _reply(
         wire.SourcePreferencesMutationResponse(

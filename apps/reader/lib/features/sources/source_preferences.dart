@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/source_preferences_repository.dart';
 import '../browse/catalog_controller.dart';
+import 'source_error_details.dart';
 import 'source_preferences_controller.dart';
 
 class const SourcePreferencesSheet({
@@ -171,10 +172,10 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
     final account =
         node.syncScope ==
         wire.PreferenceSyncScope.PREFERENCE_SYNC_SCOPE_ACCOUNT;
-    final scopeLabel = account ? '服务端确认后同步' : '仅当前客户端会话';
     final caption = <String>[
       if (account && node.summary.isNotEmpty) node.summary,
-      if (node.whichKind() != wire.PreferenceNode_Kind.group) scopeLabel,
+      if (!account && node.whichKind() != wire.PreferenceNode_Kind.group)
+        '仅本次会话',
     ];
     final captionStyle = TextStyle(
       fontSize: 13,
@@ -186,7 +187,9 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
         return MergeSemantics(
           child: CupertinoFormRow(
             prefix: Expanded(flex: 3, child: Text(node.title)),
-            helper: Text(caption.join('\n'), style: captionStyle),
+            helper: caption.isEmpty
+                ? null
+                : Text(caption.join('\n'), style: captionStyle),
             child: CupertinoSwitch(
               key: key,
               value: node.toggle.value,
@@ -257,15 +260,11 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
                   : null,
             ),
             if (choice.options.isEmpty) const Text('目前没有可选项'),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                node.summary == options[value]
-                    ? scopeLabel
-                    : caption.join('\n'),
-                style: captionStyle,
+            if (caption.isNotEmpty && node.summary != options[value])
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(caption.join('\n'), style: captionStyle),
               ),
-            ),
           ],
         );
       case wire.PreferenceNode_Kind.multiChoice:
@@ -420,24 +419,19 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
                   Text(
                     '${widget.target.source.name} · ${widget.target.source.lang}',
                   ),
-                if (activity != null) ...[
-                  const CupertinoActivityIndicator(),
+                if (activity != null)
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 8,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Semantics(
+                      liveRegion: true,
+                      label: switch (activity) {
+                        SourcePreferencesActivity.editing ||
+                        SourcePreferencesActivity.saving => '正在保存漫画源设置',
+                        _ => '正在读取漫画源设置',
+                      },
+                      child: const CupertinoActivityIndicator(),
                     ),
-                    child: Text(switch (activity) {
-                      SourcePreferencesActivity.reading => '正在读取漫画源设置。可关闭此页。',
-                      SourcePreferencesActivity.editing =>
-                        '正在应用漫画源设置。关闭会取消运行中的漫画源请求。',
-                      SourcePreferencesActivity.saving =>
-                        '正在保存漫画源设置，等待服务端确认。关闭后仍可处理原请求。',
-                      SourcePreferencesActivity.readingConfirmed =>
-                        '保存已确认，正在读取最新设置。',
-                    }),
                   ),
-                ],
                 if (!_current) const Text('身份或服务已变化，请关闭后重新打开设置。'),
                 if (_controller.error case final error?)
                   Text(
@@ -446,6 +440,8 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
                       color: AppColors.error.resolveFrom(context),
                     ),
                   ),
+                if (_controller.errorDetails case final details?)
+                  SourceErrorDetailsButton(details: details),
                 if (_controller.message != null) Text(_controller.message!),
                 if (pending != null) ...[
                   _PendingSourcePreferences(
@@ -497,11 +493,9 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
                   [],
                   true,
                   header: Text(widget.target.source.name),
-                  footer: Text(
-                    snapshot.nodes.isEmpty
-                        ? '这个漫画源没有额外设置。'
-                        : '每次修改只执行一次漫画源操作。非敏感设置收到服务器确认后生效；密码及会话设置不会同步。',
-                  ),
+                  footer: snapshot.nodes.isEmpty
+                      ? const Text('这个漫画源没有额外设置。')
+                      : null,
                 ),
               ),
             ),
@@ -512,7 +506,7 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
                 _controller.available && !_controller.busy && pending == null
                 ? () => unawaited(_controller.load(reopen: true))
                 : null,
-            child: const Text('重新读取并刷新漫画源'),
+            child: const Text('重新读取设置'),
           ),
         ],
       ),

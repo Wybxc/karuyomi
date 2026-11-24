@@ -636,7 +636,7 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(waiting, findsNothing);
-          final error = find.text('漫画源请求失败，请重试');
+          final error = find.text('未能加载章节页面，请重试');
           expect(error, findsOneWidget);
           expect(iconButton(direction).hitTestable(), findsOneWidget);
           final reader = tester.widget<ReaderScreen>(find.byType(ReaderScreen));

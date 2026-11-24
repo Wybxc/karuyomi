@@ -5,6 +5,7 @@ import {
   type MessageInitShape,
 } from '@bufbuild/protobuf';
 import {
+  BrowsingHistoryResponseSchema,
   BusinessStateErrorCode as ErrorCode,
   ReaderFit,
   ReaderMode,
@@ -16,13 +17,16 @@ import {
   GlobalSettingsValuesSchema,
   type SettingsMutation,
   LibraryMetadataSchema,
+  RecordBrowsingVisitSchema,
   StateMutationSchema,
   type StateMutation,
   CategoryMutationSchema,
   type CategoryMutation,
 } from '@karuyomi/protocol';
 import {
+  BROWSING_HISTORY_LIMIT,
   businessSchemaVersion,
+  parseMessage,
   settingsResponseSchema,
   settingsMutationResponseSchema,
   bookmarkPageResponseSchema,
@@ -188,6 +192,126 @@ function metadata(name = crypto.randomUUID()) {
     },
   });
 }
+
+test('browsing history is private, deduplicated, bounded and available in a second session', async () => {
+  const first = await client();
+  const second = await client(first.subject);
+  const other = await client();
+  const write = {
+    Origin: origin,
+    'X-App-Request': '1',
+    'Content-Type': 'application/json',
+  };
+  const data = metadata('Visited manga');
+  const record = (value = data) =>
+    first.request('/api/history', {
+      method: 'POST',
+      headers: write,
+      body: JSON.stringify(
+        toJson(
+          RecordBrowsingVisitSchema,
+          create(RecordBrowsingVisitSchema, {
+            schemaVersion: businessSchemaVersion,
+            metadata: value,
+          }),
+        ),
+      ),
+    });
+  const decode = async (response: Response) => {
+    expect(response.status).toBe(200);
+    return parseMessage(BrowsingHistoryResponseSchema, await response.json());
+  };
+  expect(
+    (await first.request('/api/history', { method: 'DELETE' })).status,
+  ).toBe(403);
+  expect(
+    (
+      await first.request('/api/history', {
+        headers: { 'X-App-Subject': other.subject },
+      })
+    ).status,
+  ).toBe(403);
+  expect(
+    (
+      await first.request('/api/history', {
+        method: 'POST',
+        headers: write,
+        body: '{"schemaVersion":1}',
+      })
+    ).status,
+  ).toBe(400);
+  expect(await decode(await record())).toMatchObject({ entries: [] });
+  const key = favorite(0, data).mangaKey;
+  expect(
+    (await decode(await second.request('/api/history'))).entries,
+  ).toMatchObject([
+    { mangaKey: key, title: 'Visited manga', sourceName: 'Test source' },
+  ]);
+  expect(
+    (await decode(await second.request(`/api/history/${key}`))).metadata,
+  ).toEqual(data);
+  expect(
+    (await decode(await other.request('/api/history'))).entries,
+  ).toHaveLength(0);
+  expect(
+    (await decode(await other.request(`/api/history/${key}`))).metadata,
+  ).toBeUndefined();
+  const updated = clone(LibraryMetadataSchema, data);
+  updated.manga!.title = 'Renamed manga';
+  await decode(await record(updated));
+  expect(
+    (await decode(await second.request('/api/history'))).entries,
+  ).toMatchObject([{ mangaKey: key, title: 'Renamed manga' }]);
+  expect((await second.state(key)).manga?.favorite).toBe(false);
+
+  await env.DB.batch(
+    Array.from({ length: BROWSING_HISTORY_LIMIT }, (_, index) => {
+      const older = metadata(`older-${index}`);
+      return env.DB.prepare(
+        `INSERT INTO browsing_history
+      (subject, manga_key, title, source_name, metadata_json, visited_at_ms)
+      VALUES (?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        first.subject,
+        favorite(0, older).mangaKey,
+        older.manga!.title,
+        older.sourceName,
+        JSON.stringify(toJson(LibraryMetadataSchema, older)),
+        index + 1,
+      );
+    }),
+  );
+  const newer = metadata('Newest manga');
+  await env.DB.prepare(
+    'UPDATE browsing_history SET visited_at_ms = ? WHERE subject = ? AND manga_key = ?',
+  )
+    .bind(1_000, first.subject, key)
+    .run();
+  await decode(await record(newer));
+  const history = (await decode(await second.request('/api/history'))).entries;
+  expect(history).toHaveLength(BROWSING_HISTORY_LIMIT);
+  expect(history.slice(0, 3).map((item) => item.title)).toEqual([
+    'Newest manga',
+    'Renamed manga',
+    'older-99',
+  ]);
+  expect(history.some((item) => item.title === 'older-0')).toBe(false);
+  await decode(
+    await second.request(`/api/history/${key}`, {
+      method: 'DELETE',
+      headers: write,
+    }),
+  );
+  expect(
+    (await decode(await first.request(`/api/history/${key}`))).metadata,
+  ).toBeUndefined();
+  await decode(
+    await second.request('/api/history', { method: 'DELETE', headers: write }),
+  );
+  expect(
+    (await decode(await first.request('/api/history'))).entries,
+  ).toHaveLength(0);
+});
 
 function favorite(
   revision = 0,
@@ -1128,22 +1252,25 @@ test('settings reads do not write, defaults inherit per field, and clearing over
   expect((await first.mutateSettings(globalSettings())).status).toBe(200);
   const override = await second.mutateSettings(
     mangaSettings(key, 0, {
-      mode: ReaderMode.RIGHT_TO_LEFT,
+      mode: ReaderMode.HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT,
       pageLayout: ReaderPageLayout.AUTO,
     }),
   );
   expect(override.body.manga?.revision).toBe(1);
   expect(override.body.effectiveReader).toMatchObject({
-    mode: ReaderMode.RIGHT_TO_LEFT,
+    mode: ReaderMode.HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT,
     pageLayout: ReaderPageLayout.AUTO,
   });
+  expect((await first.settings(key)).effectiveReader?.mode).toBe(
+    ReaderMode.HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT,
+  );
   expect(
     (
       await first.mutateSettings(
         globalSettings(
           1,
           ReaderFit.HEIGHT,
-          ReaderMode.CONTINUOUS,
+          ReaderMode.HORIZONTAL_CONTINUOUS_LEFT_TO_RIGHT,
           ReaderPageLayout.SINGLE,
         ),
       )
@@ -1160,7 +1287,7 @@ test('settings reads do not write, defaults inherit per field, and clearing over
   const cleared = await first.mutateSettings(mangaSettings(key, 2));
   expect(cleared.body.manga?.revision).toBe(3);
   expect(cleared.body.effectiveReader).toMatchObject({
-    mode: ReaderMode.CONTINUOUS,
+    mode: ReaderMode.HORIZONTAL_CONTINUOUS_LEFT_TO_RIGHT,
     pageLayout: ReaderPageLayout.SINGLE,
   });
   expect(cleared.body.manga?.overrides?.mode).toBeUndefined();

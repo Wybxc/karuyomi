@@ -65,6 +65,19 @@ void main() {
         expect(leading, findsOneWidget);
         expect(pane, findsOneWidget);
         expect(tester.getRect(list).right, tester.getRect(pane).left);
+        final leadingBar = find.descendant(
+          of: list,
+          matching: find.byType(CupertinoNavigationBar),
+        );
+        final detailBar = find.descendant(
+          of: pane,
+          matching: find.byType(CupertinoNavigationBar),
+        );
+        expect(leadingBar, findsOneWidget);
+        expect(detailBar, findsOneWidget);
+        expect(tester.getRect(leadingBar).left, tester.getRect(list).left);
+        expect(tester.getRect(leadingBar).right, tester.getRect(list).right);
+        expect(tester.getRect(detailBar).left, tester.getRect(pane).left);
         tester.view.physicalSize = const Size(390, 800);
         await tester.pumpAndSettle();
         expect(leading, findsNothing);
@@ -103,6 +116,41 @@ void main() {
       expect(detail, findsNothing);
       expect(shelf, findsOneWidget);
       expect(platform.businessServer.appliedMutations, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'an uncollected manga appears in history and can reopen and clear',
+    (tester) async {
+      final platform = TestPlatform();
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      await tester.pumpApp(KaruyomiApp(platform: platform));
+      await tester.pumpAndSettle();
+      await _browseDetails(tester);
+      expect(platform.businessServer.appliedMutations, 0);
+      for (var i = 0; i < 2; i++) {
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.byKey(const ValueKey(('app-destination', 3))));
+      await tester.pumpAndSettle();
+      expect(find.text(testManga.title), findsOneWidget);
+      await tester.tap(find.text(testManga.title));
+      await tester.pumpAndSettle();
+      expect(find.byType(MangaDetailsPage), findsOneWidget);
+      expect(platform.businessServer.appliedMutations, 0);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text(testManga.title), findsOneWidget);
+      await tester.tap(find.text('清空记录'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('清空'));
+      await tester.pumpAndSettle();
+      expect(find.text('暂无浏览记录'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -325,8 +373,11 @@ void main() {
         expect(navigation, findsOneWidget);
         final side = size.width >= 768 && size.height >= 480;
         expectPlacement(side: side);
-        expect(tester.getTopLeft(find.byType(CupertinoNavigationBar)).dx, 0);
-        for (var i = 0; i < 3; i++) {
+        expect(
+          tester.getTopLeft(find.byType(CupertinoNavigationBar)).dx,
+          side ? tester.getRect(navigation).right : 0,
+        );
+        for (var i = 0; i < 4; i++) {
           final destination = find.byKey(ValueKey(('app-destination', i)));
           expect(
             tester
@@ -373,7 +424,7 @@ void main() {
         await tester.pumpAndSettle();
 
         final navigation = find.byKey(const ValueKey('app-navigation'));
-        const labels = ['书架', '浏览', '设置'];
+        const labels = ['书架', '浏览', '设置', '浏览记录'];
         for (final viewport in [
           const Size(360, 480),
           const Size(800, 360),

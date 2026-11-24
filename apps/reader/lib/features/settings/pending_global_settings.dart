@@ -3,6 +3,8 @@ import '../../theme/app_theme.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
+import 'settings_widgets.dart' show readerModeOptions;
+
 class const PendingGlobalSettings({
   super.key,
   required final wire.GlobalSettingsValues values,
@@ -25,13 +27,8 @@ class const PendingGlobalSettings({
           alignment: Alignment.centerLeft,
           child: Text(
             [
-              '阅读模式：${switch (reader.mode) {
-                wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT => '从右到左',
-                wire.ReaderMode.READER_MODE_CONTINUOUS => '竖向连续',
-                wire.ReaderMode.READER_MODE_WEBTOON => '条漫',
-                _ => '从左到右',
-              }}',
-              '页组：${switch (reader.pageLayout) {
+              '阅读模式：${readerModeOptions[reader.mode]}',
+              '分页布局：${switch (reader.pageLayout) {
                 wire.ReaderPageLayout.READER_PAGE_LAYOUT_SINGLE => '单页',
                 wire.ReaderPageLayout.READER_PAGE_LAYOUT_DOUBLE => '双页',
                 _ => '自动',

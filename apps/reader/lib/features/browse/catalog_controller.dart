@@ -23,6 +23,7 @@ import '../../data/progress_repository.dart';
 import '../../data/reading_progress.dart';
 import '../../data/library_repository.dart';
 import '../reader/reading_progress_controller.dart';
+import '../sources/source_error_details.dart';
 
 part 'catalog_search.dart';
 part 'catalog_covers.dart';
@@ -149,6 +150,12 @@ final class MangaEntry {
   List<String> get genres => snapshot.genres;
 }
 
+typedef MangaDetails = ({
+  MangaEntry manga,
+  List<ChapterEntry> chapters,
+  CatalogSourceRef source,
+});
+
 final class ChapterEntry {
   ChapterEntry(wire.Chapter value) : snapshot = value.deepCopy()..freeze() {
     if (value.name.isEmpty || value.url.isEmpty) {
@@ -246,6 +253,8 @@ final class CatalogController extends ChangeNotifier {
   Future<bool>? _progressClosing;
 
   BusinessStateClient? _businessClient;
+  int _browsingHistoryRevision = 0;
+  String? _browsingHistoryError;
   LibraryRepository? _library;
   ProgressRepository? _progress;
   BookmarkRepository? _bookmarks;
@@ -323,6 +332,8 @@ final class CatalogController extends ChangeNotifier {
 
   void _bindBusinessClient(BusinessStateClient client) {
     _businessClient = client;
+    _browsingHistoryError = null;
+    _browsingHistoryRevision = 0;
     _library = LibraryRepository(client);
     _progress = ProgressRepository(client);
     _bookmarks = BookmarkRepository(client);
@@ -342,6 +353,39 @@ final class CatalogController extends ChangeNotifier {
 
   LibraryRepository? get library =>
       _confirmedBusinessClient == null ? null : _library;
+
+  int get browsingHistoryRevision => _browsingHistoryRevision;
+  String? get browsingHistoryError =>
+      _confirmedBusinessClient == null ? null : _browsingHistoryError;
+
+  Future<void> recordBrowsingVisit(
+    MangaEntry manga,
+    CatalogSourceRef source,
+  ) async {
+    final client = _confirmedBusinessClient;
+    final build = activeBuild;
+    if (client == null || build == null || !isCurrentSource(source)) return;
+    try {
+      await client.recordBrowsingVisit(
+        wire.LibraryMetadata(
+          packageName: build.packageName,
+          sourceId: source.sourceId,
+          sourceName: source.sourceName.length <= 256
+              ? source.sourceName
+              : String.fromCharCodes(source.sourceName.runes.take(128)),
+          sourceLang: source.sourceLang.isEmpty ? 'und' : source.sourceLang,
+          manga: manga.snapshot,
+        ),
+      );
+      if (!identical(_confirmedBusinessClient, client)) return;
+      _browsingHistoryRevision++;
+      _browsingHistoryError = null;
+    } catch (_) {
+      if (!identical(_confirmedBusinessClient, client)) return;
+      _browsingHistoryError = '上次访问未能保存到浏览记录。';
+    }
+    _notify();
+  }
 
   BookmarkRepository? get bookmarks =>
       _confirmedBusinessClient == null ? null : _bookmarks;
@@ -848,7 +892,15 @@ final class CatalogController extends ChangeNotifier {
   ServiceStatus status = ServiceStatus.disconnected;
   String? email;
   String? subject;
-  String? error;
+  String? _error;
+  String? errorDetails;
+  ({Object failure, String operation})? _failedSourceCall;
+  String? get error => _error;
+  set error(String? value) {
+    _error = value;
+    errorDetails = null;
+  }
+
   bool busy = false;
   String? activity;
   List<CatalogBuild> builds = const [];
@@ -911,15 +963,26 @@ final class CatalogController extends ChangeNotifier {
       RuntimeErrorCode.accessDenied,
       RuntimeErrorCode.timeout,
     }.contains(event.code)) {
+      final label = activity;
+      final operation = label == null
+          ? '连接漫画运行环境'
+          : label.startsWith('正在')
+          ? label.substring(2)
+          : label;
       ++_epoch;
       busy = false;
       activity = null;
       _dropSession();
-      error = event.code == RuntimeErrorCode.accessRequired
-          ? '访问验证已失效，请重新登录'
-          : event.code == RuntimeErrorCode.accessDenied
-          ? '当前身份没有访问权限'
-          : _runtimeReconnectMessage;
+      error = switch (event.code) {
+        RuntimeErrorCode.accessRequired => '访问验证已失效，请重新登录',
+        RuntimeErrorCode.accessDenied => '当前身份没有访问权限',
+        RuntimeErrorCode.timeout => '$operation超时，请重新连接',
+        _ => _runtimeReconnectMessage,
+      };
+      errorDetails = sourceErrorDetails(
+        RuntimeException(event.code, event.message ?? error!),
+        operation: operation,
+      );
       status = event.code == RuntimeErrorCode.accessRequired
           ? ServiceStatus.loginRequired
           : event.code == RuntimeErrorCode.accessDenied
@@ -988,25 +1051,39 @@ final class CatalogController extends ChangeNotifier {
     busy = true;
     activity = label;
     error = null;
+    _failedSourceCall = null;
+    final operation = label.startsWith('正在') ? label.substring(2) : label;
     _notify();
     try {
       return await action();
     } on RuntimeException catch (failure) {
       if (epoch == _epoch && !_closed) {
+        final invoked = _failedSourceCall;
+        final sourceOperation = identical(invoked?.failure, failure)
+            ? invoked?.operation
+            : null;
         error = switch (failure.code) {
           RuntimeErrorCode.accessRequired => '访问验证已失效，请重新登录',
           RuntimeErrorCode.accessDenied => '当前身份没有访问权限',
-          RuntimeErrorCode.cancelled => '已取消漫画源请求',
-          RuntimeErrorCode.timeout => '漫画源响应超时，请重新连接后重试',
+          RuntimeErrorCode.cancelled => '操作已取消',
+          RuntimeErrorCode.timeout => '$operation超时，请重试',
           RuntimeErrorCode.runtimeLost => _runtimeReconnectMessage,
           RuntimeErrorCode.unsupportedCapability => '这个漫画源功能暂未支持',
           RuntimeErrorCode.integrityError => '构建校验失败，请重新加载',
           RuntimeErrorCode.extensionAssetUnavailable => '无法从仓库读取扩展材料，请重试',
-          RuntimeErrorCode.sourceError => '漫画源请求失败，请重试',
+          RuntimeErrorCode.sourceError
+              when sourceOperation != null && failure.javaClass != null =>
+            '漫画源处理出错，请查看错误详情',
           RuntimeErrorCode.storageBusy => '这个漫画源已在其他标签页或窗口运行，请先关闭后再连接',
-          RuntimeErrorCode.protocolError => '漫画源返回的数据与当前版本不兼容',
-          _ => '漫画源请求失败，请稍后重试',
+          RuntimeErrorCode.protocolError => '返回的数据格式与当前版本不兼容',
+          _ => '未能$operation，请重试',
         };
+        if (failure.code != RuntimeErrorCode.cancelled) {
+          errorDetails = sourceErrorDetails(
+            failure,
+            operation: sourceOperation ?? operation,
+          );
+        }
         if (failure.code == RuntimeErrorCode.accessRequired) {
           status = ServiceStatus.loginRequired;
           _dropSession();
@@ -1030,12 +1107,14 @@ final class CatalogController extends ChangeNotifier {
       if (epoch == _epoch && !_closed) {
         error = failure is FormatException
             ? failure.message
-            : '连接未完成，请检查服务配置后重试';
+            : '未能$operation，请重试';
+        errorDetails = sourceErrorDetails(failure, operation: operation);
         if (status == ServiceStatus.connecting) status = ServiceStatus.failed;
       }
       return null;
     } finally {
       if (epoch == _epoch && !_closed) {
+        _failedSourceCall = null;
         busy = false;
         activity = null;
         _notify();
@@ -1385,9 +1464,20 @@ final class CatalogController extends ChangeNotifier {
         : null;
     call.timeoutMs = input == null ? 30000 : 120000;
     onRequest?.call(call.requestId);
-    final result = await runtime.invoke(
-      SourceRequest(packageId: build.packageName, call: call, onInput: input),
-    );
+    final SourceResult result;
+    try {
+      result = await runtime.invoke(
+        SourceRequest(packageId: build.packageName, call: call, onInput: input),
+      );
+    } catch (failure) {
+      if (!_closed && epoch == _epoch) {
+        _failedSourceCall = (
+          failure: failure,
+          operation: call.whichRequest().name,
+        );
+      }
+      rethrow;
+    }
     if (_closed ||
         epoch != _epoch ||
         session?.generation != current.generation ||
@@ -1780,9 +1870,7 @@ final class CatalogController extends ChangeNotifier {
       if (selected) status = ServiceStatus.ready;
       return selected;
     });
-    if (reopened != true || !current()) return false;
-    await loadMangas();
-    return current() && isCurrentPreferencesTarget(target);
+    return reopened == true && current() && isCurrentPreferencesTarget(target);
   }
 
   wire.PreferenceSnapshot _scopePreferenceSnapshot(
@@ -1976,10 +2064,7 @@ final class CatalogController extends ChangeNotifier {
 
   /// A saved manga identifies a package and Source, never an old build or
   /// generation. Only the current static index may select its runtime.
-  Future<
-    ({MangaEntry manga, List<ChapterEntry> chapters, CatalogSourceRef source})?
-  >
-  openLibraryEntry(
+  Future<MangaDetails?> openLibraryEntry(
     LibraryEntry entry, {
     required String identityKey,
     bool Function()? shouldContinue,
@@ -1997,39 +2082,25 @@ final class CatalogController extends ChangeNotifier {
         library?.identity.key == identityKey &&
         shouldContinue?.call() != false;
     if (!current()) return null;
-    final build = await openSelectedBuild(
+    final result = await _openReferencedManga(
       entry.packageName,
-      shouldContinue: current,
-    );
-    if (build == null) return null;
-    if (!current() || activeBuild?.id != build.id) return null;
-    final sources = session?.sources.where(
-      (source) => source.id == entry.sourceId,
-    );
-    if (sources == null || sources.isEmpty) {
-      error = '当前扩展中找不到原漫画源；服务端收藏和进度仍保留。';
-      _notify();
-      return null;
-    }
-    final selectedSource = sources.single;
-    await selectSource(selectedSource, loadListing: false);
-    if (!current()) return null;
-    final result = await details(
+      entry.sourceId,
       MangaEntry(entry.snapshot),
-      shouldContinue: current,
+      current,
     );
     if (result == null || !current()) return null;
+    final selectedSource = result.source;
     // Opening an unchanged shelf entry must not advance the shared manga CAS
     // or interfere with another device's bookmark/category draft.
-    if (entry.sourceName != selectedSource.name ||
-        entry.sourceLang != selectedSource.lang ||
+    if (entry.sourceName != selectedSource.sourceName ||
+        entry.sourceLang != selectedSource.sourceLang ||
         entry.snapshot != result.manga.snapshot) {
       try {
         await repository.refreshMetadata(
           packageName: entry.packageName,
-          sourceId: selectedSource.id,
-          sourceName: selectedSource.name,
-          sourceLang: selectedSource.lang,
+          sourceId: selectedSource.sourceId,
+          sourceName: selectedSource.sourceName,
+          sourceLang: selectedSource.sourceLang,
           manga: result.manga.snapshot,
         );
       } catch (_) {
@@ -2040,6 +2111,51 @@ final class CatalogController extends ChangeNotifier {
       }
     }
     return current() && isCurrentSource(result.source) ? result : null;
+  }
+
+  Future<MangaDetails?> openBrowsingVisit(
+    wire.LibraryMetadata metadata, {
+    required BusinessStateClient client,
+    required bool Function() shouldContinue,
+  }) {
+    final epoch = _epoch;
+    bool current() =>
+        !_closed &&
+        epoch == _epoch &&
+        status == ServiceStatus.ready &&
+        identical(_confirmedBusinessClient, client) &&
+        shouldContinue();
+    if (busy || !current()) return Future.value();
+    return _openReferencedManga(
+      metadata.packageName,
+      metadata.sourceId,
+      MangaEntry(metadata.manga),
+      current,
+    );
+  }
+
+  Future<MangaDetails?> _openReferencedManga(
+    String packageName,
+    String sourceId,
+    MangaEntry manga,
+    bool Function() current,
+  ) async {
+    final build = await openSelectedBuild(packageName, shouldContinue: current);
+    if (build == null || !current() || activeBuild?.id != build.id) return null;
+    final source = session?.sources
+        .where((source) => source.id == sourceId)
+        .firstOrNull;
+    if (source == null) {
+      error = '当前扩展中找不到原漫画源。';
+      _notify();
+      return null;
+    }
+    await selectSource(source, loadListing: false);
+    if (!current() || activeSource?.id != source.id) return null;
+    final result = await details(manga, shouldContinue: current);
+    return result != null && current() && isCurrentSource(result.source)
+        ? result
+        : null;
   }
 
   Future<

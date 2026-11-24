@@ -226,6 +226,18 @@ void main() {
           await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
           await tester.pump();
           expect(
+            focusedButton()?.key,
+            const ValueKey((
+              'configure-source',
+              'eu.kanade.source.test',
+              sourceId,
+            )),
+          );
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+          await tester.pump();
+          expect(
             find.descendant(
               of: find.byWidget(focusedButton()!),
               matching: source,
@@ -277,7 +289,10 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('正在等待服务端确认设置修改'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey(('settings-activity', 'saving'))),
+        findsOneWidget,
+      );
       expect(toggle(), findsNothing);
       final command = wire.decodeProtoJson(
         wire.SettingsMutation(),

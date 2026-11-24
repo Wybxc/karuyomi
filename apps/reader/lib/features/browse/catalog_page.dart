@@ -13,6 +13,7 @@ import '../extensions/extensions_page.dart';
 import '../reader/reader_recovery.dart';
 import '../search/cross_source_search_page.dart';
 import '../sources/source_directory.dart';
+import '../sources/source_error_details.dart';
 import '../sources/source_preferences.dart';
 import 'catalog_controller.dart';
 import 'manga_details_page.dart';
@@ -194,6 +195,8 @@ class const CatalogPage({
                         onPressed: needsLogin ? onAuthenticate : onConnect,
                       ),
               ),
+              if (!connecting && catalog?.errorDetails != null)
+                SourceErrorDetailsButton(details: catalog!.errorDetails!),
             ],
           ),
         ),

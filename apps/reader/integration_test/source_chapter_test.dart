@@ -378,7 +378,11 @@ Future<wire.MangaStateResponse> _confirmed(
 }) async {
   final elapsed = Stopwatch()..start();
   while (elapsed.elapsed < _budget) {
-    if (find.text('阅读进度已保存到服务端').evaluate().length == 1) {
+    if (find
+            .byKey(const ValueKey('reader-progress-confirmed'))
+            .evaluate()
+            .length ==
+        1) {
       final state = await _inspect(client, mangaKey, manifest.chapterKey);
       final progress = state.progress;
       final key = manifest.pages[page - 1].key;

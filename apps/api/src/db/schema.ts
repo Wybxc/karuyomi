@@ -1,11 +1,13 @@
 import {
   integer,
+  index,
   foreignKey,
   primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
+import { desc } from 'drizzle-orm';
 
 // Business tables follow their P0/P1 contracts; no deferred modules are seeded.
 export const appMetadata = sqliteTable('app_metadata', {
@@ -84,6 +86,26 @@ export const chapterBookmarks = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.subject, table.mangaKey, table.chapterKey] }),
+  ],
+);
+
+export const browsingHistory = sqliteTable(
+  'browsing_history',
+  {
+    subject: text('subject').notNull(),
+    mangaKey: text('manga_key').notNull(),
+    title: text('title').notNull(),
+    sourceName: text('source_name').notNull(),
+    metadataJson: text('metadata_json').notNull(),
+    visitedAtMs: integer('visited_at_ms').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subject, table.mangaKey] }),
+    index('browsing_history_recent').on(
+      table.subject,
+      desc(table.visitedAtMs),
+      table.mangaKey,
+    ),
   ],
 );
 

@@ -189,7 +189,7 @@ Future<void> _globalDefaults(
   await _dim(tester, 'global', zero: false);
   await _chooseField<ReaderInputPreset>(tester, '分页点击区', '反向');
   await _chooseField<ReaderInputPreset>(tester, '阅读快捷键', '关闭');
-  await _choose<wire.ReaderMode>(tester, '从右到左');
+  await _choose<wire.ReaderMode>(tester, '横向分页 · 从右到左');
   await _choose<wire.ReaderPageLayout>(tester, '双页');
   await _chooseField<wire.ReaderFit>(tester, '图像适配', '适宽');
   beforeLastChoice?.call();
@@ -1180,21 +1180,31 @@ void main() {
         };
         await _tap(tester, mode);
         await tester.runAsync(() async {
-          await tester.tap(find.widgetWithText(CupertinoMenuItem, '从右到左'));
+          await tester.tap(
+            find.widgetWithText(CupertinoMenuItem, '横向分页 · 从右到左'),
+          );
           await Future<void>.delayed(Duration.zero);
         });
         await tester.pump(const Duration(milliseconds: 500));
         await tester.runAsync(
           () => entered.future.timeout(const Duration(seconds: 5)),
         );
-        expect(find.text('正在等待服务端确认设置修改').hitTestable(), findsOneWidget);
+        expect(
+          find
+              .byKey(const ValueKey(('settings-activity', 'saving')))
+              .hitTestable(),
+          findsOneWidget,
+        );
         expect(
           tester.widget<ChoiceField<ReadingMode>>(mode).value,
           originalMode,
         );
         expect(_reader(tester).initialMode, originalMode);
         expect(pager().direction, TextDirection.ltr);
-        expect(find.text('正在读取服务端设置'), findsNothing);
+        expect(
+          find.byKey(const ValueKey(('settings-activity', 'reading'))),
+          findsNothing,
+        );
         expect(
           container.read(provider).snapshot!.mangaRevision,
           originalRevision,
@@ -1210,7 +1220,12 @@ void main() {
         );
         tester.view.physicalSize = const Size(844, 390);
         await tester.pump(const Duration(milliseconds: 250));
-        expect(find.text('正在等待服务端确认设置修改').hitTestable(), findsOneWidget);
+        expect(
+          find
+              .byKey(const ValueKey(('settings-activity', 'saving')))
+              .hitTestable(),
+          findsOneWidget,
+        );
         final nextPage = iconLabel('下一页');
         expect(nextPage.hitTestable(), findsOneWidget);
         await tester.tap(nextPage);
@@ -1224,7 +1239,10 @@ void main() {
           await Future<void>.delayed(Duration.zero);
         });
         await tester.pumpAndSettle();
-        expect(find.text('正在等待服务端确认设置修改'), findsNothing);
+        expect(
+          find.byKey(const ValueKey(('settings-activity', 'saving'))),
+          findsNothing,
+        );
         expect(
           container.read(provider).snapshot!.mangaRevision,
           originalRevision! + 1,
@@ -1336,7 +1354,7 @@ void main() {
       expect(reset.viewportY, 0);
       expect(_reader(tester).key, leafBeforeFit);
       await _tap(tester, find.byType(ChoiceField<ReadingMode>));
-      await _tap(tester, find.text('从左到右').last);
+      await _tap(tester, find.text('横向分页 · 从左到右').last);
       await _tap(tester, find.byType(ChoiceField<bool>));
       await _tap(tester, find.widgetWithText(CupertinoMenuItem, '单页'));
       var snapshot = await tester.runAsync(

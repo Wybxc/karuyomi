@@ -89,21 +89,23 @@ export async function hashText(text: string): Promise<string> {
   ).join('');
 }
 
+export function mangaMetadataKey(metadata: LibraryMetadata): Promise<string> {
+  if (!metadata.manga)
+    throw new StateError(ErrorCode.INVALID_INPUT, 'Manga metadata is required');
+  return hashText(
+    JSON.stringify([
+      metadata.packageName,
+      metadata.sourceId,
+      metadata.manga.url,
+    ]),
+  );
+}
+
 async function validateMetadataKey(
   mangaKey: string,
   metadata: LibraryMetadata,
 ) {
-  if (
-    !metadata.manga ||
-    mangaKey !==
-      (await hashText(
-        JSON.stringify([
-          metadata.packageName,
-          metadata.sourceId,
-          metadata.manga.url,
-        ]),
-      ))
-  )
+  if (mangaKey !== (await mangaMetadataKey(metadata)))
     throw new StateError(
       ErrorCode.INVALID_INPUT,
       'Metadata does not match manga identity',

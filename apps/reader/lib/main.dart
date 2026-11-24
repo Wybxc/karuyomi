@@ -22,6 +22,7 @@ import 'features/reader/reader_slider_focus.dart'
 import 'features/reader/chapter_reader_route.dart';
 import 'features/browse/catalog_controller.dart';
 import 'features/browse/catalog_page.dart';
+import 'features/history/browsing_history_page.dart';
 import 'features/library/library_page.dart';
 import 'features/settings/reader_device_settings.dart';
 import 'features/settings/settings_controller.dart';
@@ -188,11 +189,12 @@ class _AppShellState extends ConsumerState<AppShell> {
   static const _originKey = 'native_service_origin';
   static const _sidebarWidth = 176.0;
   late TextEditingController _originField;
-  static const _labels = ['书架', '浏览', '设置'];
+  static const _labels = ['书架', '浏览', '设置', '浏览记录'];
   static const _icons = [
     CupertinoIcons.book,
     CupertinoIcons.compass,
     CupertinoIcons.slider_horizontal_3,
+    CupertinoIcons.clock,
   ];
   final _tabFocusNodes = [
     for (final label in _labels) FocusNode(debugLabel: label),
@@ -298,7 +300,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       if (continuation?['pending'] case final Map pending) {
         _pendingContinuation = Map<String, Object?>.from(pending);
         final tab = pending['tab'];
-        if (tab is int && tab >= 0 && tab < 3) _index = tab;
+        if (tab is int && tab >= 0 && tab < _labels.length) _index = tab;
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -562,23 +564,46 @@ class _AppShellState extends ConsumerState<AppShell> {
     if (mounted) setState(() => _retryingProgress = false);
   }
 
+  Widget _destination(int index, Widget child) => CupertinoPageScaffold(
+    navigationBar: CupertinoNavigationBar(middle: Text(_labels[index])),
+    child: SafeArea(child: child),
+  );
+
   Widget _page() => switch (_index) {
     0 => AdaptiveDetailLayout(
       owner: _catalog?.library,
-      child: LibraryPage(
+      child: _destination(
+        0,
+        LibraryPage(
+          controller: _catalog,
+          onBrowse: () => _select(1),
+          onConnect: () => unawaited(_connect()),
+          onAuthenticate: () => unawaited(_authenticate()),
+          onAuthenticateReader: _authenticateReader,
+        ),
+      ),
+    ),
+    1 => _destination(
+      1,
+      CatalogPage(
         controller: _catalog,
-        onBrowse: () => _select(1),
         onConnect: () => unawaited(_connect()),
         onAuthenticate: () => unawaited(_authenticate()),
         onAuthenticateReader: _authenticateReader,
+        configurationError: _configurationError,
       ),
     ),
-    1 => CatalogPage(
-      controller: _catalog,
-      onConnect: () => unawaited(_connect()),
-      onAuthenticate: () => unawaited(_authenticate()),
-      onAuthenticateReader: _authenticateReader,
-      configurationError: _configurationError,
+    3 => AdaptiveDetailLayout(
+      owner: _catalog?.library?.client,
+      child: _destination(
+        3,
+        BrowsingHistoryPage(
+          catalog: _catalog,
+          onConnect: () => unawaited(_connect()),
+          onAuthenticate: () => unawaited(_authenticate()),
+          onAuthenticateReader: _authenticateReader,
+        ),
+      ),
     ),
     _ => GlobalSettingsPanel(
       catalog: _catalog,
@@ -899,9 +924,6 @@ class _AppShellState extends ConsumerState<AppShell> {
       ref.watch(settingsControllerProvider(catalog, catalog.settings).notifier);
     }
     return CupertinoPageScaffold(
-      navigationBar: _index == 2
-          ? null
-          : CupertinoNavigationBar(middle: Text(_labels[_index])),
       child: SafeArea(
         child: Column(
           children: [

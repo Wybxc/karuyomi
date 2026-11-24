@@ -215,7 +215,10 @@ Future<void> _back(WidgetTester tester) async {
 List<TestBusinessRequest> _posts(TestPlatform platform) => platform
     .businessServer
     .requests
-    .where((request) => request.method == 'POST')
+    .where(
+      (request) =>
+          request.method == 'POST' && request.uri.path != '/api/history',
+    )
     .toList();
 wire.StateMutation _command(TestBusinessRequest request) =>
     wire.decodeProtoJson(wire.StateMutation(), jsonDecode(request.body!));

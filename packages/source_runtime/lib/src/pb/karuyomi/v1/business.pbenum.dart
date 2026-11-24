@@ -70,6 +70,18 @@ class ReaderMode extends $pb.ProtobufEnum {
       ReaderMode._(3, _omitEnumNames ? '' : 'READER_MODE_CONTINUOUS');
   static const ReaderMode READER_MODE_WEBTOON =
       ReaderMode._(4, _omitEnumNames ? '' : 'READER_MODE_WEBTOON');
+  static const ReaderMode READER_MODE_HORIZONTAL_CONTINUOUS_LEFT_TO_RIGHT =
+      ReaderMode._(
+          5,
+          _omitEnumNames
+              ? ''
+              : 'READER_MODE_HORIZONTAL_CONTINUOUS_LEFT_TO_RIGHT');
+  static const ReaderMode READER_MODE_HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT =
+      ReaderMode._(
+          6,
+          _omitEnumNames
+              ? ''
+              : 'READER_MODE_HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT');
 
   static const $core.List<ReaderMode> values = <ReaderMode>[
     READER_MODE_UNSPECIFIED,
@@ -77,10 +89,12 @@ class ReaderMode extends $pb.ProtobufEnum {
     READER_MODE_RIGHT_TO_LEFT,
     READER_MODE_CONTINUOUS,
     READER_MODE_WEBTOON,
+    READER_MODE_HORIZONTAL_CONTINUOUS_LEFT_TO_RIGHT,
+    READER_MODE_HORIZONTAL_CONTINUOUS_RIGHT_TO_LEFT,
   ];
 
   static final $core.List<ReaderMode?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
+      $pb.ProtobufEnum.$_initByValueList(values, 6);
   static ReaderMode? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
