@@ -392,7 +392,7 @@ Wrangler 关键配置草案（并非完整部署文件，静态资源目录由 F
 
 网络中继使用 Cloudflare Access 认证后的应用会话和 Workers 公网 fetch，所有扩展采用相同转发路径。重定向由 Source 自己处理，每跳重新经同一中继；应用 Cookie、Authorization 和 Access 头不复制到上游，只转发 Source 自己为站点构造的请求凭证。
 
-Source 选择 `Dns.SYSTEM` 时使用 Workers 公网 fetch 的系统解析，自定义 DNS 配置返回明确的宿主错误。Source 配置的 `Authenticator` 可以处理原请求同源的 401，补发请求仍限定在该 origin，并与重定向共用次数上限。补发前释放旧响应正文，只重用可重放的请求体。[OkHttp 5.5.0 参考实现](https://github.com/square/okhttp/blob/parent-5.5.0/okhttp/src/commonJvmAndroid/kotlin/okhttp3/internal/http/RetryAndFollowUpInterceptor.kt)
+Source 可以调用 `OkHttpClient.Builder.dns(...)`。实际请求统一使用 Workers 公网 fetch 解析原域名。依赖特殊解析地址的源可能遇到连接超时或不同的上游响应。Source 配置的 `Authenticator` 可以处理原请求同源的 401，补发请求仍限定在该 origin，并与重定向共用次数上限。补发前释放旧响应正文，只重用可重放的请求体。[OkHttp 5.5.0 参考实现](https://github.com/square/okhttp/blob/parent-5.5.0/okhttp/src/commonJvmAndroid/kotlin/okhttp3/internal/http/RetryAndFollowUpInterceptor.kt)
 
 前台显式打开章节时，Keiyoushi 的文本输入方法可挂起当前 Source 调用。正式 Gradle 构建保留该方法的静态签名，TeaVM 在编译时将调用映射到宿主。装载时根据构建清单声明输入能力，只有带该入口的扩展开启输入控制。Worker 通过 ProtoJSON 传递来源、提示和输入类型。应用校验请求、generation、build 和弹窗标识，用户确认后才将输入交还同一次调用。弹窗默认遮蔽密码，取消以空值返回。后台预取没有输入权限，原请求结束或失效时关闭对应弹窗。每个输入字段上限为 4 KiB UTF-8，前台交互读章期限为两分钟。提示和答复只在当前调用内传递。
 

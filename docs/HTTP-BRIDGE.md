@@ -164,6 +164,12 @@ message with `remote: true`. Other source exception messages are not reflected.
 
 ## Runtime and local adapter configuration
 
+The Source client accepts OkHttp's `Builder.dns(...)` setting. The Worker
+resolves the original URL hostname with its system resolver for every
+request. Sources that depend on resolver-selected addresses may fail to
+reach their upstream. Source headers, cookies and HTTP interceptors still
+apply.
+
 Host ABI v4 binds each Java entry to `requestId`, `generation` and a fresh opaque
 operation token. Java HTTP metadata carries these three private owner fields;
 the local transport validates and removes them before creating wire META. Old
