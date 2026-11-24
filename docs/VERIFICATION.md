@@ -680,7 +680,9 @@
 
 2026-11-24，本机 JDK 25 和 TeaVM 生成 JavaScript 的 `pnpm teavm:check` 通过。宿主网络配置有 27 项断言，涵盖设置自定义 DNS 后使用中继系统解析，以及派生客户端继续保留 Source authenticator。
 
-在 `macbook-pro-4` 固定宿主 `84a7218`、Keiyoushi `efa93f5a` 补编原哔咔漫画 1.6.14。正式 AOT 和产物校验通过，canonical SHA-256 为 `afa476390cb278f200f7e05444694c997746aaf701249875f5ae91f8114daab5`，产物含 1 个 Source 并保持 `compiled_unverified`。使用同提交的正式 Native Worker 脚本在 Node.js 24.15.0 运行，只替换 Worker 全局和上游响应。生产旧包在热门调用重现自定义 DNS 异常。新包通过正式二进制中继发出签名登录和热门请求，保留源 Authorization 和 Cookie，返回含预期封面 URL 的条目并正常关闭。过程使用测试账号值与模拟上游。真实 Cloudflare 出站、站点登录和封面字节待验。
+在 `macbook-pro-4` 固定宿主 `84a7218`、Keiyoushi `efa93f5a` 补编原哔咔漫画 1.6.14。正式 AOT 和产物校验通过，canonical SHA-256 为 `afa476390cb278f200f7e05444694c997746aaf701249875f5ae91f8114daab5`，产物含 1 个 Source 并保持 `compiled_unverified`。使用同提交的正式 Native Worker 脚本在 Node.js 24.15.0 运行，只替换 Worker 全局和上游响应。生产旧包在热门调用重现自定义 DNS 异常。新包通过正式二进制中继发出签名登录和热门请求，保留源 Authorization 和 Cookie，取得封面 URL 后通过原 Source 交付与模拟上游一致的 68 字节 PNG 并正常关闭。过程使用测试账号值与模拟上游。真实 Cloudflare 出站、站点登录和出图待验。
+
+2026-11-24，默认 DNS 经 PR #12 合入 `f536983`，主线 Web 自动发布通过。单包增量复用该次主线 CI Web 归档，Worker `dbde12ac-8cdc-4378-91eb-086f14ed0ea7` 承接全部流量。生产 revision `e0d7e93309e1438d94d3919f86eb41b2` 的索引摘要为 `68bf00833dfa951e30590384779b2df9e00bc5d3a2e57b34cbdb9dd9269fb83c`。1,447 个扩展和 2,360 个 Source 得以保留，仅哔咔更新。线上索引、状态、哔咔新清单、压缩前后摘要、旧清单 404、47 项 Web 资源和匿名 Access 302 均通过，D1 无待应用迁移。[主线 CI](https://github.com/Wybxc/karuyomi/actions/runs/45308034613)
 
 ## 工程与代码验证
 
