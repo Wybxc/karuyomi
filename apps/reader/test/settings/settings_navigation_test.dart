@@ -189,7 +189,7 @@ Future<void> _globalDefaults(
   await _dim(tester, 'global', zero: false);
   await _chooseField<ReaderInputPreset>(tester, '分页点击区', '反向');
   await _chooseField<ReaderInputPreset>(tester, '阅读快捷键', '关闭');
-  await _choose<wire.ReaderMode>(tester, '横向分页 · 从右到左');
+  await _choose<TextDirection>(tester, '从右到左');
   await _choose<wire.ReaderPageLayout>(tester, '双页');
   await _chooseField<wire.ReaderFit>(tester, '图像适配', '适宽');
   beforeLastChoice?.call();
@@ -1107,11 +1107,11 @@ void main() {
       expect(_reader(tester).keyboard, ReaderInputPreset.disabled);
       expect(
         tester
-            .widget<ChoiceField<ReadingMode>>(
-              find.byType(ChoiceField<ReadingMode>),
+            .widget<ChoiceField<TextDirection>>(
+              find.byType(ChoiceField<TextDirection>),
             )
             .value,
-        ReadingMode.rightToLeft,
+        TextDirection.rtl,
       );
       expect(
         tester.widget<ChoiceField<bool>>(find.byType(ChoiceField<bool>)).value,
@@ -1142,14 +1142,12 @@ void main() {
           greaterThanOrEqualTo(3 * kMinInteractiveDimensionCupertino),
           reason: 'the short reader still needs a usable drag and tap range',
         );
-        final mode = find.byType(ChoiceField<ReadingMode>);
+        final direction = find.byKey(const ValueKey('reader-direction'));
         final layout = find.byKey(const ValueKey('reader-page-layout'));
         ReaderPageNavigation pager() => tester.widget<ReaderPageNavigation>(
           find.byType(ReaderPageNavigation),
         );
-        final originalMode = tester
-            .widget<ChoiceField<ReadingMode>>(mode)
-            .value;
+        final originalMode = _reader(tester).initialMode;
         expect(originalMode, ReadingMode.leftToRight);
         expect(tester.widget<ChoiceField<bool>>(layout).value, isNull);
         final container = ProviderScope.containerOf(
@@ -1178,11 +1176,9 @@ void main() {
           }
           return reply;
         };
-        await _tap(tester, mode);
+        await _tap(tester, direction);
         await tester.runAsync(() async {
-          await tester.tap(
-            find.widgetWithText(CupertinoMenuItem, '横向分页 · 从右到左'),
-          );
+          await tester.tap(find.widgetWithText(CupertinoMenuItem, '从右到左'));
           await Future<void>.delayed(Duration.zero);
         });
         await tester.pump(const Duration(milliseconds: 500));
@@ -1196,8 +1192,8 @@ void main() {
           findsOneWidget,
         );
         expect(
-          tester.widget<ChoiceField<ReadingMode>>(mode).value,
-          originalMode,
+          tester.widget<ChoiceField<TextDirection>>(direction).value,
+          TextDirection.ltr,
         );
         expect(_reader(tester).initialMode, originalMode);
         expect(pager().direction, TextDirection.ltr);
@@ -1211,11 +1207,7 @@ void main() {
         );
         expect(container.read(provider).snapshot!.overrides!.hasMode(), false);
         expect(
-          tester
-              .widget<ChoiceField<ReadingMode>>(
-                find.byType(ChoiceField<ReadingMode>),
-              )
-              .onChanged,
+          tester.widget<ChoiceField<TextDirection>>(direction).onChanged,
           isNull,
         );
         tester.view.physicalSize = const Size(844, 390);
@@ -1252,8 +1244,8 @@ void main() {
           wire.ReaderMode.READER_MODE_RIGHT_TO_LEFT,
         );
         expect(
-          tester.widget<ChoiceField<ReadingMode>>(mode).value,
-          ReadingMode.rightToLeft,
+          tester.widget<ChoiceField<TextDirection>>(direction).value,
+          TextDirection.rtl,
         );
         expect(pager().pageIndex, 1);
         expect(pager().direction, TextDirection.rtl);
@@ -1353,8 +1345,8 @@ void main() {
       expect(reset.viewportX, 1);
       expect(reset.viewportY, 0);
       expect(_reader(tester).key, leafBeforeFit);
-      await _tap(tester, find.byType(ChoiceField<ReadingMode>));
-      await _tap(tester, find.text('横向分页 · 从左到右').last);
+      await _tap(tester, find.byKey(const ValueKey('reader-direction')));
+      await _tap(tester, find.widgetWithText(CupertinoMenuItem, '从左到右'));
       await _tap(tester, find.byType(ChoiceField<bool>));
       await _tap(tester, find.widgetWithText(CupertinoMenuItem, '单页'));
       var snapshot = await tester.runAsync(
@@ -1411,7 +1403,8 @@ void main() {
       expect(snapshot.overrides!.fit, wire.ReaderFit.READER_FIT_CONTAIN);
       expect(snapshot.overrides!.hasCropBorders(), true);
       expect(snapshot.overrides!.cropBorders, false);
-      await _choose<wire.ReaderMode>(tester, '跟随全局');
+      await _tap(tester, find.byKey(const ValueKey('manga-mode-source')));
+      await _tap(tester, find.widgetWithText(CupertinoMenuItem, '跟随全局'));
       snapshot = await tester.runAsync(
         () => catalog.settings!.loadManga(_mangaKey),
       );

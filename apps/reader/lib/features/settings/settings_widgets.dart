@@ -12,6 +12,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../state/account_providers.dart';
 import '../browse/catalog_controller.dart';
+import '../reader/reader_mode_fields.dart';
 import '../reader/reader_preferences.dart';
 import 'reader_device_controls.dart';
 import 'settings_controller.dart';
@@ -218,7 +219,7 @@ class const DeviceAppearanceSettings({
 
 enum _SettingsSection {
   appearance('appearance', '外观与主题', '跟随系统、浅色与深色', CupertinoIcons.paintbrush),
-  reading('reading', '账户阅读偏好', '阅读模式、分页布局、图像适配和裁白', CupertinoIcons.book),
+  reading('reading', '账户阅读偏好', '阅读方式、分页布局、图像适配和裁白', CupertinoIcons.book),
   input('input', '翻页与快捷键', '点击区与键盘操作', CupertinoIcons.keyboard),
   connection('connection', '服务连接', '服务地址与登录', CupertinoIcons.cloud),
   about('about', '关于', 'Karuyomi', CupertinoIcons.info);
@@ -230,6 +231,8 @@ enum _SettingsSection {
   final IconData icon;
   bool get isLocal => this == appearance || this == input;
 }
+
+enum _ReadingModeSource { account, manga }
 
 class MangaSettingsEditor extends _SettingsEditor {
   const MangaSettingsEditor({
@@ -367,10 +370,12 @@ class const _SettingsEditor({
         ? null
         : _FormDraft(state, manga);
     final r = draft?.reader;
-    final effectiveMode = r?.hasMode() == true
-        ? r!.mode
-        : state.snapshot?.global.reader.mode ??
-              wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT;
+    final effectiveMode = readerMode(
+      r?.hasMode() == true
+          ? r!.mode
+          : state.snapshot?.global.reader.mode ??
+                wire.ReaderMode.READER_MODE_LEFT_TO_RIGHT,
+    );
     final canClose =
         state.activity != SettingsActivity.saving || state.submitting != null;
     Widget group(String title, List<Widget> fields, {String? footer}) =>
@@ -435,15 +440,37 @@ class const _SettingsEditor({
         if (r != null) ...[
           if (manga || section == _SettingsSection.reading) ...[
             group('账户阅读偏好', [
-              choice(
-                'mode',
-                '阅读模式',
-                r.hasMode() ? r.mode : null,
-                readerModeOptions,
-                (reader, value) => reader.mode = value,
-                (reader) => reader.clearMode(),
+              if (manga)
+                ChoiceField<_ReadingModeSource>(
+                  key: const ValueKey('manga-mode-source'),
+                  label: '阅读方式来源',
+                  value: r.hasMode()
+                      ? _ReadingModeSource.manga
+                      : _ReadingModeSource.account,
+                  options: const {
+                    _ReadingModeSource.account: '跟随全局',
+                    _ReadingModeSource.manga: '本漫画设置',
+                  },
+                  inline: false,
+                  onChanged: state.canChange
+                      ? (value) => change((reader) {
+                          if (value == _ReadingModeSource.account) {
+                            reader.clearMode();
+                          } else {
+                            reader.mode = wireReaderMode(effectiveMode);
+                          }
+                        })
+                      : null,
+                ),
+              ...readerModeFields(
+                scope: scope,
+                mode: effectiveMode,
+                onChanged: state.canChange
+                    ? (mode) =>
+                          change((reader) => reader.mode = wireReaderMode(mode))
+                    : null,
               ),
-              if (!readerMode(effectiveMode).isContinuous)
+              if (!effectiveMode.isContinuous)
                 choice(
                   'layout',
                   '分页布局',

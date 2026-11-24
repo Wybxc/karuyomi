@@ -13,6 +13,7 @@ class const ChoiceField<T>({
   required final ValueChanged<T?>? onChanged,
   final Set<T?> disabledValues = const {},
   final bool inline = true,
+  final bool showInlineLabel = true,
 
   /// Shows a compact button whose accessible name includes the current choice.
   final IconData? icon,
@@ -54,24 +55,28 @@ class const ChoiceField<T>({
         onPressed: enabled ? open : null,
         child: switch (icon) {
           final glyph? => Icon(glyph, semanticLabel: '$label： $valueLabel'),
-          null when inline => Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('$label：', style: disabledStyle),
-              Flexible(
-                child: Text(
-                  valueLabel,
-                  style: disabledStyle,
-                  overflow: TextOverflow.ellipsis,
+          null when inline => Semantics(
+            label: showInlineLabel ? null : '$label： $valueLabel',
+            excludeSemantics: !showInlineLabel,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (showInlineLabel) Text('$label：', style: disabledStyle),
+                Flexible(
+                  child: Text(
+                    valueLabel,
+                    style: disabledStyle,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Icon(
-                CupertinoIcons.chevron_down,
-                size: 14,
-                color: disabledStyle?.color,
-              ),
-            ],
+                const SizedBox(width: 6),
+                Icon(
+                  CupertinoIcons.chevron_down,
+                  size: 14,
+                  color: disabledStyle?.color,
+                ),
+              ],
+            ),
           ),
           null => CupertinoListTile(
             title: tileLabel(label),

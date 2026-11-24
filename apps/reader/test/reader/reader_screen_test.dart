@@ -14,6 +14,7 @@ import 'package:flutter/rendering.dart'
     show RenderParagraph, RenderRepaintBoundary;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:karuyomi/features/reader/reader_mode_fields.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/features/reader/reader_page_navigation.dart';
 import 'package:karuyomi/features/reader/reader_preferences.dart';
@@ -389,6 +390,7 @@ void main() {
       final shownTop = tester.getTopLeft(navigationBar).dy;
       final shownBottom = tester.getCenter(bottomControl).dy;
       final shownViewport = tester.getRect(viewport);
+      expect(shownViewport, const Rect.fromLTRB(0, 24, 360, 810));
 
       await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
       await tester.pump();
@@ -403,6 +405,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(pageLayoutMenu, findsNothing);
       expect(find.text('1 / 20'), findsOneWidget);
+      expect(tester.getRect(viewport), shownViewport);
       expect(tester.getRect(image), withControls);
       final pageControl = tester.getSemantics(indicator).getSemanticsData();
       expect(pageControl.label, '显示阅读工具');
@@ -422,6 +425,7 @@ void main() {
       );
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
+      expect(tester.getRect(viewport), shownViewport);
       expect(tester.getRect(image), withControls);
       expect(pageLayoutMenu.hitTestable(), findsOneWidget);
       expect(indicator, findsNothing);
@@ -445,6 +449,68 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+
+  for (final mode in [
+    ReadingMode.continuous,
+    ReadingMode.horizontalContinuousRightToLeft,
+  ]) {
+    testWidgets(
+      'toolbar toggling keeps the scroll and decoded anchor in $mode',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 780);
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetPadding);
+        final manifest = fixtureChapter();
+        final viewports = <ReaderViewportState>[];
+        await tester.pumpWidget(
+          screen(
+            provider: FixturePageProvider(),
+            manifest: manifest,
+            mode: mode,
+            fit: mode.isVertical ? ReaderFit.width : ReaderFit.height,
+            position: manifest.positionAt(5, offset: .35, normalizedX: .45),
+            imageBuilder: decodedImage(),
+            onViewport: viewports.add,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final canvas = find.byKey(const ValueKey('continuous-reader'));
+        final scroll = tester.widget<ListView>(canvas).controller!;
+        final bounds = tester.getRect(canvas);
+        final offset = scroll.offset;
+        final anchor = viewports.last.observed!;
+        final image = find.byKey(ValueKey('image-rect-${anchor.pageKey}'));
+        final imageBounds = tester.getRect(image);
+        expect(bounds, const Rect.fromLTRB(0, 24, 390, 746));
+
+        void expectUnchanged() {
+          expect(tester.getRect(canvas), bounds);
+          expect(tester.getRect(image), imageBounds);
+          expect(scroll.offset, offset);
+          final current = viewports.last.observed!;
+          expect(current.pageKey, anchor.pageKey);
+          expect(current.normalizedX, anchor.normalizedX);
+          expect(current.normalizedOffset, anchor.normalizedOffset);
+        }
+
+        await tester.tapAt(bounds.center);
+        await tester.pump(kDoubleTapTimeout);
+        await tester.pump(const Duration(milliseconds: 80));
+        expectUnchanged();
+        await tester.pumpAndSettle();
+        expectUnchanged();
+        final indicator = find.byKey(const ValueKey('reader-page-indicator'));
+        expect(indicator.hitTestable(), findsOneWidget);
+        await tester.tap(indicator);
+        await tester.pumpAndSettle();
+        expect(indicator, findsNothing);
+        expectUnchanged();
+      },
+    );
+  }
 
   for (final disabled in [false, true]) {
     testWidgets(
@@ -1322,7 +1388,7 @@ void main() {
   );
 
   testWidgets(
-    'chapter controls reflow retains the preferred image anchor through restore',
+    'changes in chapter controls leave the viewport and preferred anchor intact',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -1351,6 +1417,7 @@ void main() {
       for (final height in [160.0, 40.0, 100.0]) {
         await tester.pumpWidget(configured(height));
         await tester.pumpAndSettle();
+        expect(tester.getRect(viewport), initialBounds);
         final current = viewports.last.current;
         expect(current.pageKey, initial.pageKey);
         expect(current.normalizedX, initial.normalizedX);
@@ -1358,7 +1425,6 @@ void main() {
         expect(current.viewportX, initial.viewportX);
         expect(current.viewportY, initial.viewportY);
       }
-      expect(tester.getRect(viewport).height, lessThan(initialBounds.height));
       expect(viewports.last.observed, isNotNull);
       tester.view.physicalSize = const Size(700, 500);
       await tester.pumpAndSettle();
@@ -1469,7 +1535,11 @@ void main() {
         restored(decodedImage(width: 400, height: 200), controls: 0),
       );
       await tester.pumpAndSettle();
-      expect(tester.getRect(viewport).height, greaterThan(bounds.height));
+      expect(tester.getRect(viewport), bounds);
+      expect(
+        tester.getRect(find.byKey(const ValueKey('image-rect-page'))),
+        image,
+      );
       expect(viewports.last.current.normalizedOffset, saved.normalizedOffset);
       expect(viewports.last.current.viewportY, saved.viewportY);
 
@@ -2718,34 +2788,36 @@ void main() {
       expect(viewports.last.doublePage, isNull);
       expect(modes, isEmpty);
       expect(pagePolicies, isEmpty);
-      await tester.tap(find.byType(ChoiceField<ReadingMode>));
+      final axis = find.byKey(const ValueKey('reader-axis'));
+      await tester.tap(axis);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('横向分页 · 从右到左').last);
+      await tester.tap(find.widgetWithText(CupertinoMenuItem, '横向'));
       await tester.pumpAndSettle();
-      expect(modes, [ReadingMode.rightToLeft]);
+      expect(modes, [ReadingMode.horizontalContinuousLeftToRight]);
       expect(viewports.last.current.pageKey, 'page-5');
       expect(viewports.last.current.normalizedOffset, closeTo(.35, .001));
       // The request leaves the confirmed layout in place while awaiting the
       // parent, including across an unrelated parent rebuild.
       await tester.pumpWidget(configured(ReadingMode.webtoon, null));
       await tester.pumpAndSettle();
+      expect(tester.widget<ChoiceField<Axis>>(axis).value, Axis.vertical);
       expect(
         tester
-            .widget<ChoiceField<ReadingMode>>(
-              find.byType(ChoiceField<ReadingMode>),
+            .widget<ChoiceField<ReadingSpacing>>(
+              find.byKey(const ValueKey('reader-spacing')),
             )
             .value,
-        ReadingMode.webtoon,
+        ReadingSpacing.seamless,
       );
       await tester.pumpWidget(configured(ReadingMode.rightToLeft, true));
       await tester.pumpAndSettle();
       expect(viewports.last.mode, ReadingMode.rightToLeft);
       expect(pageLayoutPreference(tester), true);
-      expect(modes, [ReadingMode.rightToLeft]);
+      expect(modes, [ReadingMode.horizontalContinuousLeftToRight]);
       expect(pagePolicies, isEmpty);
       tester.view.physicalSize = const Size(600, 900);
       await tester.pumpAndSettle();
-      expect(modes, [ReadingMode.rightToLeft]);
+      expect(modes, [ReadingMode.horizontalContinuousLeftToRight]);
       expect(pagePolicies, isEmpty);
       expect(viewports.last.current.pageKey, 'page-5');
       expect(viewports.last.current.normalizedOffset, closeTo(.35, .001));
@@ -2775,8 +2847,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester
-            .widget<ChoiceField<ReadingMode>>(
-              find.byType(ChoiceField<ReadingMode>),
+            .widget<ChoiceField<Axis>>(
+              find.byKey(const ValueKey('reader-axis')),
             )
             .onChanged,
         isNull,
@@ -3070,6 +3142,14 @@ void main() {
       find.byType(InteractiveViewer),
     );
     expect(viewer.transformationController!.value.getMaxScaleOnAxis(), 2);
+    final transform = viewer.transformationController!.value.clone();
+    final bounds = tester.getRect(find.byType(InteractiveViewer));
+    for (var toggle = 0; toggle < 2; toggle++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+      await tester.pumpAndSettle();
+      expect(viewer.transformationController!.value.storage, transform.storage);
+      expect(tester.getRect(find.byType(InteractiveViewer)), bounds);
+    }
     await tester.drag(find.byType(InteractiveViewer), const Offset(-120, 0));
     await tester.pumpAndSettle();
     expect(find.text('2 / 20'), findsOneWidget);
@@ -3250,9 +3330,9 @@ void main() {
     expect(find.text('查看图片'), findsNothing);
     tester.view.physicalSize = const Size(700, 500);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(ChoiceField<ReadingMode>));
+    await tester.tap(find.byKey(const ValueKey('reader-spacing')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('条漫（无间距）').last);
+    await tester.tap(find.widgetWithText(CupertinoMenuItem, '无间距'));
     await tester.pumpAndSettle();
     await tester.drag(
       find.byKey(const ValueKey('continuous-reader')),
@@ -3288,7 +3368,12 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('页面清单发生变化，已定位到最接近的页码。'), findsOneWidget);
+    final notice = find.text('页面清单发生变化，已定位到最接近的页码。');
+    expect(notice, findsOneWidget);
+    expect(
+      tester.getTopLeft(notice).dy,
+      greaterThan(tester.getBottomLeft(find.byType(CupertinoNavigationBar)).dy),
+    );
     expect(find.text('3 / 20'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
