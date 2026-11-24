@@ -408,6 +408,10 @@ void main() {
       expect(find.text('另一页面'), findsOneWidget);
       expect(find.byType(MangaDetailsPage), findsNothing);
       expect(platform.invocations, hasLength(1));
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('加载已停止，请重试。'), findsOneWidget);
+      expect(find.byKey(const ValueKey('manga-details-loading')), findsNothing);
       expect(tester.takeException(), isNull);
       await hide(tester);
     },

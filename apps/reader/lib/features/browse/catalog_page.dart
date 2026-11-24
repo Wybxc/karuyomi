@@ -106,33 +106,13 @@ class const CatalogPage({
         builder: (_) => CrossSourceSearchPage(
           service: service,
           coverCatalog: catalog,
-          onOpen: (details) async {
-            bool current() =>
-                currentIdentity() && catalog.isCurrentSource(details.source);
-            if (!current()) return;
-            await Navigator.of(context).push<void>(
-              AppPageRoute(
-                builder: (_) => current()
-                    ? MangaDetailsPage(
-                        controller: catalog,
-                        manga: details.manga,
-                        chapters: details.chapters,
-                        source: details.source,
-                        onAuthenticateReader: onAuthenticateReader,
-                      )
-                    : CupertinoPageScaffold(
-                        navigationBar: CupertinoNavigationBar(
-                          middle: const Text('作品已失效'),
-                        ),
-                        child: SafeArea(
-                          child: const Center(
-                            child: Text('身份或漫画源已改变，请返回后重新搜索。'),
-                          ),
-                        ),
-                      ),
-              ),
-            );
-          },
+          buildDetails: (details) => MangaDetailsPage(
+            controller: catalog,
+            manga: details.manga,
+            chapters: details.chapters,
+            source: details.source,
+            onAuthenticateReader: onAuthenticateReader,
+          ),
         ),
       ),
     );

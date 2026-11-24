@@ -701,7 +701,7 @@ void main() {
   );
 
   testWidgets(
-    'leaving while details load waits and prevents late chapter requests or navigation',
+    'back closes the pending detail and leaving the source drains its request',
     (tester) async {
       await show(tester);
       final entered = Completer<void>(), release = Completer<void>();
@@ -720,6 +720,18 @@ void main() {
       await tester.runAsync(
         () => entered.future.timeout(const Duration(seconds: 5)),
       );
+      await tester.pump(const Duration(milliseconds: 600));
+      final loading = find.byKey(const ValueKey('manga-details-loading'));
+      expect(loading, findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const ValueKey('manga-details-destination')),
+          matching: find.byType(CupertinoNavigationBarBackButton),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(loading, findsNothing);
+      expect(find.byType(SourceBrowsePage), findsOneWidget);
       await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pump();
       expect(find.text('正在停止并收尾'), findsOneWidget);

@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-24，基于 `97f9c0a` 的详情导航改动在 macOS 上通过 `pnpm flutter:check --reporter expanded --concurrency=2`。Flutter 应用通过 1,040 项，阅读核心和 Source Runtime 共通过 112 项。组件测试用延迟请求覆盖宽窄屏布局及漫画源列表、书架、历史和跨源搜索入口，确认详情框架先出现，加载、错误详情和重试留在详情内。返回或打开其他路由后，迟到的详情响应不会继续发起章节请求。[分项计划](plan/browsing-and-reader-experience.md)
+
 2026-11-24，`ddd0e78` 与 `3f031ae` 在 macOS 27.0.1 上通过 `pnpm format:check`、`pnpm check`、`pnpm flutter:check` 和 `pnpm build`。Vitest 通过 612 项，Flutter 应用通过 1,038 项，阅读核心与 Source Runtime Dart 包共通过 112 项。官方 Wrangler 本地 D1 成功应用至 `0013_browsing-history.sql`。Worker 测试使用两份同账户会话和一份不同账户会话，核对浏览记录的排序、100 条上限、重复访问、原作品引用、删除和账户隔离。组件测试覆盖未收藏作品从历史重开，批量更新在部分失败、取消和版本并发下的行为，两种横向连续模式及章节边缘，配置期间不读取源列表，错误详情与宽窄屏顶栏。[分项计划](plan/browsing-and-reader-experience.md)
 
 同轮 `pnpm acceptance:build` 与 `pnpm acceptance:serve` 成功，本机 HTTP 请求取得 Flutter 页面。内置浏览器打开页面与查询连接状态的两次控制请求均超时。真实浏览器交互、Web 与原生独立设备的读回，以及生产部署效果仍待验。[隔离验收入口](../apps/api/test/README.md)
