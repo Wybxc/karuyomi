@@ -676,6 +676,12 @@
 
 2026-11-06，现有三项非敏感设置的协议、D1、API 与正式 Flutter UI 已接入：全局主题、四种阅读模式、AUTO/SINGLE/DOUBLE 页组及逐字段漫画覆盖。独立作用域 CAS、原子确认快照、幂等、继承和清空覆盖的后端分项通过；客户端/集中工程检查已通过；结果及仍待验收的实际跨端、生产和真机门分别维护在[设置记录](verification/reader-settings.md)。背景/亮度与可配置输入、适宽/适高及裁白随后已实现，分别见[外观记录](verification/reader-appearance.md)、[适配记录](verification/reader-fit.md)和[裁白记录](verification/reader-crop.md)；独立客户端与设备门分别维护。
 
+## Source 系统 DNS 兼容
+
+2026-11-24，本机 JDK 25 和 TeaVM 生成 JavaScript 的 `pnpm teavm:check` 通过。宿主网络配置有 27 项断言，涵盖设置自定义 DNS 后使用中继系统解析，以及派生客户端继续保留 Source authenticator。
+
+在 `macbook-pro-4` 固定宿主 `84a7218`、Keiyoushi `efa93f5a` 补编原哔咔漫画 1.6.14。正式 AOT 和产物校验通过，canonical SHA-256 为 `afa476390cb278f200f7e05444694c997746aaf701249875f5ae91f8114daab5`，产物含 1 个 Source 并保持 `compiled_unverified`。使用同提交的正式 Native Worker 脚本在 Node.js 24.15.0 运行，只替换 Worker 全局和上游响应。生产旧包在热门调用重现自定义 DNS 异常。新包通过正式二进制中继发出签名登录和热门请求，保留源 Authorization 和 Cookie，返回含预期封面 URL 的条目并正常关闭。过程使用测试账号值与模拟上游。真实 Cloudflare 出站、站点登录和封面字节待验。
+
 ## 工程与代码验证
 
 GitHub 已确认 `Wybxc/karuyomi` 为公开仓库。gitleaks 8.30.1 对截至 `c1c9e7f` 的全部 Git 历史扫描，10 处命中经核对均为文件 SHA-256（8 处）和公开 Access AUD 标识（2 处），未发现实际凭据。当时的 Release 资产清单为 AOT、清单/构建记录与锁定的运行时构建材料；原始扫描报告留在忽略目录，不写入源码。
