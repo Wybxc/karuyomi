@@ -2,6 +2,10 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-24，`ddd0e78` 与 `3f031ae` 在 macOS 27.0.1 上通过 `pnpm format:check`、`pnpm check`、`pnpm flutter:check` 和 `pnpm build`。Vitest 通过 612 项，Flutter 应用通过 1,038 项，阅读核心与 Source Runtime Dart 包共通过 112 项。官方 Wrangler 本地 D1 成功应用至 `0013_browsing-history.sql`。Worker 测试使用两份同账户会话和一份不同账户会话，核对浏览记录的排序、100 条上限、重复访问、原作品引用、删除和账户隔离。组件测试覆盖未收藏作品从历史重开，批量更新在部分失败、取消和版本并发下的行为，两种横向连续模式及章节边缘，配置期间不读取源列表，错误详情与宽窄屏顶栏。[分项计划](plan/browsing-and-reader-experience.md)
+
+同轮 `pnpm acceptance:build` 与 `pnpm acceptance:serve` 成功，本机 HTTP 请求取得 Flutter 页面。内置浏览器打开页面与查询连接状态的两次控制请求均超时。真实浏览器交互、Web 与原生独立设备的读回，以及生产部署效果仍待验。[隔离验收入口](../apps/api/test/README.md)
+
 2026-11-22，主线 `af8c203` 的生产 Worker `70948d0b-ac41-4e03-a68a-d7912c0c6829` 接收全部流量。公开状态与索引逐字节匹配 revision `ddb5ac8f3b2a46cb8efc2dafc440b3d4`，46 项 Web 静态资源和匿名 Access 302 通过。Arknights Comics 1.6.2 的清单、gzip 与解码后摘要通过。逐包检查与生产索引一致的 191 个产物，只有该包导出 `hostAcquireCover`。生产登录后的普通封面显示待验。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
 
 2026-11-22，在 `macbook-pro-4` 固定 `af8c203`、Keiyoushi `efa93f5a` 和生产父快照试编 xkcd。Gradle 构建、TeaVM AOT、正式产物校验及 `hostAcquireCover` 导出检查通过，canonical SHA-256 为 `4ef740416ad8976e9870e161ce5c7edff8b60f7261e71f3648f03edee10d5f89`。该包仍标记 `compiled_unverified`。随后在同一台机器启动两并发冻结队列。[全量升级计划](plan/engineering-and-release.md#封面宿主全量升级)
