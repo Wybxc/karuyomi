@@ -115,6 +115,7 @@ void main() {
               controller: catalog,
               onConnect: () {},
               onAuthenticate: () {},
+              onManageExtensions: () {},
             ),
           ),
         ),

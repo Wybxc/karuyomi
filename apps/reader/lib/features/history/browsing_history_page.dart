@@ -29,18 +29,20 @@ class const BrowsingHistoryPage({
       final connecting = controller?.status == ServiceStatus.connecting;
       final login = controller?.accessPaused == true;
       return Center(
-        child: AppEmptyState(
-          leading: connecting
-              ? const CupertinoActivityIndicator()
-              : const Icon(CupertinoIcons.clock),
-          title: connecting ? '正在连接' : '连接后查看浏览记录',
-          message: controller?.error ?? '',
-          action: connecting
-              ? null
-              : (
-                  label: login ? '重新登录' : '连接服务',
-                  onPressed: login ? onAuthenticate : onConnect,
-                ),
+        child: SingleChildScrollView(
+          child: AppEmptyState(
+            leading: connecting
+                ? const CupertinoActivityIndicator()
+                : const Icon(CupertinoIcons.clock),
+            title: connecting ? '正在连接' : '连接后查看浏览记录',
+            message: controller?.error ?? '',
+            action: connecting
+                ? null
+                : (
+                    label: login ? '重新登录' : '连接服务',
+                    onPressed: login ? onAuthenticate : onConnect,
+                  ),
+          ),
         ),
       );
     }

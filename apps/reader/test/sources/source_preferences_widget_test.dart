@@ -97,6 +97,7 @@ void main() {
             controller: beforeBrowsing.catalog,
             onConnect: () {},
             onAuthenticate: () {},
+            onManageExtensions: () {},
           ),
         ),
       ),

@@ -161,14 +161,20 @@ void main() {
         );
         try {
           await catalog.connect();
+          var showExtensions = false;
           await tester.pumpApp(
             CupertinoApp(
               theme: readerAppTheme(brightness),
               home: CupertinoPageScaffold(
-                child: CatalogPage(
-                  controller: catalog,
-                  onConnect: () {},
-                  onAuthenticate: () {},
+                child: StatefulBuilder(
+                  builder: (_, setState) => CatalogPage(
+                    controller: catalog,
+                    onConnect: () {},
+                    onAuthenticate: () {},
+                    showExtensions: showExtensions,
+                    onManageExtensions: () =>
+                        setState(() => showExtensions = true),
+                  ),
                 ),
               ),
             ),
@@ -1236,6 +1242,7 @@ void main() {
             controller: catalog,
             onConnect: () {},
             onAuthenticate: () {},
+            onManageExtensions: () {},
           ),
         ),
       ),

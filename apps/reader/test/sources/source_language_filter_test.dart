@@ -1,24 +1,27 @@
-import 'package:karuyomi/widgets/choice_field.dart';
-
 import '../test_app.dart';
 
 import 'dart:async';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/settings/reader_device_settings.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
+import '../settings/settings_fixture.dart';
 
 const _secondSourceId = '-9223372036854775807';
 
 void main() {
   late TestPlatform platform;
   late CatalogController catalog;
+  late TestDevicePreferences preferences;
 
   setUp(() async {
+    preferences = TestDevicePreferences();
     platform = TestPlatform()
       ..sourceInventory = [
         wire.SourceInfo(id: sourceId, name: '中文甲', lang: 'zh'),
@@ -101,6 +104,10 @@ void main() {
   Future<void> show(WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(480, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    final container = ProviderContainer(
+      overrides: [readerDeviceStorageProvider.overrideWithValue(preferences)],
+    );
+    addTearDown(container.dispose);
     await tester.pumpApp(
       CupertinoApp(
         home: CupertinoPageScaffold(
@@ -108,9 +115,11 @@ void main() {
             controller: catalog,
             onConnect: () {},
             onAuthenticate: () {},
+            onManageExtensions: () {},
           ),
         ),
       ),
+      container: container,
     );
     await tester.pumpAndSettle();
   }
@@ -145,7 +154,13 @@ void main() {
 
   Future<void> chooseLanguage(WidgetTester tester, String language) async {
     await tap(tester, languageFilter());
-    await tester.tap(find.widgetWithText(CupertinoMenuItem, language));
+    await tester.tap(find.byKey(const ValueKey('source-language-all')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(ValueKey(('source-language-option', language))),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('source-language-apply')));
     await tester.pumpAndSettle();
   }
 
@@ -179,7 +194,10 @@ void main() {
       expect(platform.invocations.last.sourceId, _secondSourceId);
       await tester.tap(find.byType(CupertinoNavigationBarBackButton));
       await tester.pumpAndSettle();
-      expect(tester.widget<ChoiceField<String>>(languageFilter()).value, 'zh');
+      expect(
+        find.descendant(of: languageFilter(), matching: find.text('中文')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
       await hide(tester);
     },
@@ -236,7 +254,10 @@ void main() {
       pending.complete();
       await loading;
       await tester.pumpAndSettle();
-      expect(tester.widget<ChoiceField<String>>(languageFilter()).value, 'zh');
+      expect(
+        find.descendant(of: languageFilter(), matching: find.text('中文')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
       await hide(tester);
     },

@@ -1,15 +1,16 @@
-import 'package:karuyomi/widgets/choice_field.dart';
-
 import '../test_app.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:karuyomi/features/browse/catalog_controller.dart';
 import 'package:karuyomi/features/browse/catalog_page.dart';
+import 'package:karuyomi/features/settings/reader_device_settings.dart';
 import 'package:karuyomi/theme/app_theme.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../browse/fakes.dart';
+import '../settings/settings_fixture.dart';
 
 wire.ExtensionBuildDescriptor _build(
   String id,
@@ -128,8 +129,11 @@ void main() {
   group('formal catalog navigation', () {
     late TestPlatform platform;
     late CatalogController catalog;
+    late TestDevicePreferences preferences;
+    late ValueNotifier<bool> showExtensions;
 
     setUp(() async {
+      preferences = TestDevicePreferences();
       platform = TestPlatform()..inventory = _index(_builds());
       platform.seedInstalledBuilds(_builds());
       catalog = CatalogController(
@@ -158,17 +162,29 @@ void main() {
     }) async {
       await tester.binding.setSurfaceSize(size);
       addTearDown(() => tester.binding.setSurfaceSize(null));
+      final section = showExtensions = ValueNotifier(false);
+      addTearDown(section.dispose);
+      final container = ProviderContainer(
+        overrides: [readerDeviceStorageProvider.overrideWithValue(preferences)],
+      );
+      addTearDown(container.dispose);
       await tester.pumpApp(
         CupertinoApp(
           theme: appearance == null ? null : readerAppTheme(appearance),
           home: CupertinoPageScaffold(
-            child: CatalogPage(
-              controller: catalog,
-              onConnect: () {},
-              onAuthenticate: () {},
+            child: ValueListenableBuilder(
+              valueListenable: section,
+              builder: (_, managing, _) => CatalogPage(
+                controller: catalog,
+                onConnect: () {},
+                onAuthenticate: () {},
+                showExtensions: managing,
+                onManageExtensions: () => section.value = true,
+              ),
             ),
           ),
         ),
+        container: container,
       );
       await tester.pumpAndSettle();
     }
@@ -185,15 +201,20 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Future<void> choose(
-      WidgetTester tester,
-      Finder filter,
-      String value,
-    ) async {
+    Future<void> choose(WidgetTester tester, List<String> values) async {
+      final filter = languageFilter();
       await reveal(tester, filter);
       await tester.tap(filter);
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(CupertinoMenuItem, value));
+      await tester.tap(find.byKey(const ValueKey('source-language-all')));
+      for (final language in values) {
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(ValueKey(('source-language-option', language))),
+        );
+      }
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('source-language-apply')));
       await tester.pumpAndSettle();
     }
 
@@ -244,11 +265,13 @@ void main() {
         expect(find.text('中文目录源'), findsOneWidget);
         final controls = platform.controlCommands.length;
         final requests = platform.businessServer.requests.length;
-        await choose(tester, languageFilter(), 'all');
+        await choose(tester, ['all', 'en']);
         expect(find.text('多语言目录源'), findsOneWidget);
+        expect(find.text('English source'), findsOneWidget);
         expect(find.text('中文目录源'), findsNothing);
-        await choose(tester, languageFilter(), '未标注语言');
-        expect(tester.widget<ChoiceField<String>>(languageFilter()).value, '');
+        expect(find.text('2 种语言'), findsOneWidget);
+        await choose(tester, ['']);
+        expect(find.text('未标注语言').first, findsOneWidget);
         expect(find.text('未标注目录源'), findsOneWidget);
         await tester.tap(clearFilter());
         await tester.pumpAndSettle();
@@ -263,7 +286,7 @@ void main() {
     );
 
     testWidgets(
-      'filtering preserves existing reading context and reconciles removed languages',
+      'selected languages survive catalog and account changes and reload from the device',
       (tester) async {
         platform.sourceInventory = [
           wire.SourceInfo(id: sourceId, name: '中文目录源', lang: 'zh'),
@@ -275,7 +298,7 @@ void main() {
         await show(tester);
         expect(catalog.activeSource, same(active), reason: '挂载目录保留已打开的 Source');
         final commands = platform.controlCommands.length;
-        await choose(tester, languageFilter(), 'ja');
+        await choose(tester, ['ja']);
         expect(catalog.activeSource, same(active));
         expect(catalog.mangas.single, same(manga));
         expect(platform.controlCommands, hasLength(commands));
@@ -283,16 +306,23 @@ void main() {
         await catalog.connect();
         await tester.pumpAndSettle();
         expect(
-          tester.widget<ChoiceField<String>>(languageFilter()).value,
-          isNull,
+          find.descendant(of: languageFilter(), matching: find.text('日语')),
+          findsOneWidget,
         );
-        await choose(tester, languageFilter(), 'en');
+        expect(find.text('没有匹配的漫画源'), findsOneWidget);
+        await choose(tester, ['en']);
         platform.bootstrapSubject = 'another-subject';
         await catalog.connect();
         await tester.pumpAndSettle();
         expect(
-          tester.widget<ChoiceField<String>>(languageFilter()).value,
-          isNull,
+          find.descendant(of: languageFilter(), matching: find.text('英语')),
+          findsOneWidget,
+        );
+        await hide(tester);
+        await show(tester);
+        expect(
+          find.descendant(of: languageFilter(), matching: find.text('英语')),
+          findsOneWidget,
         );
         expect(tester.takeException(), isNull);
         await hide(tester);
@@ -380,7 +410,7 @@ void main() {
           await tester.ensureVisible(install);
           await tester.tap(install);
           await tester.pumpAndSettle();
-          await tester.tap(find.text('漫画源').first);
+          showExtensions.value = false;
           await tester.pumpAndSettle();
           expect(find.text('中文目录源'), findsOneWidget);
           expect(

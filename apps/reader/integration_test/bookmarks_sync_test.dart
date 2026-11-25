@@ -292,7 +292,7 @@ Future<Map<String, Object?>> _prepare(
   final goBrowse = find.descendant(of: libraryPage, matching: find.text('去浏览'));
   await _reveal(tester, goBrowse, libraryPage);
   await _tap(tester, goBrowse);
-  final manage = find.byKey(const ValueKey('extensions-manage'));
+  final manage = find.byKey(const ValueKey(('app-destination', 'extensions')));
   await _waitFor(tester, '正式扩展管理入口可点击', () {
     checkSource();
     return manage.evaluate().length == 1 &&
@@ -350,7 +350,7 @@ Future<Map<String, Object?>> _prepare(
     contains(installed.bundleSha256),
   );
 
-  await _tap(tester, find.text('漫画源').first);
+  await _tap(tester, find.byKey(const ValueKey(('app-destination', 'browse'))));
   await _waitFor(tester, '返回正式浏览页', () => catalogPage.evaluate().length == 1);
   final sourceButton = find.byKey(
     ValueKey(('source-directory-row', _packageName, _sourceId)),
