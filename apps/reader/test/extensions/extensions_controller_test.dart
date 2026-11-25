@@ -768,9 +768,9 @@ void main() {
         addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
         await tester.pumpApp(KaruyomiApp(platform: appPlatform));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey(('app-destination', 1))));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('extensions-manage')));
+        await tester.tap(
+          find.byKey(const ValueKey(('app-destination', 'extensions'))),
+        );
         await tester.pumpAndSettle();
         final appCatalog = tester
             .widget<CatalogPage>(find.byType(CatalogPage))

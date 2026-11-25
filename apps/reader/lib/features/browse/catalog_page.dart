@@ -24,6 +24,8 @@ class const CatalogPage({
   required final CatalogController? controller,
   required final VoidCallback onConnect,
   required final VoidCallback onAuthenticate,
+  required final VoidCallback onManageExtensions,
+  final bool showExtensions = false,
   final String? configurationError,
   final ReaderAuthentication? onAuthenticateReader,
 }) extends HookWidget {
@@ -69,10 +71,7 @@ class const CatalogPage({
     );
   }
 
-  Future<void> _search(
-    BuildContext context,
-    VoidCallback openExtensions,
-  ) async {
+  Future<void> _search(BuildContext context) async {
     final catalog = controller;
     final client = catalog?.library?.client;
     if (catalog == null || client == null || catalog.busy) return;
@@ -116,21 +115,16 @@ class const CatalogPage({
         ),
       ),
     );
-    if (manageExtensions == true && currentIdentity()) openExtensions();
+    if (manageExtensions == true && currentIdentity()) onManageExtensions();
   }
 
   @override
   Widget build(BuildContext context) {
-    final tabs = useState(0);
     useListenable(controller);
-    return _content(context, controller, tabs);
+    return _content(context, controller);
   }
 
-  Widget _content(
-    BuildContext context,
-    CatalogController? catalog,
-    ValueNotifier<int> tabs,
-  ) {
+  Widget _content(BuildContext context, CatalogController? catalog) {
     final status = catalog?.status ?? ServiceStatus.disconnected;
     final ready =
         catalog?.settings != null &&
@@ -151,7 +145,8 @@ class const CatalogPage({
                     ? const CupertinoActivityIndicator()
                     : const Icon(CupertinoIcons.globe),
                 title: switch (status) {
-                  ServiceStatus.loginRequired => '登录后继续浏览',
+                  ServiceStatus.loginRequired =>
+                    showExtensions ? '登录后管理扩展' : '登录后继续浏览',
                   ServiceStatus.denied => '当前账号无法访问',
                   ServiceStatus.connecting => '正在连接服务',
                   ServiceStatus.failed => '服务连接未完成',
@@ -183,54 +178,27 @@ class const CatalogPage({
       );
     }
     final current = catalog!;
-    final updates = extensionListings(
-      current,
-      current.installedExtensions,
-    ).where((item) => item.needsUpdate).length;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1100),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: CupertinoSlidingSegmentedControl<int>(
-                groupValue: tabs.value,
-                children: {
-                  0: const Text('漫画源'),
-                  1: Text(
-                    updates == 0 ? '扩展' : '扩展 ($updates)',
-                    key: const ValueKey('extensions-manage'),
-                  ),
-                },
-                onValueChanged: (value) {
-                  if (value != null) tabs.value = value;
-                },
+        child: showExtensions
+            ? ExtensionsPage(
+                key: ValueKey(current.settings),
+                catalog: current,
+                repository: current.settings!,
+                embedded: true,
+                onOpenSource: (extension, source) =>
+                    _open(context, extension, source),
+              )
+            : SourceDirectory(
+                catalog: current,
+                onManage: onManageExtensions,
+                onOpen: (extension, source) =>
+                    _open(context, extension, source),
+                onSearch: () => unawaited(_search(context)),
+                onPreferences: (target) =>
+                    unawaited(_preferences(context, target)),
               ),
-            ),
-            Expanded(
-              child: tabs.value == 0
-                  ? SourceDirectory(
-                      catalog: current,
-                      onManage: () => tabs.value = 1,
-                      onOpen: (extension, source) =>
-                          _open(context, extension, source),
-                      onSearch: () =>
-                          unawaited(_search(context, () => tabs.value = 1)),
-                      onPreferences: (target) =>
-                          unawaited(_preferences(context, target)),
-                    )
-                  : ExtensionsPage(
-                      key: ValueKey(current.settings),
-                      catalog: current,
-                      repository: current.settings!,
-                      embedded: true,
-                      onOpenSource: (extension, source) =>
-                          _open(context, extension, source),
-                    ),
-            ),
-          ],
-        ),
       ),
     );
   }

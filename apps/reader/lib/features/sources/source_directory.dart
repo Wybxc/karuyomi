@@ -1,4 +1,3 @@
-import '../../widgets/choice_field.dart';
 import '../../theme/app_theme.dart';
 
 import 'dart:async';
@@ -17,6 +16,7 @@ import '../extensions/pending_extension_changes.dart';
 import '../settings/settings_controller.dart';
 import '../settings/settings_widgets.dart';
 import '../settings/pending_global_settings.dart';
+import 'source_language_filter.dart';
 
 class const SourceDirectory({
   super.key,
@@ -43,7 +43,11 @@ class const SourceDirectory({
     final account = ref.watch(confirmedAccountProvider(catalog));
     final search = useTextEditingController(keys: [account?.settings]);
     useListenable(search);
-    final language = useState<String?>(null);
+    final languageFilter = ref.watch(sourceLanguageFilterProvider);
+    final selectedLanguages =
+        languageFilter.value?.languages ?? const <String>{};
+    final changingLanguages =
+        languageFilter.isLoading || languageFilter.value?.saving == true;
     final saving = useState<(String, String)?>(null);
     final expansion = useMemoized(ExpansibleController.new);
     useEffect(() => expansion.dispose, [expansion]);
@@ -62,10 +66,14 @@ class const SourceDirectory({
       });
       return null;
     }, [commands]);
-    useEffect(() {
-      language.value = null;
-      return null;
-    }, [account?.settings]);
+    Future<void> applyLanguages(Set<String> selection) =>
+        ref.read(sourceLanguageFilterProvider.notifier).save(selection);
+
+    void clearFilters() {
+      search.clear();
+      if (selectedLanguages.isNotEmpty) unawaited(applyLanguages(const {}));
+    }
+
     Future<void> toggle(String packageName, wire.CatalogSource source) async {
       final confirmed = settings.snapshot;
       if (confirmed == null || !settings.canEdit || catalog.busy) return;
@@ -181,23 +189,42 @@ class const SourceDirectory({
           ? a.source.lang.compareTo(b.source.lang)
           : a.source.name.toLowerCase().compareTo(b.source.name.toLowerCase());
     });
-    final languages = rows.map((row) => row.source.lang).toSet().toList()
-      ..sort();
-    if (language.value != null && !languages.contains(language.value)) {
-      language.value = null;
+    final languages = {
+      ...selectedLanguages,
+      for (final row in rows) row.source.lang,
+    }.toList()..sort();
+    final languageLabel = switch (selectedLanguages.length) {
+      0 => '全部语言',
+      1 => browseLanguageLabel(selectedLanguages.single),
+      final count => '$count 种语言',
+    };
+    Future<void> editLanguages() async {
+      final selected = await chooseSourceLanguages(
+        context,
+        languages: languages,
+        selected: selectedLanguages,
+      );
+      if (context.mounted && selected != null) await applyLanguages(selected);
     }
+
     final query = search.text.trim().toLowerCase();
     final visible = rows
         .where(
           (row) =>
-              (language.value == null || row.source.lang == language.value) &&
+              (selectedLanguages.isEmpty ||
+                  selectedLanguages.contains(row.source.lang)) &&
               (query.isEmpty || row.source.name.toLowerCase().contains(query)),
         )
         .toList();
     final pendingExtensions = unresolved
-        .where((item) => item.matches(query, language.value))
+        .where(
+          (item) =>
+              item.matches(query, null) &&
+              (selectedLanguages.isEmpty ||
+                  item.languages.any(selectedLanguages.contains)),
+        )
         .toList();
-    final hasFilter = query.isNotEmpty || language.value != null;
+    final hasFilter = query.isNotEmpty || selectedLanguages.isNotEmpty;
     final canEdit = settings.canEdit == true && !catalog.busy;
     String group(String packageName, wire.CatalogSource source) =>
         saved(packageName, source.id) ? '收藏的漫画源' : sourceLanguage(source.lang);
@@ -227,10 +254,9 @@ class const SourceDirectory({
           ),
           CupertinoButton(
             onPressed: hasFilter
-                ? () {
-                    language.value = null;
-                    search.clear();
-                  }
+                ? changingLanguages
+                      ? null
+                      : clearFilters
                 : onManage,
             child: Text(hasFilter ? '清除筛选' : '前往扩展'),
           ),
@@ -284,29 +310,40 @@ class const SourceDirectory({
             Row(
               children: [
                 Expanded(
-                  child: ChoiceField<String>(
+                  child: CupertinoButton(
                     key: const ValueKey('source-language-filter'),
-                    label: '语言',
-                    value: language.value,
-                    options: {
-                      null: '全部语言',
-                      for (final language in languages)
-                        language: sourceLanguage(language),
-                    },
-                    onChanged: (value) => language.value = value,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    onPressed: changingLanguages || languages.isEmpty
+                        ? null
+                        : editLanguages,
+                    child: Row(
+                      children: [
+                        const Icon(CupertinoIcons.globe, size: 18),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            languageLabel,
+                            semanticsLabel: '筛选漫画源语言：$languageLabel',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(CupertinoIcons.chevron_down, size: 14),
+                      ],
+                    ),
                   ),
                 ),
                 if (hasFilter)
                   CupertinoButton(
                     key: const ValueKey('source-language-clear'),
-                    onPressed: () {
-                      language.value = null;
-                      search.clear();
-                    },
+                    onPressed: changingLanguages ? null : clearFilters,
                     child: const Text('清除筛选'),
                   ),
               ],
             ),
+            if (languageFilter.value?.saveFailed == true)
+              const Text('语言筛选已应用，未能记住本机选择。'),
           ],
         ),
       ),

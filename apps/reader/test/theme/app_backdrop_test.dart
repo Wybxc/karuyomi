@@ -28,7 +28,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey(('app-destination', 2))));
+      await tester.tap(
+        find.byKey(const ValueKey(('app-destination', 'settings'))),
+      );
       await tester.pumpAndSettle();
       tester
           .widget<DeviceAppearanceSettings>(
@@ -40,7 +42,9 @@ void main() {
                 : AppAppearance.light,
           );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey(('app-destination', 0))));
+      await tester.tap(
+        find.byKey(const ValueKey(('app-destination', 'library'))),
+      );
       await tester.pumpAndSettle();
       final context = tester.element(find.byType(AppShell));
       final expected = AppColors.background.resolveFrom(context);

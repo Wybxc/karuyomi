@@ -11,7 +11,7 @@
 - 应用根改为 `CupertinoApp`，中文及英文 delegates 使用 `GlobalCupertinoLocalizations.delegates`。主题使用 `CupertinoThemeData`、`CupertinoColors` 和在当前上下文解析的 `CupertinoDynamicColor`，统一替换 Material 的 `ThemeData` / `ColorScheme`。
 - 服务端 `AppTheme` 继续表达跟随系统、浅色、深色；客户端分别映射到未指定 `brightness`、`Brightness.light`、`Brightness.dark`。主题切换仍由已确认设置驱动，未确认草稿单独展示，不引入平台分支或更改协议枚举。
 - 最终主题采用官方系统蓝、label/secondaryLabel、分组背景/表面、separator、系统红/绿，颜色随亮暗、提高对比度和界面层级解析。保留官方文字和绿色开关默认值；导航/阅读工具使用不透明系统背景，保持已决定的无玻璃方案。Mihon 的固定 Material 色值只作第一阶段测量证据。
-- 保留书架、浏览、设置三个入口和根业务 Navigator。紧凑窗口使用 Cupertino 底部标签，空间充足时使用带文字的 Cupertino 侧栏。设置、书架和 Source 浏览还按各自剩余宽度安排目录或列表与详情。Reader 从根导航独立打开。
+- 书架、历史、浏览、扩展和设置共用根业务 Navigator。紧凑窗口使用 Cupertino 底部标签，空间充足时使用带文字的 Cupertino 侧栏。设置、书架和 Source 浏览还按各自剩余宽度安排目录或列表与详情。Reader 从根导航独立打开。
 - 不引入每个 tab 的嵌套 Navigator 或隐藏业务树。`CupertinoTabScaffold` / `CupertinoTabView` 会保留已访问的 tab；直接套用会改变当前退订与 Source 生命周期，不能只为导航外观采用。
 - 普通页面使用 `CupertinoPageRoute`；`AppPageRoute` 仅集中实现系统减少动态效果时淡化、禁用动画时直接切换的既有无障碍策略。设置目录/详情的内层 Navigator 使用同策略的声明式 `AppPage`，尺寸切换保持详情身份，系统返回回到目录；它只管理设置的UI层级，不增加 Source 业务树。内层导航放在独立语义容器内，防止路由的 `BlockSemantics` 隐藏同时可见的左侧目录。弹层直接使用官方 Cupertino 路由与返回值，不扩展为自建路由或设计系统。
 

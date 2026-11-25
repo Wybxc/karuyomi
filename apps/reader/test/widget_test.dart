@@ -25,6 +25,14 @@ import 'package:source_runtime/source_runtime.dart'
 
 import 'browse/fakes.dart';
 
+const _appDestinations = [
+  ('library', '书架'),
+  ('history', '历史'),
+  ('browse', '浏览'),
+  ('extensions', '扩展'),
+  ('settings', '设置'),
+];
+
 Future<void> _browseSource(WidgetTester tester) async {
   await tester.tap(find.text('去浏览'));
   await tester.pumpAndSettle();
@@ -177,7 +185,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(source, findsNothing);
 
-      await tester.tap(find.byKey(const ValueKey(('app-destination', 0))));
+      await tester.tap(
+        find.byKey(const ValueKey(('app-destination', 'library'))),
+      );
       await tester.pumpAndSettle();
       final shelfRequest = Completer<wire.SourceResult>();
       addTearDown(() {
@@ -235,7 +245,9 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
       }
-      await tester.tap(find.byKey(const ValueKey(('app-destination', 3))));
+      await tester.tap(
+        find.byKey(const ValueKey(('app-destination', 'history'))),
+      );
       await tester.pumpAndSettle();
       expect(find.text(testManga.title), findsOneWidget);
       final historyRequest = Completer<void>();
@@ -495,17 +507,22 @@ void main() {
           tester.getTopLeft(find.byType(CupertinoNavigationBar)).dx,
           side ? tester.getRect(navigation).right : 0,
         );
-        for (var i = 0; i < 4; i++) {
-          final destination = find.byKey(ValueKey(('app-destination', i)));
+        final positions = <double>[];
+        for (final (name, _) in _appDestinations) {
+          final destination = find.byKey(ValueKey(('app-destination', name)));
+          final center = tester.getCenter(destination);
+          positions.add(side ? center.dy : center.dx);
           expect(
             tester
                 .getSemantics(destination)
                 .getSemanticsData()
                 .flagsCollection
                 .isSelected,
-            i == 0 ? Tristate.isTrue : Tristate.isFalse,
+            name == 'library' ? Tristate.isTrue : Tristate.isFalse,
           );
         }
+        expect(positions.toSet(), hasLength(_appDestinations.length));
+        expect(positions, orderedEquals(positions.toList()..sort()));
         await tester.tap(find.text('去浏览'));
         await tester.pumpAndSettle();
         expect(find.text('连接漫画服务'), findsOneWidget);
@@ -542,7 +559,6 @@ void main() {
         await tester.pumpAndSettle();
 
         final navigation = find.byKey(const ValueKey('app-navigation'));
-        const labels = ['书架', '浏览', '设置', '浏览记录'];
         for (final viewport in [
           const Size(360, 480),
           const Size(800, 360),
@@ -562,11 +578,11 @@ void main() {
             final barBounds = tester.getRect(navigation);
             expect(bar.currentIndex, selection);
             expect(barBounds.height, greaterThan(defaultHeight));
-            for (var index = 0; index < labels.length; index++) {
-              final icon = find.byKey(ValueKey(('app-destination', index)));
+            for (final (name, text) in _appDestinations) {
+              final icon = find.byKey(ValueKey(('app-destination', name)));
               final label = find.descendant(
                 of: navigation,
-                matching: find.text(labels[index]),
+                matching: find.text(text),
               );
               final iconBounds = tester.getRect(icon);
               final labelBounds = tester.getRect(label);
@@ -576,9 +592,12 @@ void main() {
               expect(label.hitTestable(), findsOneWidget);
             }
           }
-          final next = (selection + 1) % labels.length;
+          final next = (selection + 1) % _appDestinations.length;
           await tester.tap(
-            find.descendant(of: navigation, matching: find.text(labels[next])),
+            find.descendant(
+              of: navigation,
+              matching: find.text(_appDestinations[next].$2),
+            ),
           );
           await tester.pumpAndSettle();
           expect(tester.widget<CupertinoTabBar>(navigation).currentIndex, next);
@@ -601,13 +620,13 @@ void main() {
         await tester.pumpApp(const KaruyomiApp());
         await tester.pumpAndSettle();
 
-        Finder destination(int index) =>
-            find.byKey(ValueKey(('app-destination', index)));
-        SemanticsData tabSemantics(int index) =>
-            tester.getSemantics(destination(index)).getSemanticsData();
-        bool isFocused(int index) =>
-            tabSemantics(index).flagsCollection.isFocused == Tristate.isTrue;
-        void expectSelected(int current) {
+        Finder destination(String name) =>
+            find.byKey(ValueKey(('app-destination', name)));
+        SemanticsData tabSemantics(String name) =>
+            tester.getSemantics(destination(name)).getSemanticsData();
+        bool isFocused(String name) =>
+            tabSemantics(name).flagsCollection.isFocused == Tristate.isTrue;
+        void expectSelected(String current) {
           expect(
             tabSemantics(current).flagsCollection.isSelected,
             Tristate.isTrue,
@@ -619,63 +638,76 @@ void main() {
           await tester.pumpAndSettle();
         }
 
-        for (var step = 0; step < 8 && !isFocused(1); step++) {
+        for (var step = 0; step < 8 && !isFocused('history'); step++) {
           await key(LogicalKeyboardKey.tab);
         }
-        expect(isFocused(1), isTrue);
-        expect(tabSemantics(1).label, contains('浏览'));
-        expect(tabSemantics(1).hasAction(SemanticsAction.tap), isTrue);
-        expectSelected(0);
+        expect(isFocused('history'), isTrue);
+        expect(tabSemantics('history').label, contains('历史'));
+        expect(tabSemantics('history').hasAction(SemanticsAction.tap), isTrue);
+        expectSelected('library');
         await key(LogicalKeyboardKey.enter);
-        expect(find.text('连接漫画服务'), findsOneWidget);
-        expectSelected(1);
-        expect(isFocused(1), isTrue);
+        expect(find.text('连接后查看浏览记录'), findsOneWidget);
+        expectSelected('history');
+        expect(isFocused('history'), isTrue);
 
         await key(LogicalKeyboardKey.tab);
-        expect(isFocused(2), isTrue);
+        expect(isFocused('browse'), isTrue);
+        await key(LogicalKeyboardKey.enter);
+        expect(find.text('连接漫画服务'), findsOneWidget);
+        expectSelected('browse');
+
+        await key(LogicalKeyboardKey.tab);
+        expect(isFocused('extensions'), isTrue);
         tester.view.physicalSize = const Size(1280, 900);
         await tester.pumpAndSettle();
         expect(find.byType(CupertinoTabBar), findsNothing);
-        expect(isFocused(2), isTrue);
+        expect(isFocused('extensions'), isTrue);
         tester.view.physicalSize = const Size(800, 360);
         await tester.pumpAndSettle();
-        expect(isFocused(2), isTrue);
+        expect(isFocused('extensions'), isTrue);
+        await key(LogicalKeyboardKey.space);
+        expect(
+          tester.widget<CatalogPage>(find.byType(CatalogPage)).showExtensions,
+          isTrue,
+        );
+        expectSelected('extensions');
+        await key(LogicalKeyboardKey.tab);
+        expect(isFocused('settings'), isTrue);
         await key(LogicalKeyboardKey.space);
         expect(find.text('连接并确认身份后可读取和保存同步设置。'), findsOneWidget);
-        expectSelected(2);
-        expect(isFocused(2), isTrue);
+        expectSelected('settings');
+        expect(isFocused('settings'), isTrue);
 
         await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
         try {
-          await key(LogicalKeyboardKey.tab);
-          expect(isFocused(1), isTrue);
-          await key(LogicalKeyboardKey.tab);
-          expect(isFocused(0), isTrue);
+          for (final (name, _) in _appDestinations.reversed.skip(1)) {
+            await key(LogicalKeyboardKey.tab);
+            expect(isFocused(name), isTrue);
+          }
         } finally {
           await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
         }
         await key(LogicalKeyboardKey.numpadEnter);
         expect(find.text('书架还是空的'), findsOneWidget);
-        expectSelected(0);
-        expect(isFocused(0), isTrue);
+        expectSelected('library');
+        expect(isFocused('library'), isTrue);
 
         await tester.tapAt(
-          tester.getCenter(destination(2)),
+          tester.getCenter(destination('settings')),
           kind: PointerDeviceKind.mouse,
         );
         await tester.pumpAndSettle();
-        expectSelected(2);
-        expect(isFocused(2), isTrue);
+        expectSelected('settings');
+        expect(isFocused('settings'), isTrue);
         await key(LogicalKeyboardKey.space);
-        expectSelected(2);
-        await tester.tap(destination(1));
+        expectSelected('settings');
+        await tester.tap(destination('browse'));
         await tester.pumpAndSettle();
-        expectSelected(1);
-        expect([
-          isFocused(0),
-          isFocused(1),
-          isFocused(2),
-        ], everyElement(isFalse));
+        expectSelected('browse');
+        expect(
+          _appDestinations.map((destination) => isFocused(destination.$1)),
+          everyElement(isFalse),
+        );
         expect(tester.takeException(), isNull);
       },
     );
@@ -693,7 +725,9 @@ void main() {
         addTearDown(tester.view.resetDevicePixelRatio);
         await tester.pumpApp(const KaruyomiApp());
         await tester.pumpAndSettle();
-        final settings = find.byKey(const ValueKey(('app-destination', 2)));
+        final settings = find.byKey(
+          const ValueKey(('app-destination', 'settings')),
+        );
         await tester.tap(settings);
         await tester.pumpAndSettle();
         expect(
@@ -758,7 +792,9 @@ void main() {
         final platform = TestPlatform(seedDefaultInstallation: false);
         await tester.pumpApp(KaruyomiApp(platform: platform));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey(('app-destination', 2))));
+        await tester.tap(
+          find.byKey(const ValueKey(('app-destination', 'settings'))),
+        );
         await tester.pumpAndSettle();
         final connection = find.byKey(
           const ValueKey('settings-section-connection'),
@@ -801,7 +837,9 @@ void main() {
           final platform = TestPlatform(seedDefaultInstallation: false);
           await tester.pumpApp(KaruyomiApp(platform: platform));
           await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const ValueKey(('app-destination', 2))));
+          await tester.tap(
+            find.byKey(const ValueKey(('app-destination', 'settings'))),
+          );
           await tester.pumpAndSettle();
 
           void expectDirectory() {
@@ -856,7 +894,9 @@ void main() {
         final platform = TestPlatform(seedDefaultInstallation: false);
         await tester.pumpApp(KaruyomiApp(platform: platform));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey(('app-destination', 2))));
+        await tester.tap(
+          find.byKey(const ValueKey(('app-destination', 'settings'))),
+        );
         await tester.pumpAndSettle();
         await tester.tap(
           find.byKey(const ValueKey('settings-section-connection')),
@@ -881,7 +921,9 @@ void main() {
         );
         await tester.enterText(origin, 'https://second.example');
         expect(tester.testTextInput.setClientArgs!['autofill'], isNull);
-        await tester.tap(find.byKey(const ValueKey(('app-destination', 0))));
+        await tester.tap(
+          find.byKey(const ValueKey(('app-destination', 'library'))),
+        );
         await tester.pumpAndSettle();
         expect(tester.testTextInput.hasAnyClients, false);
         expect(platform.businessServer.appliedMutations, 0);
@@ -1067,7 +1109,7 @@ void main() {
       platform.continuation = {
         'returnTo': '/',
         'pending': {
-          'tab': 1,
+          'tab': 'browse',
           'packageName': 'eu.kanade.source.test',
           'sourceId': sourceId,
         },

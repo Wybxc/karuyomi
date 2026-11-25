@@ -103,7 +103,9 @@ void main() {
           ?.brightness;
 
       Future<void> openAppearance() async {
-        await tester.tap(find.byKey(const ValueKey(('app-destination', 2))));
+        await tester.tap(
+          find.byKey(const ValueKey(('app-destination', 'settings'))),
+        );
         await tester.pumpAndSettle();
         await openSettingsSection(tester, 'appearance');
       }

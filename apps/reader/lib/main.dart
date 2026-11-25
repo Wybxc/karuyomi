@@ -166,8 +166,21 @@ class const AppShell({
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
+enum _AppDestination {
+  library('书架', CupertinoIcons.book),
+  history('历史', CupertinoIcons.clock),
+  browse('浏览', CupertinoIcons.compass),
+  extensions('扩展', CupertinoIcons.cube),
+  settings('设置', CupertinoIcons.slider_horizontal_3);
+
+  const _AppDestination(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
+}
+
 class _AppShellState extends ConsumerState<AppShell> {
-  int _index = 0;
+  _AppDestination _selected = _AppDestination.library;
   PlatformRuntime? _platform;
   CatalogController? _catalog;
   SettingsController? get _settings => _catalog == null
@@ -189,38 +202,36 @@ class _AppShellState extends ConsumerState<AppShell> {
   static const _originKey = 'native_service_origin';
   static const _sidebarWidth = 176.0;
   late TextEditingController _originField;
-  static const _labels = ['书架', '浏览', '设置', '浏览记录'];
-  static const _icons = [
-    CupertinoIcons.book,
-    CupertinoIcons.compass,
-    CupertinoIcons.slider_horizontal_3,
-    CupertinoIcons.clock,
-  ];
-  final _tabFocusNodes = [
-    for (final label in _labels) FocusNode(debugLabel: label),
-  ];
+  final _tabFocusNodes = {
+    for (final destination in _AppDestination.values)
+      destination: FocusNode(debugLabel: destination.label),
+  };
 
-  void _select(int index) {
+  void _select(_AppDestination destination) {
     setState(() {
-      _index = index;
-      if (index != 2) _openSettingsConnectionOnMount = false;
+      _selected = destination;
+      if (destination != _AppDestination.settings) {
+        _openSettingsConnectionOnMount = false;
+      }
     });
-    if (index == 2) unawaited(_settings?.refresh());
+    if (destination == _AppDestination.settings) {
+      unawaited(_settings?.refresh());
+    }
   }
 
-  void _tapTab(int index) {
-    final focusedTab = _tabFocusNodes
+  void _tapTab(_AppDestination destination) {
+    final focusedTab = _tabFocusNodes.values
         .where((node) => node.hasFocus)
         .firstOrNull;
     if (focusedTab != null) {
       if (FocusManager.instance.highlightMode ==
           FocusHighlightMode.traditional) {
-        _tabFocusNodes[index].requestFocus();
+        _tabFocusNodes[destination]!.requestFocus();
       } else {
         focusedTab.unfocus();
       }
     }
-    _select(index);
+    _select(destination);
   }
 
   void _initialize() {
@@ -299,8 +310,8 @@ class _AppShellState extends ConsumerState<AppShell> {
       final continuation = _platform!.takePendingAuthentication();
       if (continuation?['pending'] case final Map pending) {
         _pendingContinuation = Map<String, Object?>.from(pending);
-        final tab = pending['tab'];
-        if (tab is int && tab >= 0 && tab < _labels.length) _index = tab;
+        _selected =
+            _AppDestination.values.asNameMap()[pending['tab']] ?? _selected;
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -314,7 +325,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   Future<void> _connect([Map<String, Object?>? continuation]) async {
     final controller = _catalog;
     if (controller == null) {
-      _select(2);
+      _select(_AppDestination.settings);
       return;
     }
     await controller.connect();
@@ -419,7 +430,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   Future<void> _authenticate() async {
     final platform = _platform;
     if (platform == null) {
-      _select(2);
+      _select(_AppDestination.settings);
       return;
     }
     try {
@@ -428,7 +439,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         context,
         pending: {
           ...?_pendingContinuation,
-          'tab': _index,
+          'tab': _selected.name,
           if (_catalog?.lastPackageName != null)
             'packageName': _catalog!.lastPackageName,
           if (_catalog?.lastSourceId != null)
@@ -462,7 +473,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     // Authentication retains this document and its unconfirmed session drafts.
     final authenticated = await platform.authenticate(
       context,
-      pending: {'tab': 1, 'reader': recovery.toJson()},
+      pending: {
+        'tab': _AppDestination.browse.name,
+        'reader': recovery.toJson(),
+      },
     );
     platform.takePendingAuthentication();
     return authenticated;
@@ -542,7 +556,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         setState(() {
           adopted = true;
           _configure(candidate);
-          _openSettingsConnectionOnMount = _index == 2;
+          _openSettingsConnectionOnMount =
+              _selected == _AppDestination.settings;
         });
         if (_catalog != null) await _rememberOrigin(candidate.origin);
       } finally {
@@ -564,39 +579,39 @@ class _AppShellState extends ConsumerState<AppShell> {
     if (mounted) setState(() => _retryingProgress = false);
   }
 
-  Widget _destination(int index, Widget child) => CupertinoPageScaffold(
-    navigationBar: CupertinoNavigationBar(middle: Text(_labels[index])),
+  Widget _destination(Widget child) => CupertinoPageScaffold(
+    navigationBar: CupertinoNavigationBar(middle: Text(_selected.label)),
     child: SafeArea(child: child),
   );
 
-  Widget _page() => switch (_index) {
-    0 => AdaptiveDetailLayout(
+  Widget _page() => switch (_selected) {
+    _AppDestination.library => AdaptiveDetailLayout(
       owner: _catalog?.library,
       child: _destination(
-        0,
         LibraryPage(
           controller: _catalog,
-          onBrowse: () => _select(1),
+          onBrowse: () => _select(_AppDestination.browse),
           onConnect: () => unawaited(_connect()),
           onAuthenticate: () => unawaited(_authenticate()),
           onAuthenticateReader: _authenticateReader,
         ),
       ),
     ),
-    1 => _destination(
-      1,
+    _AppDestination.browse || _AppDestination.extensions => _destination(
       CatalogPage(
+        key: ValueKey(_selected),
         controller: _catalog,
+        showExtensions: _selected == _AppDestination.extensions,
+        onManageExtensions: () => _select(_AppDestination.extensions),
         onConnect: () => unawaited(_connect()),
         onAuthenticate: () => unawaited(_authenticate()),
         onAuthenticateReader: _authenticateReader,
         configurationError: _configurationError,
       ),
     ),
-    3 => AdaptiveDetailLayout(
+    _AppDestination.history => AdaptiveDetailLayout(
       owner: _catalog?.library?.client,
       child: _destination(
-        3,
         BrowsingHistoryPage(
           catalog: _catalog,
           onConnect: () => unawaited(_connect()),
@@ -605,7 +620,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         ),
       ),
     ),
-    _ => GlobalSettingsPanel(
+    _AppDestination.settings => GlobalSettingsPanel(
       catalog: _catalog,
       connection: _connectionSettings(),
       appearance: widget.appearance,
@@ -772,36 +787,37 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
-  BottomNavigationBarItem _navigationItem(int index) => BottomNavigationBarItem(
-    label: _labels[index],
-    // The selected item gains theme wrappers in CupertinoTabBar. Keep the
-    // focus node attached to the same destination across those changes.
-    icon: CupertinoFocusHalo.withRoundedSuperellipse(
-      key: GlobalObjectKey(_tabFocusNodes[index]),
-      borderRadius: const BorderRadius.all(Radius.circular(10)),
-      child: FocusableActionDetector(
-        focusNode: _tabFocusNodes[index],
-        actions: {
-          ActivateIntent: CallbackAction<ActivateIntent>(
-            onInvoke: (_) {
-              _select(index);
-              return null;
+  BottomNavigationBarItem _navigationItem(_AppDestination destination) =>
+      BottomNavigationBarItem(
+        label: destination.label,
+        // The selected item gains theme wrappers in CupertinoTabBar. Keep the
+        // focus node attached to the same destination across those changes.
+        icon: CupertinoFocusHalo.withRoundedSuperellipse(
+          key: GlobalObjectKey(_tabFocusNodes[destination]!),
+          borderRadius: const BorderRadius.all(Radius.circular(10)),
+          child: FocusableActionDetector(
+            focusNode: _tabFocusNodes[destination],
+            actions: {
+              ActivateIntent: CallbackAction<ActivateIntent>(
+                onInvoke: (_) {
+                  _select(destination);
+                  return null;
+                },
+              ),
             },
-          ),
-        },
-        child: SizedBox(
-          width: kMinInteractiveDimensionCupertino,
-          height: double.infinity,
-          child: Center(
-            child: Icon(
-              _icons[index],
-              key: ValueKey(('app-destination', index)),
+            child: SizedBox(
+              width: kMinInteractiveDimensionCupertino,
+              height: double.infinity,
+              child: Center(
+                child: Icon(
+                  destination.icon,
+                  key: ValueKey(('app-destination', destination.name)),
+                ),
+              ),
             ),
           ),
         ),
-      ),
-    ),
-  );
+      );
 
   Widget _navigationBar() => LayoutBuilder(
     builder: (context, constraints) {
@@ -809,9 +825,9 @@ class _AppShellState extends ConsumerState<AppShell> {
         key: const ValueKey('app-navigation'),
         backgroundColor: AppColors.toolbar.resolveFrom(context),
         inactiveColor: AppColors.secondaryLabel.resolveFrom(context),
-        currentIndex: _index,
-        onTap: _tapTab,
-        items: [for (var i = 0; i < _labels.length; i++) _navigationItem(i)],
+        currentIndex: _selected.index,
+        onTap: (index) => _tapTab(_AppDestination.values[index]),
+        items: _AppDestination.values.map(_navigationItem).toList(),
       );
       final labelStyle = CupertinoTheme.of(context).textTheme.tabLabelTextStyle;
       final textScaler = MediaQuery.textScalerOf(context);
@@ -831,13 +847,13 @@ class _AppShellState extends ConsumerState<AppShell> {
         locale: Localizations.maybeLocaleOf(context),
         textHeightBehavior: DefaultTextHeightBehavior.maybeOf(context),
       );
-      final labelWidth = constraints.maxWidth / _labels.length;
+      final labelWidth = constraints.maxWidth / _AppDestination.values.length;
 
       double largestLabelHeight(TextStyle style, TextScaler scaler) {
         painter.textScaler = scaler;
         var height = 0.0;
-        for (final label in _labels) {
-          painter.text = TextSpan(text: label, style: style);
+        for (final destination in _AppDestination.values) {
+          painter.text = TextSpan(text: destination.label, style: style);
           painter.layout(maxWidth: labelWidth);
           height = math.max(height, painter.height);
         }
@@ -870,34 +886,34 @@ class _AppShellState extends ConsumerState<AppShell> {
         padding: const EdgeInsets.all(12),
         primary: false,
         children: [
-          for (var index = 0; index < _labels.length; index++)
+          for (final destination in _AppDestination.values)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: CupertinoFocusHalo.withRoundedSuperellipse(
-                key: GlobalObjectKey(_tabFocusNodes[index]),
+                key: GlobalObjectKey(_tabFocusNodes[destination]!),
                 borderRadius: const BorderRadius.all(Radius.circular(10)),
                 child: Semantics(
-                  selected: _index == index,
+                  selected: _selected == destination,
                   child: CupertinoButton(
-                    key: ValueKey(('app-destination', index)),
-                    focusNode: _tabFocusNodes[index],
-                    onPressed: () => _tapTab(index),
+                    key: ValueKey(('app-destination', destination.name)),
+                    focusNode: _tabFocusNodes[destination],
+                    onPressed: () => _tapTab(destination),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 8,
                     ),
-                    color: _index == index
+                    color: _selected == destination
                         ? AppColors.selection.resolveFrom(context)
                         : null,
-                    foregroundColor: _index == index
+                    foregroundColor: _selected == destination
                         ? AppColors.accent.resolveFrom(context)
                         : AppColors.label.resolveFrom(context),
                     borderRadius: BorderRadius.circular(10),
                     child: Row(
                       children: [
-                        Icon(_icons[index], size: 22),
+                        Icon(destination.icon, size: 22),
                         const SizedBox(width: 10),
-                        Expanded(child: Text(_labels[index])),
+                        Expanded(child: Text(destination.label)),
                       ],
                     ),
                   ),
@@ -969,7 +985,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   void dispose() {
-    for (final node in _tabFocusNodes) {
+    for (final node in _tabFocusNodes.values) {
       node.dispose();
     }
     final catalog = _catalog;
