@@ -29,6 +29,14 @@ jobs:
           channel: stable
           cache: true
       - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .local/formatters
+            runtime/teavm/.local/webp/downloads
+          key: ci-tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/format.ts', 'runtime/teavm/toolchain/webp/toolchain.lock.json') }}
+      - name: Download the pinned WebP compiler from a Zig mirror
+        run: node scripts/download-ci-webp-compiler.ts
       - run: pnpm flutter:setup
       - run: pnpm protocol:setup
       - name: Initialize pinned TeaVM and libwebp sources
