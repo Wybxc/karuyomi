@@ -38,6 +38,7 @@ class const ChapterReaderRoute({
   required final SequenceChapter initialChapter,
   required final OpenedChapter initialOpened,
   final ReaderAuthentication? onAuthenticate,
+  final ValueChanged<String>? onChapterChanged,
   final ReadingPosition? initialPosition,
   final ChapterOrder? initialOrder,
   final ReadingMode initialMode = ReadingMode.leftToRight,
@@ -761,6 +762,7 @@ class _ChapterReaderRouteState extends ConsumerState<ChapterReaderRoute> {
         _visible = true;
       });
       next = null; // The route owns it until onAttached mounts the new leaf.
+      widget.onChapterChanged?.call(target.key);
     } catch (_) {
       if (!_closing && mounted) {
         setState(() {

@@ -15,6 +15,8 @@ import 'package:source_runtime/source_runtime.dart';
 
 import '../../data/settings_repository.dart';
 import '../../data/business_state_validation.dart';
+import '../../navigation/app_location.dart';
+import '../../navigation/app_navigation.dart';
 import '../browse/catalog_controller.dart';
 import '../browse/source_browse_page.dart';
 import '../settings/settings_controller.dart';
@@ -23,6 +25,34 @@ import '../sources/source_error_details.dart';
 import 'extension_listing.dart';
 import 'extensions_controller.dart';
 import 'pending_extension_changes.dart';
+
+void _openManagementPanel(
+  BuildContext context,
+  AppPanel panel,
+  ExtensionsController controller,
+) {
+  if (AppNavigation.maybeOf(context) case final navigation?) {
+    navigation.navigate(
+      AppLocation(
+        AppTab.extensions,
+        panel: panel,
+        extension: panel == AppPanel.storage
+            ? navigation.location.extension
+            : null,
+      ),
+    );
+    return;
+  }
+  unawaited(
+    Navigator.of(context).push<void>(
+      AppPageRoute(
+        builder: (_) => panel == AppPanel.storage
+            ? ExtensionStoragePage(controller: controller)
+            : ExtensionRepositoriesPage(controller: controller),
+      ),
+    ),
+  );
+}
 
 class const ExtensionsPage({
   super.key,
@@ -61,31 +91,35 @@ class _ExtensionsPageState extends ConsumerState<ExtensionsPage> {
     });
   }
 
-  Future<void> _details(ExtensionListing item) =>
-      Navigator.of(context).push<void>(
-        AppPageRoute(
-          builder: (_) => ExtensionDetailsPage(
-            controller: _controller,
+  Future<void> _details(ExtensionListing item) async {
+    if (AppNavigation.maybeOf(context) case final navigation?) {
+      navigation.navigate(
+        AppLocation(
+          AppTab.extensions,
+          extension: (
+            catalogKey: catalogLocationKey(item.reference),
             packageName: item.packageName,
-            candidate: item.candidate,
-            onOpenSource: widget.onOpenSource,
           ),
         ),
       );
-  void _repositories() => unawaited(
-    Navigator.of(context).push<void>(
+      return;
+    }
+    await Navigator.of(context).push<void>(
       AppPageRoute(
-        builder: (_) => ExtensionRepositoriesPage(controller: _controller),
+        builder: (_) => ExtensionDetailsPage(
+          controller: _controller,
+          packageName: item.packageName,
+          candidate: item.candidate,
+          onOpenSource: widget.onOpenSource,
+        ),
       ),
-    ),
-  );
-  void _storage() => unawaited(
-    Navigator.of(context).push<void>(
-      AppPageRoute(
-        builder: (_) => ExtensionStoragePage(controller: _controller),
-      ),
-    ),
-  );
+    );
+  }
+
+  void _repositories() =>
+      _openManagementPanel(context, AppPanel.repositories, _controller);
+  void _storage() =>
+      _openManagementPanel(context, AppPanel.storage, _controller);
 
   Widget _directoryStatus(String label, {bool failed = false}) => Semantics(
     liveRegion: true,
@@ -605,11 +639,8 @@ class const ExtensionOperationStatus({
             preparationFailure == null &&
             controller.operationFailure == RuntimeErrorCode.limitExceeded)
           CupertinoButton(
-            onPressed: () => Navigator.of(context).push<void>(
-              AppPageRoute(
-                builder: (_) => ExtensionStoragePage(controller: controller),
-              ),
-            ),
+            onPressed: () =>
+                _openManagementPanel(context, AppPanel.storage, controller),
             child: const Text('管理本机存储'),
           ),
         if (pending != null) ...[
@@ -908,11 +939,10 @@ class const _ExtensionPreparationFailureStatus({
             alignment: AlignmentDirectional.centerStart,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             onPressed: storageFull
-                ? () => Navigator.of(context).push<void>(
-                    AppPageRoute(
-                      builder: (_) =>
-                          ExtensionStoragePage(controller: controller),
-                    ),
+                ? () => _openManagementPanel(
+                    context,
+                    AppPanel.storage,
+                    controller,
                   )
                 : retry,
             child: Text(storageFull ? '管理本机存储' : '重试准备'),
@@ -1196,11 +1226,10 @@ class const ExtensionDetailsPage({
                   ),
                 if (!item.registered)
                   CupertinoButton(
-                    onPressed: () => Navigator.of(context).push<void>(
-                      AppPageRoute(
-                        builder: (_) =>
-                            ExtensionRepositoriesPage(controller: controller),
-                      ),
+                    onPressed: () => _openManagementPanel(
+                      context,
+                      AppPanel.repositories,
+                      controller,
                     ),
                     child: const Text('管理仓库'),
                   ),

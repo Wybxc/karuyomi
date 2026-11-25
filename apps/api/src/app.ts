@@ -48,7 +48,8 @@ export function createApp(
       }
       if (
         ['GET', 'HEAD'].includes(c.req.method) &&
-        ['/', '/browse', '/settings'].includes(path)
+        (['/', '/browse', '/settings', '/app'].includes(path) ||
+          path.startsWith('/app/'))
       ) {
         return c.env.ASSETS.fetch(
           new Request(new URL('/', c.req.url), c.req.raw),

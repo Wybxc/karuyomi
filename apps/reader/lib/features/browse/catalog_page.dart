@@ -15,6 +15,8 @@ import '../search/cross_source_search_page.dart';
 import '../sources/source_directory.dart';
 import '../sources/source_error_details.dart';
 import '../sources/source_preferences.dart';
+import '../../navigation/app_navigation.dart';
+import '../../navigation/app_location.dart';
 import 'catalog_controller.dart';
 import 'manga_details_page.dart';
 import 'source_browse_page.dart';
@@ -37,6 +39,10 @@ class const CatalogPage({
     final build = extension.exact;
     final catalog = controller;
     if (build == null || catalog == null || catalog.busy) return;
+    if (AppNavigation.maybeOf(context) case final navigation?) {
+      navigation.openSource(build, source);
+      return;
+    }
     await Navigator.of(context).push<void>(
       AppPageRoute(
         builder: (_) => AdaptiveDetailLayout(
@@ -75,6 +81,12 @@ class const CatalogPage({
     final catalog = controller;
     final client = catalog?.library?.client;
     if (catalog == null || client == null || catalog.busy) return;
+    if (AppNavigation.maybeOf(context) case final navigation?) {
+      navigation.navigate(
+        const AppLocation(AppTab.browse, panel: AppPanel.search),
+      );
+      return;
+    }
     bool currentIdentity() =>
         context.mounted &&
         !catalog.accessPaused &&

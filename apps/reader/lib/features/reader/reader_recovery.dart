@@ -158,19 +158,40 @@ Future<RecoveredReader?> recoverReader(
     shouldContinue: current,
   );
   if (details == null || !current()) return null;
-  final sequence = ChapterSequence(
+  return openReaderChapter(
+    catalog,
+    details,
     packageName: context.packageName,
-    sourceId: context.sourceId,
+    chapterKey: context.chapterKey,
+    isCurrent: current,
+    onInput: onInput,
+    position: context.position,
+  );
+}
+
+Future<RecoveredReader?> openReaderChapter(
+  CatalogController catalog,
+  MangaDetails details, {
+  required String packageName,
+  required String chapterKey,
+  required bool Function() isCurrent,
+  SourceInputHandler? onInput,
+  ReadingPosition? position,
+}) async {
+  final sequence = ChapterSequence(
+    packageName: packageName,
+    sourceId: details.source.sourceId,
     mangaUrl: details.manga.url,
     chapters: details.chapters.map((chapter) => chapter.snapshot),
   );
   final chapters = sequence.entries.where(
-    (chapter) => chapter.key == context.chapterKey,
+    (chapter) => chapter.key == chapterKey,
   );
   if (chapters.isEmpty) {
     throw StateError('章节清单已改变，无法确定原章节；请返回重新选择');
   }
   final chapter = chapters.single;
+  if (!await catalog.waitForSourceIdle(isCurrent)) return null;
   final opened = await catalog.openChapter(
     details.manga,
     ChapterEntry(chapter.snapshot),
@@ -179,8 +200,8 @@ Future<RecoveredReader?> recoverReader(
     onInput: onInput,
   );
   if (opened == null) return null;
-  if (!current() || !catalog.isCurrentSource(details.source)) {
-    await opened.provider.close();
+  if (!isCurrent() || !catalog.isCurrentSource(details.source)) {
+    await catalog.closeChapter(opened);
     return null;
   }
   return RecoveredReader(
@@ -191,6 +212,6 @@ Future<RecoveredReader?> recoverReader(
     opened: opened,
     // ReaderController resolves this original anchor and retains its explicit
     // missing-page notice if the Source has changed its page list.
-    position: context.position,
+    position: position,
   );
 }

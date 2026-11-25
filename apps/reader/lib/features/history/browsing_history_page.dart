@@ -92,6 +92,7 @@ class const _HistoryList({
       await openMangaDetails(
         context,
         title: entry.title,
+        mangaKey: entry.mangaKey,
         catalog: catalog,
         onAuthenticateReader: onAuthenticateReader,
         load: (isCurrent) async {

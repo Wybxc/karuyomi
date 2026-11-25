@@ -2,10 +2,23 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 
 /// Declarative settings navigation shares the same reduced-motion route policy.
 class AppPage<T> extends CupertinoPage<T> {
-  const AppPage({super.key, required super.child, super.title});
+  const AppPage({
+    super.key,
+    required super.child,
+    super.title,
+    this.onCompleted,
+    this.animate = true,
+  });
+
+  final void Function(Future<T?>)? onCompleted;
+  final bool animate;
 
   @override
-  Route<T> createRoute(BuildContext context) => _AppPageRoute<T>(this);
+  Route<T> createRoute(BuildContext context) {
+    final route = _AppPageRoute<T>(this);
+    onCompleted?.call(route.completed);
+    return route;
+  }
 }
 
 class _AppPageRoute<T> extends AppPageRoute<T> {
@@ -24,6 +37,14 @@ class _AppPageRoute<T> extends AppPageRoute<T> {
 
   @override
   String? get title => _page.title;
+
+  @override
+  Duration get transitionDuration =>
+      _page.animate ? super.transitionDuration : Duration.zero;
+
+  @override
+  Duration get reverseTransitionDuration =>
+      _page.animate ? super.reverseTransitionDuration : Duration.zero;
 }
 
 /// Keep the application's reduced-motion policy across all business routes.

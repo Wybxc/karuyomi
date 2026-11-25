@@ -2139,6 +2139,73 @@ final class CatalogController extends ChangeNotifier {
     );
   }
 
+  /// Resolves an account link through the same saved Source DTOs used by the
+  /// library and history screens. The path never supplies an upstream URL.
+  Future<({MangaDetails details, String packageName})?> openMangaLocation(
+    String mangaKey, {
+    String? packageName,
+    String? sourceId,
+    required bool Function() shouldContinue,
+  }) async {
+    final client = _confirmedBusinessClient;
+    final epoch = _epoch;
+    if (client == null) return null;
+    bool current() =>
+        !_closed &&
+        epoch == _epoch &&
+        status == ServiceStatus.ready &&
+        identical(_confirmedBusinessClient, client) &&
+        shouldContinue();
+    if (!current()) return null;
+    final state = await client.readManga(mangaKey, shouldContinue: current);
+    if (!current()) return null;
+    final metadata = state.manga.hasMetadata()
+        ? state.manga.metadata
+        : await client.readBrowsingVisit(mangaKey);
+    if (!current()) return null;
+    if (metadata == null) {
+      throw const FormatException('在当前账号的书架和浏览记录中找不到这部作品。');
+    }
+    if ((packageName != null && metadata.packageName != packageName) ||
+        (sourceId != null && metadata.sourceId != sourceId)) {
+      throw const FormatException('链接中的漫画源与作品记录不匹配。');
+    }
+    if (!await waitForSourceIdle(current)) return null;
+    final entry = MangaEntry(metadata.manga);
+    final details =
+        session != null &&
+            activeBuild?.packageName == metadata.packageName &&
+            activeSource?.id == metadata.sourceId &&
+            isCurrentSource(sourceReference) &&
+            !sourcePreferencesBlocked
+        ? await this.details(entry, shouldContinue: current)
+        : await openBrowsingVisit(
+            metadata,
+            client: client,
+            shouldContinue: current,
+          );
+    return details != null && current()
+        ? (details: details, packageName: metadata.packageName)
+        : null;
+  }
+
+  Future<bool> waitForSourceIdle(bool Function() current) async {
+    while (!_closed && busy && current()) {
+      final idle = Completer<void>();
+      void changed() {
+        if (!busy && !idle.isCompleted) idle.complete();
+      }
+
+      addListener(changed);
+      try {
+        await Future.any([idle.future, _catalogCancelled.future]);
+      } finally {
+        removeListener(changed);
+      }
+    }
+    return !_closed && current();
+  }
+
   Future<MangaDetails?> _openReferencedManga(
     String packageName,
     String sourceId,

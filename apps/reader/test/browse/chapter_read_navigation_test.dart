@@ -1,5 +1,3 @@
-import 'package:karuyomi/widgets/app_routes.dart';
-
 import '../test_app.dart';
 
 import 'dart:async';
@@ -8,6 +6,7 @@ import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:karuyomi/data/bookmark_repository.dart';
@@ -22,6 +21,7 @@ import 'package:karuyomi/features/reader/chapter_sequence.dart';
 import 'package:karuyomi/features/reader/chapter_reader_route.dart';
 import 'package:karuyomi/features/reader/reader_screen.dart';
 import 'package:karuyomi/main.dart';
+import 'package:karuyomi/navigation/app_location.dart';
 import 'package:karuyomi/runtime/runtime_platform_types.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
@@ -862,9 +862,6 @@ void main() {
       await _tap(tester, _readFilter('read'));
       await _shown(tester, [0, 1, 2, 3]);
 
-      final detail = tester.widget<MangaDetailsPage>(
-        find.byType(MangaDetailsPage),
-      );
       final repository = catalog.readingProgress!;
       final snapshot = (await tester.runAsync(
         () => repository.loadAll(_sequence.mangaKey),
@@ -907,23 +904,26 @@ void main() {
         changedSequence.entries.first.key,
         isNot(_sequence.entries.first.key),
       );
-      await tester.runAsync(() async {
-        unawaited(
-          Navigator.of(tester.element(find.byType(MangaDetailsPage)))
-              .push<void>(
-                AppPageRoute<void>(
-                  builder: (_) => MangaDetailsPage(
-                    controller: catalog,
-                    manga: detail.manga,
-                    chapters: changedChapters.map(ChapterEntry.new).toList(),
-                    source: detail.source,
-                  ),
-                ),
+      final router = GoRouter.of(tester.element(find.byType(AppShell)));
+      final detailsAddress = AppLocation.parse(
+        router.routeInformationProvider.value.uri,
+      )!;
+      final invoke = platform.invokeHandler!;
+      platform.invokeHandler = (call) => call.hasChapters()
+          ? Future.value(
+              wire.SourceResult(
+                chapters: wire.ChapterList(chapters: changedChapters),
               ),
-        );
-        await Future<void>.delayed(Duration.zero);
-      });
+            )
+          : invoke(call);
+      router.go(detailsAddress.parent.path);
       await tester.pumpAndSettle();
+      router.go(detailsAddress.path);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<MangaDetailsPage>(find.byType(MangaDetailsPage)).chapters,
+        hasLength(changedChapters.length),
+      );
       expect(
         pendingChapterReadBatch(repository, _sequence.mangaKey),
         same(pending),

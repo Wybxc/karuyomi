@@ -59,10 +59,26 @@ Future<void> _tap(
     await Future<void>.delayed(const Duration(milliseconds: 100));
   });
   if (settle) {
-    await tester.pumpAndSettle();
+    await _settleAfterCoverOperation(tester);
   } else {
     await tester.pump(const Duration(milliseconds: 300));
   }
+}
+
+Future<void> _settleAfterCoverOperation(WidgetTester tester) async {
+  await tester.pump();
+  final picking = find.text('正在读取所选图片');
+  final clock = Stopwatch()..start();
+  // Let the real isolate and image codec finish while pumping the test UI.
+  while (picking.evaluate().isNotEmpty) {
+    if (clock.elapsed >= const Duration(seconds: 5)) {
+      fail('Cover selection did not finish decoding.');
+    }
+    const tick = Duration(milliseconds: 10);
+    await tester.runAsync(() => Future<void>.delayed(tick));
+    await tester.pump(tick);
+  }
+  await tester.pumpAndSettle();
 }
 
 Future<void> _decodeImage(WidgetTester tester, Finder image) async {
@@ -433,10 +449,7 @@ void main() {
           expect(server.appliedMutations, writes);
           pickGate.complete(_imageFile());
           picker.waiting = null;
-          await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 100)),
-          );
-          await tester.pumpAndSettle();
+          await _settleAfterCoverOperation(tester);
           expect(find.text('待保存的修改'), findsOneWidget);
           expect(transport.uploads, isEmpty);
           expectContentBelowNavigation();

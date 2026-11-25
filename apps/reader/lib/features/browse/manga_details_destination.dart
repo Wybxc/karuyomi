@@ -4,6 +4,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 
 import '../../widgets/adaptive_detail_layout.dart';
 import '../../widgets/app_empty_state.dart';
+import '../../navigation/app_navigation.dart';
 import '../reader/reader_recovery.dart';
 import '../sources/source_error_details.dart';
 import 'catalog_controller.dart';
@@ -16,24 +17,43 @@ typedef LoadMangaDetails = Future<MangaDetails?> Function(
 Future<void> openMangaDetails(
   BuildContext context, {
   required String title,
+  String? mangaKey,
   required CatalogController catalog,
   required LoadMangaDetails load,
   ReaderAuthentication? onAuthenticateReader,
-}) => openAdaptiveDetail(
-  context,
-  (_, close) => MangaDetailsDestination(
-    title: title,
-    load: load,
-    failure: () => (message: catalog.error, diagnostics: catalog.errorDetails),
-    onClose: close,
-    buildDetails: (details) => MangaDetailsPage(
-      controller: catalog,
-      manga: details.manga,
-      chapters: details.chapters,
-      source: details.source,
-      onClose: close,
-      onAuthenticateReader: onAuthenticateReader,
-    ),
+}) {
+  Widget detail(BuildContext context, VoidCallback? close) =>
+      buildCatalogMangaDetails(
+        title: title,
+        catalog: catalog,
+        load: load,
+        onClose: close,
+        onAuthenticateReader: onAuthenticateReader,
+      );
+  final navigation = AppNavigation.maybeOf(context);
+  return mangaKey != null && navigation != null
+      ? navigation.openManga(mangaKey, detail)
+      : openAdaptiveDetail(context, detail);
+}
+
+Widget buildCatalogMangaDetails({
+  required String title,
+  required CatalogController catalog,
+  required LoadMangaDetails load,
+  VoidCallback? onClose,
+  ReaderAuthentication? onAuthenticateReader,
+}) => MangaDetailsDestination(
+  title: title,
+  load: load,
+  failure: () => (message: catalog.error, diagnostics: catalog.errorDetails),
+  onClose: onClose,
+  buildDetails: (details) => MangaDetailsPage(
+    controller: catalog,
+    manga: details.manga,
+    chapters: details.chapters,
+    source: details.source,
+    onClose: onClose,
+    onAuthenticateReader: onAuthenticateReader,
   ),
 );
 
