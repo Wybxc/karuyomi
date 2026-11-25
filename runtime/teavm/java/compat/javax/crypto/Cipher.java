@@ -9,6 +9,7 @@ import org.bouncycastle.crypto.DataLengthException;
 import org.bouncycastle.crypto.DefaultBufferedBlockCipher;
 import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.engines.AESEngine;
+import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
 import org.bouncycastle.crypto.params.KeyParameter;
 import prototype.Bridge;
 
@@ -17,6 +18,7 @@ public class Cipher {
   public static final int ENCRYPT_MODE = 1, DECRYPT_MODE = 2, WRAP_MODE = 3, UNWRAP_MODE = 4;
   private static final String AES_GCM = "AES/GCM/NoPadding";
   private static final String AES_ECB = "AES/ECB/NoPadding";
+  private static final String AES_ECB_PADDED = "AES/ECB/PKCS5Padding";
   private static final String RSA_OAEP = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
   private static final String RSA_PKCS1 = "RSA/ECB/PKCS1Padding";
   private final String transformation;
@@ -36,7 +38,12 @@ public class Cipher {
     pkcs1 = RSA_PKCS1.equalsIgnoreCase(t);
     rsa = pkcs1 || RSA_OAEP.equalsIgnoreCase(t);
     gcm = AES_GCM.equalsIgnoreCase(t);
-    ecb = AES_ECB.equalsIgnoreCase(t);
+    ecb = isEcb(t);
+  }
+
+  private static boolean isEcb(String transformation) {
+    return AES_ECB.equalsIgnoreCase(transformation)
+        || AES_ECB_PADDED.equalsIgnoreCase(transformation);
   }
 
   public static Cipher getInstance(String t)
@@ -45,7 +52,7 @@ public class Cipher {
     if (!t.equalsIgnoreCase("AES/CBC/PKCS5Padding")
         && !t.equalsIgnoreCase("AES/CBC/PKCS7Padding")
         && !AES_GCM.equalsIgnoreCase(t)
-        && !AES_ECB.equalsIgnoreCase(t)
+        && !isEcb(t)
         && !RSA_OAEP.equalsIgnoreCase(t)
         && !RSA_PKCS1.equalsIgnoreCase(t)) throw new NoSuchAlgorithmException(t);
     return new Cipher(t);
@@ -106,7 +113,10 @@ public class Cipher {
     if (ecb) {
       if (params != null)
         throw new InvalidAlgorithmParameterException("ECB does not use parameters");
-      DefaultBufferedBlockCipher cipher = new DefaultBufferedBlockCipher(AESEngine.newInstance());
+      DefaultBufferedBlockCipher cipher =
+          AES_ECB_PADDED.equalsIgnoreCase(transformation)
+              ? new PaddedBufferedBlockCipher(AESEngine.newInstance())
+              : new DefaultBufferedBlockCipher(AESEngine.newInstance());
       cipher.init(mode == ENCRYPT_MODE, new KeyParameter(bytes));
       ecbCipher = cipher;
       return;
@@ -175,7 +185,11 @@ public class Cipher {
     requireInitialized();
     if (len < 0) throw new IllegalArgumentException();
     if (rsa) return rsaKey.modulusBytes();
-    if (ecb) return Math.addExact(ecbCipher.getOutputSize(0), len);
+    if (ecb) {
+      int size = ecbCipher.getOutputSize(len);
+      if (size < 0) throw new ArithmeticException("Cipher output size exceeds int");
+      return size;
+    }
     int total = Math.addExact(pending.size(), len);
     return mode == DECRYPT_MODE
         ? (gcm ? Math.max(0, total - tag / 8) : total)
@@ -237,8 +251,8 @@ public class Cipher {
         throw new IllegalBlockSizeException("ECB input must contain complete blocks");
       byte[] out = new byte[outputSize];
       int written = ecbCipher.processBytes(input, offset, len, out, 0);
-      finishEcb(out, written);
-      return out;
+      written += finishEcb(out, written);
+      return written == out.length ? out : Arrays.copyOf(out, written);
     }
     if (pending.size() > 0) {
       pending.write(input, offset, len);

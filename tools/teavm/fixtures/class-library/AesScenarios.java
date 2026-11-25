@@ -5,6 +5,7 @@ import java.security.InvalidKeyException;
 import java.security.InvalidAlgorithmParameterException;
 import java.util.Arrays;
 import java.util.Base64;
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.ShortBufferException;
@@ -76,7 +77,70 @@ final class AesScenarios {
     } catch (InvalidKeyException expected) {
       checks++;
     }
+    paddedEcb(decoder);
     System.out.println("AES_ECB_SCENARIOS_PASS " + checks);
+  }
+
+  private static void paddedEcb(Base64.Decoder decoder) throws GeneralSecurityException {
+    var key =
+        new SecretKeySpec(decoder.decode("AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="), "AES");
+    var encrypt = Cipher.getInstance("AES/ECB/PKCS5Padding");
+    var decrypt = Cipher.getInstance("AES/ECB/PKCS5Padding");
+    encrypt.init(Cipher.ENCRYPT_MODE, key);
+    decrypt.init(Cipher.DECRYPT_MODE, key);
+    check(encrypt.getIV() == null && decrypt.getIV() == null, "Padded ECB uses no IV");
+    for (String[] vector :
+        new String[][] {
+          {"", "nzt1BJJvi9NuMRjpA6TNSg=="},
+          {"AAECAwQFBgcICQoLDA0ODw==", "Wm4EVwj7cZbwLlU9AsOmkp87dQSSb4vTbjEY6QOkzUo="},
+          {"AAECAwQFBgcICQoLDA0ODxAREhMUFRY=", "Wm4EVwj7cZbwLlU9AsOmkvLExGUsLC9ynNkVcbAe5C0="}
+        }) {
+      byte[] plaintext = decoder.decode(vector[0]);
+      byte[] ciphertext = decoder.decode(vector[1]);
+      check(encrypt.getOutputSize(plaintext.length) == ciphertext.length, "Include padding block");
+      check(Arrays.equals(encrypt.doFinal(plaintext), ciphertext), "Padded known ciphertext");
+      check(Arrays.equals(decrypt.doFinal(ciphertext), plaintext), "Strip exactly the padding");
+    }
+
+    byte[] plaintext = decoder.decode("AAECAwQFBgcICQoLDA0ODxAREhMUFRY=");
+    byte[] ciphertext = encrypt.doFinal(plaintext);
+    byte[] out = new byte[34];
+    int written = decrypt.update(ciphertext, 0, ciphertext.length, out, 2);
+    check(written == 16, "Retain the last block until padding is checked");
+    written += decrypt.doFinal(out, 2 + written);
+    check(written == plaintext.length, "Final output excludes padding");
+    check(Arrays.equals(Arrays.copyOfRange(out, 2, 2 + written), plaintext), "Output offset");
+
+    check(decrypt.update(ciphertext, 0, 7, out, 0) == 0, "Retain partial ciphertext");
+    check(
+        Arrays.equals(decrypt.doFinal(ciphertext, 7, ciphertext.length - 7), plaintext),
+        "Decrypt split ciphertext");
+    try {
+      encrypt.doFinal(new byte[15], 0);
+      throw new AssertionError("A short final output was accepted");
+    } catch (ShortBufferException expected) {
+      checks++;
+    }
+    check(encrypt.doFinal(out, 0) == 16, "A short buffer leaves the operation retryable");
+    check(
+        Arrays.equals(Arrays.copyOf(out, 16), decoder.decode("nzt1BJJvi9NuMRjpA6TNSg==")),
+        "A retry writes the same result");
+
+    try {
+      decrypt.doFinal(ciphertext, 0, 15);
+      throw new AssertionError("Incomplete padded ciphertext was accepted");
+    } catch (IllegalBlockSizeException expected) {
+      checks++;
+    }
+    var unpadded = Cipher.getInstance("AES/ECB/NoPadding");
+    unpadded.init(Cipher.ENCRYPT_MODE, key);
+    decrypt.init(Cipher.DECRYPT_MODE, key);
+    try {
+      decrypt.doFinal(unpadded.doFinal(new byte[16]));
+      throw new AssertionError("Invalid padding was accepted");
+    } catch (BadPaddingException expected) {
+      checks++;
+    }
   }
 
   private static void check(boolean condition, String message) {

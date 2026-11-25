@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-25，基于 `b5a6483` 补齐禁漫天堂等 Source 使用的 `AES/ECB/PKCS5Padding`。macOS arm64 上的 `pnpm teavm:check` 通过，固定 JDK 和生成的 JavaScript 的 65 项 AES ECB 断言一致，新增 20 项覆盖末块填充、分段解密、短缓冲重试和异常类型。[宿主实现](../runtime/teavm/README.md)
+
 2026-11-25，基于 `f6e919a` 的路由改动在 macOS 27.0.1 上通过 `pnpm check`、`pnpm flutter:check --reporter expanded --concurrency=3` 和 `pnpm acceptance:build`。Vitest 通过 613 项，Flutter 应用通过 1,050 项，阅读核心和 Source Runtime 共通过 112 项。组件回归覆盖宽窄屏、引擎导航事件、同账号独立客户端恢复作品和章节、切章更新地址及账号隔离。官方隔离 Worker 使用正式 Web 入口和空扩展索引，核对首页和多个深链接的 GET 正文逐字节一致、深链接 HEAD 为 200、Flutter 启动脚本为 200，缺失扩展静态文件为 404。内置浏览器查询与打开页面两次超时。地址栏、刷新和前进后退的实际浏览器操作，以及线上源站阅读，仍待验收。[路由计划](plan/url-navigation.md)
 
 2026-11-25，扩展本机设置持久化与报错复制在 macOS 使用固定 Flutter 3.50.0 验证。Flutter 应用通过 1,045 项，阅读核心和 Source Runtime 共通过 112 项。回归覆盖独立客户端恢复、身份隔离、账户请求隔离和复制脱敏错误。实际平台重开与系统剪贴板另验。[Source 设置验证](verification/source-preferences.md#2026-11-25-本机设置恢复与报错复制)
