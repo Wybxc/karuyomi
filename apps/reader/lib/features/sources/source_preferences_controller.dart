@@ -4,9 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import '../../data/business_state_client.dart';
+import '../../data/device_source_preferences.dart';
 import '../../data/source_preferences_repository.dart';
 import '../../data/source_preferences_validation.dart';
 import '../browse/catalog_controller.dart';
+import 'source_error_details.dart';
 
 enum SourcePreferencesActivity { reading, editing, saving, readingConfirmed }
 
@@ -192,15 +194,33 @@ final class SourcePreferencesController extends ChangeNotifier {
         errorDetails = catalog.errorDetails;
         return false;
       }
-      catalog.retainSourceSessionPreferences(
-        target,
+      final localChanged = !samePreferenceEntries(
+        before.sessionValues,
         result.snapshot.sessionValues,
       );
-      if (catalog.allowsAccountPreferences(target.build) &&
-          !samePreferenceEntries(
-            result.snapshot.syncValues,
-            baseline.entries,
-          )) {
+      final accountChanged = !samePreferenceEntries(
+        result.snapshot.syncValues,
+        baseline.entries,
+      );
+      if (localChanged) {
+        _setActivity(SourcePreferencesActivity.saving);
+        try {
+          await DeviceSourcePreferences(repository.identity).save(
+            catalog: target.build.catalog,
+            packageName: target.build.packageName,
+            sourceId: target.source.id,
+            entries: result.snapshot.sessionValues,
+          );
+        } on FormatException catch (failure) {
+          if (available) {
+            error = failure.message;
+            errorDetails = sourceErrorDetails(failure, operation: '保存本机漫画源设置');
+          }
+          return false;
+        }
+        if (!available) return false;
+      }
+      if (catalog.allowsAccountPreferences(target.build) && accountChanged) {
         _setActivity(SourcePreferencesActivity.saving);
         await repository.save(
           catalog: target.build.catalog,
@@ -216,16 +236,11 @@ final class SourcePreferencesController extends ChangeNotifier {
       if (!result.accepted && request.hasClick()) {
         message = result.clickHandled ? '操作已处理。' : '漫画源未处理此操作；实际设置已重新读取。';
       } else if (!result.accepted) {
-        final changed =
+        if (localChanged ||
             !samePreferenceEntries(
               before.syncValues,
               result.snapshot.syncValues,
-            ) ||
-            !samePreferenceEntries(
-              before.sessionValues,
-              result.snapshot.sessionValues,
-            );
-        if (changed) {
+            )) {
           message = '漫画源已更新设置；请核对实际值。';
         } else {
           error = '漫画源未接受输入；设置未更改。';

@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-25，扩展本机设置持久化与报错复制在 macOS 使用固定 Flutter 3.50.0 验证。Flutter 应用通过 1,045 项，阅读核心和 Source Runtime 共通过 112 项。回归覆盖独立客户端恢复、身份隔离、账户请求隔离和复制脱敏错误。实际平台重开与系统剪贴板另验。[Source 设置验证](verification/source-preferences.md#2026-11-25-本机设置恢复与报错复制)
+
 2026-11-25，基于 `8267328` 的五栏导航和浏览语言筛选在 macOS 27.0.1 上通过 `pnpm flutter:check --reporter expanded --concurrency=3` 和 `pnpm build`。Flutter 应用通过 1,044 项，阅读核心和 Source Runtime 共通过 112 项。组件回归覆盖侧栏与底栏顺序、短屏大字号、五个入口的键盘切换、扩展管理跳转和登录回跳。用同一扩展的不同语言源核对多选匹配，并确认筛选可在切换账户和重建应用后从本机读回。[分项计划](plan/browsing-and-reader-experience.md)
 
 2026-11-24，基于 `ec61759` 的 Karuyomi 标志接入在 macOS 27.0.1 上通过 `pnpm build`、Flutter 静态分析及 60 项设置与应用组件测试。检查了 Worker 构建产物中的标签页 SVG 和 PNG、Apple 添加到主屏幕图标、四个 Web 安装图标及「关于」使用的 Flutter 资源。两种可裁切安装图标的图案均落在内切安全区内。[标志矢量源](../apps/reader/web/karuyomi-logo.svg)

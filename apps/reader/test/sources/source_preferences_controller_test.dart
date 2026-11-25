@@ -71,7 +71,7 @@ void main() {
     expect(fixture.catalog.mangas, isNotEmpty);
   });
 
-  test('single session edits stay off the API and survive confirmed account edits and reopening', () async {
+  test('device edits stay off the API and survive confirmed account edits and reopening', () async {
     final editor = fixture.editor();
     addTearDown(editor.dispose);
     expect(await editor.load(), true);
@@ -107,6 +107,40 @@ void main() {
     expect(fixture.catalog.sourceFilterSnapshot, isNull);
     expect(fixture.catalog.page, 0);
   });
+
+  test(
+    'a fresh client restores device settings for the same account only',
+    () async {
+      final editor = fixture.editor();
+      addTearDown(editor.dispose);
+      expect(await editor.load(), true);
+      expect(
+        await editor.change([1], wire.PreferenceValue(text: 'saved-password')),
+        true,
+      );
+      expect(fixture.postedBodies, isEmpty);
+
+      final restarted = PreferenceFixture();
+      addTearDown(restarted.close);
+      await restarted.open();
+      final restored = restarted.editor();
+      addTearDown(restored.dispose);
+      expect(await restored.load(), true);
+      expect(restored.snapshot!.nodes[1].text.value, 'saved-password');
+      expect(restarted.callbacks, 0);
+
+      final other = PreferenceFixture();
+      addTearDown(other.close);
+      other.platform.bootstrapSubject = 'another-reader';
+      other.platform.seedInstalledBuilds(
+        wire
+            .decodeProtoJson(wire.ExtensionIndex(), other.platform.inventory)
+            .builds,
+      );
+      await other.open();
+      expect(other.platform.preferenceBootstraps.last.sources, isEmpty);
+    },
+  );
 
   test('fresh remote revision triggers reconstruction before editing rather than pairing old runtime values with new CAS', () async {
     final remote = BusinessStateClient(

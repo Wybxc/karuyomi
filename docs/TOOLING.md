@@ -35,6 +35,8 @@ JS/TS 产品构建使用声明式 Vite 配置和官方 CLI；API 使用 Cloudfla
 
 Flutter 3.50 正式构建开启 `--web-content-hash` 与 `--no-deprecated-js-interop`。项目按官方 `precache_manifest.json` 校验实际文件、尺寸与哈希，移除 Native 专用 pubspec payload；清单中的哈希 URL 长期 immutable，bootstrap/未哈希 HTML/未哈希渲染资源重新验证。公开资源验证使用标准 Fetch 重定向，再核对实际正文的大小、哈希与缓存头；这涵盖 Cloudflare 默认将 `.html` 规范化为无扩展名 URL 的行为，匿名 API 的 Access 检查仍使用手动重定向。`tools/flutter/web-assets.ts` 提供该发布合同和缓存规则，Vite 与交付验证直接消费，不维护第二套 Flutter 文件列表。CI 独立 Wasm 候选与默认 JavaScript 构建使用同一提交和 runtime，默认采用须有产品实测依据。
 
+通用 CI 缓存锁定的格式工具和 WebP 编译器归档。缓存缺失时可从 Zig 登记镜像准备 Linux 归档，Kotlin 格式工具可从 Google 的 Maven Central 镜像下载。使用前仍按仓库锁定值校验，归档来源的变化不影响实际构建输入。[Zig 镜像登记](https://codeberg.org/ziglang/www.ziglang.org/src/branch/main/assets/community-mirrors.ziggy)
+
 `pnpm test` 先经 Vite CLI 构建 runtime 与 API 测试 fixture，再运行 Node/官方 Workers Vitest。官方 Test Harness 使用独立 fixture 与输出，不改写生产构建定位。浏览器桥回归使用官方 Vitest Browser Preview：运行 `BROWSER=none pnpm test:browser`，再用 Codex 内置浏览器打开其 URL；Preview 会请求打开默认浏览器，单设 `server.open: false` 不足。旧手写 socket/HTTP、Source 在线与浏览器 runner 已移除，新 fixture 测试不自动继承原 Source、Native、网络 TCP reset 或生产 Access 的验收范围。当前覆盖和剩余门见 [Vite 计划](plan/vite-build-and-testing.md)及[验证记录](verification/vite-build-and-testing.md)。
 
 正式 Flutter Web 的交互验收使用 `pnpm acceptance:build` 构建当前产品及独立 Vite 测试产物，再运行 `pnpm acceptance:serve`。入口直接使用 Cloudflare 官方 `createTestHarness()`，监听随机 loopback URL、应用真实 D1 迁移；同一个 URL 可在 Codex 内置浏览器打开两个独立标签页。测试入口为 loopback 请求签发临时 RS256 身份，随后仍经过正式 JWT、Origin 和业务请求头校验；它不替客户端补写 `X-App-Subject` 或 `X-App-Request`。该入口不进入生产构建，测试身份不能代替生产 Access 正向验收。按 Enter 或发送 SIGINT/SIGTERM 后关闭官方 harness，隔离 D1 状态随进程销毁。

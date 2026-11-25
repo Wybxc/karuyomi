@@ -159,6 +159,7 @@ const ktfmt = jar(
   'ktfmt-0.63-with-dependencies.jar',
   [
     'https://repo.maven.apache.org/maven2/com/facebook/ktfmt/0.63/ktfmt-0.63-with-dependencies.jar',
+    'https://maven-central.storage-download.googleapis.com/maven2/com/facebook/ktfmt/0.63/ktfmt-0.63-with-dependencies.jar',
   ],
   'a015521ddb1c7a80c41edb56b91b4a231439592ffd2e85ac866ff8134c37c112',
 );

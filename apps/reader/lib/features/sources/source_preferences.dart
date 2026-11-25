@@ -175,7 +175,7 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
     final caption = <String>[
       if (account && node.summary.isNotEmpty) node.summary,
       if (!account && node.whichKind() != wire.PreferenceNode_Kind.group)
-        '仅本次会话',
+        '保存在本机',
     ];
     final captionStyle = TextStyle(
       fontSize: 13,
