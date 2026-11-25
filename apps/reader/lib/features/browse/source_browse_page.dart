@@ -11,6 +11,7 @@ import 'package:source_runtime/control_protocol.dart' as wire;
 import 'package:uuid/uuid.dart';
 
 import '../../data/cover_repository.dart';
+import '../../data/business_state_validation.dart';
 import '../../data/library_repository.dart';
 import '../library/library_providers.dart';
 import '../reader/reader_recovery.dart';
@@ -119,7 +120,7 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
   }
 
   Future<void> _open() async {
-    if (!_current || catalog.busy) return;
+    if (!_current || !await catalog.waitForSourceIdle(() => _current)) return;
     setState(() {
       _loading = _ListingWork.initial;
       _error = null;
@@ -264,6 +265,13 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
     await openMangaDetails(
       context,
       title: entry.title,
+      mangaKey: businessMetadataKey(
+        wire.LibraryMetadata(
+          packageName: widget.build.packageName,
+          sourceId: reference.sourceId,
+          manga: entry.snapshot,
+        ),
+      ),
       catalog: catalog,
       onAuthenticateReader: widget.onAuthenticateReader,
       load: (isCurrent) {

@@ -10,6 +10,10 @@ typedef AdaptiveDetailBuilder = Widget Function(
   BuildContext context,
   VoidCallback? close,
 );
+typedef AdaptiveDetailSelection = ({
+  Object token,
+  AdaptiveDetailBuilder builder,
+});
 
 Future<void> openAdaptiveDetail(
   BuildContext context,
@@ -35,6 +39,9 @@ class const AdaptiveDetailLayout({
   required final Widget child,
   final Object? owner,
   final bool handleSystemBack = true,
+  final AdaptiveDetailSelection? detail,
+  final VoidCallback? onCloseDetail,
+  final bool singleColumn = false,
 }) extends StatefulWidget {
   @override
   State<AdaptiveDetailLayout> createState() => _AdaptiveDetailLayoutState();
@@ -42,7 +49,8 @@ class const AdaptiveDetailLayout({
 
 class _AdaptiveDetailLayoutState extends State<AdaptiveDetailLayout> {
   final _details = GlobalKey<NavigatorState>();
-  ({Object token, AdaptiveDetailBuilder builder})? _selection;
+  AdaptiveDetailSelection? _selection;
+  AdaptiveDetailSelection? get _detail => widget.detail ?? _selection;
   bool _wide = false;
 
   bool open(AdaptiveDetailBuilder builder) {
@@ -52,15 +60,19 @@ class _AdaptiveDetailLayoutState extends State<AdaptiveDetailLayout> {
   }
 
   void _close() {
-    setState(() => _selection = null);
+    if (widget.detail != null) {
+      widget.onCloseDetail?.call();
+    } else {
+      setState(() => _selection = null);
+    }
   }
 
   Future<bool> back() async {
-    final selection = _selection;
+    final selection = _detail;
     if (selection == null) return false;
     // An inline detail can consume Back to exit chapter selection first.
     final handled = await _details.currentState?.maybePop() ?? false;
-    if (!handled && mounted && _selection == selection) _close();
+    if (!handled && mounted && _detail == selection) _close();
     return true;
   }
 
@@ -72,14 +84,16 @@ class _AdaptiveDetailLayoutState extends State<AdaptiveDetailLayout> {
 
   @override
   Widget build(BuildContext context) => PopScope<void>(
-    canPop: !widget.handleSystemBack || _selection == null,
+    canPop: !widget.handleSystemBack || _detail == null,
     onPopInvokedWithResult: (didPop, _) {
       if (widget.handleSystemBack && !didPop) unawaited(back());
     },
     child: LayoutBuilder(
       builder: (context, constraints) {
-        _wide = fitsColumns(context, constraints, minimumWidth: 832);
-        final selected = _selection;
+        _wide =
+            !widget.singleColumn &&
+            fitsColumns(context, constraints, minimumWidth: 832);
+        final selected = _detail;
         final both = _wide && selected != null;
         final hideList = !_wide && selected != null;
         final detailWidth = (constraints.maxWidth * .44).clamp(352.0, 520.0);
@@ -100,42 +114,55 @@ class _AdaptiveDetailLayoutState extends State<AdaptiveDetailLayout> {
                 ),
               ),
             ),
-            if (selected != null)
-              PositionedDirectional(
-                key: const ValueKey('adaptive-detail'),
-                start: both ? constraints.maxWidth - detailWidth : 0,
-                end: 0,
-                top: 0,
-                bottom: 0,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: AppColors.background.resolveFrom(context),
-                    border: both
-                        ? BorderDirectional(
-                            start: BorderSide(
-                              color: AppColors.separator.resolveFrom(context),
-                            ),
-                          )
-                        : null,
-                  ),
-                  child: Navigator(
-                    key: _details,
-                    requestFocus: false,
-                    pages: [
-                      AppPage<void>(
-                        key: ObjectKey(selected.token),
-                        child: Builder(
-                          builder: (context) =>
-                              selected.builder(context, _close),
+            PositionedDirectional(
+              key: const ValueKey('adaptive-detail'),
+              start: both ? constraints.maxWidth - detailWidth : 0,
+              end: 0,
+              top: 0,
+              bottom: 0,
+              child: Offstage(
+                offstage: selected == null,
+                child: ExcludeFocus(
+                  excluding: selected == null,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.background.resolveFrom(context),
+                      border: both
+                          ? BorderDirectional(
+                              start: BorderSide(
+                                color: AppColors.separator.resolveFrom(context),
+                              ),
+                            )
+                          : null,
+                    ),
+                    child: Navigator(
+                      key: _details,
+                      requestFocus: false,
+                      pages: [
+                        const AppPage<void>(
+                          key: ValueKey('adaptive-detail-empty'),
+                          child: SizedBox.shrink(),
                         ),
-                      ),
-                    ],
-                    onDidRemovePage: (page) {
-                      if (page.key == ObjectKey(_selection?.token)) _close();
-                    },
+                        if (selected != null)
+                          AppPage<void>(
+                            key: ValueKey<Object?>(selected.token),
+                            animate: !_wide,
+                            child: Builder(
+                              builder: (context) =>
+                                  selected.builder(context, _close),
+                            ),
+                          ),
+                      ],
+                      onDidRemovePage: (page) {
+                        if (page.key == ValueKey<Object?>(_detail?.token)) {
+                          _close();
+                        }
+                      },
+                    ),
                   ),
                 ),
               ),
+            ),
           ],
         );
       },

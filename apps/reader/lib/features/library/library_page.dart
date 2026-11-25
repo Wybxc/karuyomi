@@ -5,6 +5,8 @@ import '../../widgets/choice_field.dart';
 
 import 'dart:async';
 
+import '../../navigation/app_navigation.dart';
+
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -155,6 +157,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       await openMangaDetails(
         context,
         title: entry.title,
+        mangaKey: entry.mangaKey,
         catalog: controller,
         onAuthenticateReader: widget.onAuthenticateReader,
         load: (isCurrent) => controller.openLibraryEntry(
@@ -183,18 +186,22 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
       }
       Future<void> showDetails({String? notice}) async {
         if (!isCurrent() || !controller.isCurrentSource(details.source)) return;
-        await openAdaptiveDetail(
-          context,
-          (_, close) => MangaDetailsPage(
-            controller: controller,
-            manga: details.manga,
-            chapters: details.chapters,
-            source: details.source,
-            notice: notice,
-            onClose: close,
-            onAuthenticateReader: widget.onAuthenticateReader,
-          ),
-        );
+        Widget detail(BuildContext context, VoidCallback? close) =>
+            MangaDetailsPage(
+              controller: controller,
+              manga: details.manga,
+              chapters: details.chapters,
+              source: details.source,
+              notice: notice,
+              onClose: close,
+              onAuthenticateReader: widget.onAuthenticateReader,
+            );
+        final navigation = AppNavigation.maybeOf(context);
+        if (navigation != null) {
+          await navigation.openManga(entry.mangaKey, detail);
+        } else {
+          await openAdaptiveDetail(context, detail);
+        }
       }
 
       final progress = controller.readingProgress;
@@ -245,8 +252,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         unawaited(
           controller.recordBrowsingVisit(details.manga, details.source),
         );
-        final readerRoute = AppPageRoute<void>(
-          builder: (_) => ChapterReaderRoute(
+        await openReaderPage(
+          context,
+          mangaKey: sequence.mangaKey,
+          chapterKey: chapter.key,
+          builder: (_, onChapterChanged) => ChapterReaderRoute(
             catalog: controller,
             manga: details.manga,
             source: details.source,
@@ -259,10 +269,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 ? ChapterOrder.reversed
                 : ChapterOrder.source,
             onAuthenticate: widget.onAuthenticateReader,
+            onChapterChanged: onChapterChanged,
           ),
         );
-        await Navigator.of(context).push<void>(readerRoute);
-        await readerRoute.completed;
       } finally {
         // Also owns a page session acquired after this shelf ceased to be
         // current, or a route popped before its Reader leaf attached.

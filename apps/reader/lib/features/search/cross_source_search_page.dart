@@ -6,7 +6,11 @@ import 'dart:async';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:source_runtime/control_protocol.dart' as wire;
 
+import '../../data/business_state_validation.dart';
+import '../../navigation/app_navigation.dart';
+import '../../widgets/adaptive_detail_layout.dart';
 import '../browse/catalog_controller.dart';
 import '../browse/manga_details_destination.dart';
 import '../browse/source_manga_cover.dart';
@@ -18,6 +22,7 @@ class const CrossSourceSearchPage({
   required final CatalogSourceSearch service,
   required final Widget Function(MangaDetails details) buildDetails,
   final CatalogController? coverCatalog,
+  final VoidCallback? onManageExtensions,
 }) extends StatefulHookWidget {
   @override
   State<CrossSourceSearchPage> createState() => _CrossSourceSearchPageState();
@@ -61,6 +66,8 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
   }
 
   Future<void> _leave({bool openExtensions = false}) async {
+    if (!openExtensions && await backFromAdaptiveDetail(context)) return;
+    if (!mounted) return;
     if (_leaving ||
         controller.transitioning ||
         controller.retirement?.releasing == true) {
@@ -73,6 +80,12 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     if (!mounted) return;
     if (!closed) {
       if (controller.cleanupNotice != null) _showSearchFeedback();
+      return;
+    }
+    if (controller.retirement == null &&
+        destination &&
+        widget.onManageExtensions != null) {
+      widget.onManageExtensions!();
       return;
     }
     setState(() => _allowPop = true);
@@ -94,33 +107,45 @@ class _CrossSourceSearchPageState extends State<CrossSourceSearchPage> {
     if (!_foreground || route?.isCurrent != true || !controller.canSearch) {
       return;
     }
-    await Navigator.of(context).push<void>(
-      AppPageRoute(
-        builder: (_) => MangaDetailsDestination(
-          title: manga.title,
-          buildDetails: widget.buildDetails,
-          load: (isCurrent) => controller.open(
-            group,
-            manga,
-            shouldContinue: () =>
-                mounted &&
-                _foreground &&
-                route?.isActive == true &&
-                isCurrent(),
-          ),
-          failure: () {
-            final message = controller.cleanupNotice ?? controller.error;
-            final catalog = widget.coverCatalog;
-            return (
-              message: message,
-              diagnostics: message == catalog?.error
-                  ? catalog?.errorDetails
-                  : null,
-            );
-          },
-        ),
+    Widget detail(
+      BuildContext context,
+      VoidCallback? close,
+    ) => MangaDetailsDestination(
+      title: manga.title,
+      onClose: close,
+      buildDetails: widget.buildDetails,
+      load: (isCurrent) => controller.open(
+        group,
+        manga,
+        shouldContinue: () =>
+            mounted && _foreground && route?.isActive == true && isCurrent(),
       ),
+      failure: () {
+        final message = controller.cleanupNotice ?? controller.error;
+        final catalog = widget.coverCatalog;
+        return (
+          message: message,
+          diagnostics: message == catalog?.error ? catalog?.errorDetails : null,
+        );
+      },
     );
+    final navigation = AppNavigation.maybeOf(context);
+    if (navigation != null) {
+      await navigation.openManga(
+        businessMetadataKey(
+          wire.LibraryMetadata(
+            packageName: group.target.build.packageName,
+            sourceId: group.target.source.id,
+            manga: manga.snapshot,
+          ),
+        ),
+        detail,
+      );
+    } else {
+      await Navigator.of(
+        context,
+      ).push<void>(AppPageRoute(builder: (context) => detail(context, null)));
+    }
   }
 
   Future<void> _start(String query) async {

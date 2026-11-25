@@ -5,6 +5,8 @@ import '../../theme/app_theme.dart';
 
 import 'dart:async';
 
+import '../../navigation/app_navigation.dart';
+
 import 'package:clock/clock.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
@@ -683,8 +685,11 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
       return;
     }
     try {
-      final readerRoute = AppPageRoute<void>(
-        builder: (_) => ChapterReaderRoute(
+      await openReaderPage(
+        context,
+        mangaKey: sequence.mangaKey,
+        chapterKey: selected.key,
+        builder: (_, onChapterChanged) => ChapterReaderRoute(
           catalog: catalog,
           manga: selectedManga,
           source: selectedSource,
@@ -693,10 +698,9 @@ class _MangaDetailsPageState extends ConsumerState<MangaDetailsPage> {
           initialOpened: opened,
           initialOrder: initialOrder,
           onAuthenticate: authenticate,
+          onChapterChanged: onChapterChanged,
         ),
       );
-      await Navigator.of(context, rootNavigator: true).push<void>(readerRoute);
-      await readerRoute.completed;
       await catalog.flushReadingProgress();
     } finally {
       // Also covers a route popped before its first Reader leaf mounted.

@@ -127,6 +127,21 @@ test('the public Access callback serves only a no-store return notice', async ()
   expect(await callback.text()).toBe('请返回 Karuyomi。');
 });
 
+test('direct reader links serve the Flutter entry and keep API and asset paths separate', async () => {
+  const path = `/app/browse/source/eu.kanade.test/-1/manga/${'a'.repeat(64)}/read/${'b'.repeat(64)}`;
+  const entry = await server.fetch(origin + path, { redirect: 'manual' });
+  expect(entry.status).toBe(200);
+  expect(entry.headers.get('Location')).toBeNull();
+  expect(await entry.text()).toContain('Karuyomi static fixture');
+  const head = await server.fetch(origin + path, { method: 'HEAD' });
+  expect(head.status).toBe(200);
+  expect(await head.text()).toBe('');
+  const missing = await server.fetch(`${origin}/extensions/missing.json`);
+  expect(missing.status).toBe(404);
+  const privateApi = await worker.fetch(`${origin}/api/session`);
+  expect(privateApi.status).toBe(401);
+});
+
 test('generated Worker config applies D1 migrations, binds private R2 and verifies the test JWT', async () => {
   expect((await worker.fetch(`${origin}/api/categories`)).status).toBe(401);
   const response = await worker.fetch(`${origin}/api/categories`, {

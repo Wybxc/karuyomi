@@ -3,6 +3,7 @@ import '../../test_support/cupertino.dart';
 
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:karuyomi/data/business_state_client.dart';
 import 'package:karuyomi/data/progress_repository.dart';
 import 'package:karuyomi/data/reading_progress.dart';
@@ -406,6 +407,9 @@ void main() {
       await tester.pumpAndSettle();
       var leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
       final firstManifest = leaf.manifest;
+      final router = GoRouter.of(tester.element(find.byType(AppShell)));
+      final firstAddress = router.routeInformationProvider.value.uri.path;
+      expect(firstAddress, endsWith('/read/${firstManifest.chapterKey}'));
       (leaf.positionRequest! as ValueNotifier<ReadingPosition?>).value =
           firstManifest.positionAt(2);
       await tester.pumpAndSettle();
@@ -434,6 +438,13 @@ void main() {
       );
       leaf = tester.widget<ReaderScreen>(find.byType(ReaderScreen));
       final secondManifest = leaf.manifest;
+      expect(
+        router.routeInformationProvider.value.uri.path,
+        firstAddress.replaceFirst(
+          '/read/${firstManifest.chapterKey}',
+          '/read/${secondManifest.chapterKey}',
+        ),
+      );
       await _readerOptions(tester);
       await tester.tap(
         find.byKey(

@@ -10,6 +10,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:reader_core/reader_core.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
+import '../../navigation/app_location.dart';
+
 import '../../state/account_providers.dart';
 import '../browse/catalog_controller.dart';
 import '../reader/reader_mode_fields.dart';
@@ -164,6 +166,8 @@ class const GlobalSettingsPanel({
   super.connection,
   super.appearance,
   super.openConnectionOnMount,
+  super.addressedSection,
+  super.onSectionChanged,
 }) extends _SettingsEditor {}
 
 class const DeviceAppearanceSettings({
@@ -215,21 +219,6 @@ class const DeviceAppearanceSettings({
       ],
     ],
   );
-}
-
-enum _SettingsSection {
-  appearance('appearance', '外观与主题', '跟随系统、浅色与深色', CupertinoIcons.paintbrush),
-  reading('reading', '账户阅读偏好', '阅读方式、分页布局、图像适配和裁白', CupertinoIcons.book),
-  input('input', '翻页与快捷键', '点击区与键盘操作', CupertinoIcons.keyboard),
-  connection('connection', '服务连接', '服务地址与登录', CupertinoIcons.cloud),
-  about('about', '关于', 'Karuyomi', CupertinoIcons.info);
-
-  const _SettingsSection(this.id, this.title, this.subtitle, this.icon);
-  final String id;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  bool get isLocal => this == appearance || this == input;
 }
 
 enum _ReadingModeSource { account, manga }
@@ -294,6 +283,8 @@ class const _SettingsEditor({
   final Widget? connection,
   final Widget? appearance,
   final bool openConnectionOnMount = false,
+  final SettingsSection? addressedSection,
+  final ValueChanged<SettingsSection?>? onSectionChanged,
 }) extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -312,11 +303,23 @@ class const _SettingsEditor({
     final owner = service == null
         ? null
         : ref.watch(confirmedAccountProvider(service))?.settings;
-    final selected = useState<_SettingsSection?>(
+    final selected = useState<SettingsSection?>(
       openConnectionOnMount || service == null
-          ? _SettingsSection.connection
+          ? SettingsSection.connection
           : null,
     );
+    final currentSection = onSectionChanged == null
+        ? selected.value
+        : addressedSection;
+    void changeSection(SettingsSection? section) {
+      final navigate = onSectionChanged;
+      if (navigate == null) {
+        selected.value = section;
+      } else {
+        navigate(section);
+      }
+    }
+
     final detailScroll = useScrollController();
     final navigator = useMemoized(GlobalKey<NavigatorState>.new);
     final wasWide = useRef<bool?>(null);
@@ -396,14 +399,14 @@ class const _SettingsEditor({
           SettingsStatus(controller: controller, state: state),
       ],
     );
-    Widget content(_SettingsSection? section) => Column(
+    Widget content(SettingsSection? section) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         if (owner != null) ?mangaContext,
         if (connection != null &&
             section?.isLocal != true &&
-            section != _SettingsSection.connection &&
+            section != SettingsSection.connection &&
             service?.status != ServiceStatus.ready) ...[
           if (service?.error case final error?)
             Text(
@@ -411,21 +414,21 @@ class const _SettingsEditor({
               style: TextStyle(color: AppColors.error.resolveFrom(context)),
             ),
           CupertinoButton(
-            onPressed: () => selected.value = _SettingsSection.connection,
+            onPressed: () => changeSection(SettingsSection.connection),
             child: const Text('服务连接与登录'),
           ),
         ],
-        if (section == _SettingsSection.connection) ...[
+        if (section == SettingsSection.connection) ...[
           ?connection,
           if (service == null) const Text('连接并确认身份后可读取和保存同步设置。'),
         ],
-        if (section == _SettingsSection.appearance) ...[
+        if (section == SettingsSection.appearance) ...[
           ?appearance,
           const ReaderDeviceControls(display: true, input: false),
         ],
-        if (section == _SettingsSection.input)
+        if (section == SettingsSection.input)
           const ReaderDeviceControls(display: false, input: true),
-        if (section == _SettingsSection.about)
+        if (section == SettingsSection.about)
           CupertinoListTile(
             leadingSize: 36,
             leading: ClipRRect(
@@ -444,11 +447,11 @@ class const _SettingsEditor({
         if (draft == null &&
             !state.available &&
             section?.isLocal != true &&
-            section != _SettingsSection.about &&
-            section != _SettingsSection.connection)
+            section != SettingsSection.about &&
+            section != SettingsSection.connection)
           const Text('连接并确认身份后可读取和保存同步设置。'),
         if (r != null) ...[
-          if (manga || section == _SettingsSection.reading) ...[
+          if (manga || section == SettingsSection.reading) ...[
             group('账户阅读偏好', [
               if (manga)
                 ChoiceField<_ReadingModeSource>(
@@ -519,7 +522,7 @@ class const _SettingsEditor({
           ),
         if (!manga &&
             section?.isLocal != true &&
-            (section == _SettingsSection.reading ||
+            (section == SettingsSection.reading ||
                 state.unsent != null ||
                 state.activity == SettingsActivity.saving ||
                 state.pending != null ||
@@ -560,8 +563,8 @@ class const _SettingsEditor({
         : LayoutBuilder(
             builder: (context, constraints) {
               final wide = fitsColumns(context, constraints, minimumWidth: 600);
-              final section = selected.value ?? _SettingsSection.appearance;
-              final showDetail = wide || selected.value != null;
+              final section = currentSection ?? SettingsSection.appearance;
+              final showDetail = wide || currentSection != null;
               bool isBackControl(FocusNode node) =>
                   node.context
                       ?.findAncestorWidgetOfExactType<
@@ -584,7 +587,7 @@ class const _SettingsEditor({
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (context.mounted &&
                       wasWide.value == false &&
-                      selected.value == section) {
+                      currentSection == section) {
                     detailFocus.traversalDescendants
                         .where(isBackControl)
                         .firstOrNull
@@ -593,9 +596,9 @@ class const _SettingsEditor({
                 });
               }
               wasWide.value = wide;
-              void select(_SettingsSection value) {
+              void select(SettingsSection value) {
                 FocusScope.of(context).unfocus();
-                selected.value = value;
+                changeSection(value);
                 if (detailScroll.hasClients) detailScroll.jumpTo(0);
               }
 
@@ -612,8 +615,8 @@ class const _SettingsEditor({
                         ),
                       CupertinoListSection.insetGrouped(
                         children: [
-                          for (final item in _SettingsSection.values)
-                            if (item != _SettingsSection.connection ||
+                          for (final item in SettingsSection.values)
+                            if (item != SettingsSection.connection ||
                                 connection != null)
                               Semantics(
                                 container: true,
@@ -741,7 +744,7 @@ class const _SettingsEditor({
                           onDidRemovePage: (page) {
                             if (page.key ==
                                 const ValueKey('settings-detail-page')) {
-                              selected.value = null;
+                              if (currentSection != null) changeSection(null);
                             }
                           },
                         ),
