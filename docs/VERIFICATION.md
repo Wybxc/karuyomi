@@ -4,6 +4,8 @@
 
 2026-11-25，基于 `b5a6483` 补齐禁漫天堂等 Source 使用的 `AES/ECB/PKCS5Padding`。macOS arm64 上的 `pnpm teavm:check` 通过，固定 JDK 和生成的 JavaScript 的 65 项 AES ECB 断言一致，新增 20 项覆盖末块填充、分段解密、短缓冲重试和异常类型。[宿主实现](../runtime/teavm/README.md)
 
+同日，在 `macbook-pro-4` 固定宿主 `166ea48`、Keiyoushi `efa93f5a` 重编原版禁漫天堂 1.6.63。正式 AOT 和产物完整性校验通过，保留 Source `6286738698187452081`，canonical SHA-256 为 `94410f925565d7df68068fb4a179df3156d159969e01ae40436bca88c98d989f`。用现网 Native Worker 脚本在 Node.js 24.15.0 运行两份扩展，将加密的节点列表和热门响应由隔离夹具交给正式二进制中继。现网包降级到备用节点后抛出 `NoSuchAlgorithmException`。重编包解出节点列表，发送签名热门请求并返回夹具作品。新包保持 `compiled_unverified`，生产上线与真实源站阅读待验。
+
 2026-11-25，基于 `f6e919a` 的路由改动在 macOS 27.0.1 上通过 `pnpm check`、`pnpm flutter:check --reporter expanded --concurrency=3` 和 `pnpm acceptance:build`。Vitest 通过 613 项，Flutter 应用通过 1,050 项，阅读核心和 Source Runtime 共通过 112 项。组件回归覆盖宽窄屏、引擎导航事件、同账号独立客户端恢复作品和章节、切章更新地址及账号隔离。官方隔离 Worker 使用正式 Web 入口和空扩展索引，核对首页和多个深链接的 GET 正文逐字节一致、深链接 HEAD 为 200、Flutter 启动脚本为 200，缺失扩展静态文件为 404。内置浏览器查询与打开页面两次超时。地址栏、刷新和前进后退的实际浏览器操作，以及线上源站阅读，仍待验收。[路由计划](plan/url-navigation.md)
 
 2026-11-25，扩展本机设置持久化与报错复制在 macOS 使用固定 Flutter 3.50.0 验证。Flutter 应用通过 1,045 项，阅读核心和 Source Runtime 共通过 112 项。回归覆盖独立客户端恢复、身份隔离、账户请求隔离和复制脱敏错误。实际平台重开与系统剪贴板另验。[Source 设置验证](verification/source-preferences.md#2026-11-25-本机设置恢复与报错复制)
