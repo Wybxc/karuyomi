@@ -10,6 +10,7 @@ import '../../data/business_state_validation.dart';
 import '../../data/settings_repository.dart';
 import '../browse/catalog_controller.dart';
 import '../settings/settings_controller.dart';
+import '../sources/source_error_details.dart';
 import 'extension_listing.dart';
 
 /// Account intent reuses the identity-bound global settings queue. Artifacts
@@ -17,10 +18,11 @@ import 'extension_listing.dart';
 enum ExtensionActivity { reading, previewing, preparing, saving, cleaning }
 
 typedef ExtensionLocalCopy = ({String sha256, String name});
-typedef ExtensionBatchFailure = ({String name, String reason});
+typedef ExtensionBatchFailure = ({String name, String reason, String? details});
 typedef ExtensionPreparationFailure = ({
   CatalogBuild build,
   String reason,
+  String details,
   wire.InstalledExtension? localCopyOf,
 });
 
@@ -52,13 +54,24 @@ final class ExtensionsController extends ChangeNotifier {
   SettingsController get _settingsCommands =>
       container.read(settingsControllerProvider(catalog, repository).notifier);
   wire.ExtensionCacheState? cache;
-  ({String reason, CatalogBuild? build, wire.InstalledExtension? localCopyOf})?
+  ({
+    String reason,
+    String details,
+    CatalogBuild? build,
+    wire.InstalledExtension? localCopyOf,
+  })?
   _failure;
   String? get error => _failure?.reason;
+  String? get errorDetails => _failure?.details;
   set error(String? value) {
     _failure = value == null
         ? null
-        : (reason: value, build: null, localCopyOf: null);
+        : (
+            reason: value,
+            details: sourceErrorDetails(value, operation: '管理扩展'),
+            build: null,
+            localCopyOf: null,
+          );
   }
 
   String? message;
@@ -70,6 +83,7 @@ final class ExtensionsController extends ChangeNotifier {
   RuntimeErrorCode? operationFailure;
   List<ExtensionLocalCopy> _cleanupCopies = [];
   String? _cleanupError;
+  String? _cleanupDetails;
   ({int current, int total})? batchProgress;
   List<ExtensionBatchFailure> batchFailures = const [];
   bool _busy = false;
@@ -87,14 +101,25 @@ final class ExtensionsController extends ChangeNotifier {
   bool get preparing => available && _preparationId != null;
   CatalogBuild? get preparationBuild => available ? _preparationBuild : null;
   ExtensionPreparationFailure? get preparationFailure => switch (_failure) {
-    (reason: final reason, build: final build?, localCopyOf: final localCopyOf)
+    (
+      reason: final reason,
+      details: final details,
+      build: final build?,
+      localCopyOf: final localCopyOf,
+    )
         when available =>
-      (build: build, reason: reason, localCopyOf: localCopyOf),
+      (
+        build: build,
+        reason: reason,
+        details: details,
+        localCopyOf: localCopyOf,
+      ),
     _ => null,
   };
   ExtensionLocalCopy? get cleanupTarget =>
       available ? _cleanupCopies.firstOrNull : null;
   String? get cleanupError => available ? _cleanupError : null;
+  String? get cleanupDetails => available ? _cleanupDetails : null;
   List<wire.InstalledExtension> get installed =>
       settings.snapshot?.global.installedExtensions ?? const [];
   Iterable<ExtensionListing> get updates => installed
@@ -282,11 +307,11 @@ final class ExtensionsController extends ChangeNotifier {
             build.id == previous.buildId ||
             !item.registered ||
             item.repositoryError != null) {
-          failures.add((name: name, reason: '目录已变化，请重新检查更新。'));
+          failures.add((name: name, reason: '目录已变化，请重新检查更新。', details: null));
           continue;
         }
         if (_hasPendingSourceSettings(previous)) {
-          failures.add((name: name, reason: '漫画源设置待确认。'));
+          failures.add((name: name, reason: '漫画源设置待确认。', details: null));
           continue;
         }
         batchProgress = (current: index + 1, total: candidates.length);
@@ -296,7 +321,11 @@ final class ExtensionsController extends ChangeNotifier {
         } catch (failure) {
           _preparationId = null;
           _preparationBuild = null;
-          failures.add((name: name, reason: _operationError(failure)));
+          failures.add((
+            name: name,
+            reason: _operationError(failure),
+            details: sourceErrorDetails(failure, operation: '更新扩展'),
+          ));
           continue;
         }
         if (prepared == null || !available) return;
@@ -316,7 +345,7 @@ final class ExtensionsController extends ChangeNotifier {
         if (replacements.containsKey(previous.packageName) &&
             _hasPendingSourceSettings(previous)) {
           replacements.remove(previous.packageName);
-          failures.add((name: item.name, reason: '漫画源设置待确认。'));
+          failures.add((name: item.name, reason: '漫画源设置待确认。', details: null));
         }
       }
       batchProgress = null;
@@ -623,6 +652,7 @@ final class ExtensionsController extends ChangeNotifier {
     activity = ExtensionActivity.cleaning;
     _cleanupCopies = List.of(copies);
     _cleanupError = null;
+    _cleanupDetails = null;
     _changed();
     try {
       if (confirmed == null) {
@@ -643,6 +673,7 @@ final class ExtensionsController extends ChangeNotifier {
     } catch (failure) {
       if (!available) return;
       operationFailure = failure is RuntimeException ? failure.code : null;
+      _cleanupDetails = sourceErrorDetails(failure, operation: '清理扩展');
       _cleanupError = switch (failure) {
         RuntimeException(code: RuntimeErrorCode.storageBusy) =>
           '本机副本仍在使用。请关闭正在使用此扩展的标签页或窗口后重试。',
@@ -711,11 +742,21 @@ final class ExtensionsController extends ChangeNotifier {
       if (available) {
         operationFailure = failure is RuntimeException ? failure.code : null;
         final reason = _operationError(failure);
-        if (_preparationBuild case final build?) {
-          _failure = (reason: reason, build: build, localCopyOf: localCopyOf);
-        } else {
-          error = reason;
-        }
+        final details = sourceErrorDetails(
+          failure,
+          operation: switch (activity) {
+            ExtensionActivity.preparing => '准备扩展',
+            ExtensionActivity.previewing => '预览扩展仓库',
+            ExtensionActivity.saving => '保存扩展设置',
+            _ => '管理扩展',
+          },
+        );
+        _failure = (
+          reason: reason,
+          details: details,
+          build: _preparationBuild,
+          localCopyOf: localCopyOf,
+        );
       }
     } finally {
       if (_preparationCancellation case final cancellation?) await cancellation;

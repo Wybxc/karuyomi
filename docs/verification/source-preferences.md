@@ -85,11 +85,17 @@ Java oracle 和全源编译的临时日志在 `/private/tmp/karuyomi-source-pref
 
 2026-11-19，`0e432ce` 正式 Web 两主题复验独立的分组与空标题、祖先禁用及 Cupertino 字色。分组夹具保留实际 Komiic 的两个设置，嵌套编辑转交同一个原监听器。两个主题均只提交章节字段，并从权威 API 和重开表单读回。[双主题实拍](mihon-cupertino-fidelity.md#漫画源设置分组与禁用色的正式-web-双主题验收)
 
+## 2026-11-25 本机设置恢复与报错复制
+
+使用 macOS 和仓库固定 Flutter 3.50.0 运行 Source 设置与扩展管理测试。第二个客户端使用独立运行时从同一模拟设备存储恢复密码，无需重放设置回调。切换账户时新的 Source 启动参数没有旧账户的值。本机编辑未发起业务设置写入，混合编辑的账户正文只包含可同步字段。浅色和深色的扩展准备失败界面均可打开错误详情，剪贴板收到错误码及已移除查询令牌的描述。
+
+复验在 `apps/reader` 执行 `flutter test test/sources/source_preferences_controller_test.dart test/extensions/extensions_controller_test.dart`。测试使用模拟设备存储、运行时和剪贴板。真实浏览器重新打开、原生进程重启和系统剪贴板另验。
+
 ## 尚未通过的运行门
 
 - [ ] 其它真实 Source 控件、原 click/veto、实际别名、动态依赖、密码/会话值与刷新；Komiic 仅通过本轮明确的原单选/镜像和新文档恢复分项。
 - [ ] 同一身份 Web 与独立 Native 读取/修改非敏感设置后收敛，确认旧 ACK 不回退 Source 构造基线。
-- [ ] Web/iOS/Android 各自正式入口、取消/身份切换及秘密值仅当前会话的实际运行。
+- [ ] Web/iOS/Android 各自正式入口、取消/身份切换及本机秘密值重开恢复的实际运行。
 - [ ] 生产 Access 正向和目标真机门。
 
 本次未部署生产、未修改扩展 baseline，也未把包标为 `runtimeReady=true`。AOT 编译、工程检查和真实阅读是独立验收层级。

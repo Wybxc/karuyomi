@@ -4,7 +4,7 @@
 
 正式协议位于 `protocol/karuyomi/v1/{control,business}.proto`。Host ABI 为 `karuyomi-source-host-v6`；原型直接更新当前 ABI，不为旧 AOT 加兼容路径。实现与平台验收状态见[计划](../plan/source-preferences.md)，工程及运行证据见[验证记录](../verification/source-preferences.md)。
 
-设置编辑执行原 Source 的 `ConfigurableSource.setupPreferenceScreen` 和 Preference listener，不能把配置转换成一组脱离插件的通用表单。服务端确认的非敏感值以 Worker API + D1 为唯一权威；未知值及凭证只存在当前客户端会话，不写普通业务 API 或持久 outbox。
+设置编辑执行原 Source 的 `ConfigurableSource.setupPreferenceScreen` 和 Preference listener。已审核的账户值以 Worker API + D1 为唯一权威。其它值和凭证在当前设备保存，由用户使用同一账户重开应用时恢复。普通业务 API 只接收账户分区。
 
 ## 控制合同
 
@@ -28,7 +28,7 @@ change listener 返回 true 才执行该控件的标准持久化；返回 false 
 
 setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主仍使用有界 operation owner；描述和实际存储最终序列化放在 `owner.drain` 成功之后，避免保存回调尚未写完的值。headless bind 仅在建立描述时执行一次，drain 后不重复触发。设置专用 EditText 支持有界 bind post、全选、非秘密提示及原 TextWatcher；不为普通 Android 控件提供此行为。Flutter 通过 typed 提示和全选字段呈现元数据。
 
-文本编辑弹窗保留源的 `dialogMessage`。宿主将 `Linkify.WEB_URLS` 识别出的显式 HTTP(S) URL 表示为原文的 UTF-16 区间，TS 和 Dart 在使用前校验区间顺序、地址和大小。Flutter 将原文与链接显示在输入框前。用户点击才打开对应地址，打开失败时保留输入草稿和链接。弹窗说明属于显示元数据，密码值仍留在当前会话。
+文本编辑弹窗保留源的 `dialogMessage`。宿主将 `Linkify.WEB_URLS` 识别出的显式 HTTP(S) URL 表示为原文的 UTF-16 区间，TS 和 Dart 在使用前校验区间顺序、地址和大小。Flutter 将原文与链接显示在输入框前。用户点击才打开对应地址，打开失败时保留输入草稿和链接。密码由设备存储，弹窗说明属于显示元数据。
 
 提交文本时，对原存储值到候选值执行一轮 before/on/after，候选通过只读 Editable 提供。设置专用的 `android.R.id.button1` 只表示本次提交是否启用；任一 error、禁用或校验异常均拒绝候选，宿主不调用 change listener、不执行默认写入，原始异常与输入文本不作为错误回显。允许后仍执行原 change listener 一次，并重读实际存储，保留它在返回 false 之前自行写入的值。此边界不模拟逐键输入、IME、span 或其它 Android 对话框。
 
@@ -36,16 +36,18 @@ setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主�
 
 ## 同步许可与业务 API
 
-已审核的键由 AOT 写进当前官方构建的 `preferenceSyncRules`。正式部署装配从同一快照投影设置规则，Worker 只接受应用自己的 Static Assets 提供的规则，并在账户读取和写入时按 Source、原始键与值类型检查。额外仓库与无规则构建的设置留在当前会话，不能用自报相同 package/repoId 获得同步权限。响应和 ACK 回显当前规则，原规则撤下后保留已确认 revision，不再返回对应值。密码、未知文本和未知键留在 `sessionValues`，不会整体上传 `getAll()`。
+已审核的键由 AOT 写进当前官方构建的 `preferenceSyncRules`。正式部署装配从同一快照投影设置规则，Worker 只接受应用自己的 Static Assets 提供的规则，并在账户读取和写入时按 Source、原始键与值类型检查。额外仓库与无规则构建使用本机设置。响应和 ACK 回显当前规则，原规则撤下后保留已确认 revision。密码、未知文本和未知键通过 `sessionValues` 交给客户端保存。
 
 - GET `/api/source-preferences/packages/:packageName?catalogUrl=...&repoId=...` 返回该身份、该来源的整包 `SourcePreferencesResponse`。
 - POST `/api/source-preferences/mutations` 接收 mutationId、CatalogReference、packageName、sourceId、expectedRevision 和完整 entries，返回确认的 Source 状态与 accountRevision。
 
 每个 `(subject,catalogUrl,repoId,packageName,sourceId)` 独立 CAS，整组 entries 替换；遗漏的键删除，清空后仍保留 revision 行。D1 batch 原子维护 Source revision、account revision 和持久幂等确认；包内 Source 数量与总字节配额在同一写入门验证，不能被并发跨 Source 请求绕过。
 
-编辑基线必须是该 Source 构造时注入的 revision/entries。打开设置页先 GET；若与构造基线不同，先重开 Source 再取描述，不能把旧 runtime 的值套到新 revision 上。编辑后只上传 snapshot.syncValues；sessionValues 在当前部署/身份会话内按 catalog URL、repoId、package 和 Source 隔离保留，供确认后重开注入。
+编辑基线必须是该 Source 构造时注入的 revision/entries。打开设置页先 GET；若与构造基线不同，先重开 Source 再取描述，不能把旧 runtime 的值套到新 revision 上。编辑后只上传 `syncValues`。实际 `sessionValues` 变化时等待本机写入，空分区删除该记录。失败与未知结果提供重新读取入口，插件回调只执行原编辑一次。
 
-业务响应丢失时保留冻结的 UUID、body 和 CAS。显式重试重发这份业务请求，插件回调仍只执行原编辑一次。校验 ACK 的身份、版本和提交值后，在原会话保存确认，随后的失败恢复只 GET 整包。读回校验确认版本并采用当前 D1 数据，再重开运行容器。未确认和已确认的恢复均可查看本次提交的同步值。冲突、显式放弃或未知运行结果可读取 D1 当前状态后重开。关闭表单、切换 Source/包/身份/部署及迟到结果不能复活旧草稿。切换身份/部署清空客户端秘密值。同包换仓的 Session、D1 值和可变存储按仓库隔离。额外仓库边界见[设计](additional-repositories.md)。
+本机记录按确认的部署/账户、目录 URL、repoId、package 和 Source 隔离。iOS 使用设备 Keychain，Android 使用由 Keystore 保护的存储并排除系统备份，Web 保存在当前浏览器站点存储中。Web 使用浏览器同源锁串行化写入，避免多标签首次保存时生成不同密钥。源列表、浏览、封面与跨源搜索通过同一入口在构造前读取设置。当前同步许可覆盖的键由账户分区提供，防止已保存在设备的值进入同步正文。[存储依赖文档](https://pub.dev/packages/flutter_secure_storage/versions/11.2.0)
+
+业务响应丢失时保留冻结的 UUID、body 和 CAS。显式重试重发这份业务请求，插件回调仍只执行原编辑一次。校验 ACK 的身份、版本和提交值后，在原会话保存确认，随后的失败恢复只 GET 整包。读回校验确认版本并采用当前 D1 数据，再重开运行容器。未确认和已确认的恢复均可查看本次提交的同步值。冲突、显式放弃或未知运行结果可读取 D1 当前状态后重开。关闭表单、切换 Source/包/身份/部署及迟到结果不能复活旧草稿。相同账户和部署再次连接时才能访问各自保存的本机设置。额外仓库边界见[设计](additional-repositories.md)。
 
 ## 统一限额
 
@@ -63,7 +65,7 @@ setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主�
 | snapshot / edit result              | 256KiB                                                    |
 | 编辑及控制请求                      | 完整控制请求 128KiB，含封装开销                           |
 
-所有字节限额使用 UTF-8；各层同时检查整体预算，不把多份独立合规的小消息无界拼接。API 只保存 sync 分区，bootstrap 还可能包括客户端 session 分区；合并超额必须明确失败，不能悄悄截断。
+所有字节限额使用 UTF-8；各层同时检查整体预算，不把多份独立合规的小消息无界拼接。API 保存 sync 分区，bootstrap 还可能包括设备恢复的分区；合并超额明确失败。
 
 ## 验证边界
 

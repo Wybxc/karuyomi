@@ -19,6 +19,7 @@ import '../browse/catalog_controller.dart';
 import '../browse/source_browse_page.dart';
 import '../settings/settings_controller.dart';
 import '../settings/pending_global_settings.dart';
+import '../sources/source_error_details.dart';
 import 'extension_listing.dart';
 import 'extensions_controller.dart';
 import 'pending_extension_changes.dart';
@@ -576,10 +577,13 @@ class const ExtensionOperationStatus({
                 CupertinoListTile(
                   title: Text(failure.name, maxLines: 2),
                   subtitle: Text(failure.reason, maxLines: 3),
+                  trailing: failure.details == null
+                      ? null
+                      : SourceErrorDetailsButton(details: failure.details!),
                 ),
             ],
           ),
-        if (operationError != null)
+        if (operationError != null) ...[
           Semantics(
             container: true,
             liveRegion: true,
@@ -589,8 +593,14 @@ class const ExtensionOperationStatus({
               style: errorStyle,
             ),
           ),
-        if (controller.settings.error case final error?)
+          SourceErrorDetailsButton(details: controller.errorDetails!),
+        ],
+        if (controller.settings.error case final error?) ...[
           Text(error, style: errorStyle),
+          SourceErrorDetailsButton(
+            details: sourceErrorDetails(error, operation: '管理扩展'),
+          ),
+        ],
         if (showStorageAction &&
             preparationFailure == null &&
             controller.operationFailure == RuntimeErrorCode.limitExceeded)
@@ -886,6 +896,10 @@ class const _ExtensionPreparationFailureStatus({
             ),
           ),
         ),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: SourceErrorDetailsButton(details: failure.details),
+        ),
         if (!storageFull || showStorageAction)
           CupertinoButton(
             key: storageFull
@@ -939,6 +953,11 @@ class const _ExtensionCleanupStatus({
                   style: TextStyle(color: AppColors.error.resolveFrom(context)),
                 ),
               ),
+            ),
+            SourceErrorDetailsButton(
+              details:
+                  controller.cleanupDetails ??
+                  sourceErrorDetails(failure, operation: '清理扩展'),
             ),
             SizedBox(
               width: double.infinity,
@@ -1352,7 +1371,7 @@ class const ExtensionRepositoriesPage({
   Future<({String url, String name})?> _promptRepository(
     BuildContext context,
     ({String url, String name}) draft,
-    String? failure,
+    ({String message, String details})? failure,
   ) => showAppSheet<({String url, String name})>(
     context: context,
     enableDrag: false,
@@ -1384,14 +1403,20 @@ class const ExtensionRepositoriesPage({
               if (failure != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      failure,
-                      style: TextStyle(
-                        color: AppColors.error.resolveFrom(context),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          failure.message,
+                          style: TextStyle(
+                            color: AppColors.error.resolveFrom(context),
+                          ),
+                        ),
                       ),
-                    ),
+                      SourceErrorDetailsButton(details: failure.details),
+                    ],
                   ),
                 ),
               CupertinoFormSection.insetGrouped(
@@ -1428,7 +1453,7 @@ class const ExtensionRepositoriesPage({
 
   Future<void> _addRepository(BuildContext context) async {
     var draft = (url: '', name: '');
-    String? failure;
+    ({String message, String details})? failure;
     RepositoryPreview? preview;
     do {
       final submitted = await _promptRepository(context, draft, failure);
@@ -1440,7 +1465,10 @@ class const ExtensionRepositoriesPage({
           ModalRoute.of(context)?.isCurrent != true) {
         return;
       }
-      failure = controller.error;
+      final message = controller.error;
+      failure = message == null
+          ? null
+          : (message: message, details: controller.errorDetails!);
       if (preview == null && failure == null) return;
     } while (preview == null);
     final candidate = preview;

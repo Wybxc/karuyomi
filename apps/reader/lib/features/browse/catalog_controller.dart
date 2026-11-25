@@ -16,6 +16,7 @@ import '../../runtime/catalog_transport.dart';
 import '../../data/business_state_client.dart';
 import '../../data/business_state_validation.dart';
 import '../../data/bookmark_repository.dart';
+import '../../data/device_source_preferences.dart';
 import '../../data/settings_repository.dart';
 import '../../data/source_preferences_repository.dart';
 import '../../data/source_preferences_validation.dart';
@@ -267,8 +268,6 @@ final class CatalogController extends ChangeNotifier {
   final _openedChapters = <OpenedChapter>{};
   SourcePreferencesRepository? _sourcePreferences;
   SourcePreferencesSnapshot? loadedSourcePreferences;
-  final _sessionPreferenceValues =
-      <(String, String, String, String), List<wire.PreferenceEntry>>{};
   final _preferenceRecoveries =
       <(String, String, String, String), SourcePreferencesTarget>{};
   String? _preferenceIdentity;
@@ -308,7 +307,6 @@ final class CatalogController extends ChangeNotifier {
     if (origin == null || verifiedSubject == null) return null;
     final identity = ProgressIdentity(origin: origin, subject: verifiedSubject);
     if (_preferenceIdentity != identity.key) {
-      _sessionPreferenceValues.clear();
       _preferenceRecoveries.clear();
       loadedSourcePreferences = null;
       _preferenceIdentity = identity.key;
@@ -1401,16 +1399,32 @@ final class CatalogController extends ChangeNotifier {
       packageName: build.packageName,
       syncRules: confirmedPreferences.syncRules,
     );
-    // Removed Sources retain their account values without being injected into
+    final devicePreferences = DeviceSourcePreferences(preferences.identity);
+    // Removed Sources retain their saved values without being injected into
     // an extension that no longer constructs that namespace.
     final sourceIds = manifest.sourceIds.toSet();
     for (final id in sourceIds) {
+      final local = await devicePreferences.load(
+        catalog: build.catalog,
+        packageName: build.packageName,
+        sourceId: id,
+      );
+      if (_closed ||
+          epoch != _epoch ||
+          subject != identity ||
+          shouldContinue?.call() == false) {
+        return null;
+      }
+      // A newly approved key starts from the account state, never from a
+      // previously private value that could then enter the sync payload.
+      final accountKeys = {
+        for (final rule in bootstrap.syncRules)
+          if (!rule.hasSourceId() || rule.sourceId == id) rule.key,
+      };
       final entries = <String, wire.PreferenceEntry>{
+        for (final entry in local)
+          if (!accountKeys.contains(entry.key)) entry.key: entry,
         for (final entry in confirmedPreferences.source(id).entries)
-          entry.key: entry,
-        for (final entry
-            in _sessionPreferenceValues[_preferenceScope(build, id)] ??
-                <wire.PreferenceEntry>[])
           entry.key: entry,
       };
       if (entries.isNotEmpty) {
@@ -1976,15 +1990,6 @@ final class CatalogController extends ChangeNotifier {
     } on RuntimeException {
       // The real cancellation reports container loss through runtime.events.
     }
-  }
-
-  void retainSourceSessionPreferences(
-    SourcePreferencesTarget target,
-    List<wire.PreferenceEntry> entries,
-  ) {
-    wire.validatePreferenceEntries(entries);
-    _sessionPreferenceValues[_preferenceScope(target.build, target.source.id)] =
-        List.unmodifiable(entries.map((entry) => entry.deepCopy()..freeze()));
   }
 
   bool isCurrentSource(CatalogSourceRef reference) =>

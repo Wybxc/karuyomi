@@ -20,7 +20,7 @@
 
 可变 Source 存储与 Cookie 的 namespace 包含应用/API origin、Access subject、catalog URL、repoId、package 和 storage schema。不可变代码缓存仍按已验证 canonical digest 复用，同一份代码不重复验证；缓存命中不授权账户安装或网络访问。
 
-Source 设置也以 `(catalogUrl, repoId, package, source)` 隔离。D1 的非敏感设置、客户端当前会话敏感值以及已确认 bootstrap 都按来源解析。只有可信应用 origin 的默认目录加 `keiyoushi` 可获得已审阅的账户同步规则；外仓即使自报官方 package/repoId，也只获得空规则。非空账户写入被拒绝，外仓当前会话值不会进入其它仓库。
+Source 设置也以 `(catalogUrl, repoId, package, source)` 隔离。D1 的非敏感设置、当前设备持久保存的设置以及已确认 bootstrap 都按来源解析。只有可信应用 origin 的默认目录加 `keiyoushi` 可获得已审阅的账户同步规则。外仓使用本机存储，并按已确认的部署、账户和来源隔离。
 
 ## Source 网络与设置
 

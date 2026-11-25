@@ -1,4 +1,5 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart';
 import 'package:source_runtime/source_runtime.dart';
 
 import '../../widgets/app_routes.dart';
@@ -44,17 +45,46 @@ class const SourceErrorDetailsButton({super.key, required final String details})
   Widget build(BuildContext context) => CupertinoButton(
     onPressed: () => showAppDialog<void>(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('错误详情'),
-        content: Text(details, textAlign: TextAlign.start),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
+      builder: (_) => _SourceErrorDetailsDialog(details: details),
     ),
     child: const Text('查看错误详情'),
+  );
+}
+
+class const _SourceErrorDetailsDialog({required final String details})
+    extends StatefulWidget {
+  @override
+  State<_SourceErrorDetailsDialog> createState() =>
+      _SourceErrorDetailsDialogState();
+}
+
+class _SourceErrorDetailsDialogState extends State<_SourceErrorDetailsDialog> {
+  String _copyLabel = '复制错误';
+
+  Future<void> _copy() async {
+    String label;
+    try {
+      await Clipboard.setData(ClipboardData(text: widget.details));
+      label = '已复制';
+    } catch (_) {
+      label = '复制失败，重试';
+    }
+    if (mounted) setState(() => _copyLabel = label);
+  }
+
+  @override
+  Widget build(BuildContext context) => CupertinoAlertDialog(
+    title: const Text('错误详情'),
+    content: Text(widget.details, textAlign: TextAlign.start),
+    actions: [
+      CupertinoDialogAction(
+        onPressed: _copy,
+        child: Semantics(liveRegion: true, child: Text(_copyLabel)),
+      ),
+      CupertinoDialogAction(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('关闭'),
+      ),
+    ],
   );
 }

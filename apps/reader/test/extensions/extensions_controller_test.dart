@@ -978,7 +978,22 @@ void main() {
           code: wire
               .RuntimeErrorCode
               .RUNTIME_ERROR_CODE_EXTENSION_ASSET_UNAVAILABLE,
-          message: 'Manifest unavailable',
+          message: 'Manifest unavailable at https://extensions.example/manifest.json?token=secret',
+        );
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        String? copied;
+        messenger.setMockMethodCallHandler(SystemChannels.platform, (
+          call,
+        ) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String?;
+          }
+          return null;
+        });
+        addTearDown(
+          () =>
+              messenger.setMockMethodCallHandler(SystemChannels.platform, null),
         );
         try {
           await show(
@@ -1027,6 +1042,17 @@ void main() {
           expect(scroll.position.pixels, greaterThan(300));
           expect(find.text('无法从仓库读取扩展材料。').hitTestable(), findsOneWidget);
           expect(platform.businessServer.appliedMutations, 0);
+
+          await tester.tap(find.text('查看错误详情').hitTestable());
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('复制错误'));
+          await tester.pumpAndSettle();
+          expect(find.text('已复制'), findsOneWidget);
+          expect(copied, contains('extensionAssetUnavailable'));
+          expect(copied, contains('https://extensions.example/manifest.json'));
+          expect(copied, isNot(contains('secret')));
+          await tester.tap(find.text('关闭'));
+          await tester.pumpAndSettle();
 
           platform.preparationFailure = null;
           await tester.tap(retry);
