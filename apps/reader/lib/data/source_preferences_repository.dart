@@ -1,7 +1,9 @@
+import 'package:collection/collection.dart';
 import 'package:source_runtime/control_protocol.dart' as wire;
 
 import 'business_state_client.dart';
 import 'reading_progress.dart';
+import 'source_preferences_validation.dart';
 
 final class SourcePreferencesSnapshot {
   SourcePreferencesSnapshot(wire.SourcePreferencesResponse value)
@@ -26,6 +28,23 @@ final class SourcePreferencesSnapshot {
         wire.SourcePreferences(packageName: packageName, sourceId: sourceId)
           ..freeze(),
   );
+
+  bool hasSameSyncRules(SourcePreferencesSnapshot other) =>
+      const ListEquality<wire.PreferenceSyncRule>().equals(
+        syncRules,
+        other.syncRules,
+      );
+
+  bool hasSameConfiguration(SourcePreferencesSnapshot other) =>
+      catalog == other.catalog &&
+      packageName == other.packageName &&
+      hasSameSyncRules(other) &&
+      sources.length == other.sources.length &&
+      sources.every((value) {
+        final current = other.source(value.sourceId);
+        return value.revision == current.revision &&
+            samePreferenceEntries(value.entries, current.entries);
+      });
 }
 
 final class SourcePreferencesDraft {

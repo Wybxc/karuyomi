@@ -84,13 +84,9 @@ final class SourcePreferencesController extends ChangeNotifier {
       pending == null &&
       snapshot != null &&
       catalog.isCurrentPreferencesTarget(target) &&
-      !catalog.sourcePreferencesBlocked &&
       _reference != null &&
       catalog.isCurrentSource(_reference!) &&
       catalog.session?.workerInstanceId == _worker;
-
-  bool _sameBaseline(wire.SourcePreferences a, wire.SourcePreferences b) =>
-      a.revision == b.revision && samePreferenceEntries(a.entries, b.entries);
 
   Future<bool> load({bool reopen = false}) => _perform(
     pending?.acknowledged == true
@@ -112,10 +108,10 @@ final class SourcePreferencesController extends ChangeNotifier {
             : '原设置操作尚未确认，可重试原保存或读取服务端状态。';
         return true;
       }
-      final loaded = catalog.loadedSourcePreferences?.source(target.source.id);
+      final loaded = catalog.loadedSourcePreferences;
       if (reopen ||
           loaded == null ||
-          !_sameBaseline(loaded, current) ||
+          !loaded.hasSameConfiguration(latest) ||
           !catalog.isCurrentPreferencesTarget(target) ||
           catalog.sourcePreferencesBlocked) {
         if (!await catalog.reopenSourcePreferences(
@@ -130,25 +126,7 @@ final class SourcePreferencesController extends ChangeNotifier {
           return false;
         }
       }
-      confirmed = catalog.loadedSourcePreferences!.source(target.source.id);
-      final value = await catalog.describeSourcePreferences(
-        target,
-        shouldContinue: () => available,
-        onRequest: (id) => _requestId = id,
-      );
-      _requestId = null;
-      if (!available) return false;
-      if (value == null) {
-        error = catalog.error ?? '未能读取漫画源设置，可明确重试；默认浏览仍可继续。';
-        errorDetails = catalog.errorDetails;
-        snapshot = null;
-        return false;
-      }
-      snapshot = value;
-      _reference = catalog.sourceReference;
-      _worker = catalog.session!.workerInstanceId;
-      needsRecovery = false;
-      return true;
+      return _describe();
     },
   );
 
@@ -188,8 +166,8 @@ final class SourcePreferencesController extends ChangeNotifier {
       _requestId = null;
       if (!available) return false;
       needsRecovery = true;
-      snapshot = null;
       if (result == null) {
+        snapshot = null;
         error = '设置操作的运行结果未知，请读取服务端状态后重新打开；不会自动重跑原操作。';
         errorDetails = catalog.errorDetails;
         return false;
@@ -213,6 +191,7 @@ final class SourcePreferencesController extends ChangeNotifier {
           );
         } on FormatException catch (failure) {
           if (available) {
+            snapshot = null;
             error = failure.message;
             errorDetails = sourceErrorDetails(failure, operation: '保存本机漫画源设置');
           }
@@ -222,7 +201,7 @@ final class SourcePreferencesController extends ChangeNotifier {
       }
       if (catalog.allowsAccountPreferences(target.build) && accountChanged) {
         _setActivity(SourcePreferencesActivity.saving);
-        await repository.save(
+        final saved = await repository.save(
           catalog: target.build.catalog,
           packageName: target.build.packageName,
           sourceId: target.source.id,
@@ -232,6 +211,12 @@ final class SourcePreferencesController extends ChangeNotifier {
               _setActivity(SourcePreferencesActivity.readingConfirmed),
         );
         if (!available) return false;
+        if (catalog.loadedSourcePreferences?.hasSameSyncRules(saved) != true) {
+          snapshot = null;
+          error = '同步范围已变化，请重新读取漫画源设置。';
+          return false;
+        }
+        confirmed = saved.source(target.source.id);
       }
       if (!result.accepted && request.hasClick()) {
         message = result.clickHandled ? '操作已处理。' : '漫画源未处理此操作；实际设置已重新读取。';
@@ -246,7 +231,9 @@ final class SourcePreferencesController extends ChangeNotifier {
           error = '漫画源未接受输入；设置未更改。';
         }
       }
-      return _reopenAndDescribe();
+      snapshot = result.snapshot;
+      needsRecovery = false;
+      return true;
     });
   }
 
@@ -298,6 +285,10 @@ final class SourcePreferencesController extends ChangeNotifier {
       }
       return false;
     }
+    return _describe();
+  }
+
+  Future<bool> _describe() async {
     confirmed = catalog.loadedSourcePreferences!.source(target.source.id);
     final value = await catalog.describeSourcePreferences(
       target,
@@ -307,7 +298,8 @@ final class SourcePreferencesController extends ChangeNotifier {
     _requestId = null;
     if (!available) return false;
     if (value == null) {
-      error = catalog.error ?? '漫画源已重新打开，设置描述未能读取。';
+      snapshot = null;
+      error = catalog.error ?? '未能读取漫画源设置，请重试。';
       errorDetails = catalog.errorDetails;
       return false;
     }
@@ -340,6 +332,7 @@ final class SourcePreferencesController extends ChangeNotifier {
       if (available) {
         final draft = pending;
         needsRecovery = catalog.sourcePreferencesBlocked || draft != null;
+        if (needsRecovery) snapshot = null;
         error = failure is BusinessStateException && failure.conflict
             ? '设置已在另一端修改。请读取服务端状态并重新打开，再确认新编辑。'
             : draft?.acknowledged == true && draft?.retryable == true

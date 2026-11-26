@@ -604,12 +604,13 @@ void main() {
 
   for (final outcome in ['accepted', 'vetoed', 'failed']) {
     test(
-      '$outcome edit dispatches once and gates Source/image work until reopen while cleanup remains available',
+      '$outcome edit can continue only with the returned snapshot while other Source/image work waits for reopen',
       () async {
         final transport = FakeTransport();
         final editEntered = Completer<void>();
         final editResult = Completer<void>();
         var opens = 0;
+        var edits = 0;
         transport.handler = (call) async {
           final response = transport.respond(call);
           if (call.hasOpen()) {
@@ -618,8 +619,10 @@ void main() {
           if (call.hasInvoke()) {
             response.source.generation = 'generation-$opens';
             if (call.invoke.hasEditPreference()) {
-              editEntered.complete();
-              await editResult.future;
+              if (++edits == 1) {
+                editEntered.complete();
+                await editResult.future;
+              }
               if (outcome == 'failed') {
                 return wire.ControlResponse(
                   slotId: call.slotId,
@@ -632,7 +635,7 @@ void main() {
               }
               response.source.preferenceEdit = wire.PreferenceEditResult(
                 accepted: outcome == 'accepted',
-                snapshot: _snapshot(),
+                snapshot: _snapshot()..snapshotId = 'preferences-2',
               );
             } else {
               response.source.preferences = _snapshot();
@@ -712,11 +715,28 @@ void main() {
           runtime.invoke(_get()),
           throwsA(failure(RuntimeErrorCode.protocolError)),
         );
+        await expectLater(
+          runtime.invoke(_edit()..call.requestId = 'stale-edit'),
+          throwsA(failure(RuntimeErrorCode.protocolError)),
+        );
+        final next = _edit()
+          ..call.requestId = 'next-edit'
+          ..call.editPreference.snapshotId = 'preferences-2';
+        if (outcome == 'failed') {
+          await expectLater(
+            runtime.invoke(next),
+            throwsA(failure(RuntimeErrorCode.protocolError)),
+          );
+        } else {
+          final continued = await runtime.invoke(next);
+          expect(continued.generation, first.generation);
+          expect(continued.preferenceEdit.snapshot.snapshotId, 'preferences-2');
+        }
         expect(
           transport.calls.where(
             (call) => call.hasInvoke() && call.invoke.hasEditPreference(),
           ),
-          hasLength(1),
+          hasLength(outcome == 'failed' ? 1 : 2),
         );
         final second = await runtime.open(_build());
         expect(second.generation, isNot(first.generation));

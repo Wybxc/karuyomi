@@ -34,7 +34,10 @@ final class PreferenceFixture {
     catalog = CatalogController(
       api: platform,
       runtime: platform.runtime,
-      rebuildRuntime: platform.rebuild,
+      rebuildRuntime: () async {
+        await platform.rebuild();
+        platform.runtimeGeneration = 'generation-${platform.rebuildCount + 1}';
+      },
       deploymentOrigin: platform.origin,
     );
     await catalog.connect();

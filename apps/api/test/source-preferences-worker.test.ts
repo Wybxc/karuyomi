@@ -184,6 +184,43 @@ test('package reads are pure and identity-scoped; full replacement preserves act
   ).toBe(0);
 });
 
+test.each([
+  {
+    packageName: 'eu.kanade.tachiyomi.extension.zh.jinmantiantang',
+    entries: [
+      text('BLOCK_GENRES_LIST', 'sample'),
+      boolean('auto_checkin', true),
+    ],
+    deviceKeys: ['username', 'password'],
+  },
+  {
+    packageName: 'eu.kanade.tachiyomi.extension.zh.picacomic',
+    entries: [
+      text('BLOCK_GENRES', 'sample'),
+      text('IMAGE_QUALITY', 'medium'),
+      text('APP_CHANNEL', '2'),
+    ],
+    deviceKeys: ['USERNAME', 'PASSWORD', 'APP_CHANNEL_URL'],
+  },
+])(
+  '$packageName syncs reviewed options and rejects device-only entries',
+  async ({ packageName, entries, deviceKeys }) => {
+    const first = await client(),
+      second = await client(first.subject);
+    const saved = await first.mutate(command(entries, 0, packageName));
+    expect(saved.status).toBe(200);
+    for (const key of deviceKeys) {
+      const rejected = await first.mutate(
+        command([...entries, text(key, 'on-device')], 1, packageName),
+      );
+      expect(rejected.status).toBe(400);
+    }
+    expect((await second.read(packageName)).sources).toEqual([
+      saved.body.preferences,
+    ]);
+  },
+);
+
 test('lost ACK replays its exact committed snapshot without applying twice or rolling back newer preferences; source CAS stays independent', async () => {
   const first = await client(),
     second = await client(first.subject);

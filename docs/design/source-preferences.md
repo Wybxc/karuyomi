@@ -18,7 +18,7 @@
 
 change listener 返回 true 才执行该控件的标准持久化；返回 false 仍可能写别名键或清缓存，因此必须重读实际存储。点击独立执行原 listener，不能当作普通值修改。不能自动重试这两个插件操作。
 
-用户可从源列表或源内浏览页打开设置。账户可同步值在编辑时提交，配置期间只重建和读取配置会话。退出后按已确认的值刷新当前浏览列表，或在第一次打开漫画源时读取列表。开关和单选在选择时提交。普通文本可通过键盘完成输入，多选在选完后应用整组值。密码及插件动作保留明确确认，每种入口都使用同一个 Source 编辑命令。
+用户可从源列表或源内浏览页打开设置。每项编辑立即保存，窗口继续使用同一个 Source 实例和编辑响应中的设置树。关闭后统一重建一次，按已确认的值刷新当前浏览列表。从源列表设置时，在第一次进入漫画源后请求列表。开关和单选在选择时提交。普通文本可通过键盘完成输入，多选在选完后应用整组值。密码及插件动作保留明确确认，每种入口都使用同一个 Source 编辑命令。
 
 ## 原对象、构造顺序与生命周期
 
@@ -32,22 +32,24 @@ setup 和编辑回调可能启动后台 HTTP 并在返回后写设置。宿主�
 
 提交文本时，对原存储值到候选值执行一轮 before/on/after，候选通过只读 Editable 提供。设置专用的 `android.R.id.button1` 只表示本次提交是否启用；任一 error、禁用或校验异常均拒绝候选，宿主不调用 change listener、不执行默认写入，原始异常与输入文本不作为错误回显。允许后仍执行原 change listener 一次，并重读实际存储，保留它在返回 false 之前自行写入的值。此边界不模拟逐键输入、IME、span 或其它 Android 对话框。
 
-一次 edit 发送后，即使 veto、异常、取消或响应丢失，该代都不得继续普通 Source/图片请求。TS manager、Worker 和 Dart transport 都执行此门；已有资源的 release、close 与 shutdown 仍可用。必须确认保存或显式放弃并读取 D1 后，通过平台 `rebuildRuntime` 清理旧阅读资源并构造新代；不能用命中缓存的同一 open 或只丢 session 替代。
+首次发送 edit 后，该运行时仅供当前设置窗口使用。TS manager、Worker 和 Dart transport 在收到有效编辑响应后，只放行同一 Source 和返回快照的后续编辑。成功和 veto 都使用实际存储与当次更新后的描述。结果未知时必须重建后才能继续编辑。其间仍可释放已有资源、关闭页面会话和关闭运行时。退出设置窗口后通过平台 `rebuildRuntime` 构造新代，再恢复普通 Source 和图片请求。遇到未确认的账户请求时，保留明确重试和读取服务端状态入口。
 
 ## 同步许可与业务 API
 
 已审核的键由 AOT 写进当前官方构建的 `preferenceSyncRules`。正式部署装配从同一快照投影设置规则，Worker 只接受应用自己的 Static Assets 提供的规则，并在账户读取和写入时按 Source、原始键与值类型检查。额外仓库与无规则构建使用本机设置。响应和 ACK 回显当前规则，原规则撤下后保留已确认 revision。密码、未知文本和未知键通过 `sessionValues` 交给客户端保存。
+
+禁漫天堂的屏蔽词与自动签到开关、哔咔的屏蔽词、图片质量及分流选择纳入各自 AOT 的同步规则。两者的登录凭证和哔咔的自定义分流 URL 由当前设备保存。规则从对应的新构建发布时生效。
 
 - GET `/api/source-preferences/packages/:packageName?catalogUrl=...&repoId=...` 返回该身份、该来源的整包 `SourcePreferencesResponse`。
 - POST `/api/source-preferences/mutations` 接收 mutationId、CatalogReference、packageName、sourceId、expectedRevision 和完整 entries，返回确认的 Source 状态与 accountRevision。
 
 每个 `(subject,catalogUrl,repoId,packageName,sourceId)` 独立 CAS，整组 entries 替换；遗漏的键删除，清空后仍保留 revision 行。D1 batch 原子维护 Source revision、account revision 和持久幂等确认；包内 Source 数量与总字节配额在同一写入门验证，不能被并发跨 Source 请求绕过。
 
-编辑基线必须是该 Source 构造时注入的 revision/entries。打开设置页先 GET；若与构造基线不同，先重开 Source 再取描述，不能把旧 runtime 的值套到新 revision 上。编辑后只上传 `syncValues`。实际 `sessionValues` 变化时等待本机写入，空分区删除该记录。失败与未知结果提供重新读取入口，插件回调只执行原编辑一次。
+首项编辑以构造 Source 时注入的 revision/entries 为基线。打开设置页先 GET，整包确认设置或同步规则已变化时先重开 Source 再取描述。同一窗口内的下一项以此前服务端确认的 revision 为基线。编辑只上传 `syncValues`。实际 `sessionValues` 变化时等待本机写入，空分区删除该记录。另一端进入漫画源或打开设置时读取已确认值，重入已有会话也会检查最新账户配置。失败与未知结果提供重新读取入口，插件回调只执行原编辑一次。
 
 本机记录按确认的部署/账户、目录 URL、repoId、package 和 Source 隔离。iOS 使用设备 Keychain，Android 使用由 Keystore 保护的存储并排除系统备份，Web 保存在当前浏览器站点存储中。Web 使用浏览器同源锁串行化写入，避免多标签首次保存时生成不同密钥。源列表、浏览、封面与跨源搜索通过同一入口在构造前读取设置。当前同步许可覆盖的键由账户分区提供，防止已保存在设备的值进入同步正文。[存储依赖文档](https://pub.dev/packages/flutter_secure_storage/versions/11.2.0)
 
-业务响应丢失时保留冻结的 UUID、body 和 CAS。显式重试重发这份业务请求，插件回调仍只执行原编辑一次。校验 ACK 的身份、版本和提交值后，在原会话保存确认，随后的失败恢复只 GET 整包。读回校验确认版本并采用当前 D1 数据，再重开运行容器。未确认和已确认的恢复均可查看本次提交的同步值。冲突、显式放弃或未知运行结果可读取 D1 当前状态后重开。关闭表单、切换 Source/包/身份/部署及迟到结果不能复活旧草稿。相同账户和部署再次连接时才能访问各自保存的本机设置。额外仓库边界见[设计](additional-repositories.md)。
+业务响应丢失时保留冻结的 UUID、body 和 CAS。显式重试重发这份业务请求，插件回调仍只执行原编辑一次。校验 ACK 的身份、版本和提交值后，在原会话保存确认，随后的失败恢复只 GET 整包。保存或确认期间等待当前操作完成再关闭窗口。读回校验确认版本并采用当前 D1 数据，明确恢复时重开运行容器。未确认和已确认的恢复均可查看本次提交的同步值。冲突、显式放弃或未知运行结果可读取 D1 当前状态后重开。关闭表单、切换 Source/包/身份/部署及迟到结果不能复活旧草稿。相同账户和部署再次连接时才能访问各自保存的本机设置。额外仓库边界见[设计](additional-repositories.md)。
 
 ## 统一限额
 

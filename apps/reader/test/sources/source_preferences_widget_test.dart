@@ -113,6 +113,17 @@ void main() {
     await tester.tap(find.byKey(const ValueKey(('source-preference', '0'))));
     await tester.pumpAndSettle();
     expect(beforeBrowsing.postedBodies, hasLength(1));
+    expect(beforeBrowsing.platform.preferenceBootstraps.last.sources, isEmpty);
+    final rebuilds = beforeBrowsing.platform.rebuildCount;
+    expect(
+      beforeBrowsing.platform.invocations.where(
+        (call) => call.hasPopular() || call.hasLatest(),
+      ),
+      isEmpty,
+    );
+    await tester.tap(iconLabel('关闭设置'));
+    await tester.pumpAndSettle();
+    expect(beforeBrowsing.platform.rebuildCount, rebuilds + 1);
     final preference = beforeBrowsing
         .platform
         .preferenceBootstraps
@@ -122,14 +133,6 @@ void main() {
         .entries
         .singleWhere((entry) => entry.key == 'alias');
     expect(preference.value.boolean, isTrue);
-    expect(
-      beforeBrowsing.platform.invocations.where(
-        (call) => call.hasPopular() || call.hasLatest(),
-      ),
-      isEmpty,
-    );
-    await tester.tap(iconLabel('关闭设置'));
-    await tester.pumpAndSettle();
     expect(
       beforeBrowsing.platform.invocations.where(
         (call) => call.hasPopular() || call.hasLatest(),
@@ -158,8 +161,14 @@ void main() {
         final invoke = fixture.platform.invokeHandler!;
         fixture.platform.invokeHandler = (call) async {
           final result = await invoke(call);
-          if (result.hasPreferences()) {
-            final node = result.preferences.nodes[2];
+          final snapshot = switch (result.whichPayload()) {
+            wire.SourceResult_Payload.preferences => result.preferences,
+            wire.SourceResult_Payload.preferenceEdit =>
+              result.preferenceEdit.snapshot,
+            _ => null,
+          };
+          if (snapshot != null) {
+            final node = snapshot.nodes[2];
             node.summary = node.choice.value == 'a' ? '服务器甲' : '优先使用该镜像浏览';
           }
           return result;
@@ -552,6 +561,11 @@ void main() {
     'the formal phone sheet edits typed controls, dependency and session fields without uploading secrets',
     (tester) async {
       await open(tester);
+      final generation = fixture.catalog.session!.generation;
+      final rebuilds = fixture.platform.rebuildCount;
+      Iterable<wire.SourceCall> popular() =>
+          fixture.platform.invocations.where((call) => call.hasPopular());
+      final listings = popular().length;
       expect(find.text('不应回显的密码摘要'), findsNothing);
       await item(tester, '0');
       expect(fixture.postedBodies, hasLength(1));
@@ -599,8 +613,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(unsupported, findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tester.tap(iconLabel('关闭设置'));
+      expect(fixture.catalog.session!.generation, generation);
+      expect(fixture.platform.rebuildCount, rebuilds);
+      expect(popular(), hasLength(listings));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(find.byType(SourcePreferencesSheet), findsNothing);
+      expect(fixture.platform.rebuildCount, rebuilds + 1);
+      expect(popular(), hasLength(listings + 1));
+      expect(popular().last.generation, isNot(generation));
     },
   );
 
@@ -712,6 +733,9 @@ void main() {
           expect(find.byType(CupertinoActivityIndicator), findsWidgets);
           expect(find.text('未确认的原保存请求 · 基于版本 0'), findsNothing);
           expect(fixture.postedBodies, hasLength(1));
+          await tester.binding.handlePopRoute();
+          await tester.pump();
+          expect(find.byType(SourcePreferencesSheet), findsOneWidget);
         } finally {
           release.complete();
           await tester.pumpAndSettle();

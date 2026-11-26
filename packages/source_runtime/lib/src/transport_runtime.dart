@@ -95,7 +95,7 @@ final class TransportSourceRuntime implements SourceRuntime {
   int _epoch = 0;
   int _containerEpoch = 0;
   bool _disposed = false;
-  bool _preferencesEdited = false;
+  ({String sourceId, String? snapshotId})? _preferenceEdit;
   RuntimeException? _accessFailure;
   Future<RuntimeSession>? _opening;
   String? _openKey;
@@ -436,7 +436,7 @@ final class TransportSourceRuntime implements SourceRuntime {
       _session = null;
       _opening = null;
       _openKey = null;
-      _preferencesEdited = false;
+      _preferenceEdit = null;
       _accessFailure = null;
     }
   }
@@ -474,7 +474,7 @@ final class TransportSourceRuntime implements SourceRuntime {
       build.packageId ?? '',
       bootstrap == null ? '' : jsonEncode(wire.encodeProtoJson(bootstrap)),
     ].join('\u0000');
-    if (!_preferencesEdited && _openKey == key) {
+    if (_preferenceEdit == null && _openKey == key) {
       if (_opening != null) return _opening!;
       if (_session != null) return Future.value(_session);
     }
@@ -515,7 +515,7 @@ final class TransportSourceRuntime implements SourceRuntime {
       );
     }
     final epoch = ++_epoch;
-    _preferencesEdited = false;
+    _preferenceEdit = null;
     _accessFailure = null;
     _session = null;
     final hello = (await _exchange(
@@ -589,11 +589,11 @@ final class TransportSourceRuntime implements SourceRuntime {
 
   @override
   Future<SourceResult> invoke(SourceRequest request) async {
-    _requireConfirmedPreferences();
+    final call = request.call.deepCopy();
+    _requireConfirmedPreferences(call);
     final accessFailure = _accessFailure;
     if (accessFailure != null) throw accessFailure;
     final session = _session;
-    final call = request.call.deepCopy();
     if (session == null ||
         call.generation != session.generation ||
         (_packageId != null && request.packageId != _packageId) ||
@@ -648,8 +648,10 @@ final class TransportSourceRuntime implements SourceRuntime {
     };
     final epoch = _epoch;
     // A dispatched callback can mutate storage even if its response is lost.
-    // Only a fresh confirmed bootstrap and generation may resume Source work.
-    if (call.hasEditPreference()) _preferencesEdited = true;
+    // Only a validated result may unlock the next edit of these preferences.
+    if (call.hasEditPreference()) {
+      _preferenceEdit = (sourceId: call.sourceId, snapshotId: null);
+    }
     final response = onInput == null
         ? (await _exchange(
             wire.ControlRequest(invoke: call),
@@ -684,6 +686,10 @@ final class TransportSourceRuntime implements SourceRuntime {
           wire.validatePreferenceSnapshot(response.preferences);
         case wire.SourceResult_Payload.preferenceEdit:
           wire.validatePreferenceEditResult(response.preferenceEdit);
+          _preferenceEdit = (
+            sourceId: call.sourceId,
+            snapshotId: response.preferenceEdit.snapshot.snapshotId,
+          );
         case wire.SourceResult_Payload.filters:
           wire.validateFilterSnapshot(response.filters);
         case wire.SourceResult_Payload.mangaPage:
@@ -827,8 +833,13 @@ final class TransportSourceRuntime implements SourceRuntime {
     }
   }
 
-  void _requireConfirmedPreferences() {
-    if (_preferencesEdited) {
+  void _requireConfirmedPreferences([wire.SourceCall? call]) {
+    final edit = _preferenceEdit;
+    if (edit != null &&
+        (call == null ||
+            !call.hasEditPreference() ||
+            call.sourceId != edit.sourceId ||
+            call.editPreference.snapshotId != edit.snapshotId)) {
       throw const RuntimeException(
         RuntimeErrorCode.protocolError,
         'Confirm Source preferences and reopen the runtime before continuing',

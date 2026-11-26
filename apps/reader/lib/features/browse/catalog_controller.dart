@@ -1844,6 +1844,46 @@ final class CatalogController extends ChangeNotifier {
     }
   }
 
+  Future<bool> refreshCurrentSourcePreferences({
+    required bool Function() shouldContinue,
+  }) async {
+    final target = currentPreferencesTarget;
+    final repository = sourcePreferences;
+    final loaded = loadedSourcePreferences;
+    if (target == null || repository == null || loaded == null) return false;
+    final reference = sourceReference;
+    final latest = await _perform<SourcePreferencesSnapshot>(
+      '正在读取漫画源设置',
+      () => repository.load(
+        target.build.packageName,
+        catalog: target.build.catalog,
+      ),
+    );
+    bool current() =>
+        shouldContinue() && identical(sourcePreferences, repository);
+    if (latest == null || !current() || !isCurrentSource(reference)) {
+      return false;
+    }
+    return loaded.hasSameConfiguration(latest) ||
+        await reopenSourcePreferences(target, shouldContinue: current);
+  }
+
+  Future<void> applyClosedSourcePreferences(
+    SourcePreferencesTarget target, {
+    required bool Function() shouldContinue,
+  }) async {
+    if (!isCurrentPreferencesTarget(target) ||
+        !sourcePreferencesBlocked ||
+        sourcePreferences?.hasPendingPackage(
+              target.build.packageName,
+              catalog: target.build.catalog,
+            ) !=
+            false) {
+      return;
+    }
+    await reopenSourcePreferences(target, shouldContinue: shouldContinue);
+  }
+
   Future<bool> reopenSourcePreferences(
     SourcePreferencesTarget target, {
     bool Function()? shouldContinue,
@@ -1948,8 +1988,12 @@ final class CatalogController extends ChangeNotifier {
     void Function(String)? onRequest,
   }) async {
     if (!isCurrentPreferencesTarget(target) ||
-        sourcePreferencesBlocked ||
         busy ||
+        sourcePreferences?.hasPendingPackage(
+              target.build.packageName,
+              catalog: target.build.catalog,
+            ) !=
+            false ||
         shouldContinue?.call() == false) {
       return null;
     }

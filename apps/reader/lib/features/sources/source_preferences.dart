@@ -16,6 +16,33 @@ import '../browse/catalog_controller.dart';
 import 'source_error_details.dart';
 import 'source_preferences_controller.dart';
 
+Future<void> showSourcePreferences({
+  required BuildContext context,
+  required CatalogController catalog,
+  required SourcePreferencesTarget target,
+}) async {
+  final repository = catalog.sourcePreferences;
+  if (repository == null || catalog.busy) return;
+  final callingRoute = ModalRoute.of(context);
+  await showAppSheet<void>(
+    context: context,
+    enableDrag: false,
+    scrollableBuilder: (context, _) => SourcePreferencesSheet(
+      catalog: catalog,
+      target: target,
+      repository: repository,
+    ),
+  );
+  await catalog.applyClosedSourcePreferences(
+    target,
+    shouldContinue: () =>
+        context.mounted &&
+        callingRoute?.isActive != false &&
+        !catalog.accessPaused &&
+        identical(catalog.sourcePreferences, repository),
+  );
+}
+
 class const SourcePreferencesSheet({
   super.key,
   required final CatalogController catalog,
@@ -395,14 +422,16 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
     final snapshot = _controller.snapshot;
     final pending = _controller.available ? _controller.pending : null;
     final activity = _controller.activity;
-    return EditSheet(
+    final canClose = switch (activity) {
+      SourcePreferencesActivity.editing ||
+      SourcePreferencesActivity.saving ||
+      SourcePreferencesActivity.readingConfirmed => false,
+      _ => true,
+    };
+    final sheet = EditSheet(
       title: const Text('漫画源设置'),
       leading: CupertinoButton(
-        onPressed: () {
-          _closing = true;
-          _controller.cancelActiveRequest();
-          Navigator.of(context).pop();
-        },
+        onPressed: canClose ? () => Navigator.of(context).pop() : null,
         padding: EdgeInsets.zero,
         child: const Icon(CupertinoIcons.xmark, semanticLabel: '关闭设置'),
       ),
@@ -510,6 +539,16 @@ class _SourcePreferencesSheetState extends State<SourcePreferencesSheet> {
           ),
         ],
       ),
+    );
+    return PopScope<void>(
+      canPop: canClose,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          _closing = true;
+          _controller.cancelActiveRequest();
+        }
+      },
+      child: sheet,
     );
   }
 

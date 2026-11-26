@@ -132,6 +132,15 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
           catalog.activeSource?.id == widget.source.id &&
           catalog.extensionUnavailableReason == null &&
           !catalog.sourcePreferencesBlocked) {
+        if (!await catalog.refreshCurrentSourcePreferences(
+              shouldContinue: () => _current,
+            ) ||
+            !_current) {
+          if (_current) {
+            _error = catalog.error ?? '未能同步漫画源设置，请重试。';
+          }
+          return;
+        }
         _reference = catalog.sourceReference;
         _search.text = catalog.query;
         if (catalog.page > 0) {
@@ -306,33 +315,34 @@ class _SourceBrowsePageState extends ConsumerState<SourceBrowsePage> {
   }
 
   Future<void> _preferences([SourcePreferencesTarget? recovery]) async {
-    final target = recovery ?? catalog.currentPreferencesTarget,
-        repository = catalog.sourcePreferences;
-    if (target == null || repository == null) return;
-    await showAppSheet<void>(
+    final target = recovery ?? catalog.currentPreferencesTarget;
+    if (target == null) return;
+    await showSourcePreferences(
       context: context,
-      enableDrag: false,
-      scrollableBuilder: (context, _) => SourcePreferencesSheet(
-        catalog: catalog,
-        target: target,
-        repository: repository,
-      ),
+      catalog: catalog,
+      target: target,
     );
-    if (mounted &&
-        catalog.activeSource?.id == widget.source.id &&
-        catalog.activeBuild?.id == widget.build.id) {
-      setState(() {
-        _reference = catalog.sourceReference;
-        _error = catalog.error;
-        if (_sourceCurrent && catalog.page > 0) _adoptResults();
-      });
-      if (catalog.page == 0 && !catalog.sourcePreferencesBlocked) {
-        await _load(
-          _ListingWork.refresh,
-          query: _displayQuery,
-          listing: _displayListing,
-        );
-      }
+    if (!_current ||
+        target.build.id != widget.build.id ||
+        target.build.catalog != widget.build.catalog ||
+        target.source.id != widget.source.id) {
+      return;
+    }
+    setState(() {
+      _reference = catalog.isCurrentPreferencesTarget(target)
+          ? catalog.sourceReference
+          : null;
+      _error = catalog.error;
+      if (_sourceCurrent && catalog.page > 0) _adoptResults();
+    });
+    if (_sourceCurrent &&
+        catalog.page == 0 &&
+        !catalog.sourcePreferencesBlocked) {
+      _start(
+        _ListingWork.refresh,
+        query: _displayQuery,
+        listing: _displayListing,
+      );
     }
   }
 
