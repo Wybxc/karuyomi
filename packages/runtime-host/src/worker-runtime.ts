@@ -22,7 +22,7 @@ export class WorkerRuntime {
   private generation: string | undefined;
   private manifest: BuildManifest | undefined;
   private busy = false;
-  private preferencesEdited = false;
+  private preferenceEdit: { sourceId: string; snapshotId?: string } | undefined;
   private controller = new AbortController();
   private input:
     | { prompt: pb.SourceInputPrompt; resolve(text: string | null): void }
@@ -149,8 +149,8 @@ export class WorkerRuntime {
           break;
         }
         case 'invoke': {
-          this.requireConfirmedPreferences();
           const call = command.command.value;
+          this.requireConfirmedPreferences(call);
           if (!this.manifest)
             throw new RuntimeFailure(
               'runtime_lost',
@@ -162,7 +162,7 @@ export class WorkerRuntime {
               'Source does not belong to the loaded build',
             );
           if (call.request.case === 'editPreference')
-            this.preferencesEdited = true;
+            this.preferenceEdit = { sourceId: call.sourceId };
           const payload = await this.driver.invoke(
             call,
             {
@@ -173,10 +173,17 @@ export class WorkerRuntime {
               ? (fields) => this.requestInput(command, call.sourceId, fields)
               : undefined,
           );
-          this.reply(command, {
-            case: 'source',
-            value: sourceResultFor(call, envelope.buildId, payload),
-          });
+          const value = sourceResultFor(call, envelope.buildId, payload);
+          this.reply(command, { case: 'source', value });
+          if (
+            value.payload.case === 'preferenceEdit' &&
+            value.payload.value.snapshot
+          ) {
+            this.preferenceEdit = {
+              sourceId: call.sourceId,
+              snapshotId: value.payload.value.snapshot.snapshotId,
+            };
+          }
           break;
         }
         case 'acquireImage': {
@@ -297,8 +304,13 @@ export class WorkerRuntime {
     });
   }
 
-  private requireConfirmedPreferences(): void {
-    if (this.preferencesEdited)
+  private requireConfirmedPreferences(call?: pb.SourceCall): void {
+    if (
+      this.preferenceEdit &&
+      (call?.request.case !== 'editPreference' ||
+        call.sourceId !== this.preferenceEdit.sourceId ||
+        call.request.value.snapshotId !== this.preferenceEdit.snapshotId)
+    )
       throw new RuntimeFailure(
         'protocol_error',
         'Confirm Source preferences and reopen the runtime before continuing',

@@ -12,6 +12,15 @@
     "eu.kanade.tachiyomi.extension.en.mangakatana": [
       { "key": "server_preference", "kind": 2 },
       { "key": "SERVER_PREFERENCE", "kind": 2 }
+    ],
+    "eu.kanade.tachiyomi.extension.zh.jinmantiantang": [
+      { "key": "BLOCK_GENRES_LIST", "kind": 2 },
+      { "key": "auto_checkin", "kind": 1 }
+    ],
+    "eu.kanade.tachiyomi.extension.zh.picacomic": [
+      { "key": "BLOCK_GENRES", "kind": 2 },
+      { "key": "IMAGE_QUALITY", "kind": 2 },
+      { "key": "APP_CHANNEL", "kind": 2 }
     ]
   }
 }

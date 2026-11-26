@@ -838,6 +838,10 @@ void main() {
       true,
     );
     final owner = fixture.catalog;
+    await owner.applyClosedSourcePreferences(
+      officialEditor.target,
+      shouldContinue: () => true,
+    );
     final management = ExtensionsController(
       container: container,
       catalog: owner,
@@ -875,6 +879,10 @@ void main() {
       reason: externalEditor.error,
     );
     expect(fixture.postedBodies, hasLength(count));
+    await owner.applyClosedSourcePreferences(
+      externalEditor.target,
+      shouldContinue: () => true,
+    );
     expect(
       fixture
           .platform

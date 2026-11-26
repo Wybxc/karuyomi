@@ -1638,6 +1638,12 @@ final class BusinessStateClient {
       final previous =
           _sourcePreferences[_sourcePreferenceScope(catalog, packageName)];
       if (value.accountRevision < _accountRevision) continue;
+      final sameRules =
+          previous != null &&
+          const ListEquality<wire.PreferenceSyncRule>().equals(
+            value.syncRules,
+            previous.syncRules,
+          );
       var stale = false;
       for (final old in previous?.sources ?? <wire.SourcePreferences>[]) {
         final matching = value.sources.where(
@@ -1647,7 +1653,8 @@ final class BusinessStateClient {
           stale = true;
           break;
         }
-        if (matching.single.revision == old.revision &&
+        if (sameRules &&
+            matching.single.revision == old.revision &&
             !samePreferenceEntries(matching.single.entries, old.entries)) {
           throw const FormatException(
             'Source settings changed without revision',

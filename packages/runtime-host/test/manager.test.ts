@@ -1362,7 +1362,7 @@ test('typed bootstrap keeps long width in open identity, reaches the Worker, and
 });
 
 test.each(['accepted', 'vetoed', 'failed'] as const)(
-  'a %s preference edit runs once, blocks queued and future work, and requires a fresh confirmed generation',
+  'a %s preference edit admits only the next verified edit until reopening',
   async (outcome) => {
     const waiting = deferred<SourcePayload>();
     const { manager, driver, workers } = await setup(async (request) => {
@@ -1370,24 +1370,26 @@ test.each(['accepted', 'vetoed', 'failed'] as const)(
       return mangaPage();
     });
     const session = await manager.open(options);
-    const editing = manager.invoke(
-      create(pb.SourceCallSchema, {
-        requestId: 'edit-once',
-        sourceId: '9223372036854775806',
-        generation: session.generation,
-        request: {
-          case: 'editPreference',
-          value: {
-            snapshotId: 'prefs-1',
-            path: [0],
-            command: {
-              case: 'change',
-              value: { value: { case: 'boolean', value: false } },
+    const edit = (requestId: string, snapshotId: string) =>
+      manager.invoke(
+        create(pb.SourceCallSchema, {
+          requestId,
+          sourceId: '9223372036854775806',
+          generation: session.generation,
+          request: {
+            case: 'editPreference',
+            value: {
+              snapshotId,
+              path: [0],
+              command: {
+                case: 'change',
+                value: { value: { case: 'boolean', value: false } },
+              },
             },
           },
-        },
-      }),
-    );
+        }),
+      );
+    const editing = edit('edit-once', 'prefs-1');
     const editResult =
       outcome === 'failed'
         ? expect(editing).rejects.toMatchObject({ code: 'source_error' })
@@ -1397,6 +1399,9 @@ test.each(['accepted', 'vetoed', 'failed'] as const)(
     await expect(
       manager.invoke(call('later-read', session.generation)),
     ).rejects.toMatchObject({ code: 'protocol_error' });
+    await expect(edit('early-edit', 'prefs-1')).rejects.toMatchObject({
+      code: 'protocol_error',
+    });
     await expect(
       manager.invoke(
         create(pb.SourceCallSchema, {
@@ -1423,13 +1428,27 @@ test.each(['accepted', 'vetoed', 'failed'] as const)(
     await expect(
       manager.invoke(call('after-edit', session.generation)),
     ).rejects.toMatchObject({ code: 'protocol_error' });
+    await expect(edit('stale-edit', 'prefs-1')).rejects.toMatchObject({
+      code: 'protocol_error',
+    });
     expect(driver.invoke).toHaveBeenCalledTimes(1);
+    const next = edit('next-edit', 'prefs-2');
+    if (outcome === 'failed') {
+      await expect(next).rejects.toMatchObject({ code: 'protocol_error' });
+    } else {
+      await expect(next).resolves.toMatchObject({
+        generation: session.generation,
+        payload: { case: 'preferenceEdit' },
+      });
+    }
+    const editCount = outcome === 'failed' ? 1 : 2;
+    expect(driver.invoke).toHaveBeenCalledTimes(editCount);
     const reopened = await manager.open(options);
     expect(reopened.generation).not.toBe(session.generation);
     expect(workers[0]?.terminated).toBe(true);
     expect(driver.open).toHaveBeenCalledTimes(2);
     await manager.invoke(call('confirmed-read', reopened.generation));
-    expect(driver.invoke).toHaveBeenCalledTimes(2);
+    expect(driver.invoke).toHaveBeenCalledTimes(editCount + 1);
   },
 );
 

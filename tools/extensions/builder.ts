@@ -75,6 +75,21 @@ const reviewedPreferenceRules: ReadonlyMap<
       { key: 'SERVER_PREFERENCE', kind: PreferenceValueKind.TEXT },
     ],
   ],
+  [
+    'eu.kanade.tachiyomi.extension.zh.jinmantiantang',
+    [
+      { key: 'BLOCK_GENRES_LIST', kind: PreferenceValueKind.TEXT },
+      { key: 'auto_checkin', kind: PreferenceValueKind.BOOLEAN },
+    ],
+  ],
+  [
+    'eu.kanade.tachiyomi.extension.zh.picacomic',
+    [
+      { key: 'BLOCK_GENRES', kind: PreferenceValueKind.TEXT },
+      { key: 'IMAGE_QUALITY', kind: PreferenceValueKind.TEXT },
+      { key: 'APP_CHANNEL', kind: PreferenceValueKind.TEXT },
+    ],
+  ],
 ]);
 
 const browserVerificationSources = new Set([

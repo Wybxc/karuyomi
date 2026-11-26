@@ -2,7 +2,7 @@
 
 ## 目标与状态
 
-状态：**已实现账户同步和本机持久化。固定 v6 AOT 与 Komiic Web 账户设置恢复已通过。实际浏览器和 Native 的本机恢复待验收。** 本计划细化 [P3](p3-extensions-and-migration.md) 的 Source 设置待办。沿用[跨语言协议设计](../design/cross-language-protocol.md)与[同步计划](p2-sync.md)，完成同一身份在 Web/iOS/Android 的非敏感 Source 设置在线读写、运行时生效和失败恢复。敏感凭证和其它未纳入同步的设置随当前设备保存。
+状态为 **已接入逐项保存、关窗统一生效与账户同步**。固定 v6 AOT 与 Komiic Web 账户设置恢复已通过。关窗重载和新规则的客户端验收分别见下方验收门。本计划细化 [P3](p3-extensions-and-migration.md) 的 Source 设置待办。沿用[跨语言协议设计](../design/cross-language-protocol.md)与[同步计划](p2-sync.md)，完成同一身份在 Web/iOS/Android 的非敏感 Source 设置在线读写、运行时生效和失败恢复。敏感凭证和其它未纳入同步的设置随当前设备保存。
 
 交付范围是开关、文本/密码、单选、多选、分组、依赖项与修改后刷新。保留 Source 原 Preference 对象和回调语义，不修改官方扩展业务源码。Android 自定义 Activity、任意自定义对话框或 WebView 登录不因出现设置入口而视为已支持。正式消息、字段、数据表和流程以当前 IDL、产品代码及[设计](../design/source-preferences.md)为准。
 
@@ -25,8 +25,8 @@
 
 - `getPreferences` 返回描述和实际存储的同步/会话完整分区；`editPreference` 使用 snapshotId、path 和 typed change 或 click，每次只调用一次原回调。
 - 单/多选采用真实 entryValues，动态未知当前值明确显示，空选项禁编辑。int32/long/float 保留原 SharedPreferences 存储类型，不混用；Dart 在生成解码前拒绝 int64 溢出。
-- 唯一可信同步许可表供 API 和 driver 共同使用。未知键、未知文本和密码由当前设备保存。账户和本机已保存值在 Source 构造前注入，账户编辑基线绑定构造时的 D1 revision。
-- 已发送编辑后整代暂停 Source/图片工作，保留 cleanup；业务丢 ACK 仅显式重发原 UUID/body，确认、冲突或放弃后从 D1 重读并经平台容器入口重开。
+- 唯一可信同步许可表供 API 和 driver 共同使用。未知键、未知文本和密码由当前设备保存。账户和本机已保存值在 Source 构造前注入。首项编辑使用构造时的 D1 revision，后续编辑使用最近的确认 revision。
+- 已发送编辑后，当前代保留同源、同设置快照的编辑及资源清理。窗口关闭后统一重开，恢复 Source/图片工作。业务丢 ACK 时可显式重发原 UUID/body，异常和冲突可从 D1 重读并经平台容器入口恢复。
 - host ABI 升为 v6，不维护 v5 回退；有界 headless bind 支持之外明确不支持，不模拟 Android Activity。
 - 统一树、值、整包和控制封装预算以设计文档为准。包最多 64 Sources、entries 数组总计 64KiB，完整 bootstrap/业务响应 128KiB；不能只检查每个 Source 后无界拼接。
 
@@ -94,6 +94,8 @@ AOT 清单承载已审核键，Worker 与运行时不再按扩展名配置。当
 - [x] 以未修改的 FoolSlide Customizable 和 MangaDex 原包完成固定提交的隔离 AOT，见[工程与构建证据](../verification/source-preferences.md#文本设置绑定与输入校验)。
 - [x] 本机持久化变更之前，MangaDex 英文 Source 的正式 Web 设置入口验证无效 UUID 拒绝、有效值读回及旧版会话隔离。
 - [x] 本机持久化变更之前，FoolSlide Customizable 的正式 Web 设置入口验证默认值全选、无效 URL 拒绝和原回调归一化写入。原测试中的新文档恢复默认是旧版会话行为，没有 D1 设置行。[验收记录](../verification/source-preferences.md#双包正式-web-设置)
+- [x] 组件验证连续保存、关窗一次重载与同账号读回。两包 AOT 候选通过原设置在 Node 环境的隔离编辑和重开。[验收记录](../verification/source-preferences.md#2026-11-26-关窗统一生效与账户同步)
+- [ ] 使用原包在正式客户端复验多项修改只在关窗后触发一次 Source 重载，并核对禁漫天堂与哔咔新规则的已确认值在另一端读回。
 - [ ] Mango、BookOrbit 和 Komga 尚有独立的 DNS/认证能力缺口；解决后使用原包继续验证。文本绑定范围见[设计](../design/source-preferences.md#原对象构造顺序与生命周期)。
 - [ ] 继续通过正式入口验证开关、多选、文本/密码、veto、别名、依赖及刷新；如源站不可用，记录具体失败和未通过门，不用 supplier 结果替代。
 - [ ] 同一身份的 Web 与独立 Native 客户端读取并修改非敏感值后收敛，重开 Source 使用服务端确认值；敏感凭证不随另一端设置同步。Web/iOS/Android 分别记录实际通过范围。

@@ -123,7 +123,7 @@ export class SourceRuntimeManager {
     { key: string; done: Promise<{ closed: true }> } | undefined;
   private lastClosedBuild: string | undefined;
   private disposed = false;
-  private preferencesEdited = false;
+  private preferenceEdit: { sourceId: string; snapshotId?: string } | undefined;
   private disposing: Promise<void> | undefined;
   private queue: Task[] = [];
   private active: Task | undefined;
@@ -208,7 +208,7 @@ export class SourceRuntimeManager {
         : null,
     ]);
     if (key === this.openKey && this.opening) return this.opening;
-    if (key === this.openKey && this.session && !this.preferencesEdited)
+    if (key === this.openKey && this.session && !this.preferenceEdit)
       return Promise.resolve(this.session);
     const replaced = new RuntimeFailure(
       'runtime_lost',
@@ -563,7 +563,12 @@ export class SourceRuntimeManager {
         new RuntimeFailure('protocol_error', 'Invalid Source request'),
       );
     }
-    if (this.preferencesEdited)
+    if (
+      this.preferenceEdit &&
+      (call.request.case !== 'editPreference' ||
+        call.sourceId !== this.preferenceEdit.sourceId ||
+        call.request.value.snapshotId !== this.preferenceEdit.snapshotId)
+    )
       return Promise.reject(this.preferenceConfirmationError());
     if (this.accessSuspension?.generation === call.generation)
       return Promise.reject(this.accessSuspension.error);
@@ -675,7 +680,8 @@ export class SourceRuntimeManager {
     if (!task) return;
     this.active = task;
     if (task.kind === 'source' && task.call.request.case === 'editPreference') {
-      this.preferencesEdited = true;
+      // A failed or interrupted edit leaves its runtime unusable until reopened.
+      this.preferenceEdit = { sourceId: task.call.sourceId };
       const blocked = this.queue.filter(
         (queued) => queued.kind !== 'page-session',
       );
@@ -747,6 +753,7 @@ export class SourceRuntimeManager {
           task.completed = true;
           task.resolve(resource);
         } else if (task.kind === 'source') {
+          this.assertGeneration(generation);
           if (response.result.case !== 'source')
             throw new RuntimeFailure(
               'protocol_error',
@@ -757,6 +764,15 @@ export class SourceRuntimeManager {
             buildId,
             response.result.value.payload,
           );
+          if (
+            result.payload.case === 'preferenceEdit' &&
+            result.payload.value.snapshot
+          ) {
+            this.preferenceEdit = {
+              sourceId: task.call.sourceId,
+              snapshotId: result.payload.value.snapshot.snapshotId,
+            };
+          }
           task.completed = true;
           task.resolve(result);
         } else {
@@ -877,7 +893,7 @@ export class SourceRuntimeManager {
 
   private invalidate(error: RuntimeFailure): void {
     this.generation = undefined;
-    this.preferencesEdited = false;
+    this.preferenceEdit = undefined;
     this.session = undefined;
     this.opening = undefined;
     this.openKey = undefined;
@@ -921,7 +937,7 @@ export class SourceRuntimeManager {
     if (!parsed.success)
       throw new RuntimeFailure('protocol_error', 'Invalid image request');
     const request = parsed.data;
-    if (this.preferencesEdited) throw this.preferenceConfirmationError();
+    if (this.preferenceEdit) throw this.preferenceConfirmationError();
     if (this.accessSuspension?.generation === request.generation)
       throw this.accessSuspension.error;
     if (this.imageOptions.enabled === false)

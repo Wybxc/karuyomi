@@ -64,16 +64,11 @@ class const CatalogPage({
     SourcePreferencesTarget target,
   ) async {
     final catalog = controller;
-    final repository = catalog?.sourcePreferences;
-    if (catalog == null || repository == null || catalog.busy) return;
-    await showAppSheet<void>(
+    if (catalog == null) return;
+    await showSourcePreferences(
       context: context,
-      enableDrag: false,
-      scrollableBuilder: (context, _) => SourcePreferencesSheet(
-        catalog: catalog,
-        target: target,
-        repository: repository,
-      ),
+      catalog: catalog,
+      target: target,
     );
   }
 

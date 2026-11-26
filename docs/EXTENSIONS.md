@@ -169,7 +169,7 @@ pnpm --filter @karuyomi/api exec wrangler r2 bucket domain list karuyomi-covers
 
 静态分发无需 Access。Source HTTP 使用同一应用的 Access 会话和 Worker 公网 fetch；安装、更新或切换漫画站不需要登记包、域名或镜像。额外仓库须与应用 ABI/materials 一致，并为浏览器及 Native WebView 下载提供 CORS；目录、清单与产物验证仍在正式加载边界执行。
 
-具体扩展的适配由 AOT 提供。AOT 可将已审核的非敏感设置键写入当前构建的 `preferenceSyncRules`。正式装配从当前官方清单投影精简的 `/extensions/preference-rules.json`，供 Worker 读取。缺规则的键只在当前客户端会话生效。额外仓库不获得官方清单的设置规则。
+具体扩展的适配由 AOT 提供。AOT 可将已审核的非敏感设置键写入当前构建的 `preferenceSyncRules`。正式装配从当前官方清单投影精简的 `/extensions/preference-rules.json`，供 Worker 读取。新规则随对应的扩展构建发布。本机分区由当前设备持久保存，额外仓库也使用本机分区。
 
 历史 `0009` 迁移保留，当前 Source 设置表依赖其来源主键。新增 `0010` 只删除退役的网络登记表。切换时按上一节安排两者与 Worker 的顺序。
 

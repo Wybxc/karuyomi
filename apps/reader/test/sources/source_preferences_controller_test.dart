@@ -74,6 +74,7 @@ void main() {
   test('device edits stay off the API and survive confirmed account edits and reopening', () async {
     final editor = fixture.editor();
     addTearDown(editor.dispose);
+    final generation = fixture.catalog.session!.generation;
     expect(await editor.load(), true);
     expect(
       await editor.change([1], wire.PreferenceValue(text: 'session-password')),
@@ -81,19 +82,7 @@ void main() {
     );
     expect(fixture.callbacks, 1);
     expect(fixture.postedBodies, isEmpty);
-    expect(
-      fixture
-          .platform
-          .preferenceBootstraps
-          .last
-          .sources
-          .single
-          .entries
-          .single
-          .value
-          .text,
-      'session-password',
-    );
+    expect(fixture.platform.preferenceBootstraps.last.sources, isEmpty);
     expect(await editor.change([0], wire.PreferenceValue(boolean: true)), true);
     expect(fixture.callbacks, 2);
     expect(fixture.postedBodies, hasLength(1));
@@ -103,6 +92,25 @@ void main() {
     expect(editor.snapshot!.nodes.first.toggle.value, true);
     expect(editor.snapshot!.nodes[4].group.nodes.first.enabled, true);
     expect(editor.snapshot!.nodes[1].text.value, 'session-password');
+    expect(fixture.catalog.session!.generation, generation);
+    expect(fixture.catalog.sourcePreferencesBlocked, true);
+    expect(fixture.platform.rebuildCount, 0);
+    await fixture.catalog.applyClosedSourcePreferences(
+      editor.target,
+      shouldContinue: () => true,
+    );
+    expect(fixture.platform.rebuildCount, 1);
+    expect(fixture.catalog.session!.generation, isNot(generation));
+    final saved =
+        fixture.platform.preferenceBootstraps.last.sources.single.entries;
+    expect(
+      saved.singleWhere((entry) => entry.key == 'password').value.text,
+      'session-password',
+    );
+    expect(
+      saved.singleWhere((entry) => entry.key == 'alias').value.boolean,
+      true,
+    );
     expect(fixture.catalog.sourcePreferencesBlocked, false);
     expect(fixture.catalog.sourceFilterSnapshot, isNull);
     expect(fixture.catalog.page, 0);
@@ -173,6 +181,65 @@ void main() {
       containsAll(['remote-key', 'alias']),
     );
     expect(fixture.callbacks, 1);
+  });
+
+  test('another client reads successive account edits before the local settings close', () async {
+    final editor = fixture.editor();
+    addTearDown(editor.dispose);
+    final remote = BusinessStateClient(
+      api: fixture.platform,
+      identity: fixture.business.identity,
+    );
+    addTearDown(remote.dispose);
+    final other = SourcePreferencesRepository(remote);
+    Future<wire.SourcePreferences> read() async => (await other.load(
+      preferencePackage,
+      catalog: fixture.catalog.defaultCatalog,
+    )).source(sourceId);
+
+    expect(await editor.load(), true);
+    expect(await editor.change([0], wire.PreferenceValue(boolean: true)), true);
+    expect((await read()).revision, 1);
+    expect(await editor.change([2], wire.PreferenceValue(text: 'b')), true);
+    final current = await read();
+    expect(current.revision, 2);
+    expect(current.entries, [
+      preferenceEntry('alias', wire.PreferenceValue(boolean: true)),
+      preferenceEntry('choice', wire.PreferenceValue(text: 'b')),
+    ]);
+    expect(editor.confirmed, current);
+    expect(fixture.callbacks, 2);
+    expect(fixture.platform.rebuildCount, 0);
+  });
+
+  test('reentering an open Source applies account changes once and reuses unchanged settings', () async {
+    final original = fixture.catalog.sourceReference;
+    Future<bool> refresh() => fixture.catalog.refreshCurrentSourcePreferences(
+      shouldContinue: () => true,
+    );
+    expect(await refresh(), true);
+    expect(fixture.catalog.isCurrentSource(original), true);
+    expect(fixture.platform.rebuildCount, 0);
+    final remote = BusinessStateClient(
+      api: fixture.platform,
+      identity: fixture.business.identity,
+    );
+    addTearDown(remote.dispose);
+    final entry = preferenceEntry('choice', wire.PreferenceValue(text: 'b'));
+    await SourcePreferencesRepository(remote).save(
+      catalog: fixture.catalog.defaultCatalog,
+      packageName: preferencePackage,
+      sourceId: sourceId,
+      basedOnRevision: 0,
+      entries: [entry],
+    );
+    expect(await refresh(), true);
+    expect(fixture.catalog.isCurrentSource(original), false);
+    expect(fixture.platform.preferenceBootstraps.last.sources.single.entries, [
+      entry,
+    ]);
+    expect(await refresh(), true);
+    expect(fixture.platform.rebuildCount, 1);
   });
 
   test('lost business ACK blocks Source calls and only exact explicit business retry resumes; reopening editor is read-only', () async {
