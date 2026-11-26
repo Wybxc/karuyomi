@@ -2,6 +2,8 @@
 
 记录以提交号、实际运行环境、观测结果和未通过项标识每轮验收。需要重跑时从仓库的[工程检查入口](TOOLING.md)、[Worker 测试](../apps/api/test/README.md)或[原生集成测试](../apps/reader/integration_test/README.md)重新生成输入。历史日志、截图名称和报告摘要只标识当时的观测。
 
+2026-11-26，`e433450` 的漫画源设置通过完整格式、工程、Flutter 和 Web 构建检查。组件验证逐项保存、关窗一次重载和同账号读回。禁漫天堂与哔咔按固定源码重编，经过真实扩展和正式 Worker 脚本的 Node 隔离编辑与重开。两个候选仍待真实平台与生产验收。[详细证据](verification/source-preferences.md#2026-11-26-关窗统一生效与账户同步)
+
 2026-11-25，基于 `b5a6483` 补齐禁漫天堂等 Source 使用的 `AES/ECB/PKCS5Padding`。macOS arm64 上的 `pnpm teavm:check` 通过，固定 JDK 和生成的 JavaScript 的 65 项 AES ECB 断言一致，新增 20 项覆盖末块填充、分段解密、短缓冲重试和异常类型。[宿主实现](../runtime/teavm/README.md)
 
 同日，在 `macbook-pro-4` 固定宿主 `166ea48`、Keiyoushi `efa93f5a` 重编原版禁漫天堂 1.6.63。正式 AOT 和产物完整性校验通过，保留 Source `6286738698187452081`，canonical SHA-256 为 `94410f925565d7df68068fb4a179df3156d159969e01ae40436bca88c98d989f`。用现网 Native Worker 脚本在 Node.js 24.15.0 运行两份扩展，将加密的节点列表和热门响应由隔离夹具交给正式二进制中继。现网包降级到备用节点后抛出 `NoSuchAlgorithmException`。重编包解出节点列表，发送签名热门请求并返回夹具作品。新包保持 `compiled_unverified`，生产上线与真实源站阅读待验。

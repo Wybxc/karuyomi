@@ -91,6 +91,17 @@ Java oracle 和全源编译的临时日志在 `/private/tmp/karuyomi-source-pref
 
 复验在 `apps/reader` 执行 `flutter test test/sources/source_preferences_controller_test.dart test/extensions/extensions_controller_test.dart`。测试使用模拟设备存储、运行时和剪贴板。真实浏览器重新打开、原生进程重启和系统剪贴板另验。
 
+## 2026-11-26 关窗统一生效与账户同步
+
+在 macOS arm64 以 `e433450` 和仓库固定 Node 24.15.0、Flutter 3.50.0 通过 `pnpm format:check`、`pnpm check`、`pnpm flutter:check --reporter expanded --concurrency=4` 和 `pnpm build`。Vitest 615 项、Flutter 应用 1,052 项、阅读核心和 Source Runtime 共 112 项通过。
+
+- Flutter 组件回归从源列表配置和浏览页配置两个正式入口操作。窗口内连续修改时沿用同一运行时，关闭后只重建一次。从源列表配置时，进入源前没有热门或最新请求。从浏览页按系统返回时，当前列表只刷新一次。保存读回期间保留窗口，失败后可精确重试。
+- 同账号的独立客户端在窗口关闭之前就读回连续提交的两个版本。重新进入已有 Source 会话时，确认值有变化才重建。用官方 workerd 与 D1 核对两包规则下的账户值写入、独立请求读回以及本机凭证被拒绝。
+- 在本机锁定 `e433450` 和 Keiyoushi `efa93f5a` 重编两份原包，候选使用生产父快照 `c6a230b8c994486ebdc07a83bc7e2f7c` 的共享运行材料。禁漫天堂 1.6.63 的 canonical SHA-256 为 `c3b29b7ec2ff06a78c7c06b560eae28a665fec023eb4ae5c3f0e8d73d54c5cde`。哔咔 1.6.14 为 `ab3c1da98092d7bc2e206d71b6e808f3f1421919687cef623db979b3352beae2`。
+- 用正式构建的 Native Worker 脚本在 Node 隔离环境加载每包，使用模拟站点存储。禁漫天堂连续执行 2 项、哔咔连续执行 3 项原设置编辑，每包重开后读回全部账号字段。编辑代的热门请求在到达 Source 前被拒绝。两包保持 `compiled_unverified`，新规则在真实浏览器、独立原生客户端及生产仍待验收。
+
+组件验收见[源设置组件测试](../../apps/reader/test/sources/source_preferences_widget_test.dart)和[控制器测试](../../apps/reader/test/sources/source_preferences_controller_test.dart)。D1 复验运行 `pnpm exec vitest run apps/api/test/source-preferences-worker.test.ts`。按[本地有界构建流程](../EXTENSIONS.md#增量-ci-与验证层级)可生成两包候选产物。
+
 ## 尚未通过的运行门
 
 - [ ] 其它真实 Source 控件、原 click/veto、实际别名、动态依赖、密码/会话值与刷新；Komiic 仅通过本轮明确的原单选/镜像和新文档恢复分项。

@@ -94,6 +94,7 @@ AOT 清单承载已审核键，Worker 与运行时不再按扩展名配置。当
 - [x] 以未修改的 FoolSlide Customizable 和 MangaDex 原包完成固定提交的隔离 AOT，见[工程与构建证据](../verification/source-preferences.md#文本设置绑定与输入校验)。
 - [x] 本机持久化变更之前，MangaDex 英文 Source 的正式 Web 设置入口验证无效 UUID 拒绝、有效值读回及旧版会话隔离。
 - [x] 本机持久化变更之前，FoolSlide Customizable 的正式 Web 设置入口验证默认值全选、无效 URL 拒绝和原回调归一化写入。原测试中的新文档恢复默认是旧版会话行为，没有 D1 设置行。[验收记录](../verification/source-preferences.md#双包正式-web-设置)
+- [x] 组件验证连续保存、关窗一次重载与同账号读回。两包 AOT 候选通过原设置在 Node 环境的隔离编辑和重开。[验收记录](../verification/source-preferences.md#2026-11-26-关窗统一生效与账户同步)
 - [ ] 使用原包在正式客户端复验多项修改只在关窗后触发一次 Source 重载，并核对禁漫天堂与哔咔新规则的已确认值在另一端读回。
 - [ ] Mango、BookOrbit 和 Komga 尚有独立的 DNS/认证能力缺口；解决后使用原包继续验证。文本绑定范围见[设计](../design/source-preferences.md#原对象构造顺序与生命周期)。
 - [ ] 继续通过正式入口验证开关、多选、文本/密码、veto、别名、依赖及刷新；如源站不可用，记录具体失败和未通过门，不用 supplier 结果替代。

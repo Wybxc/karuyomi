@@ -64,7 +64,7 @@ D1 保存账户清单、enabled 和精确 build/hash，缺记录不自动安装�
 
 ## typed Source preferences 里程碑
 
-**已实现，集中工程检查、固定 Komiic v6 AOT 与 Web 设置/新文档恢复分项通过；其它控件、Native 与生产待验收。** [子计划](source-preferences.md)和[设计](../design/source-preferences.md)记录正式 v6 IDL、限额、敏感分类、实际存储分区与原 Preference 适配。开关、文本/密码、单/多选、分组、依赖、动作及确认后重开刷新已接入。
+**已实现。集中工程检查、固定 Komiic v6 AOT 与 Web 设置和新文档恢复分项通过。** [子计划](source-preferences.md)和[设计](../design/source-preferences.md)记录正式 v6 IDL、限额、敏感分类、实际存储分区与原 Preference 适配。开关、文本/密码、单/多选、分组、依赖和动作逐项保存。关闭设置窗口后统一生效。
 
 运行时保留原 Preference 对象和回调语义，处理拒绝、别名写入与动态描述；非敏感值由 D1 条件写入确认并在构造 Source 前注入，秘密值留当前客户端。待确认业务请求只显式重试原 UUID/body，不重跑 Source listener；冲突或未知运行结果经回收重开恢复。工程与真实运行证据分别维护在[记录](../verification/source-preferences.md)，已有筛选证据不覆盖设置能力。
 
